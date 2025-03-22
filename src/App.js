@@ -9,7 +9,7 @@ function App() {
       <div className="App">
         <header>
           <SignedOut>
-            <SignInButton className="text-base" />
+            <SignInButton className="text-base text-green-600" />
           </SignedOut>
           <SignedIn>
             <UserButton />
