@@ -59,7 +59,7 @@ const DiamondCard = () => {
           <p><span className="font-semibold">Price C/T: </span> 
             <span className="font-bold text-green-700">B{encryptPrice(details.price_per_carat)}</span>
           </p>
-          <p className="text-center font-semibold text-xl text-green-700 mt-4">
+          <p className=" font-semibold text-xl text-green-700">
             Total Price: {encryptPrice(details.total_price)}
           </p>
         </SignedIn>
