@@ -47,6 +47,7 @@ const DiamondCard = () => {
   const [loading, setLoading] = useState(true);
   const URL = process.env.REACT_APP_API_URL;
 
+
   useEffect(() => {
     if (!stone_id) return;
 
@@ -64,10 +65,11 @@ const DiamondCard = () => {
 
   if (loading) return <p className="text-center">🔄 Loading..</p>;
   if (!details) return <p className="text-center text-red-600">❌ Stone not found.</p>;
-
   return (
     <div className="max-w-3xl mx-auto p-6 shadow-lg rounded-lg border bg-gradient-to-t bg-green- border-gray-200 bg-white overflow-hidden">
       <h2 className="text-xl font-semibold text-gray-700 text-center mb-4">Gemstone Details</h2>
+
+
       <div className="grid grid-cols-1 ml-24 sm:grid-cols-2 sm:text-lg md:text-base gap-x-10 gap-y-4 text-gray-700 overflow-x-auto sm:ml-10 md:ml-4">
         <p><span className="font-semibold">Stone ID:</span> <span className="text-green-600">{details.stone_id}</span></p>
         <p><span className="font-semibold">Shape:</span> <span className="text-green-600">{details.shape}</span></p>

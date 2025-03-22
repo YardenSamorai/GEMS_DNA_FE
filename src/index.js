@@ -6,8 +6,8 @@ import reportWebVitals from './reportWebVitals';
 import { ClerkProvider } from '@clerk/clerk-react'
 
 const phublishKey = process.env.REACT_APP_PUBLISHABLE_KEY;
-
 if (!phublishKey) {
+
   throw new Error("Missing Publishable Key")
 }
 
@@ -15,8 +15,7 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <ClerkProvider publishableKey={phublishKey} afterSignOutUrl="/">
-      <App />
-    </ClerkProvider>
+ </ClerkProvider>
   </React.StrictMode>
 );
 
