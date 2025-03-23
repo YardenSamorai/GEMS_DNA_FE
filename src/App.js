@@ -2,9 +2,12 @@ import React from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
+    <>
+    <Toaster position="bottom-center" />
     <Router>
       <div className="App">
         <header>
@@ -20,6 +23,7 @@ function App() {
         </Routes>
       </div>
     </Router>
+  </>
   );
 }
 

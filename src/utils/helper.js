@@ -1,4 +1,4 @@
-import {mapping} from "./const";
+import { mapping } from "./const";
 
 export const encryptPrice = (price) => {
   if (price === null || price === undefined || isNaN(price)) return "N/A"; // ✅ בדיקה למקרה שאין מחיר
@@ -24,7 +24,7 @@ export const encryptPrice = (price) => {
 };
 
 export const changeMeasurementsFormat = (measurements) => {
-    if (measurements === null || measurements === undefined) return "N/A"; // ✅ בדיקה למקרה שאין מידות
-    
-    return measurements.replace(/-/g, " x ");
+  if (measurements === null || measurements === undefined) return "N/A"; // ✅ בדיקה למקרה שאין מידות
+
+  return measurements.replace(/-/g, " x ");
 }
