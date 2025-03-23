@@ -32,7 +32,7 @@ const DiamondCard = () => {
 
   const handleShare = async () => {
     const url = window.location.href;
-  
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -49,6 +49,34 @@ const DiamondCard = () => {
         toast.success('Link copied to clipboard!');
       } catch (error) {
         toast.error('Failed to copy the link');
+      }
+    }
+  };
+
+  const handleShareVideo = async () => {
+    const videoUrl = details?.video;
+
+    if (!videoUrl) {
+      toast.error('No video available to share.');
+      return;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Gemstone Video',
+          text: 'Check out this gemstone video:',
+          url: videoUrl,
+        });
+      } catch (error) {
+        toast.error('Sharing canceled or failed.');
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(videoUrl);
+        toast.success('Video link copied to clipboard!');
+      } catch (error) {
+        toast.error('Failed to copy video link.');
       }
     }
   };
@@ -156,7 +184,9 @@ const DiamondCard = () => {
           <Button variant="outlined" color="success" onClick={handleShare}>
             Share DNA
           </Button>
-          <Button variant="outlined" color="success">Send Video</Button>
+          <Button variant="outlined" color="success" onClick={handleShareVideo}>
+            Share Video
+          </Button>
         </div>
       </div>
 
