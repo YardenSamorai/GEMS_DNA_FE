@@ -67,6 +67,14 @@ const DiamondCard = () => {
     }
   };
 
+  const handleInterested = () => {
+    const stoneId = details?.stone_id || "Unknown";
+    const message = `Hi, I'm interested in stone ${stoneId}. Can you provide more details?`;
+    const phoneNumber = "972585555778"; // שים פה את המספר שלך
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+  };
+
   if (loading) return <p className="text-center">🔄 Loading..</p>;
   if (!details) return <p className="text-center text-red-600">❌ Stone not found.</p>;
 
@@ -141,9 +149,10 @@ const DiamondCard = () => {
           </div>
         </div>
 
-        <div className="flex mt-9 text-center justify-around">
+        <div className="flex flex-col sm:flex-row mt-9 text-center justify-around gap-4">
           <Button variant="outlined" color="success" onClick={handleShare}>Share DNA</Button>
           <Button variant="outlined" color="success" onClick={handleShareVideo}>Share Video</Button>
+          <Button variant="contained" color="success" onClick={handleInterested}>I'm Interested</Button>
         </div>
       </div>
     </>
