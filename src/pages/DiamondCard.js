@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignInButton,UserButton } from "@clerk/clerk-react";
 import { encryptPrice, changeMeasurementsFormat } from "../utils/helper";
 import { barakURL } from "../utils/const";
 import { useUser } from "@clerk/clerk-react";
@@ -70,7 +70,7 @@ const DiamondCard = () => {
   const handleInterested = () => {
     const stoneId = details?.stone_id || "Unknown";
     const message = `Hi, I'm interested in stone ${stoneId}. Can you provide more details?`;
-    const phoneNumber = "972585555778"; // שים פה את המספר שלך
+    const phoneNumber = "972585555778";
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
   };
@@ -80,6 +80,9 @@ const DiamondCard = () => {
 
   return (
     <>
+              <SignedIn>
+            <UserButton />
+          </SignedIn>
       <div className="max-w-3xl mx-auto p-6 shadow-lg rounded-lg border bg-white border-gray-200 overflow-hidden">
         <h2 className="text-xl font-semibold text-gray-700 text-center mb-4">Gemstone Details</h2>
 
@@ -102,7 +105,7 @@ const DiamondCard = () => {
         <SignedOut>
           <p className="text-base text-center font-bold text-red-500">
             <SignInButton className="text-base">
-              <b style={{ cursor: "pointer" }}>Sign in to view pricing details.</b>
+              <b className="text-xs" style={{ cursor: "pointer"}}></b>
             </SignInButton>
           </p>
         </SignedOut>
