@@ -122,7 +122,8 @@ const DiamondCard = () => {
             ></iframe>
           ) : (
             <div className="w-full h-32 bg-gray-200 flex items-center justify-center rounded-lg">
-              <p className="text-gray-500">No Video Available</p>
+              {/* <p className="text-gray-500">No Video Available</p> */}
+              <img placeholder="No Video Available" className="max-h-96" src="https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg"/>
             </div>
           )}
         </div>
