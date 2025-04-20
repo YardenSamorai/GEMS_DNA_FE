@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SignedIn } from "@clerk/clerk-react";
+import Button from '@mui/material/Button';
+import toast from 'react-hot-toast';
 
 const GemstoneDetails = ({ data }) => {
   const {
@@ -15,6 +17,42 @@ const GemstoneDetails = ({ data }) => {
   const images = all_pictures_link?.split(';').map((img) => img.trim()).filter(Boolean);
   const [mainImage, setMainImage] = useState(images?.[0]);
   const [zoom, setZoom] = useState(false);
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Check out this gem!', text: 'View the full DNA of this gemstone:', url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (error) {
+      toast.error('Sharing canceled or failed.');
+    }
+  };
+
+  const handleShareVideo = async () => {
+    const videoUrl = video_link;
+    if (!videoUrl) return toast.error('No video available to share.');
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Gemstone Video', text: 'Check out this gemstone video:', url: videoUrl });
+      } else {
+        await navigator.clipboard.writeText(videoUrl);
+        toast.success('Video link copied to clipboard!');
+      }
+    } catch (error) {
+      toast.error('Sharing canceled or failed.');
+    }
+  };
+
+  const handleInterested = () => {
+    const message = `Hi, I'm interested in model ${model_number}. Can you provide more details?`;
+    const phoneNumber = "972585555778";
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+  };
 
   return (
     <div className="w-full min-h-screen bg-gray-50 py-12 px-4 sm:px-8 lg:px-24">
@@ -56,14 +94,20 @@ const GemstoneDetails = ({ data }) => {
         {/* Info Section */}
         <div className="md:w-1/2 w-full mt-6 md:mt-0">
           <p className="text-xs text-green-600 uppercase tracking-wider font-semibold mb-1">{jewelry_type}</p>
-          <h1 className="text-3xl font-bold mb-4 text-gray-800">{title}</h1>
+          <h1 className="text-3xl font-bold mb-2 text-gray-800">{title}</h1>
+
+          <SignedIn>
+            <div className="text-sm font-semibold text-gray-900 mb-4 border border-gray-300 rounded-md px-3 py-2 inline-block">
+              {price ? `${currency} ${price.toLocaleString()}` : "Price not available"}
+            </div>
+          </SignedIn>
 
           <div className="text-sm mb-6">
             <h2 className="font-semibold text-gray-700 mb-1">Description</h2>
             <p className="text-gray-600 leading-relaxed whitespace-pre-line">{full_description}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-8">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm mb-8">
             <Info label="Model #" value={model_number} />
             <Info label="Collection" value={collection} />
             <Info label="Category" value={category} />
@@ -75,12 +119,12 @@ const GemstoneDetails = ({ data }) => {
             <Info label="Color" value={center_stone_color} />
             <Info label="Clarity" value={center_stone_clarity} />
             <Info label="Total Carat" value={total_carat} />
-            <Info label="Certificate:" value={certificate_number} />
+            <Info label="Certificate #" value={certificate_number} />
           </div>
 
           <SignedIn>
-            <div className="text-base font-semibold text-gray-800 border-t pt-4">
-              Stone Price: <span className="text-green-700 font-bold ml-1">{(description.match(/\bB[A-Z]+\b/) || [])[0] || "N/A"}</span>
+            <div className="text-sm font-semibold text-gray-800 border-t pt-4">
+              Stone Code: <span className="text-black font-bold ml-1">{(description.match(/\bB[A-Z]+\b/) || [])[0] || "N/A"}</span>
             </div>
           </SignedIn>
 
@@ -94,6 +138,11 @@ const GemstoneDetails = ({ data }) => {
               />
             </div>
           )}
+
+          <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-4 mt-10">
+            <Button variant="outlined" color="success" onClick={handleShare}>Share DNA</Button>
+            <Button variant="contained" color="success" onClick={handleInterested}>I'm Interested</Button>
+          </div>
         </div>
       </div>
     </div>
@@ -102,8 +151,8 @@ const GemstoneDetails = ({ data }) => {
 
 const Info = ({ label, value }) => (
   <div className="flex justify-between text-gray-700">
-    <span className="font-medium text-gray-600">{label}:</span>
-    <span className="ml-2 text-right">{value}</span>
+    <span className="font-medium text-gray-600 w-1/2">{label}:</span>
+    <span className="text-right w-1/2">{value}</span>
   </div>
 );
 
