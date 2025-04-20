@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { decryptPrice } from "../utils/decrypt";
-import { changeMeasurementsFormat } from "../utils/helper";
+import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
 import { barakURL } from "../utils/const";
 import Button from '@mui/material/Button';
 import toast from 'react-hot-toast';
@@ -69,6 +69,8 @@ const DiamondCard = () => {
   if (loading) return <p className="text-center">🔄 Loading...</p>;
   if (!details) return <p className="text-center text-red-600">❌ Stone not found.</p>;
 
+  const halfTotalPrice = decryptPrice(details.total_price) / 2;
+
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-10 bg-white rounded-2xl shadow-md border border-gray-200">
       <h2 className="text-2xl sm:text-xl font-bold text-center text-gray-800 mb-8 border-b pb-2 border-gray-300">{details.shape} {details.carat} {details.lab} {details.clarity}</h2>
@@ -86,10 +88,10 @@ const DiamondCard = () => {
 
         {isSignedIn && (
           <>
-            <Info label="Price C/T" value={`B${decryptPrice(details.price_per_carat).toLocaleString()}`} />
+            <Info label="Price C/T" value={`B${encryptPrice(decryptPrice(details.price_per_carat))}`} />
             <div className="flex justify-between col-span-1 sm:col-span-2 text-xl font-semibold text-green-700">
               <span>Total Price:</span>
-              <span>{decryptPrice(details.total_price).toLocaleString()}</span>
+              <span>{encryptPrice(halfTotalPrice)}</span>
             </div>
           </>
         )}
