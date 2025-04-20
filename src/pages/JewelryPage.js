@@ -10,8 +10,7 @@ const JewelryPage = () => {
   useEffect(() => {
     const fetchItem = async () => {
       try {
-        // const res = await fetch(`https://gems-dna-be.onrender.com/api/jewelry/${modelNumber}`);
-        const res = await fetch(`http://localhost:3001/api/jewelry/${modelNumber}`);
+        const res = await fetch(`https://gems-dna-be.onrender.com/api/jewelry/${modelNumber}`);
         if (!res.ok) throw new Error('Item not found');
         const data = await res.json();
         setItem(data);
