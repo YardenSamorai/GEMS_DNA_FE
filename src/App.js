@@ -1,15 +1,33 @@
 import React from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, useLocation } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
-import { Toaster } from 'react-hot-toast';
 import HomePage from "./pages/HomePage";
+import JewelryPage from "./pages/JewelryPage";
+import { Toaster } from 'react-hot-toast';
+
+const Header = () => {
+  const location = useLocation(); // 👈 current route
+  const currentPath = location.pathname;
+
+  return (
+    <div className="w-full p-4 flex justify-end bg-white border-b shadow-sm">
+      <SignedOut>
+        <SignInButton className="text-base text-green-600 border px-4 py-1 rounded-md border-green-600 hover:bg-green-100" />
+      </SignedOut>
+      <SignedIn>
+        <UserButton afterSignOutUrl={currentPath} />
+      </SignedIn>
+    </div>
+  );
+};
 
 function App() {
   return (
     <>
       <Toaster position="bottom-center" />
       <Router>
+        <Header />
         <div className="App">
           <Routes>
             <Route 
@@ -28,15 +46,9 @@ function App() {
                 </>
               } 
             />
-
+            <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
             <Route path="/:stone_id" element={<DiamondCard />} />
           </Routes>
-
-          <footer className="items-center flex justify-center text-sm p-4">
-            <SignedOut>
-              <SignInButton className="text-base text-green-600" />
-            </SignedOut>
-          </footer>
         </div>
       </Router>
     </>

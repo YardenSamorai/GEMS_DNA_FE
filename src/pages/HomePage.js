@@ -41,39 +41,7 @@ const HomePage = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-800">
-      {/* 📚 Sidebar navigation */}
-      <Sidabar />
 
-      {/* 🧱 Main content area */}
-      <div className="flex-1 flex flex-col">
-        <Navbar />
-
-        <main className="flex-1 p-8">
-          <div className="max-w-6xl mx-auto">
-            {/* 📈 Info cards row */}
-            <div className="flex flex-wrap gap-6">
-              <InfoCard
-                icon={<Database size={20} />}
-                title="Live Products"
-                value={data.productsCount}
-                description="Total active stones in the database"
-              />
-              <InfoCard
-                icon={<RefreshCw size={20} />}
-                title="Sync Status"
-                value={data.syncStatus}
-                description="The system is currently connected"
-              />
-              <InfoCard
-                icon={<CheckCircle size={20} />}
-                title="Last Sync"
-                value={formattedSyncTime}
-                description="Last time data was imported"
-              />
-            </div>
-          </div>
-        </main>
-      </div>
     </div>
   );
 };

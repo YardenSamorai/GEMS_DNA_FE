@@ -20,6 +20,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.40.0",
     "express": "^4.21.2",
+    "framer-motion": "^12.7.3",
     "fs": "^0.0.1-security",
     "lucide-react": "^0.483.0",
     "neon-cli": "^0.10.1",
