@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { decryptPrice } from '../utils/decrypt';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SignedIn } from "@clerk/clerk-react";
 import Button from '@mui/material/Button';
 import toast from 'react-hot-toast';
 
 const GemstoneDetails = ({ data }) => {
+  console.log('🔍 Raw encrypted price:', data.price);
   const {
     model_number, stock_number, jewelry_type, style, collection,
     price, video_link, all_pictures_link, certificate_link, certificate_number,
@@ -98,7 +100,7 @@ const GemstoneDetails = ({ data }) => {
 
           <SignedIn>
             <div className="text-sm font-semibold text-gray-900 mb-4 border border-gray-300 rounded-md px-3 py-2 inline-block">
-              {price ? `${currency} ${price.toLocaleString()}` : "Price not available"}
+              {price ? (() => { const decrypted = decryptPrice(price); console.log('🔓 Decrypted price:', decrypted); return `${currency} ${decrypted.toLocaleString()}` })() : "Price not available"}
             </div>
           </SignedIn>
 
@@ -141,6 +143,7 @@ const GemstoneDetails = ({ data }) => {
 
           <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-4 mt-10">
             <Button variant="outlined" color="success" onClick={handleShare}>Share DNA</Button>
+            <Button variant="outlined" color="success" onClick={handleShareVideo}>Share Video</Button>
             <Button variant="contained" color="success" onClick={handleInterested}>I'm Interested</Button>
           </div>
         </div>

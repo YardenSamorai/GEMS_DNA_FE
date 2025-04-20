@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
-import { encryptPrice, changeMeasurementsFormat } from "../utils/helper";
+import { decryptPrice } from "../utils/decrypt";
+import { changeMeasurementsFormat } from "../utils/helper";
 import { barakURL } from "../utils/const";
 import Button from '@mui/material/Button';
 import toast from 'react-hot-toast';
@@ -16,7 +17,7 @@ const DiamondCard = () => {
   useEffect(() => {
     if (!stone_id) return;
 
-    fetch(`${URL}/api/stones/${stone_id}`)
+    fetch(`http://localhost:3001/api/stones/${stone_id}`)
       .then((res) => res.json())
       .then((data) => {
         setDetails(data);
@@ -85,10 +86,10 @@ const DiamondCard = () => {
 
         {isSignedIn && (
           <>
-            <Info label="Price C/T" value={`B${encryptPrice(details.price_per_carat)}`} />
+            <Info label="Price C/T" value={`B${decryptPrice(details.price_per_carat).toLocaleString()}`} />
             <div className="flex justify-between col-span-1 sm:col-span-2 text-xl font-semibold text-green-700">
               <span>Total Price:</span>
-              <span>{encryptPrice(details.total_price)}</span>
+              <span>{decryptPrice(details.total_price).toLocaleString()}</span>
             </div>
           </>
         )}
