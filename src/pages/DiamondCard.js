@@ -114,12 +114,22 @@ const DiamondCard = () => {
         </div>
         <div>
           <h3 className="font-semibold text-gray-700 mb-2">Certificate</h3>
-          {details.cert_pdf ? (
-            <a href={`${barakURL}/${details.certificate_number}.pdf`} target="_blank" rel="noopener noreferrer">
-              <embed src={`${barakURL}/${details.certificate_number}.pdf`} className="w-full h-72 border rounded-lg" type="application/pdf" />
+          {details.certificate_number && details.certificate_number.trim() !== '' ? (
+            <a
+              href={`${barakURL}/${details.certificate_number}.pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <embed
+                src={`${barakURL}/${details.certificate_number}.pdf`}
+                type="application/pdf"
+                className="w-full h-72 border rounded-lg"
+              />
             </a>
           ) : (
-            <p className="text-gray-500">No Certificate Available</p>
+            <p className="text-gray-500">
+              No Certificate Available
+            </p>
           )}
         </div>
       </div>
