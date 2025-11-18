@@ -137,7 +137,7 @@ const DiamondCard = () => {
       <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-4 mt-10">
         <Button variant="outlined" color="success" onClick={handleShare}>Share DNA</Button>
         <Button variant="outlined" color="success" onClick={handleShareVideo}>Share Video</Button>
-        <Button variant="contained" color="success" onClick={handleInterested}>I'm Interested</Button>
+
       </div>
     </div>
   );

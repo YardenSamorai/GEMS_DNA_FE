@@ -49,12 +49,7 @@ const GemstoneDetails = ({ data }) => {
     }
   };
 
-  const handleInterested = () => {
-    const message = `Hi, I'm interested in model ${model_number}. Can you provide more details?`;
-    const phoneNumber = "972585555778";
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
-  };
+
 
   return (
     <div className="w-full min-h-screen bg-gray-50 py-12 px-4 sm:px-8 lg:px-24">
@@ -144,7 +139,6 @@ const GemstoneDetails = ({ data }) => {
           <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-4 mt-10">
             <Button variant="outlined" color="success" onClick={handleShare}>Share DNA</Button>
             <Button variant="outlined" color="success" onClick={handleShareVideo}>Share Video</Button>
-            <Button variant="contained" color="success" onClick={handleInterested}>I'm Interested</Button>
           </div>
         </div>
       </div>
