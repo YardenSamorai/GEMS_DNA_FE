@@ -31,7 +31,12 @@ const LoadingBar = ({ active, progress }) => {
 
 /* ---------------- Filters ---------------- */
 
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) => {
+const StoneFilters = ({
+  filters,
+  onChange,
+  shapesOptions,
+  categoriesOptions,
+}) => {
   const handleChange = (field) => (e) => {
     onChange({
       ...filters,
@@ -270,8 +275,8 @@ Eshed Diamonds`;
     { label: "Certificate #", value: certificateNumberText },
   ];
 
-const imageBlock = stone.imageUrl
-  ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+  const imageBlock = stone.imageUrl
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
        <tr>
          <td align="center">
            <img src="${stone.imageUrl}" alt="${stone.sku || "Stone image"}"
@@ -279,7 +284,7 @@ const imageBlock = stone.imageUrl
          </td>
        </tr>
      </table>`
-  : "";
+    : "";
 
   const videoRow = stone.videoUrl
     ? `<tr>
@@ -371,19 +376,11 @@ const StonesTable = ({
   onSort,
 }) => {
   if (loading) {
-    return (
-      <div className="mt-6 text-sm text-slate-500">
-        Loading stones…
-      </div>
-    );
+    return <div className="mt-6 text-sm text-slate-500">Loading stones…</div>;
   }
 
   if (error) {
-    return (
-      <div className="mt-6 text-sm text-red-500">
-        Error: {error}
-      </div>
-    );
+    return <div className="mt-6 text-sm text-red-500">Error: {error}</div>;
   }
 
   if (!stones.length) {
@@ -412,9 +409,10 @@ const StonesTable = ({
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
       <div className="w-full overflow-x-auto">
-        <table className="min-w-full text-left text-xs sm:text-sm">
+        <table className="w-full text-left text-xs sm:text-sm">
           <thead className="bg-slate-50">
             <tr>
+              {/* SKU */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
                 <button
                   type="button"
@@ -425,9 +423,13 @@ const StonesTable = ({
                   {renderSortIcon("sku")}
                 </button>
               </th>
+
+              {/* Image */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
                 Image
               </th>
+
+              {/* Shape */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
                 <button
                   type="button"
@@ -438,6 +440,8 @@ const StonesTable = ({
                   {renderSortIcon("shape")}
                 </button>
               </th>
+
+              {/* Weight */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
                 <button
                   type="button"
@@ -448,7 +452,9 @@ const StonesTable = ({
                   {renderSortIcon("weightCt")}
                 </button>
               </th>
-              <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
+
+              {/* Measurements – מוסתר במובייל */}
+              <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 hidden sm:table-cell">
                 <button
                   type="button"
                   onClick={() => onSort("measurements")}
@@ -458,6 +464,8 @@ const StonesTable = ({
                   {renderSortIcon("measurements")}
                 </button>
               </th>
+
+              {/* Price per carat */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
                 <button
                   type="button"
@@ -468,6 +476,8 @@ const StonesTable = ({
                   {renderSortIcon("pricePerCt")}
                 </button>
               </th>
+
+              {/* Total price */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
                 <button
                   type="button"
@@ -478,6 +488,8 @@ const StonesTable = ({
                   {renderSortIcon("priceTotal")}
                 </button>
               </th>
+
+              {/* Treatment – רק ב-lg ומעלה */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 hidden lg:table-cell">
                 <button
                   type="button"
@@ -488,6 +500,8 @@ const StonesTable = ({
                   {renderSortIcon("treatment")}
                 </button>
               </th>
+
+              {/* Category – גם ככה רק ב-lg ומעלה, אז לא יופיע במובייל */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 hidden lg:table-cell">
                 <button
                   type="button"
@@ -498,6 +512,8 @@ const StonesTable = ({
                   {renderSortIcon("category")}
                 </button>
               </th>
+
+              {/* Actions */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 text-right">
                 Actions
               </th>
@@ -539,10 +555,12 @@ const StonesTable = ({
                       expanded ? "bg-slate-50" : ""
                     }`}
                   >
+                    {/* SKU */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-[11px] sm:text-xs">
                       {stone.sku}
                     </td>
 
+                    {/* Image */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden border border-slate-200 bg-slate-100">
                         {stone.imageUrl ? (
@@ -559,36 +577,46 @@ const StonesTable = ({
                       </div>
                     </td>
 
+                    {/* Shape */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3">
                       {stone.shape}
                     </td>
+
+                    {/* Weight */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3">
                       {stone.weightCt}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+
+                    {/* Measurements – מוסתר במובייל */}
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap hidden sm:table-cell">
                       {stone.measurements}
                     </td>
 
+                    {/* Price per carat */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                       {stone.pricePerCt != null
                         ? `${stone.pricePerCt.toLocaleString("en-US")}`
                         : "-"}
                     </td>
 
+                    {/* Total price */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                       {stone.priceTotal != null
                         ? `${stone.priceTotal.toLocaleString("en-US")}`
                         : "-"}
                     </td>
 
+                    {/* Treatment – רק ב-lg */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 hidden lg:table-cell">
                       {stone.treatment || ""}
                     </td>
 
+                    {/* Category – רק ב-lg */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 hidden lg:table-cell">
                       {stone.category || ""}
                     </td>
 
+                    {/* Actions */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 text-right">
                       <button
                         onClick={() => onToggle(stone)}
@@ -606,6 +634,7 @@ const StonesTable = ({
                         className="bg-slate-50 border-t border-slate-100"
                       >
                         <div className="p-3 sm:p-4 lg:p-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                          {/* Selected stone info */}
                           <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 sm:p-4 shadow-sm">
                             <h2 className="mb-2 text-sm sm:text-base font-semibold text-slate-800">
                               Selected stone
@@ -674,9 +703,7 @@ const StonesTable = ({
                                 {stone.ratio != null ? stone.ratio : "N/A"}
                               </div>
                               <div>
-                                <span className="font-medium">
-                                  Luster:
-                                </span>{" "}
+                                <span className="font-medium">Luster:</span>{" "}
                                 {stone.luster || "N/A"}
                               </div>
                               <div>
@@ -740,6 +767,7 @@ const StonesTable = ({
                             </div>
                           </div>
 
+                          {/* Email preview */}
                           <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 sm:p-4 shadow-sm">
                             <div className="flex items-center justify-between mb-2 gap-2">
                               <h2 className="text-sm sm:text-base font-semibold text-slate-800">
@@ -855,7 +883,9 @@ const StoneSearchPage = () => {
         setError("");
         startProgress();
 
-        const res = await fetch("https://gems-dna-be.onrender.com/api/soap-stones");
+        const res = await fetch(
+          "https://gems-dna-be.onrender.com/api/soap-stones"
+        );
 
         if (!res.ok) {
           throw new Error("Failed to load stones");
@@ -873,15 +903,10 @@ const StoneSearchPage = () => {
           id: row.id ?? index,
           sku: row.sku ?? "",
           shape: row.shape ?? "",
-          weightCt:
-            row.weightCt != null
-              ? Number(row.weightCt)
-              : null,
+          weightCt: row.weightCt != null ? Number(row.weightCt) : null,
           measurements: row.measurements ?? "",
-          priceTotal:
-            row.priceTotal != null ? Number(row.priceTotal) : null,
-          pricePerCt:
-            row.pricePerCt != null ? Number(row.pricePerCt) : null,
+          priceTotal: row.priceTotal != null ? Number(row.priceTotal) : null,
+          pricePerCt: row.pricePerCt != null ? Number(row.pricePerCt) : null,
           imageUrl: row.imageUrl ?? null,
           videoUrl: row.videoUrl ?? null,
           certificateUrl: row.certificateUrl ?? null,
@@ -897,7 +922,7 @@ const StoneSearchPage = () => {
           fluorescence: row.fluorescence ?? "",
           certificateNumber: row.certificateNumber ?? "",
           treatment: row.treatment ?? "",
-          category: row.category ?? "", // 🆕 מיפוי הקטגוריה מה-DB
+          category: row.category ?? "",
         }));
 
         setStones(normalized);
@@ -981,10 +1006,7 @@ const StoneSearchPage = () => {
         return false;
       }
 
-      if (
-        filters.shape !== "All shapes" &&
-        stone.shape !== filters.shape
-      ) {
+      if (filters.shape !== "All shapes" && stone.shape !== filters.shape) {
         return false;
       }
 
@@ -1048,9 +1070,7 @@ const StoneSearchPage = () => {
           );
           break;
         case "category":
-          res = getString(a.category).localeCompare(
-            getString(b.category)
-          );
+          res = getString(a.category).localeCompare(getString(b.category));
           break;
         default:
           res = 0;
@@ -1075,15 +1095,11 @@ const StoneSearchPage = () => {
   };
 
   const handleNextPage = () => {
-    setCurrentPage((prev) =>
-      prev < totalPages ? prev + 1 : prev
-    );
+    setCurrentPage((prev) => (prev < totalPages ? prev + 1 : prev));
   };
 
   const handleToggleStone = (stone) => {
-    setSelectedStone((prev) =>
-      prev && prev.id === stone.id ? null : stone
-    );
+    setSelectedStone((prev) => (prev && prev.id === stone.id ? null : stone));
   };
 
   return (
@@ -1097,8 +1113,8 @@ const StoneSearchPage = () => {
               Stone selector
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-slate-500">
-              Search stones by SKU, weight, measurements, shape, treatment and category.
-              Prices are not displayed in this view.
+              Search stones by SKU, weight, measurements, shape, treatment and
+              category. Prices are not displayed in this view.
             </p>
           </header>
 
@@ -1122,8 +1138,7 @@ const StoneSearchPage = () => {
           {!loading && !error && totalItems > 0 && (
             <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] sm:text-xs text-slate-600">
               <div>
-                Showing{" "}
-                {totalItems === 0 ? 0 : startIndex + 1}–
+                Showing {totalItems === 0 ? 0 : startIndex + 1}–
                 {Math.min(endIndex, totalItems)} of {totalItems} stones
               </div>
               <div className="flex items-center gap-2">
