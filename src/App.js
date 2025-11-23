@@ -4,7 +4,8 @@ import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-reac
 import DiamondCard from "./pages/DiamondCard";
 import HomePage from "./pages/HomePage";
 import JewelryPage from "./pages/JewelryPage";
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from "react-hot-toast";
+import Inventory from "./pages/Inventory";
 
 const Header = () => {
   const location = useLocation(); // 👈 current route
@@ -30,8 +31,8 @@ function App() {
         <Header />
         <div className="App">
           <Routes>
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <>
                   <SignedIn>
@@ -44,8 +45,28 @@ function App() {
                     </div>
                   </SignedOut>
                 </>
-              } 
+              }
             />
+
+            {/* ✅ Inventory רק למשתמש מחובר */}
+            <Route
+              path="/inventory"
+              element={
+                <>
+                  <SignedIn>
+                    <Inventory />
+                  </SignedIn>
+                  <SignedOut>
+                    <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+                      <p className="text-lg">Please sign in to access the inventory</p>
+                      <SignInButton mode="modal" />
+                    </div>
+                  </SignedOut>
+                </>
+              }
+            />
+
+            {/* דפים ציבוריים */}
             <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
             <Route path="/:stone_id" element={<DiamondCard />} />
           </Routes>
