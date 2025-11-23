@@ -31,7 +31,7 @@ const LoadingBar = ({ active, progress }) => {
 
 /* ---------------- Filters ---------------- */
 
-const StoneFilters = ({ filters, onChange, shapesOptions }) => {
+const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) => {
   const handleChange = (field) => (e) => {
     onChange({
       ...filters,
@@ -48,6 +48,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions }) => {
       maxCarat: "",
       shape: "All shapes",
       treatment: "All treatments",
+      category: "All categories",
     });
   };
 
@@ -64,7 +65,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-8">
         {/* SKU search */}
         <div className="lg:col-span-2">
           <label className="block text-[11px] font-medium text-slate-500 mb-1">
@@ -151,6 +152,24 @@ const StoneFilters = ({ filters, onChange, shapesOptions }) => {
           </select>
         </div>
 
+        {/* Category */}
+        <div>
+          <label className="block text-[11px] font-medium text-slate-500 mb-1">
+            Category
+          </label>
+          <select
+            value={filters.category}
+            onChange={handleChange("category")}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+          >
+            {categoriesOptions.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Treatment / Oil */}
         <div>
           <label className="block text-[11px] font-medium text-slate-500 mb-1">
@@ -172,8 +191,6 @@ const StoneFilters = ({ filters, onChange, shapesOptions }) => {
     </div>
   );
 };
-
-/* ---------------- Email layout helper (Plain text + HTML) ---------------- */
 
 /* ---------------- Email layout helper (Plain text + HTML) ---------------- */
 
@@ -204,11 +221,8 @@ Certificate: ${stone.certificateUrl || "Available upon request"}
 Best regards,
 Eshed Diamonds`;
 
-  // 🔹 URLs של הלוגואים
   const logoUrl1 =
     "https://www.eshed.com/wp-content/uploads/media/other/EshedLogo.png";
-  const logoUrl2 =
-    "https://www.eshed.com/wp-content/uploads/media/other/GEMSTAR-Symbol-2025.png";
 
   const title = `${stone.shape || ""} ${stone.weightCt || ""} ct ${
     stone.lab || ""
@@ -224,29 +238,52 @@ Eshed Diamonds`;
   const certificateNumberText = stone.certificateNumber || "N/A";
   const fluorescenceText = stone.fluorescence || "N/A";
 
-  // helper – only render line if value exists and is not "N/A"
-  const buildLine = (label, value) => {
-    if (value === undefined || value === null) return "";
-    const str = String(value).trim();
-    if (!str || str === "N/A") return "";
-    return `<strong>${label}:</strong> ${str}<br/>`;
-  };
+  const renderDetailsColumn = (items) =>
+    items
+      .filter(
+        (item) =>
+          item.value !== undefined &&
+          item.value !== null &&
+          item.value !== "" &&
+          item.value !== "N/A"
+      )
+      .map(
+        (item) =>
+          `<div style="margin:0 0 2px 0;"><strong>${item.label}:</strong> ${item.value}</div>`
+      )
+      .join("");
 
-  const imageBlock = stone.imageUrl
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
-         <tr>
-           <td align="center" style="text-align:center;">
-             <img src="${stone.imageUrl}" alt="${
-        stone.sku || "Stone image"
-      }" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;display:block;" />
-           </td>
-         </tr>
-       </table>`
-    : "";
+  const leftColumnItems = [
+    { label: "Stone ID", value: stone.sku || "" },
+    { label: "Carat", value: caratText },
+    { label: "Shape", value: stone.shape || "N/A" },
+    { label: "Lab", value: labText },
+    { label: "Origin", value: originText },
+  ];
+
+  const rightColumnItems = [
+    { label: "Measurements", value: measurementsText },
+    { label: "Ratio", value: ratioText },
+    { label: "Enhancement", value: treatmentText },
+    { label: "Clarity", value: clarityText },
+    { label: "Fluorescence", value: fluorescenceText },
+    { label: "Certificate #", value: certificateNumberText },
+  ];
+
+const imageBlock = stone.imageUrl
+  ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+       <tr>
+         <td align="center">
+           <img src="${stone.imageUrl}" alt="${stone.sku || "Stone image"}"
+             style="max-width:100%; max-height:350px; height:auto; border-radius:6px; border:1px solid #e5e7eb; display:block;" />
+         </td>
+       </tr>
+     </table>`
+  : "";
 
   const videoRow = stone.videoUrl
     ? `<tr>
-         <td style="padding-bottom:4px;text-align:left;">
+         <td style="padding-bottom:4px;">
            <strong>Video:</strong>
            <a href="${stone.videoUrl}" style="color:#0ea5e9;text-decoration:none;">Open video</a>
          </td>
@@ -255,7 +292,7 @@ Eshed Diamonds`;
 
   const certRow = stone.certificateUrl
     ? `<tr>
-         <td style="text-align:left;">
+         <td>
            <strong>Certificate:</strong>
            <a href="${stone.certificateUrl}" style="color:#0ea5e9;text-decoration:none;">Open certificate</a>
          </td>
@@ -272,51 +309,33 @@ Eshed Diamonds`;
 
   const htmlBody = `<!DOCTYPE html>
 <html>
-  <body style="margin:0;padding:0;background-color:#f3f4f6;direction:ltr;text-align:left;">
+  <body style="margin:0;padding:0;background-color:#f3f4f6;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 0;">
       <tr>
         <td align="center">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;border:1px solid #e5e7eb;font-family:Arial, sans-serif;color:#111827;text-align:left;direction:ltr;">
-            <!-- Header with 2 logos side by side + title -->
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;border:1px solid #e5e7eb;font-family:Arial, sans-serif;color:#111827;">
             <tr>
               <td align="center" style="padding:16px 24px;border-bottom:1px solid #e5e7eb;">
                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 8px auto;">
                   <tr>
-                    <td align="right" style="padding-right:8px;">
-                      <img src="${logoUrl1}" alt="Eshed" style="max-height:40px;display:block;" />
-                    </td>
-                    <td align="left" style="padding-left:8px;">
-                      <img src="${logoUrl2}" alt="Gemstar" style="max-height:40px;display:block;" />
+                    <td align="center">
+                      <img src="${logoUrl1}" alt="Eshed" style="max-height:50px;display:block;" />
                     </td>
                   </tr>
                 </table>
-                <div style="font-size:18px;font-weight:600;color:#111827;">${title}</div>
               </td>
             </tr>
 
-            <!-- Body -->
             <tr>
-              <td style="padding:16px 24px;font-size:14px;line-height:1.5;text-align:left;direction:ltr;">
-                <p style="margin:0 0 12px 0;">Dear Customer,</p>
-                <p style="margin:0 0 16px 0;">Please find below the details of the stone:</p>
+              <td style="padding:16px 24px;font-size:14px;line-height:1.5;direction:ltr;text-align:left;">
 
-                <!-- 2-column details -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
                   <tr>
-                    <td valign="top" width="50%" style="padding-right:12px;font-size:13px;line-height:1.6;text-align:left;">
-                      ${buildLine("Stone ID", stone.sku || "")}
-                      ${buildLine("Carat", caratText)}
-                      ${buildLine("Lab", labText)}
-                      ${buildLine("Ratio", ratioText)}
-                      ${buildLine("Measurements", measurementsText)}
-                      ${buildLine("Certificate #", certificateNumberText)}
+                    <td valign="top" width="50%" style="padding-right:12px;font-size:13px;line-height:1.6;direction:ltr;text-align:left;">
+                      ${renderDetailsColumn(leftColumnItems)}
                     </td>
-                    <td valign="top" width="50%" style="padding-left:12px;font-size:13px;line-height:1.6;text-align:left;">
-                      ${buildLine("Shape", stone.shape || "N/A")}
-                      ${buildLine("Clarity", clarityText)}
-                      ${buildLine("Enhancement", treatmentText)}
-                      ${buildLine("Origin", originText)}
-                      ${buildLine("Fluorescence", fluorescenceText)}
+                    <td valign="top" width="50%" style="padding-left:12px;font-size:13px;line-height:1.6;direction:ltr;text-align:left;">
+                      ${renderDetailsColumn(rightColumnItems)}
                     </td>
                   </tr>
                 </table>
@@ -325,7 +344,7 @@ Eshed Diamonds`;
                 ${linksBlock}
 
                 <p style="margin:16px 0 0 0;">
-                  Best regards,<br/>
+                  Best regards<br/>
                   Eshed-Gemstar
                 </p>
               </td>
@@ -342,7 +361,15 @@ Eshed Diamonds`;
 
 /* ---------------- Table ---------------- */
 
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
+const StonesTable = ({
+  stones,
+  onToggle,
+  selectedStone,
+  loading,
+  error,
+  sortConfig,
+  onSort,
+}) => {
   if (loading) {
     return (
       <div className="mt-6 text-sm text-slate-500">
@@ -370,6 +397,18 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
   const isExpandedStone = (stone) =>
     selectedStone && selectedStone.id === stone.id;
 
+  const renderSortIcon = (field) => {
+    if (!sortConfig || sortConfig.field !== field) return null;
+    return (
+      <span className="ml-1 text-[10px]">
+        {sortConfig.direction === "asc" ? "▲" : "▼"}
+      </span>
+    );
+  };
+
+  const headerButtonClass =
+    "flex items-center gap-1 w-full text-left focus:outline-none";
+
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
       <div className="w-full overflow-x-auto">
@@ -377,30 +416,87 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
           <thead className="bg-slate-50">
             <tr>
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
-                SKU
+                <button
+                  type="button"
+                  onClick={() => onSort("sku")}
+                  className={headerButtonClass}
+                >
+                  <span>SKU</span>
+                  {renderSortIcon("sku")}
+                </button>
               </th>
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
                 Image
               </th>
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
-                Shape
+                <button
+                  type="button"
+                  onClick={() => onSort("shape")}
+                  className={headerButtonClass}
+                >
+                  <span>Shape</span>
+                  {renderSortIcon("shape")}
+                </button>
               </th>
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
-                Weight (ct)
+                <button
+                  type="button"
+                  onClick={() => onSort("weightCt")}
+                  className={headerButtonClass}
+                >
+                  <span>Weight (ct)</span>
+                  {renderSortIcon("weightCt")}
+                </button>
               </th>
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
-                Measurements
+                <button
+                  type="button"
+                  onClick={() => onSort("measurements")}
+                  className={headerButtonClass}
+                >
+                  <span>Measurements</span>
+                  {renderSortIcon("measurements")}
+                </button>
               </th>
-              {/* Price per carat */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
-                Price/ct ($)
+                <button
+                  type="button"
+                  onClick={() => onSort("pricePerCt")}
+                  className={headerButtonClass}
+                >
+                  <span>Price/ct ($)</span>
+                  {renderSortIcon("pricePerCt")}
+                </button>
               </th>
-              {/* Total price */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600">
-                Total price ($)
+                <button
+                  type="button"
+                  onClick={() => onSort("priceTotal")}
+                  className={headerButtonClass}
+                >
+                  <span>Total price ($)</span>
+                  {renderSortIcon("priceTotal")}
+                </button>
               </th>
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 hidden lg:table-cell">
-                Treatment
+                <button
+                  type="button"
+                  onClick={() => onSort("treatment")}
+                  className={headerButtonClass}
+                >
+                  <span>Treatment</span>
+                  {renderSortIcon("treatment")}
+                </button>
+              </th>
+              <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 hidden lg:table-cell">
+                <button
+                  type="button"
+                  onClick={() => onSort("category")}
+                  className={headerButtonClass}
+                >
+                  <span>Category</span>
+                  {renderSortIcon("category")}
+                </button>
               </th>
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 text-right">
                 Actions
@@ -411,7 +507,6 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
             {stones.map((stone) => {
               const expanded = isExpandedStone(stone);
 
-              // 🆕 יצירת טקסט ו-HTML לאימייל
               const { plainTextBody: emailBody, htmlBody: emailHtml } =
                 createEmailBodies(stone);
 
@@ -419,7 +514,6 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
                 `Stone ${stone.sku || ""} details`
               )}&body=${encodeURIComponent(emailBody)}`;
 
-              // 🆕 העתקת HTML ל־Clipboard כדי להדביק ב-Outlook עם תמונות
               const handleCopyHtmlToClipboard = async () => {
                 try {
                   if (navigator.clipboard && window.ClipboardItem) {
@@ -428,7 +522,6 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
                     const data = [new ClipboardItem({ [type]: blob })];
                     await navigator.clipboard.write(data);
                   } else if (navigator.clipboard) {
-                    // fallback – יעתיק כטקסט עם תגיות HTML
                     await navigator.clipboard.writeText(emailHtml);
                   } else {
                     alert("Clipboard API is not available in this browser.");
@@ -446,12 +539,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
                       expanded ? "bg-slate-50" : ""
                     }`}
                   >
-                    {/* SKU */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 font-mono text-[11px] sm:text-xs">
                       {stone.sku}
                     </td>
 
-                    {/* Thumbnail image */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden border border-slate-200 bg-slate-100">
                         {stone.imageUrl ? (
@@ -478,24 +569,26 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
                       {stone.measurements}
                     </td>
 
-                    {/* Price per carat */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                       {stone.pricePerCt != null
                         ? `${stone.pricePerCt.toLocaleString("en-US")}`
                         : "-"}
                     </td>
 
-                    {/* Total price */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                       {stone.priceTotal != null
                         ? `${stone.priceTotal.toLocaleString("en-US")}`
                         : "-"}
                     </td>
 
-                    {/* Treatment */}
                     <td className="px-3 sm:px-4 py-2 sm:py-3 hidden lg:table-cell">
                       {stone.treatment || ""}
                     </td>
+
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 hidden lg:table-cell">
+                      {stone.category || ""}
+                    </td>
+
                     <td className="px-3 sm:px-4 py-2 sm:py-3 text-right">
                       <button
                         onClick={() => onToggle(stone)}
@@ -508,13 +601,11 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
 
                   {expanded && (
                     <tr>
-                      {/* התאמה ל-9 עמודות בראש הטבלה */}
                       <td
-                        colSpan={9}
+                        colSpan={10}
                         className="bg-slate-50 border-t border-slate-100"
                       >
                         <div className="p-3 sm:p-4 lg:p-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                          {/* Selected stone info */}
                           <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 sm:p-4 shadow-sm">
                             <h2 className="mb-2 text-sm sm:text-base font-semibold text-slate-800">
                               Selected stone
@@ -555,6 +646,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
                                 <div>
                                   <span className="font-medium">Clarity:</span>{" "}
                                   {stone.clarity || "N/A"}
+                                </div>
+                                <div>
+                                  <span className="font-medium">Category:</span>{" "}
+                                  {stone.category || "N/A"}
                                 </div>
                               </div>
                             </div>
@@ -645,21 +740,18 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error }) => {
                             </div>
                           </div>
 
-                          {/* Email preview */}
                           <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 sm:p-4 shadow-sm">
                             <div className="flex items-center justify-between mb-2 gap-2">
                               <h2 className="text-sm sm:text-base font-semibold text-slate-800">
                                 Email preview
                               </h2>
                               <div className="flex items-center gap-2">
-                                {/* כפתור פתיחה ב-Outlook (mailto טקסט רגיל) */}
                                 <a
                                   href={mailtoHref}
                                   className="inline-flex items-center rounded-full border border-sky-500 px-3 py-1 text-[11px] sm:text-xs font-medium text-sky-600 hover:bg-sky-50"
                                 >
                                   Open in Outlook
                                 </a>
-                                {/* כפתור העתקת HTML עם תמונה */}
                                 <button
                                   type="button"
                                   onClick={handleCopyHtmlToClipboard}
@@ -703,6 +795,7 @@ const StoneSearchPage = () => {
     maxCarat: "",
     shape: "All shapes",
     treatment: "All treatments",
+    category: "All categories",
   });
 
   const [stones, setStones] = useState([]);
@@ -714,7 +807,23 @@ const StoneSearchPage = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [progress, setProgress] = useState(0);
 
-  // ✅ טוען אבנים מה-API
+  const [sortConfig, setSortConfig] = useState({
+    field: "sku",
+    direction: "asc",
+  });
+
+  const handleSort = (field) => {
+    setSortConfig((prev) => {
+      if (prev.field === field) {
+        return {
+          field,
+          direction: prev.direction === "asc" ? "desc" : "asc",
+        };
+      }
+      return { field, direction: "asc" };
+    });
+  };
+
   useEffect(() => {
     let intervalId;
 
@@ -788,6 +897,7 @@ const StoneSearchPage = () => {
           fluorescence: row.fluorescence ?? "",
           certificateNumber: row.certificateNumber ?? "",
           treatment: row.treatment ?? "",
+          category: row.category ?? "", // 🆕 מיפוי הקטגוריה מה-DB
         }));
 
         setStones(normalized);
@@ -807,13 +917,11 @@ const StoneSearchPage = () => {
     };
   }, []);
 
-  // בכל שינוי פילטרים — חזור לעמוד 1 וסגור את ה־row
   useEffect(() => {
     setCurrentPage(1);
     setSelectedStone(null);
   }, [filters]);
 
-  // ✅ shapes options דינמי לפי מה שמגיע מה־API
   const shapesOptions = useMemo(() => {
     const set = new Set();
     stones.forEach((s) => {
@@ -822,6 +930,16 @@ const StoneSearchPage = () => {
       }
     });
     return ["All shapes", ...Array.from(set).sort()];
+  }, [stones]);
+
+  const categoriesOptions = useMemo(() => {
+    const set = new Set();
+    stones.forEach((s) => {
+      if (s.category) {
+        set.add(s.category);
+      }
+    });
+    return ["All categories", ...Array.from(set).sort()];
   }, [stones]);
 
   const filteredStones = useMemo(() => {
@@ -877,19 +995,80 @@ const StoneSearchPage = () => {
         return false;
       }
 
+      if (
+        filters.category !== "All categories" &&
+        stone.category !== filters.category
+      ) {
+        return false;
+      }
+
       return true;
     });
   }, [filters, stones]);
 
-  // ✅ פאגינציה
-  const totalItems = filteredStones.length;
+  const sortedStones = useMemo(() => {
+    const sorted = [...filteredStones];
+    const { field, direction } = sortConfig || {};
+    if (!field) return sorted;
+
+    const dir = direction === "desc" ? -1 : 1;
+
+    const getString = (val) => (val || "").toString();
+    const getNumber = (val) =>
+      val === null || val === undefined || val === ""
+        ? Number.NEGATIVE_INFINITY
+        : Number(val);
+
+    sorted.sort((a, b) => {
+      let res = 0;
+      switch (field) {
+        case "sku":
+          res = getString(a.sku).localeCompare(getString(b.sku));
+          break;
+        case "shape":
+          res = getString(a.shape).localeCompare(getString(b.shape));
+          break;
+        case "weightCt":
+          res = getNumber(a.weightCt) - getNumber(b.weightCt);
+          break;
+        case "measurements":
+          res = getString(a.measurements).localeCompare(
+            getString(b.measurements)
+          );
+          break;
+        case "pricePerCt":
+          res = getNumber(a.pricePerCt) - getNumber(b.pricePerCt);
+          break;
+        case "priceTotal":
+          res = getNumber(a.priceTotal) - getNumber(b.priceTotal);
+          break;
+        case "treatment":
+          res = getString(a.treatment).localeCompare(
+            getString(b.treatment)
+          );
+          break;
+        case "category":
+          res = getString(a.category).localeCompare(
+            getString(b.category)
+          );
+          break;
+        default:
+          res = 0;
+      }
+      return res * dir;
+    });
+
+    return sorted;
+  }, [filteredStones, sortConfig]);
+
+  const totalItems = sortedStones.length;
   const totalPages =
     totalItems === 0 ? 1 : Math.ceil(totalItems / ITEMS_PER_PAGE);
 
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
 
-  const paginatedStones = filteredStones.slice(startIndex, endIndex);
+  const paginatedStones = sortedStones.slice(startIndex, endIndex);
 
   const handlePrevPage = () => {
     setCurrentPage((prev) => (prev > 1 ? prev - 1 : prev));
@@ -918,7 +1097,7 @@ const StoneSearchPage = () => {
               Stone selector
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-slate-500">
-              Search stones by SKU, weight, measurements, shape and treatment.
+              Search stones by SKU, weight, measurements, shape, treatment and category.
               Prices are not displayed in this view.
             </p>
           </header>
@@ -927,6 +1106,7 @@ const StoneSearchPage = () => {
             filters={filters}
             onChange={setFilters}
             shapesOptions={shapesOptions}
+            categoriesOptions={categoriesOptions}
           />
 
           <StonesTable
@@ -935,6 +1115,8 @@ const StoneSearchPage = () => {
             selectedStone={selectedStone}
             loading={loading}
             error={error}
+            sortConfig={sortConfig}
+            onSort={handleSort}
           />
 
           {!loading && !error && totalItems > 0 && (
