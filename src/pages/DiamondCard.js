@@ -4,14 +4,14 @@ import { useUser } from "@clerk/clerk-react";
 import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
 import { barakURL } from "../utils/const";
-import Button from '@mui/material/Button';
 import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 
 const DiamondCard = () => {
   const { stone_id } = useParams();
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const URL = process.env.REACT_APP_API_URL;
+  const [activeTab, setActiveTab] = useState('details');
   const { isSignedIn } = useUser();
 
   useEffect(() => {
@@ -66,87 +66,271 @@ const DiamondCard = () => {
     window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
   };
 
-  if (loading) return <p className="text-center">🔄 Loading...</p>;
-  if (!details) return <p className="text-center text-red-600">❌ Stone not found.</p>;
+  if (loading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-primary-200 rounded-full"></div>
+            <div className="w-16 h-16 border-4 border-primary-500 rounded-full border-t-transparent animate-spin absolute inset-0"></div>
+          </div>
+          <p className="text-stone-500 font-medium">Loading diamond details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!details) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+            <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-stone-800 mb-2">Stone Not Found</h2>
+          <p className="text-stone-500">The stone you're looking for doesn't exist or has been removed.</p>
+        </div>
+      </div>
+    );
+  }
 
   const halfTotalPrice = decryptPrice(details.total_price) / 2;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 sm:p-10 bg-white rounded-2xl shadow-md border border-gray-200">
-      <h2 className="text-2xl sm:text-xl font-bold text-center text-gray-800 mb-8 border-b pb-2 border-gray-300">{details.shape} {details.carat} {details.lab} {details.clarity}</h2>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-5 gap-x-10 text-sm sm:text-base text-gray-700">
-        <Info label="Stone ID" value={details.stone_id} />
-        <Info label="Shape" value={details.shape} />
-        <Info label="Carat" value={details.carat} />
-        <Info label="Clarity" value={details.clarity} />
-        <Info label="Lab" value={details.lab} />
-        <Info label="Origin" value={details.origin} />
-        <Info label="Ratio" value={details.ratio} />
-        <Info label="Measurements" value={changeMeasurementsFormat(details.measurements1)} wide />
-        <Info label="Certificate #" value={<a href={`${barakURL}/${details.certificate_number}.pdf`} className="text-green-600 underline">{details.certificate_number}</a>} wide />
-
-        {isSignedIn && (
-          <>
-            <Info label="Price C/T" value={`B${encryptPrice(decryptPrice(details.price_per_carat))}`} />
-            <div className="flex justify-between col-span-1 sm:col-span-2 text-xl font-semibold text-green-700">
-              <span>Total Price:</span>
-              <span>{encryptPrice(halfTotalPrice)}</span>
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+      <motion.div 
+        className="max-w-6xl mx-auto"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* Header Card */}
+        <div className="glass rounded-3xl shadow-xl border border-white/50 overflow-hidden mb-6">
+          {/* Title Bar */}
+          <div className="gradient-dark px-6 py-5 sm:px-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="badge badge-gold">
+                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    {details.lab}
+                  </span>
+                  <span className="text-stone-400 text-sm">ID: {details.stone_id}</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                  {details.shape} • {details.carat} ct • {details.clarity}
+                </h1>
+              </div>
+              {isSignedIn && (
+                <div className="flex flex-col items-start sm:items-end">
+                  <span className="text-stone-400 text-sm mb-1">Total Price</span>
+                  <span className="text-3xl font-bold text-gradient-gold">{encryptPrice(halfTotalPrice)}</span>
+                </div>
+              )}
             </div>
-          </>
-        )}
-      </div>
-
-      <div className="mt-8 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-        {details.video ? (
-          <iframe className="w-full h-[300px] sm:h-[500px]" src={details.video} title="Video Preview" allowFullScreen></iframe>
-        ) : (
-          <div className="w-full h-64 flex items-center justify-center">
-            <img src="https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg" className="h-full object-contain" />
           </div>
-        )}
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
-        <div>
-          <h3 className="font-semibold text-gray-700 mb-2">Photo</h3>
-          <img src={details.picture} alt="Diamond" className="w-full h-72 object-contain border rounded-lg" />
+          {/* Content */}
+          <div className="p-6 sm:p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left - Media */}
+              <div className="space-y-6">
+                {/* Main Video/Image */}
+                <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg">
+                  {details.video ? (
+                    <iframe 
+                      className="w-full h-full absolute inset-0" 
+                      src={details.video} 
+                      title="Video Preview" 
+                      allowFullScreen
+                    ></iframe>
+                  ) : (
+                    <img 
+                      src={details.picture || "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg"} 
+                      alt="Diamond"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </div>
+
+                {/* Thumbnails */}
+                <div className="grid grid-cols-2 gap-4">
+                  {details.picture && (
+                    <div className="relative group">
+                      <div className="rounded-xl overflow-hidden bg-stone-100 aspect-square shadow-md card-hover">
+                        <img 
+                          src={details.picture} 
+                          alt="Diamond" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="absolute bottom-2 left-2 text-xs font-medium text-white bg-black/50 px-2 py-1 rounded-lg">
+                        Photo
+                      </span>
+                    </div>
+                  )}
+                  {details.certificate_number && details.certificate_number.trim() !== '' && (
+                    <a
+                      href={`${barakURL}/${details.certificate_number}.pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative group"
+                    >
+                      <div className="rounded-xl overflow-hidden bg-stone-100 aspect-square shadow-md card-hover border-2 border-transparent hover:border-primary-500">
+                        <embed
+                          src={`${barakURL}/${details.certificate_number}.pdf`}
+                          type="application/pdf"
+                          className="w-full h-full pointer-events-none"
+                        />
+                      </div>
+                      <span className="absolute bottom-2 left-2 text-xs font-medium text-white bg-black/50 px-2 py-1 rounded-lg">
+                        Certificate
+                      </span>
+                      <div className="absolute inset-0 bg-primary-500/0 group-hover:bg-primary-500/10 transition-colors rounded-xl flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-primary-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                          View PDF
+                        </span>
+                      </div>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Right - Details */}
+              <div className="space-y-6">
+                {/* Tabs */}
+                <div className="flex gap-2 p-1 bg-stone-100 rounded-xl">
+                  <TabButton active={activeTab === 'details'} onClick={() => setActiveTab('details')}>
+                    Details
+                  </TabButton>
+                  <TabButton active={activeTab === 'specs'} onClick={() => setActiveTab('specs')}>
+                    Specifications
+                  </TabButton>
+                </div>
+
+                {/* Tab Content */}
+                {activeTab === 'details' && (
+                  <motion.div 
+                    className="space-y-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <DetailCard icon="💎" title="Shape" value={details.shape} />
+                    <DetailCard icon="⚖️" title="Carat Weight" value={`${details.carat} ct`} />
+                    <DetailCard icon="✨" title="Clarity" value={details.clarity} />
+                    <DetailCard icon="🏛️" title="Lab" value={details.lab} />
+                    <DetailCard icon="🌍" title="Origin" value={details.origin} />
+                    <DetailCard icon="📐" title="Ratio" value={details.ratio} />
+                    <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
+                    
+                    {isSignedIn && (
+                      <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-primary-50 to-accent-50 border border-primary-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-stone-600 font-medium">Price per Carat</span>
+                          <span className="text-lg font-bold text-primary-700">
+                            B{encryptPrice(decryptPrice(details.price_per_carat))}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {activeTab === 'specs' && (
+                  <motion.div 
+                    className="space-y-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <DetailCard icon="🔢" title="Stone ID" value={details.stone_id} />
+                    <DetailCard 
+                      icon="📜" 
+                      title="Certificate #" 
+                      value={
+                        details.certificate_number ? (
+                          <a 
+                            href={`${barakURL}/${details.certificate_number}.pdf`} 
+                            className="text-primary-600 hover:text-primary-700 underline decoration-primary-300 underline-offset-2"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {details.certificate_number}
+                          </a>
+                        ) : 'N/A'
+                      } 
+                    />
+                    <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
+                  </motion.div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="pt-6 border-t border-stone-200 space-y-3">
+                  <button 
+                    onClick={handleInterested}
+                    className="w-full btn-primary flex items-center justify-center gap-2 py-3"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                    </svg>
+                    I'm Interested
+                  </button>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={handleShare}
+                      className="btn-secondary flex items-center justify-center gap-2 py-2.5"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                      Share DNA
+                    </button>
+                    <button 
+                      onClick={handleShareVideo}
+                      className="btn-secondary flex items-center justify-center gap-2 py-2.5"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Share Video
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <h3 className="font-semibold text-gray-700 mb-2">Certificate</h3>
-          {details.certificate_number && details.certificate_number.trim() !== '' ? (
-            <a
-              href={`${barakURL}/${details.certificate_number}.pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <embed
-                src={`${barakURL}/${details.certificate_number}.pdf`}
-                type="application/pdf"
-                className="w-full h-72 border rounded-lg"
-              />
-            </a>
-          ) : (
-            <p className="text-gray-500">
-              No Certificate Available
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-4 mt-10">
-        <Button variant="outlined" color="success" onClick={handleShare}>Share DNA</Button>
-        <Button variant="outlined" color="success" onClick={handleShareVideo}>Share Video</Button>
-
-      </div>
+      </motion.div>
     </div>
   );
 };
 
-const Info = ({ label, value, wide }) => (
-  <div className={`flex justify-between ${wide ? 'col-span-1 sm:col-span-2' : ''}`}>
-    <span className="font-medium text-gray-600">{label}:</span>
-    <span className="text-green-700 font-semibold text-right ml-2">{value}</span>
+const TabButton = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+      active
+        ? 'bg-white text-stone-900 shadow-md'
+        : 'text-stone-500 hover:text-stone-700'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const DetailCard = ({ icon, title, value }) => (
+  <div className="flex items-center justify-between p-4 rounded-xl bg-stone-50 hover:bg-stone-100 transition-colors">
+    <div className="flex items-center gap-3">
+      <span className="text-xl">{icon}</span>
+      <span className="text-stone-600 font-medium">{title}</span>
+    </div>
+    <span className="text-stone-900 font-semibold">{value || 'N/A'}</span>
   </div>
 );
 
