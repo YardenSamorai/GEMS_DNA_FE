@@ -229,10 +229,6 @@ Eshed Diamonds`;
   const logoUrl1 =
     "https://www.eshed.com/wp-content/uploads/media/other/EshedLogo.png";
 
-  const title = `${stone.shape || ""} ${stone.weightCt || ""} ct ${
-    stone.lab || ""
-  } ${stone.treatment || ""}`.trim();
-
   const caratText = stone.weightCt != null ? stone.weightCt : "N/A";
   const ratioText = stone.ratio != null ? stone.ratio : "N/A";
   const measurementsText = stone.measurements || "N/A";
@@ -258,12 +254,12 @@ Eshed Diamonds`;
       )
       .join("");
 
+  // 👇 Origin הועבר לעמודה הימנית
   const leftColumnItems = [
     { label: "Stone ID", value: stone.sku || "" },
     { label: "Carat", value: caratText },
     { label: "Shape", value: stone.shape || "N/A" },
     { label: "Lab", value: labText },
-    { label: "Origin", value: originText },
   ];
 
   const rightColumnItems = [
@@ -273,14 +269,18 @@ Eshed Diamonds`;
     { label: "Clarity", value: clarityText },
     { label: "Fluorescence", value: fluorescenceText },
     { label: "Certificate #", value: certificateNumberText },
+    { label: "Origin", value: originText },
   ];
 
+  // 👇 תמונת האבן – בגודל מוקטן (בערך חצי מהגודל הקודם)
   const imageBlock = stone.imageUrl
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
        <tr>
          <td align="center">
-           <img src="${stone.imageUrl}" alt="${stone.sku || "Stone image"}"
-             style="max-width:100%; max-height:350px; height:auto; border-radius:6px; border:1px solid #e5e7eb; display:block;" />
+           <img src="${stone.imageUrl}" alt="${
+        stone.sku || "Stone image"
+      }"
+             style="max-width:100%; width:250px; height:250px; object-fit:cover; border-radius:6px; border:1px solid #e5e7eb; display:block;" />
          </td>
        </tr>
      </table>`
@@ -318,22 +318,25 @@ Eshed Diamonds`;
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 0;">
       <tr>
         <td align="center">
+          <!-- === MAIN CONTAINER === -->
           <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;border:1px solid #e5e7eb;font-family:Arial, sans-serif;color:#111827;">
+            
+            <!-- === HEADER (LOGO) === -->
             <tr>
-              <td align="center" style="padding:16px 24px;border-bottom:1px solid #e5e7eb;">
-                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 8px auto;">
-                  <tr>
-                    <td align="center">
-                      <img src="${logoUrl1}" alt="Eshed" style="max-height:50px;display:block;" />
-                    </td>
-                  </tr>
-                </table>
+              <td align="center" style="padding:20px 24px 12px 24px;border-bottom:1px solid #e5e7eb;">
+                <img 
+                  src="${logoUrl1}" 
+                  alt="Eshed" 
+                  style="width:200px;height:200px;object-fit:contain;display:block;"
+                />
               </td>
             </tr>
 
+            <!-- === CONTENT === -->
             <tr>
-              <td style="padding:16px 24px;font-size:14px;line-height:1.5;direction:ltr;text-align:left;">
+              <td style="padding:20px 24px 24px 24px;font-size:14px;line-height:1.6;direction:ltr;text-align:left;">
 
+                <!-- DETAILS (TWO COLUMNS) -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
                   <tr>
                     <td valign="top" width="50%" style="padding-right:12px;font-size:13px;line-height:1.6;direction:ltr;text-align:left;">
@@ -345,16 +348,49 @@ Eshed Diamonds`;
                   </tr>
                 </table>
 
-                ${imageBlock}
-                ${linksBlock}
+                <!-- SEPARATOR BEFORE IMAGE -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px 0;">
+                  <tr>
+                    <td style="border-top:1px solid #e5e7eb;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
 
-                <p style="margin:16px 0 0 0;">
-                  Best regards<br/>
-                  Eshed-Gemstar
+                <!-- IMAGE BLOCK (STONE IMAGE) -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                  <tr>
+                    <td align="center">
+                      ${imageBlock}
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- LINKS BLOCK -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                  <tr>
+                    <td>
+                      ${linksBlock}
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- SEPARATOR BEFORE SIGNATURE -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 12px 0;">
+                  <tr>
+                    <td style="border-top:1px solid #e5e7eb;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+
+                <!-- SIGNATURE -->
+                <p style="margin:0;font-size:13px;line-height:1.5;color:#4b5563;">
+                  Best regards,<br/>
+                  <span style="font-weight:bold;color:#111827;">Eshed-Gemstar</span>
                 </p>
+
               </td>
             </tr>
           </table>
+          <!-- === /MAIN CONTAINER === -->
+
         </td>
       </tr>
     </table>
@@ -375,6 +411,8 @@ const StonesTable = ({
   sortConfig,
   onSort,
 }) => {
+  const [copiedStoneId, setCopiedStoneId] = useState(null); // 👈 בשביל הודעת "Copied"
+
   if (loading) {
     return <div className="mt-6 text-sm text-slate-500">Loading stones…</div>;
   }
@@ -501,7 +539,7 @@ const StonesTable = ({
                 </button>
               </th>
 
-              {/* Category – גם ככה רק ב-lg ומעלה, אז לא יופיע במובייל */}
+              {/* Category – רק ב-lg ומעלה */}
               <th className="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-slate-600 hidden lg:table-cell">
                 <button
                   type="button"
@@ -541,7 +579,14 @@ const StonesTable = ({
                     await navigator.clipboard.writeText(emailHtml);
                   } else {
                     alert("Clipboard API is not available in this browser.");
+                    return;
                   }
+
+                  // 👇 עדכון סטטוס "Copied" לאבן הספציפית
+                  setCopiedStoneId(stone.id);
+                  setTimeout(() => {
+                    setCopiedStoneId(null);
+                  }, 1500);
                 } catch (err) {
                   console.error("Failed to copy HTML:", err);
                 }
@@ -787,6 +832,11 @@ const StonesTable = ({
                                 >
                                   Copy with images
                                 </button>
+                                {copiedStoneId === stone.id && (
+                                  <span className="text-[10px] sm:text-xs text-emerald-600 ml-1">
+                                    Copied
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <p className="text-[11px] sm:text-xs text-slate-500 mb-2">
@@ -1065,9 +1115,7 @@ const StoneSearchPage = () => {
           res = getNumber(a.priceTotal) - getNumber(b.priceTotal);
           break;
         case "treatment":
-          res = getString(a.treatment).localeCompare(
-            getString(b.treatment)
-          );
+          res = getString(a.treatment).localeCompare(getString(b.treatment));
           break;
         case "category":
           res = getString(a.category).localeCompare(getString(b.category));
