@@ -49,27 +49,32 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 100 }}
+          className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Mobile drag handle */}
+          <div className="sm:hidden flex justify-center pt-2 pb-1">
+            <div className="w-10 h-1 rounded-full bg-stone-300"></div>
+          </div>
+          
           {/* Header */}
-          <div className="px-6 py-4 border-b border-stone-200 bg-gradient-to-r from-blue-500 to-blue-600">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r from-blue-500 to-blue-600">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">Manage Client Tags</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-white">Manage Client Tags</h2>
                   <p className="text-blue-100 text-xs">{tags.length} tags</p>
                 </div>
               </div>
@@ -83,32 +88,42 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
 
           {/* Create New Tag */}
           <div className="p-4 border-b border-stone-100 bg-stone-50">
-            <p className="text-xs font-medium text-stone-500 mb-2">Create New Tag</p>
-            <div className="flex gap-2">
+            <p className="text-xs font-medium text-stone-500 mb-3">Create New Tag</p>
+            
+            {/* Mobile: Stack vertically, Desktop: Row */}
+            <div className="space-y-3 sm:space-y-0 sm:flex sm:gap-2">
               <input
                 type="text"
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
                 placeholder="Client name..."
-                className="flex-1 px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full sm:flex-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
-              <div className="flex gap-1">
-                {TAG_COLORS.slice(0, 4).map((c) => (
+              
+              {/* Colors - Grid on mobile, Row on desktop */}
+              <div className="flex flex-wrap gap-2 sm:gap-1 justify-center sm:justify-start">
+                {TAG_COLORS.map((c) => (
                   <button
                     key={c.value}
                     onClick={() => setNewTagColor(c.value)}
-                    className={`w-8 h-8 rounded-lg transition-transform ${newTagColor === c.value ? "scale-110 ring-2 ring-offset-1 ring-stone-400" : ""}`}
+                    className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg transition-all ${
+                      newTagColor === c.value 
+                        ? "scale-110 ring-2 ring-offset-2 ring-blue-500 shadow-lg" 
+                        : "hover:scale-105"
+                    }`}
                     style={{ backgroundColor: c.value }}
+                    title={c.name}
                   />
                 ))}
               </div>
+              
               <button
                 onClick={handleCreate}
                 disabled={!newTagName.trim()}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Add
+                Add Tag
               </button>
             </div>
           </div>
@@ -196,11 +211,14 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
 /* ---------------- Tag Selector (for adding tags to stones) ---------------- */
 const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, onManageTags }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef(null);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target) && 
+          buttonRef.current && !buttonRef.current.contains(e.target)) {
         setIsOpen(false);
       }
     };
@@ -208,15 +226,25 @@ const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, on
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 4,
+        left: Math.min(rect.left, window.innerWidth - 200)
+      });
+    }
+    setIsOpen(!isOpen);
+  };
+
   const availableTags = allTags.filter((t) => !currentTags.some((ct) => ct.id === t.id));
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
+        ref={buttonRef}
+        onClick={handleOpen}
         className="flex items-center gap-1 px-2 py-1 text-xs bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg transition-colors"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -228,10 +256,16 @@ const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, on
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            ref={dropdownRef}
             initial={{ opacity: 0, y: -5, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -5, scale: 0.95 }}
-            className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-stone-200 z-50 overflow-hidden"
+            className="fixed w-48 bg-white rounded-xl shadow-2xl border border-stone-200 overflow-hidden"
+            style={{ 
+              zIndex: 9999,
+              top: position.top,
+              left: position.left
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Current Tags */}
@@ -1275,7 +1309,7 @@ const DetailItem = ({ label, value }) => (
 );
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags }) => {
   if (loading) {
     return (
       <div className="glass rounded-2xl border border-white/50 p-8 sm:p-12">
@@ -1422,6 +1456,27 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                   </span>
                 )}
               </div>
+              
+              {/* Client Tags */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                {stoneTags?.[stone.sku]?.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                    style={{ backgroundColor: tag.color }}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+                <TagSelector
+                  stoneSku={stone.sku}
+                  currentTags={stoneTags?.[stone.sku] || []}
+                  allTags={allTags || []}
+                  onAddTag={onAddTag}
+                  onRemoveTag={onRemoveTag}
+                  onManageTags={onManageTags}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1550,6 +1605,14 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                   <SortButton field="treatment">Treatment</SortButton>
                 </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    Tags
+                  </span>
+                </th>
                 <th className="px-4 py-4 text-right text-xs font-semibold text-stone-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -1604,6 +1667,27 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                       </td>
                       <td className="px-4 py-3 hidden xl:table-cell">
                         <span className="badge badge-neutral">{stone.treatment || 'N/A'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-1">
+                          {stoneTags?.[stone.sku]?.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                              style={{ backgroundColor: tag.color }}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                          <TagSelector
+                            stoneSku={stone.sku}
+                            currentTags={stoneTags?.[stone.sku] || []}
+                            allTags={allTags || []}
+                            onAddTag={onAddTag}
+                            onRemoveTag={onRemoveTag}
+                            onManageTags={onManageTags}
+                          />
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -1923,6 +2007,52 @@ const StoneSearchPage = () => {
       setScanResult(null);
     }
   };
+
+  // USB Barcode Scanner Listener (global keyboard listener)
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyTime = 0;
+    const SCAN_THRESHOLD = 50; // Max ms between keystrokes for scanner input
+    const MIN_LENGTH = 3; // Minimum barcode length
+
+    const handleKeyDown = (e) => {
+      // Ignore if user is typing in an input field
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) {
+        return;
+      }
+
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+
+      // If Enter key and we have buffer content
+      if (e.key === "Enter" && buffer.length >= MIN_LENGTH) {
+        e.preventDefault();
+        const scannedBarcode = buffer.trim();
+        buffer = "";
+        
+        // Process the scanned barcode
+        if (scannedBarcode) {
+          console.log("🔫 USB Scanner detected:", scannedBarcode);
+          handleBarcodeScan(scannedBarcode);
+        }
+        return;
+      }
+
+      // If too much time passed, reset buffer (user is typing manually)
+      if (timeDiff > SCAN_THRESHOLD && buffer.length > 0) {
+        buffer = "";
+      }
+
+      // Add character to buffer (only printable characters)
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        buffer += e.key;
+        lastKeyTime = currentTime;
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [stones]); // Re-create when stones change so handleBarcodeScan has access to latest stones
 
   // Export selected stones to Excel with styling
   const exportToExcel = async (customStones = null) => {
@@ -2428,6 +2558,11 @@ const StoneSearchPage = () => {
               onToggleSelection={toggleStoneSelection}
               onToggleSelectAll={toggleSelectAll}
               allSelected={paginatedStones.length > 0 && paginatedStones.every((s) => selectedStones.has(s.id))}
+              stoneTags={stoneTags}
+              allTags={tags}
+              onAddTag={addTagToStone}
+              onRemoveTag={removeTagFromStone}
+              onManageTags={() => setShowTagsModal(true)}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
