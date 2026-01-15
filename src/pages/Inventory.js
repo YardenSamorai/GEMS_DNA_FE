@@ -785,7 +785,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
         animate={{ opacity: 1 }}
         className={`rounded-2xl border overflow-hidden shadow-sm transition-colors duration-200 ${
           isSelected 
-            ? 'border-primary-400 bg-primary-50/50 shadow-primary-100' 
+            ? 'border-emerald-400 bg-emerald-50 shadow-emerald-100 ring-2 ring-emerald-200' 
             : 'border-stone-200 bg-white'
         }`}
       >
@@ -1001,14 +1001,19 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 return (
                   <React.Fragment key={stone.id}>
                     <motion.tr
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={false}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.02 }}
                       onClick={(e) => {
                         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
                         onToggleSelection(stone.id);
                       }}
-                      className={`hover:bg-stone-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary-50/30' : ''} ${selectedStones?.has(stone.id) ? 'bg-primary-50/50' : ''}`}
+                      className={`transition-colors cursor-pointer ${
+                        selectedStones?.has(stone.id) 
+                          ? 'bg-emerald-50 border-l-4 border-l-emerald-500 hover:bg-emerald-100/70' 
+                          : isExpanded 
+                            ? 'bg-primary-50/30 hover:bg-stone-50/50' 
+                            : 'hover:bg-stone-50/50'
+                      }`}
                     >
                       <td className="px-4 py-3 text-center">
                         <input
@@ -1158,8 +1163,9 @@ const StoneSearchPage = () => {
   const [sortConfig, setSortConfig] = useState({ field: "sku", direction: "asc" });
   const [viewMode, setViewMode] = useState("table");
 
-  // Toggle single stone selection
+  // Toggle single stone selection (preserve scroll position)
   const toggleStoneSelection = (stoneId) => {
+    const scrollY = window.scrollY;
     setSelectedStones((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(stoneId)) {
@@ -1169,10 +1175,15 @@ const StoneSearchPage = () => {
       }
       return newSet;
     });
+    // Restore scroll position after React re-renders
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+    });
   };
 
-  // Select/Deselect all visible stones
+  // Select/Deselect all visible stones (preserve scroll position)
   const toggleSelectAll = () => {
+    const scrollY = window.scrollY;
     const visibleIds = paginatedStones.map((s) => s.id);
     const allSelected = visibleIds.every((id) => selectedStones.has(id));
     
@@ -1184,6 +1195,10 @@ const StoneSearchPage = () => {
         visibleIds.forEach((id) => newSet.add(id));
       }
       return newSet;
+    });
+    // Restore scroll position after React re-renders
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
     });
   };
 
@@ -1320,7 +1335,7 @@ const StoneSearchPage = () => {
     });
 
     // DNA base URL (use production URL)
-    const dnaBaseUrl = "https://gemsdna.com";
+    const dnaBaseUrl = "https://gems-dna.com";
 
     // Add data rows
     selectedData.forEach((stone, index) => {
@@ -1564,12 +1579,17 @@ const StoneSearchPage = () => {
     const { field, direction } = sortConfig;
     const dir = direction === "desc" ? -1 : 1;
     sorted.sort((a, b) => {
-      // First, prioritize Emerald shapes
+      // First, prioritize selected stones (always on top)
+      const aIsSelected = selectedStones.has(a.id) ? 1 : 0;
+      const bIsSelected = selectedStones.has(b.id) ? 1 : 0;
+      if (aIsSelected !== bIsSelected) return bIsSelected - aIsSelected;
+      
+      // Second, prioritize Emerald shapes
       const aIsEmerald = a.shape?.toUpperCase() === "EM" || a.shape?.toLowerCase().includes("emerald") ? 1 : 0;
       const bIsEmerald = b.shape?.toUpperCase() === "EM" || b.shape?.toLowerCase().includes("emerald") ? 1 : 0;
       if (aIsEmerald !== bIsEmerald) return bIsEmerald - aIsEmerald;
       
-      // Second, prioritize items with images (for mobile UX)
+      // Third, prioritize items with images (for mobile UX)
       const aHasImage = a.imageUrl ? 1 : 0;
       const bHasImage = b.imageUrl ? 1 : 0;
       if (aHasImage !== bHasImage) return bHasImage - aHasImage;
@@ -1581,7 +1601,7 @@ const StoneSearchPage = () => {
       return String(aVal || "").localeCompare(String(bVal || "")) * dir;
     });
     return sorted;
-  }, [filteredStones, sortConfig]);
+  }, [filteredStones, sortConfig, selectedStones]);
 
   const totalItems = sortedStones.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
