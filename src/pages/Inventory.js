@@ -2565,6 +2565,7 @@ const StoneSearchPage = () => {
           certificateNumber: row.certificateNumber ?? "",
           treatment: row.treatment ?? "",
           category: row.category ?? "",
+          location: row.location ?? "",
         }));
         setStones(normalized);
       } catch (err) {
