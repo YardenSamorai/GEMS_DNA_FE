@@ -1,10 +1,279 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
 const ITEMS_PER_PAGE = 50;
+
+/* ---------------- Export Modal ---------------- */
+const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
+  const [globalMarkup, setGlobalMarkup] = useState(0);
+  const [priceOverrides, setPriceOverrides] = useState({});
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setGlobalMarkup(0);
+      setPriceOverrides({});
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  // Calculate adjusted prices (based on Price Per Carat)
+  const getAdjustedPricePerCt = (stone) => {
+    if (priceOverrides[stone.id] !== undefined) {
+      return priceOverrides[stone.id];
+    }
+    const original = stone.pricePerCt || 0;
+    return original * (1 + globalMarkup / 100);
+  };
+
+  const getAdjustedTotal = (stone) => {
+    const pricePerCt = getAdjustedPricePerCt(stone);
+    const weight = stone.weightCt || 0;
+    return pricePerCt * weight;
+  };
+
+  // Apply global markup to all
+  const applyGlobalMarkup = () => {
+    const newOverrides = {};
+    selectedStones.forEach((stone) => {
+      const original = stone.pricePerCt || 0;
+      newOverrides[stone.id] = original * (1 + globalMarkup / 100);
+    });
+    setPriceOverrides(newOverrides);
+  };
+
+  // Reset single stone price
+  const resetPrice = (stoneId) => {
+    setPriceOverrides((prev) => {
+      const newOverrides = { ...prev };
+      delete newOverrides[stoneId];
+      return newOverrides;
+    });
+  };
+
+  // Reset all prices
+  const resetAllPrices = () => {
+    setPriceOverrides({});
+    setGlobalMarkup(0);
+  };
+
+  // Calculate totals
+  const totalOriginal = selectedStones.reduce((sum, s) => sum + (s.priceTotal || 0), 0);
+  const totalAdjusted = selectedStones.reduce((sum, s) => sum + getAdjustedTotal(s), 0);
+  const totalWeight = selectedStones.reduce((sum, s) => sum + (s.weightCt || 0), 0);
+
+  // Handle export with modified prices
+  const handleExport = () => {
+    const stonesWithAdjustedPrices = selectedStones.map((stone) => ({
+      ...stone,
+      pricePerCt: getAdjustedPricePerCt(stone),
+      priceTotal: getAdjustedTotal(stone),
+    }));
+    onExport(stonesWithAdjustedPrices);
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="bg-white rounded-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden fixed sm:relative bottom-0 sm:bottom-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r from-emerald-500 to-emerald-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-white">Export Preview</h2>
+                  <p className="text-emerald-100 text-xs sm:text-sm">{selectedStones.length} stones selected</p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg hover:bg-white/20 transition-colors text-white"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Global Markup Section */}
+          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-stone-50 border-b border-stone-200">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="text-sm font-medium text-stone-700 whitespace-nowrap">Markup:</label>
+                <div className="relative flex-1 sm:flex-none">
+                  <input
+                    type="number"
+                    value={globalMarkup}
+                    onChange={(e) => setGlobalMarkup(parseFloat(e.target.value) || 0)}
+                    className="w-full sm:w-24 px-3 py-2 pr-8 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="0"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 text-sm">%</span>
+                </div>
+                <button
+                  onClick={applyGlobalMarkup}
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 transition-colors whitespace-nowrap"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={resetAllPrices}
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors whitespace-nowrap"
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto">
+                <span className="text-stone-500">
+                  Original: <span className="font-semibold text-stone-700">${totalOriginal.toLocaleString()}</span>
+                </span>
+                <span className="text-emerald-600">
+                  Adjusted: <span className="font-bold text-emerald-700">${totalAdjusted.toLocaleString()}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stones Table */}
+          <div className="overflow-auto max-h-[50vh] sm:max-h-[45vh]">
+            <table className="w-full min-w-[700px]">
+              <thead className="bg-stone-100 sticky top-0">
+                <tr>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-stone-600 uppercase">SKU</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-stone-600 uppercase hidden sm:table-cell">Shape</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-[10px] sm:text-xs font-semibold text-stone-600 uppercase">Weight</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-[10px] sm:text-xs font-semibold text-stone-600 uppercase">Orig $/ct</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-[10px] sm:text-xs font-semibold text-stone-600 uppercase">New $/ct</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-[10px] sm:text-xs font-semibold text-stone-600 uppercase">+/-</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-[10px] sm:text-xs font-semibold text-stone-600 uppercase">Total</th>
+                  <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-[10px] sm:text-xs font-semibold text-stone-600 uppercase"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {selectedStones.map((stone, index) => {
+                  const originalPricePerCt = stone.pricePerCt || 0;
+                  const adjustedPricePerCt = getAdjustedPricePerCt(stone);
+                  const adjustedTotal = getAdjustedTotal(stone);
+                  const priceDiff = adjustedPricePerCt - originalPricePerCt;
+                  const percentChange = originalPricePerCt > 0 ? ((priceDiff / originalPricePerCt) * 100).toFixed(1) : 0;
+                  const isModified = priceOverrides[stone.id] !== undefined || globalMarkup !== 0;
+
+                  return (
+                    <tr key={stone.id} className={index % 2 === 0 ? "bg-white" : "bg-stone-50/50"}>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3">
+                        <span className="font-mono text-xs sm:text-sm font-medium text-emerald-600">{stone.sku}</span>
+                      </td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-stone-700 hidden sm:table-cell">{stone.shape}</td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-stone-700 text-center">{stone.weightCt}ct</td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-stone-500 text-right">
+                        ${originalPricePerCt.toLocaleString()}
+                      </td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3">
+                        <input
+                          type="number"
+                          value={Math.round(adjustedPricePerCt)}
+                          onChange={(e) => {
+                            const newPricePerCt = parseFloat(e.target.value) || 0;
+                            setPriceOverrides((prev) => ({ ...prev, [stone.id]: newPricePerCt }));
+                          }}
+                          className={`w-20 sm:w-28 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm text-center border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                            isModified ? "border-emerald-400 bg-emerald-50" : "border-stone-300"
+                          }`}
+                        />
+                      </td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                        {priceDiff !== 0 && (
+                          <span className={`text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
+                            priceDiff > 0 
+                              ? "text-emerald-700 bg-emerald-100" 
+                              : "text-red-700 bg-red-100"
+                          }`}>
+                            {priceDiff > 0 ? "+" : ""}{percentChange}%
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-stone-700 text-right font-medium">
+                        ${Math.round(adjustedTotal).toLocaleString()}
+                      </td>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                        {isModified && (
+                          <button
+                            onClick={() => resetPrice(stone.id)}
+                            className="text-[10px] sm:text-xs text-stone-500 hover:text-stone-700 underline"
+                          >
+                            ↺
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-stone-200 bg-stone-50">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm text-stone-600 text-center sm:text-left space-y-1 sm:space-y-0">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1">
+                  <span><span className="font-medium">{selectedStones.length}</span> stones</span>
+                  <span><span className="font-medium">{totalWeight.toFixed(2)}</span> ct</span>
+                  <span className="text-stone-400">|</span>
+                  <span>Orig: <span className="font-medium text-stone-500">${totalOriginal.toLocaleString()}</span></span>
+                  <span className={`font-semibold ${totalAdjusted !== totalOriginal ? 'text-emerald-600' : 'text-stone-700'}`}>
+                    → Total: ${Math.round(totalAdjusted).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExport}
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="hidden sm:inline">Export Excel</span>
+                  <span className="sm:hidden">Export</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 const treatmentOptions = [
   "All treatments",
@@ -451,7 +720,7 @@ const DetailItem = ({ label, value }) => (
 const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected }) => {
   if (loading) {
     return (
-      <div className="glass rounded-2xl border border-white/50 p-12">
+      <div className="glass rounded-2xl border border-white/50 p-8 sm:p-12">
         <div className="flex flex-col items-center justify-center gap-4">
           <div className="relative">
             <div className="w-12 h-12 border-4 border-primary-200 rounded-full"></div>
@@ -465,7 +734,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
 
   if (error) {
     return (
-      <div className="glass rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+      <div className="glass rounded-2xl border border-red-200 bg-red-50 p-6 sm:p-8 text-center">
         <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
           <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -478,7 +747,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
 
   if (!stones.length) {
     return (
-      <div className="glass rounded-2xl border border-white/50 p-12 text-center">
+      <div className="glass rounded-2xl border border-white/50 p-8 sm:p-12 text-center">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-stone-100 flex items-center justify-center">
           <svg className="w-8 h-8 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -504,127 +773,309 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
     </button>
   );
 
+  // Mobile Card Component
+  const MobileStoneCard = ({ stone, index }) => {
+    const isSelected = selectedStones?.has(stone.id);
+    const isExpanded = selectedStone?.id === stone.id;
+
+    return (
+      <motion.div
+        layout
+        initial={false}
+        animate={{ opacity: 1 }}
+        className={`rounded-2xl border overflow-hidden shadow-sm transition-colors duration-200 ${
+          isSelected 
+            ? 'border-primary-400 bg-primary-50/50 shadow-primary-100' 
+            : 'border-stone-200 bg-white'
+        }`}
+      >
+        {/* Main Card Content */}
+        <div 
+          className="p-4"
+          onClick={() => onToggleSelection(stone.id)}
+        >
+          <div className="flex gap-3">
+            {/* Checkbox */}
+            <div className="flex-shrink-0 pt-1">
+              <input
+                type="checkbox"
+                checked={isSelected || false}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onToggleSelection(stone.id);
+                }}
+                className="w-5 h-5 text-primary-600 rounded border-stone-300 focus:ring-primary-500"
+              />
+            </div>
+
+            {/* Image */}
+            <div className="flex-shrink-0">
+              <div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                {stone.imageUrl ? (
+                  <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-stone-300">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="inline-block font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
+                    {stone.sku}
+                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm font-medium text-stone-800">{stone.shape}</span>
+                    <span className="text-stone-300">•</span>
+                    <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-stone-900">
+                    ${stone.priceTotal?.toLocaleString() || '-'}
+                  </p>
+                  <p className="text-xs text-stone-500">
+                    ${stone.pricePerCt?.toLocaleString() || '-'}/ct
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Info Tags */}
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {stone.origin && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">
+                    {stone.origin}
+                  </span>
+                )}
+                {stone.treatment && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                    {stone.treatment}
+                  </span>
+                )}
+                {stone.lab && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                    {stone.lab}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Bar */}
+        <div className="flex border-t border-stone-100">
+          <Link
+            to={`/${stone.sku}`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-primary-600 hover:bg-primary-50 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            DNA
+          </Link>
+          <div className="w-px bg-stone-100"></div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(stone);
+            }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
+              isExpanded 
+                ? 'bg-primary-500 text-white' 
+                : 'text-stone-600 hover:bg-stone-50'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {isExpanded ? 'Hide' : 'Details'}
+          </button>
+          {stone.certificateUrl && (
+            <>
+              <div className="w-px bg-stone-100"></div>
+              <a
+                href={stone.certificateUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Cert
+              </a>
+            </>
+          )}
+        </div>
+
+        {/* Expanded Details */}
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden border-t border-stone-200"
+            >
+              <StoneDetails stone={stone} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  };
+
   return (
-    <div className="glass rounded-2xl border border-white/50 overflow-hidden shadow-lg">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-stone-200 bg-stone-50/50">
-              <th className="px-4 py-4 text-center">
-                <input
-                  type="checkbox"
-                  checked={allSelected && stones.length > 0}
-                  onChange={onToggleSelectAll}
-                  className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
-                />
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="sku">SKU</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">Image</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="shape">Shape</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="weightCt">Weight</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
-                <SortButton field="measurements">Measurements</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="pricePerCt">Price/ct</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="priceTotal">Total</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
-                <SortButton field="treatment">Treatment</SortButton>
-              </th>
-              <th className="px-4 py-4 text-right text-xs font-semibold text-stone-600 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100">
-            {stones.map((stone, index) => {
-              const isExpanded = selectedStone?.id === stone.id;
-              return (
-                <>
-                  <motion.tr
-                    key={stone.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.02 }}
-                    onClick={(e) => {
-                      // Don't toggle if clicking on button or checkbox
-                      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
-                      onToggleSelection(stone.id);
-                    }}
-                    className={`hover:bg-stone-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary-50/30' : ''} ${selectedStones?.has(stone.id) ? 'bg-primary-50/50' : ''}`}
-                  >
-                    <td className="px-4 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedStones?.has(stone.id) || false}
-                        onChange={() => onToggleSelection(stone.id)}
-                        className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
-                        {stone.imageUrl ? (
-                          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">N/A</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-stone-700">{stone.shape}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-stone-800">{stone.weightCt} ct</td>
-                    <td className="px-4 py-3 text-sm text-stone-600 hidden lg:table-cell">{stone.measurements}</td>
-                    <td className="px-4 py-3 text-sm text-stone-700">
-                      ${stone.pricePerCt?.toLocaleString() || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-stone-800">
-                      ${stone.priceTotal?.toLocaleString() || '-'}
-                    </td>
-                    <td className="px-4 py-3 hidden xl:table-cell">
-                      <span className="badge badge-neutral">{stone.treatment || 'N/A'}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => onToggle(stone)}
-                        className={`px-4 py-2 rounded-xl text-xs font-medium transition-all ${
-                          isExpanded
-                            ? 'bg-primary-500 text-white'
-                            : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                        }`}
-                      >
-                        {isExpanded ? 'Hide' : 'Details'}
-                      </button>
-                    </td>
-                  </motion.tr>
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.tr
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                      >
-                        <td colSpan={10} className="bg-stone-50 border-t border-stone-200">
-                          <StoneDetails stone={stone} />
-                        </td>
-                      </motion.tr>
-                    )}
-                  </AnimatePresence>
-                </>
-              );
-            })}
-          </tbody>
-        </table>
+    <>
+      {/* Mobile Select All Bar */}
+      <div className="md:hidden flex items-center justify-between px-4 py-3 mb-3 rounded-xl bg-stone-100/50">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allSelected && stones.length > 0}
+            onChange={onToggleSelectAll}
+            className="w-5 h-5 text-primary-600 rounded border-stone-300 focus:ring-primary-500"
+          />
+          <span className="text-sm font-medium text-stone-700">Select All</span>
+        </label>
+        <span className="text-xs text-stone-500">{stones.length} stones</span>
       </div>
-    </div>
+
+      {/* Mobile Cards View */}
+      <div className="md:hidden space-y-3">
+        {stones.map((stone, index) => (
+          <MobileStoneCard key={stone.id} stone={stone} index={index} />
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block glass rounded-2xl border border-white/50 overflow-hidden shadow-lg">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-stone-200 bg-stone-50/50">
+                <th className="px-4 py-4 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allSelected && stones.length > 0}
+                    onChange={onToggleSelectAll}
+                    className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
+                  />
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                  <SortButton field="sku">SKU</SortButton>
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">Image</th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                  <SortButton field="shape">Shape</SortButton>
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                  <SortButton field="weightCt">Weight</SortButton>
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
+                  <SortButton field="measurements">Measurements</SortButton>
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                  <SortButton field="pricePerCt">Price/ct</SortButton>
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                  <SortButton field="priceTotal">Total</SortButton>
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
+                  <SortButton field="treatment">Treatment</SortButton>
+                </th>
+                <th className="px-4 py-4 text-right text-xs font-semibold text-stone-600 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {stones.map((stone, index) => {
+                const isExpanded = selectedStone?.id === stone.id;
+                return (
+                  <React.Fragment key={stone.id}>
+                    <motion.tr
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.02 }}
+                      onClick={(e) => {
+                        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+                        onToggleSelection(stone.id);
+                      }}
+                      className={`hover:bg-stone-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary-50/30' : ''} ${selectedStones?.has(stone.id) ? 'bg-primary-50/50' : ''}`}
+                    >
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedStones?.has(stone.id) || false}
+                          onChange={() => onToggleSelection(stone.id)}
+                          className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
+                          {stone.imageUrl ? (
+                            <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">N/A</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-stone-700">{stone.shape}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-stone-800">{stone.weightCt} ct</td>
+                      <td className="px-4 py-3 text-sm text-stone-600 hidden lg:table-cell">{stone.measurements}</td>
+                      <td className="px-4 py-3 text-sm text-stone-700">
+                        ${stone.pricePerCt?.toLocaleString() || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-stone-800">
+                        ${stone.priceTotal?.toLocaleString() || '-'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        <span className="badge badge-neutral">{stone.treatment || 'N/A'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => onToggle(stone)}
+                          className={`px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                            isExpanded
+                              ? 'bg-primary-500 text-white'
+                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                          }`}
+                        >
+                          {isExpanded ? 'Hide' : 'Details'}
+                        </button>
+                      </td>
+                    </motion.tr>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.tr
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                        >
+                          <td colSpan={10} className="bg-stone-50 border-t border-stone-200">
+                            <StoneDetails stone={stone} />
+                          </td>
+                        </motion.tr>
+                      )}
+                    </AnimatePresence>
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -696,6 +1147,9 @@ const StoneSearchPage = () => {
   const [stones, setStones] = useState([]);
   const [selectedStone, setSelectedStone] = useState(null);
   const [selectedStones, setSelectedStones] = useState(new Set());
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showFloatingExport, setShowFloatingExport] = useState(false);
+  const exportButtonRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -739,8 +1193,8 @@ const StoneSearchPage = () => {
   };
 
   // Export selected stones to Excel with styling
-  const exportToExcel = async () => {
-    const selectedData = stones.filter((s) => selectedStones.has(s.id));
+  const exportToExcel = async (customStones = null) => {
+    const selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
     
     if (selectedData.length === 0) {
       alert("Please select at least one stone to export.");
@@ -769,6 +1223,7 @@ const StoneSearchPage = () => {
       { key: "lab", width: 10 },
       { key: "pricePerCt", width: 14 },
       { key: "priceTotal", width: 14 },
+      { key: "dna", width: 15 },
       { key: "certificate", width: 20 },
       { key: "image", width: 20 },
       { key: "video", width: 20 },
@@ -776,7 +1231,7 @@ const StoneSearchPage = () => {
 
     // Create styled text header
     // Row 1: Company Name
-    worksheet.mergeCells("A1:N1");
+    worksheet.mergeCells("A1:O1");
     const titleCell = worksheet.getCell("A1");
     titleCell.value = "◆  E S H E D  ◆";
     titleCell.font = { bold: true, size: 22, color: { argb: "FF10B981" }, name: "Arial" };
@@ -785,7 +1240,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(1).height = 35;
 
     // Row 2: Tagline
-    worksheet.mergeCells("A2:N2");
+    worksheet.mergeCells("A2:O2");
     const taglineCell = worksheet.getCell("A2");
     taglineCell.value = "Premium Gemstones & Diamonds";
     taglineCell.font = { size: 12, color: { argb: "FFD1D5DB" }, name: "Arial", italic: true };
@@ -794,7 +1249,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(2).height = 22;
 
     // Row 3: Locations
-    worksheet.mergeCells("A3:N3");
+    worksheet.mergeCells("A3:O3");
     const locationsCell = worksheet.getCell("A3");
     locationsCell.value = "NYC  ·  LOS ANGELES  ·  TEL AVIV  ·  HONG KONG";
     locationsCell.font = { size: 10, color: { argb: "FF9CA3AF" }, name: "Arial" };
@@ -807,7 +1262,7 @@ const StoneSearchPage = () => {
     const totalWeight = selectedData.reduce((sum, s) => sum + (s.weightCt || 0), 0);
     const date = new Date().toLocaleDateString("en-GB");
 
-    worksheet.mergeCells("A4:N4");
+    worksheet.mergeCells("A4:O4");
     worksheet.getRow(4).height = 8; // Spacer
 
     worksheet.mergeCells("A5:D5");
@@ -820,7 +1275,7 @@ const StoneSearchPage = () => {
     worksheet.getCell("E5").font = { bold: true, size: 11, color: { argb: "FF1F2937" } };
     worksheet.getCell("E5").alignment = { vertical: "middle", horizontal: "center" };
 
-    worksheet.mergeCells("I5:N5");
+    worksheet.mergeCells("I5:O5");
     worksheet.getCell("I5").value = `💰 Total Value: $${totalPrice.toLocaleString()}`;
     worksheet.getCell("I5").font = { bold: true, size: 11, color: { argb: "FF10B981" } };
     worksheet.getCell("I5").alignment = { vertical: "middle", horizontal: "right" };
@@ -834,7 +1289,7 @@ const StoneSearchPage = () => {
     });
 
     // Add header row (row 6)
-    const headers = ["SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Lab", "Price/ct ($)", "Total ($)", "Certificate", "Image", "Video"];
+    const headers = ["SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Lab", "Price/ct ($)", "Total ($)", "DNA", "Certificate", "Image", "Video"];
     const headerRow = worksheet.getRow(6);
     headers.forEach((header, index) => {
       headerRow.getCell(index + 1).value = header;
@@ -864,6 +1319,9 @@ const StoneSearchPage = () => {
       };
     });
 
+    // DNA base URL (use production URL)
+    const dnaBaseUrl = "https://gemsdna.com";
+
     // Add data rows
     selectedData.forEach((stone, index) => {
       const row = worksheet.addRow({
@@ -878,6 +1336,7 @@ const StoneSearchPage = () => {
         lab: stone.lab || "",
         pricePerCt: stone.pricePerCt || "",
         priceTotal: stone.priceTotal || "",
+        dna: stone.sku || "",
         certificate: stone.certificateUrl || "",
         image: stone.imageUrl || "",
         video: stone.videoUrl || "",
@@ -927,6 +1386,13 @@ const StoneSearchPage = () => {
       }
 
       // Make URLs clickable
+      // DNA Link
+      if (stone.sku) {
+        const dnaUrl = `${dnaBaseUrl}/${stone.sku}`;
+        row.getCell("dna").value = { text: "View DNA", hyperlink: dnaUrl };
+        row.getCell("dna").font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, bold: true };
+        row.getCell("dna").alignment = { vertical: "middle", horizontal: "center" };
+      }
       if (stone.certificateUrl) {
         row.getCell("certificate").value = { text: "View Certificate", hyperlink: stone.certificateUrl };
         row.getCell("certificate").font = { color: { argb: "FF10B981" }, underline: true, size: 10 };
@@ -946,7 +1412,7 @@ const StoneSearchPage = () => {
     // Add auto-filter on header row (row 6)
     worksheet.autoFilter = {
       from: { row: 6, column: 1 },
-      to: { row: 6 + selectedData.length, column: 14 },
+      to: { row: 6 + selectedData.length, column: 15 },
     };
 
     // Generate and download
@@ -962,6 +1428,23 @@ const StoneSearchPage = () => {
       direction: prev.field === field && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
+
+  // Track visibility of export button for floating button
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Show floating button when original is NOT visible and there are selected stones
+        setShowFloatingExport(!entry.isIntersecting && selectedStones.size > 0);
+      },
+      { threshold: 0 }
+    );
+
+    if (exportButtonRef.current) {
+      observer.observe(exportButtonRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [selectedStones.size]);
 
   useEffect(() => {
     let intervalId;
@@ -1081,6 +1564,17 @@ const StoneSearchPage = () => {
     const { field, direction } = sortConfig;
     const dir = direction === "desc" ? -1 : 1;
     sorted.sort((a, b) => {
+      // First, prioritize Emerald shapes
+      const aIsEmerald = a.shape?.toUpperCase() === "EM" || a.shape?.toLowerCase().includes("emerald") ? 1 : 0;
+      const bIsEmerald = b.shape?.toUpperCase() === "EM" || b.shape?.toLowerCase().includes("emerald") ? 1 : 0;
+      if (aIsEmerald !== bIsEmerald) return bIsEmerald - aIsEmerald;
+      
+      // Second, prioritize items with images (for mobile UX)
+      const aHasImage = a.imageUrl ? 1 : 0;
+      const bHasImage = b.imageUrl ? 1 : 0;
+      if (aHasImage !== bHasImage) return bHasImage - aHasImage;
+      
+      // Then sort by the selected field
       const aVal = a[field];
       const bVal = b[field];
       if (typeof aVal === "number" && typeof bVal === "number") return (aVal - bVal) * dir;
@@ -1110,6 +1604,7 @@ const StoneSearchPage = () => {
               </div>
               <div className="flex items-center gap-3">
                 {/* Export Button */}
+                <div ref={exportButtonRef}>
                 {selectedStones.size > 0 && (
                   <div className="flex items-center gap-2">
                     <button
@@ -1119,7 +1614,7 @@ const StoneSearchPage = () => {
                       Clear ({selectedStones.size})
                     </button>
                     <button
-                      onClick={exportToExcel}
+                      onClick={() => setShowExportModal(true)}
                       className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/25 transition-all"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1129,6 +1624,7 @@ const StoneSearchPage = () => {
                     </button>
                   </div>
                 )}
+                </div>
                 {/* View Mode Toggle */}
                 <div className="flex items-center gap-2 p-1 rounded-xl bg-stone-100">
                 <button
@@ -1238,6 +1734,32 @@ const StoneSearchPage = () => {
           )}
         </div>
       </div>
+
+      {/* Floating Export Button */}
+      <AnimatePresence>
+        {showFloatingExport && (
+          <motion.button
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            onClick={() => setShowExportModal(true)}
+            className="fixed right-6 bottom-6 z-40 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-2xl shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Export ({selectedStones.size})</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        selectedStones={stones.filter((s) => selectedStones.has(s.id))}
+        onExport={exportToExcel}
+      />
     </>
   );
 };
