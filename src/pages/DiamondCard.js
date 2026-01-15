@@ -17,7 +17,7 @@ const DiamondCard = () => {
   useEffect(() => {
     if (!stone_id) return;
 
-    fetch(`https://gems-dna-be.onrender.com/api/stones/${stone_id}`)
+    fetch(`https://gems-dna-be.vercel.app/api/stones/${stone_id}`)
       .then((res) => res.json())
       .then((data) => {
         setDetails(data);

@@ -2540,7 +2540,7 @@ const StoneSearchPage = () => {
         setLoading(true);
         setError("");
         startProgress();
-        const res = await fetch("https://gems-dna-be.onrender.com/api/soap-stones");
+        const res = await fetch(`${API_BASE}/api/soap-stones`);
         if (!res.ok) throw new Error("Failed to load stones");
         const data = await res.json();
         const rows = Array.isArray(data.stones) ? data.stones : Array.isArray(data) ? data : [];
