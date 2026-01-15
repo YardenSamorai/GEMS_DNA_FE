@@ -829,6 +829,18 @@ const treatmentOptions = [
   "Significant",
 ];
 
+const locationOptions = [
+  "All locations",
+  "NY",
+  "LA", 
+  "HK",
+  "IL",
+  "EY",
+  "EH",
+  "EL",
+  "EM",
+];
+
 /* ---------------- Progress Bar ---------------- */
 const LoadingBar = ({ active, progress }) => {
   if (!active) return null;
@@ -865,6 +877,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
       treatment: "All treatments",
       category: "All categories",
       tag: "All tags",
+      location: "All locations",
     });
   };
 
@@ -882,6 +895,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
     !filters.treatment.includes("All") && filters.treatment,
     !filters.category.includes("All") && filters.category,
     !filters.tag.includes("All") && filters.tag,
+    !filters.location.includes("All") && filters.location,
   ].filter(Boolean).length;
 
   return (
@@ -1066,6 +1080,26 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
           >
             {treatmentOptions.map((t) => (
               <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Location */}
+        <div>
+          <label className="block text-xs font-medium text-stone-500 mb-1.5 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Location
+          </label>
+          <select
+            value={filters.location}
+            onChange={handleChange("location")}
+            className="input-modern"
+          >
+            {locationOptions.map((loc) => (
+              <option key={loc} value={loc}>{loc}</option>
             ))}
           </select>
         </div>
@@ -1617,6 +1651,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="treatment">Treatment</SortButton>
               </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
+                <SortButton field="location">Location</SortButton>
+              </th>
                 <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                   <span className="flex items-center gap-1">
                     <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1680,6 +1717,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     <td className="px-4 py-3 hidden xl:table-cell">
                       <span className="badge badge-neutral">{stone.treatment || 'N/A'}</span>
                     </td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      <span className="text-sm text-stone-600">{stone.location || 'N/A'}</span>
+                    </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
                           {stoneTags?.[stone.sku]?.map((tag) => (
@@ -1721,7 +1761,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                          <td colSpan={10} className="bg-stone-50 border-t border-stone-200">
+                          <td colSpan={11} className="bg-stone-50 border-t border-stone-200">
                           <StoneDetails stone={stone} />
                         </td>
                       </motion.tr>
@@ -1802,6 +1842,7 @@ const StoneSearchPage = () => {
     treatment: "All treatments",
     category: "All categories",
     tag: "All tags",
+    location: "All locations",
   });
 
   const [stones, setStones] = useState([]);
@@ -2093,6 +2134,7 @@ const StoneSearchPage = () => {
       { key: "clarity", width: 10 },
       { key: "treatment", width: 15 },
       { key: "origin", width: 12 },
+      { key: "location", width: 12 },
       { key: "lab", width: 10 },
       { key: "pricePerCt", width: 14 },
       { key: "priceTotal", width: 14 },
@@ -2104,7 +2146,7 @@ const StoneSearchPage = () => {
 
     // Create styled text header
     // Row 1: Company Name
-    worksheet.mergeCells("A1:P1");
+    worksheet.mergeCells("A1:Q1");
     const titleCell = worksheet.getCell("A1");
     titleCell.value = "◆  G E M S T A R  ◆";
     titleCell.font = { bold: true, size: 22, color: { argb: "FF10B981" }, name: "Arial" };
@@ -2113,7 +2155,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(1).height = 35;
 
     // Row 2: Tagline
-    worksheet.mergeCells("A2:P2");
+    worksheet.mergeCells("A2:Q2");
     const taglineCell = worksheet.getCell("A2");
     taglineCell.value = "Premium Gemstones & Diamonds";
     taglineCell.font = { size: 12, color: { argb: "FFD1D5DB" }, name: "Arial", italic: true };
@@ -2122,7 +2164,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(2).height = 22;
 
     // Row 3: Locations
-    worksheet.mergeCells("A3:P3");
+    worksheet.mergeCells("A3:Q3");
     const locationsCell = worksheet.getCell("A3");
     locationsCell.value = "NYC  ·  LOS ANGELES  ·  TEL AVIV  ·  HONG KONG";
     locationsCell.font = { size: 10, color: { argb: "FF9CA3AF" }, name: "Arial" };
@@ -2138,7 +2180,7 @@ const StoneSearchPage = () => {
     const time = now.toLocaleTimeString("en-GB");
 
     // Row 4: Spacer
-    worksheet.mergeCells("A4:P4");
+    worksheet.mergeCells("A4:Q4");
     worksheet.getRow(4).height = 10;
 
     // ═══════════════════════════════════════════════════════════════
@@ -2250,11 +2292,11 @@ const StoneSearchPage = () => {
     worksheet.getRow(7).height = 22;
 
     // Row 8: Spacer before main table
-    worksheet.mergeCells("A8:P8");
+    worksheet.mergeCells("A8:Q8");
     worksheet.getRow(8).height = 10;
 
     // Add header row (row 9)
-    const headers = ["#", "SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Lab", "Price/ct ($)", "Total ($)", "DNA", "Certificate", "Image", "Video"];
+    const headers = ["#", "SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Location", "Lab", "Price/ct ($)", "Total ($)", "DNA", "Certificate", "Image", "Video"];
     const headerRow = worksheet.getRow(9);
     headers.forEach((header, index) => {
       headerRow.getCell(index + 1).value = header;
@@ -2299,6 +2341,7 @@ const StoneSearchPage = () => {
         clarity: stone.clarity || "",
         treatment: stone.treatment || "",
         origin: stone.origin || "",
+        location: stone.location || "",
         lab: stone.lab || "",
         pricePerCt: stone.pricePerCt || "",
         priceTotal: stone.priceTotal || "",
@@ -2389,11 +2432,11 @@ const StoneSearchPage = () => {
     const footerStartRow = 10 + selectedData.length;
     
     // Spacer row
-    worksheet.mergeCells(`A${footerStartRow}:P${footerStartRow}`);
+    worksheet.mergeCells(`A${footerStartRow}:Q${footerStartRow}`);
     worksheet.getRow(footerStartRow).height = 15;
 
     // Footer background row
-    worksheet.mergeCells(`A${footerStartRow + 1}:P${footerStartRow + 1}`);
+    worksheet.mergeCells(`A${footerStartRow + 1}:Q${footerStartRow + 1}`);
     const footerBgRow = worksheet.getRow(footerStartRow + 1);
     footerBgRow.height = 8;
     worksheet.getCell(`A${footerStartRow + 1}`).fill = { 
@@ -2401,7 +2444,7 @@ const StoneSearchPage = () => {
     };
 
     // Footer Row 1: Company & Tagline
-    worksheet.mergeCells(`A${footerStartRow + 2}:P${footerStartRow + 2}`);
+    worksheet.mergeCells(`A${footerStartRow + 2}:Q${footerStartRow + 2}`);
     const footerCell1 = worksheet.getCell(`A${footerStartRow + 2}`);
     footerCell1.value = "◆  GEMSTAR  ◆  Premium Gemstones & Diamonds";
     footerCell1.font = { bold: true, size: 12, color: { argb: "FF10B981" }, name: "Arial" };
@@ -2410,7 +2453,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(footerStartRow + 2).height = 28;
 
     // Footer Row 2: Locations
-    worksheet.mergeCells(`A${footerStartRow + 3}:P${footerStartRow + 3}`);
+    worksheet.mergeCells(`A${footerStartRow + 3}:Q${footerStartRow + 3}`);
     const footerCell2 = worksheet.getCell(`A${footerStartRow + 3}`);
     footerCell2.value = "📍 NEW YORK  ·  TEL AVIV  ·  HONG KONG  ·  LOS ANGELES";
     footerCell2.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
@@ -2419,7 +2462,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(footerStartRow + 3).height = 22;
 
     // Footer Row 3: Contact Info
-    worksheet.mergeCells(`A${footerStartRow + 4}:P${footerStartRow + 4}`);
+    worksheet.mergeCells(`A${footerStartRow + 4}:Q${footerStartRow + 4}`);
     const footerCell3 = worksheet.getCell(`A${footerStartRow + 4}`);
     footerCell3.value = "📞 +1 (212) 869-0544  ·  ✉ info@gems.net  ·  🌐 www.gems.net";
     footerCell3.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
@@ -2428,7 +2471,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(footerStartRow + 4).height = 22;
 
     // Footer Row 4: Disclaimer
-    worksheet.mergeCells(`A${footerStartRow + 5}:P${footerStartRow + 5}`);
+    worksheet.mergeCells(`A${footerStartRow + 5}:Q${footerStartRow + 5}`);
     const footerCell4 = worksheet.getCell(`A${footerStartRow + 5}`);
     footerCell4.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
     footerCell4.font = { size: 9, color: { argb: "FF9CA3AF" }, name: "Arial", italic: true };
@@ -2437,7 +2480,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(footerStartRow + 5).height = 20;
 
     // Footer bottom accent line
-    worksheet.mergeCells(`A${footerStartRow + 6}:P${footerStartRow + 6}`);
+    worksheet.mergeCells(`A${footerStartRow + 6}:Q${footerStartRow + 6}`);
     const footerAccent = worksheet.getCell(`A${footerStartRow + 6}`);
     footerAccent.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF10B981" } };
     worksheet.getRow(footerStartRow + 6).height = 5;
@@ -2582,6 +2625,7 @@ const StoneSearchPage = () => {
       if (filters.shape !== "All shapes" && stone.shape !== filters.shape) return false;
       if (filters.treatment !== "All treatments" && stone.treatment?.toLowerCase() !== filters.treatment.toLowerCase()) return false;
       if (filters.category !== "All categories" && stone.category !== filters.category) return false;
+      if (filters.location !== "All locations" && stone.location !== filters.location) return false;
       
       // Tag filter
       if (filters.tag !== "All tags") {
