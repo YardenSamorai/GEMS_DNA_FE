@@ -6,6 +6,307 @@ import { saveAs } from "file-saver";
 import { Html5Qrcode } from "html5-qrcode";
 
 const ITEMS_PER_PAGE = 50;
+const API_BASE = "https://gems-dna-be.vercel.app";
+
+/* ---------------- Tag Colors ---------------- */
+const TAG_COLORS = [
+  { name: "Emerald", value: "#10b981" },
+  { name: "Blue", value: "#3b82f6" },
+  { name: "Purple", value: "#8b5cf6" },
+  { name: "Pink", value: "#ec4899" },
+  { name: "Orange", value: "#f97316" },
+  { name: "Yellow", value: "#eab308" },
+  { name: "Red", value: "#ef4444" },
+  { name: "Cyan", value: "#06b6d4" },
+];
+
+/* ---------------- Tags Management Modal ---------------- */
+const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTag }) => {
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("#10b981");
+  const [editingTag, setEditingTag] = useState(null);
+
+  if (!isOpen) return null;
+
+  const handleCreate = () => {
+    if (newTagName.trim()) {
+      onCreateTag(newTagName.trim(), newTagColor);
+      setNewTagName("");
+      setNewTagColor("#10b981");
+    }
+  };
+
+  const handleUpdate = () => {
+    if (editingTag && editingTag.name.trim()) {
+      onUpdateTag(editingTag.id, editingTag.name, editingTag.color);
+      setEditingTag(null);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-stone-200 bg-gradient-to-r from-blue-500 to-blue-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Manage Client Tags</h2>
+                  <p className="text-blue-100 text-xs">{tags.length} tags</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/20 transition-colors text-white">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Create New Tag */}
+          <div className="p-4 border-b border-stone-100 bg-stone-50">
+            <p className="text-xs font-medium text-stone-500 mb-2">Create New Tag</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="Client name..."
+                className="flex-1 px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              />
+              <div className="flex gap-1">
+                {TAG_COLORS.slice(0, 4).map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => setNewTagColor(c.value)}
+                    className={`w-8 h-8 rounded-lg transition-transform ${newTagColor === c.value ? "scale-110 ring-2 ring-offset-1 ring-stone-400" : ""}`}
+                    style={{ backgroundColor: c.value }}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={handleCreate}
+                disabled={!newTagName.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* Tags List */}
+          <div className="max-h-80 overflow-y-auto p-4">
+            {tags.length === 0 ? (
+              <div className="text-center py-8 text-stone-400">
+                <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <p>No tags yet</p>
+                <p className="text-xs">Create your first client tag above</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tags.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 hover:bg-stone-100 transition-colors"
+                  >
+                    {editingTag?.id === tag.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingTag.name}
+                          onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
+                          className="flex-1 px-2 py-1 text-sm border border-stone-300 rounded"
+                          autoFocus
+                        />
+                        <div className="flex gap-1">
+                          {TAG_COLORS.map((c) => (
+                            <button
+                              key={c.value}
+                              onClick={() => setEditingTag({ ...editingTag, color: c.value })}
+                              className={`w-6 h-6 rounded transition-transform ${editingTag.color === c.value ? "scale-110 ring-2 ring-offset-1 ring-stone-400" : ""}`}
+                              style={{ backgroundColor: c.value }}
+                            />
+                          ))}
+                        </div>
+                        <button onClick={handleUpdate} className="text-emerald-600 hover:text-emerald-700 text-sm font-medium">
+                          Save
+                        </button>
+                        <button onClick={() => setEditingTag(null)} className="text-stone-400 hover:text-stone-600 text-sm">
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span className="flex-1 font-medium text-stone-700">{tag.name}</span>
+                        <span className="text-xs text-stone-400">{tag.stone_count || 0} stones</span>
+                        <button
+                          onClick={() => setEditingTag({ id: tag.id, name: tag.name, color: tag.color })}
+                          className="p-1.5 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => onDeleteTag(tag.id)}
+                          className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+/* ---------------- Tag Selector (for adding tags to stones) ---------------- */
+const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, onManageTags }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const availableTags = allTags.filter((t) => !currentTags.some((ct) => ct.id === t.id));
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="flex items-center gap-1 px-2 py-1 text-xs bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        </svg>
+        Tag
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.95 }}
+            className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-stone-200 z-50 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Current Tags */}
+            {currentTags.length > 0 && (
+              <div className="p-2 border-b border-stone-100">
+                <p className="text-[10px] uppercase text-stone-400 mb-1.5 px-1">Current</p>
+                <div className="flex flex-wrap gap-1">
+                  {currentTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white"
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.name}
+                      <button
+                        onClick={() => onRemoveTag(stoneSku, tag.id)}
+                        className="hover:bg-white/20 rounded-full p-0.5"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Available Tags */}
+            <div className="max-h-40 overflow-y-auto">
+              {availableTags.length > 0 ? (
+                <div className="p-1">
+                  {availableTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        onAddTag(stoneSku, tag.id);
+                        setIsOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-stone-50 transition-colors text-left"
+                    >
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                      <span className="text-sm text-stone-700">{tag.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 text-center text-stone-400 text-xs">
+                  {allTags.length === 0 ? "No tags created yet" : "All tags assigned"}
+                </div>
+              )}
+            </div>
+
+            {/* Manage Tags Button */}
+            <div className="p-2 border-t border-stone-100">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  onManageTags();
+                }}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Manage Tags
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 /* ---------------- Export Modal ---------------- */
 const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
@@ -475,7 +776,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
 
 const treatmentOptions = [
   "All treatments",
-  "No oil",
+  "No Oil",
   "Insignificant",
   "Minor",
   "Moderate",
@@ -498,7 +799,7 @@ const LoadingBar = ({ active, progress }) => {
 };
 
 /* ---------------- Filters ---------------- */
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) => {
+const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tags, onManageTags }) => {
   const handleChange = (field) => (e) => {
     onChange({ ...filters, [field]: e.target.value });
   };
@@ -517,6 +818,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) =
       shape: "All shapes",
       treatment: "All treatments",
       category: "All categories",
+      tag: "All tags",
     });
   };
 
@@ -533,6 +835,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) =
     !filters.shape.includes("All") && filters.shape,
     !filters.treatment.includes("All") && filters.treatment,
     !filters.category.includes("All") && filters.category,
+    !filters.tag.includes("All") && filters.tag,
   ].filter(Boolean).length;
 
   return (
@@ -720,13 +1023,45 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) =
             ))}
           </select>
         </div>
+
+        {/* Client Tag */}
+        <div>
+          <label className="block text-xs font-medium text-stone-500 mb-1.5 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+            Client Tag
+          </label>
+          <div className="flex gap-2">
+            <select
+              value={filters.tag}
+              onChange={handleChange("tag")}
+              className="input-modern flex-1"
+            >
+              <option value="All tags">All tags</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.name}>{tag.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={onManageTags}
+              className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors"
+              title="Manage tags"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-/* ---------------- Stone Card (Mobile) ---------------- */
-const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection }) => (
+/* ---------------- Stone Card (Grid) ---------------- */
+const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags }) => (
   <motion.div
     layout
     onClick={(e) => {
@@ -734,7 +1069,11 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection 
       if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A' || e.target.closest('button') || e.target.closest('a')) return;
       onToggleSelection(stone.id);
     }}
-    className={`glass rounded-2xl border overflow-hidden shadow-md cursor-pointer ${isSelected ? 'border-primary-400 bg-primary-50/30' : 'border-white/50'}`}
+    className={`rounded-2xl border-2 overflow-hidden shadow-md cursor-pointer transition-all duration-200 ${
+      isSelected 
+        ? 'border-emerald-500 bg-emerald-100 shadow-emerald-200 shadow-lg' 
+        : 'border-stone-200 bg-white hover:border-stone-300'
+    }`}
   >
     <div className="p-4">
       <div className="flex gap-4">
@@ -775,6 +1114,27 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection 
             <span>${stone.priceTotal?.toLocaleString() || '-'}</span>
             <span>•</span>
             <span>{stone.treatment || 'N/A'}</span>
+          </div>
+          
+          {/* Tags */}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {stoneTags?.map((tag) => (
+              <span
+                key={tag.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                style={{ backgroundColor: tag.color }}
+              >
+                {tag.name}
+              </span>
+            ))}
+            <TagSelector
+              stoneSku={stone.sku}
+              currentTags={stoneTags || []}
+              allTags={allTags}
+              onAddTag={onAddTag}
+              onRemoveTag={onRemoveTag}
+              onManageTags={onManageTags}
+            />
           </div>
         </div>
       </div>
@@ -1345,6 +1705,7 @@ const StoneSearchPage = () => {
     shape: "All shapes",
     treatment: "All treatments",
     category: "All categories",
+    tag: "All tags",
   });
 
   const [stones, setStones] = useState([]);
@@ -1362,6 +1723,134 @@ const StoneSearchPage = () => {
   const [progress, setProgress] = useState(0);
   const [sortConfig, setSortConfig] = useState({ field: "sku", direction: "asc" });
   const [viewMode, setViewMode] = useState("table");
+
+  // Tags state
+  const [tags, setTags] = useState([]);
+  const [stoneTags, setStoneTags] = useState({}); // { sku: [tag1, tag2, ...] }
+  const [showTagsModal, setShowTagsModal] = useState(false);
+
+  // Fetch tags on mount
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const [tagsRes, stoneTagsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/tags`),
+          fetch(`${API_BASE}/api/stone-tags`)
+        ]);
+        const tagsData = await tagsRes.json();
+        const stoneTagsData = await stoneTagsRes.json();
+        setTags(tagsData);
+        setStoneTags(stoneTagsData);
+      } catch (err) {
+        console.error("Error fetching tags:", err);
+      }
+    };
+    fetchTags();
+  }, []);
+
+  // Tag management functions
+  const createTag = async (name, color) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color }),
+      });
+      if (res.ok) {
+        const newTag = await res.json();
+        setTags((prev) => [...prev, { ...newTag, stone_count: 0 }]);
+      }
+    } catch (err) {
+      console.error("Error creating tag:", err);
+    }
+  };
+
+  const updateTag = async (id, name, color) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/tags/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTags((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+        // Update stoneTags as well
+        setStoneTags((prev) => {
+          const newStoneTags = { ...prev };
+          Object.keys(newStoneTags).forEach((sku) => {
+            newStoneTags[sku] = newStoneTags[sku].map((t) =>
+              t.id === id ? { ...t, name: updated.name, color: updated.color } : t
+            );
+          });
+          return newStoneTags;
+        });
+      }
+    } catch (err) {
+      console.error("Error updating tag:", err);
+    }
+  };
+
+  const deleteTag = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this tag?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/tags/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setTags((prev) => prev.filter((t) => t.id !== id));
+        // Remove from stoneTags
+        setStoneTags((prev) => {
+          const newStoneTags = { ...prev };
+          Object.keys(newStoneTags).forEach((sku) => {
+            newStoneTags[sku] = newStoneTags[sku].filter((t) => t.id !== id);
+          });
+          return newStoneTags;
+        });
+      }
+    } catch (err) {
+      console.error("Error deleting tag:", err);
+    }
+  };
+
+  const addTagToStone = async (sku, tagId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/stones/${sku}/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tagId }),
+      });
+      if (res.ok) {
+        const tag = await res.json();
+        setStoneTags((prev) => ({
+          ...prev,
+          [sku]: [...(prev[sku] || []), tag],
+        }));
+        // Update tag count
+        setTags((prev) =>
+          prev.map((t) => (t.id === tagId ? { ...t, stone_count: (parseInt(t.stone_count) || 0) + 1 } : t))
+        );
+      }
+    } catch (err) {
+      console.error("Error adding tag to stone:", err);
+    }
+  };
+
+  const removeTagFromStone = async (sku, tagId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/stones/${sku}/tags/${tagId}`, { method: "DELETE" });
+      if (res.ok) {
+        setStoneTags((prev) => ({
+          ...prev,
+          [sku]: (prev[sku] || []).filter((t) => t.id !== tagId),
+        }));
+        // Update tag count
+        setTags((prev) =>
+          prev.map((t) => (t.id === tagId ? { ...t, stone_count: Math.max(0, (parseInt(t.stone_count) || 0) - 1) } : t))
+        );
+      }
+    } catch (err) {
+      console.error("Error removing tag from stone:", err);
+    }
+  };
 
   // Toggle single stone selection (preserve scroll position)
   const toggleStoneSelection = (stoneId) => {
@@ -1796,11 +2285,18 @@ const StoneSearchPage = () => {
       if (filters.maxWidth && dims.width != null && dims.width > Number(filters.maxWidth)) return false;
       
       if (filters.shape !== "All shapes" && stone.shape !== filters.shape) return false;
-      if (filters.treatment !== "All treatments" && stone.treatment !== filters.treatment) return false;
+      if (filters.treatment !== "All treatments" && stone.treatment?.toLowerCase() !== filters.treatment.toLowerCase()) return false;
       if (filters.category !== "All categories" && stone.category !== filters.category) return false;
+      
+      // Tag filter
+      if (filters.tag !== "All tags") {
+        const stoneTagList = stoneTags[stone.sku] || [];
+        if (!stoneTagList.some((t) => t.name === filters.tag)) return false;
+      }
+      
       return true;
     });
-  }, [filters, stones]);
+  }, [filters, stones, stoneTags]);
 
   const sortedStones = useMemo(() => {
     const sorted = [...filteredStones];
@@ -1914,6 +2410,8 @@ const StoneSearchPage = () => {
             onChange={setFilters}
             shapesOptions={shapesOptions}
             categoriesOptions={categoriesOptions}
+            tags={tags}
+            onManageTags={() => setShowTagsModal(true)}
           />
 
           {/* Content */}
@@ -1932,7 +2430,7 @@ const StoneSearchPage = () => {
               allSelected={paginatedStones.length > 0 && paginatedStones.every((s) => selectedStones.has(s.id))}
             />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
               {loading ? (
                 [...Array(6)].map((_, i) => (
                   <div key={i} className="glass rounded-2xl border border-white/50 p-4 animate-pulse">
@@ -1959,6 +2457,11 @@ const StoneSearchPage = () => {
                     isExpanded={selectedStone?.id === stone.id}
                     isSelected={selectedStones.has(stone.id)}
                     onToggleSelection={toggleStoneSelection}
+                    stoneTags={stoneTags[stone.sku] || []}
+                    allTags={tags}
+                    onAddTag={addTagToStone}
+                    onRemoveTag={removeTagFromStone}
+                    onManageTags={() => setShowTagsModal(true)}
                   />
                 ))
               )}
@@ -2026,6 +2529,16 @@ const StoneSearchPage = () => {
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
         onScan={handleBarcodeScan}
+      />
+
+      {/* Tags Management Modal */}
+      <TagsModal
+        isOpen={showTagsModal}
+        onClose={() => setShowTagsModal(false)}
+        tags={tags}
+        onCreateTag={createTag}
+        onDeleteTag={deleteTag}
+        onUpdateTag={updateTag}
       />
 
       {/* Scan Success Toast */}
