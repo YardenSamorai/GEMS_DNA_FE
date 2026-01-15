@@ -56,7 +56,7 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
           initial={{ opacity: 0, y: 100 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 100 }}
-          className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden"
+          className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Mobile drag handle */}
@@ -65,7 +65,7 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
           </div>
           
           {/* Header */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r from-blue-500 to-blue-600">
+          <div className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r from-blue-500 to-blue-600">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -87,49 +87,57 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
           </div>
 
           {/* Create New Tag */}
-          <div className="p-4 border-b border-stone-100 bg-stone-50">
+          <div className="flex-shrink-0 p-4 border-b border-stone-100 bg-stone-50">
             <p className="text-xs font-medium text-stone-500 mb-3">Create New Tag</p>
             
-            {/* Mobile: Stack vertically, Desktop: Row */}
-            <div className="space-y-3 sm:space-y-0 sm:flex sm:gap-2">
+            <div className="space-y-3">
+              {/* Tag Name Input */}
               <input
                 type="text"
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="Client name..."
-                className="w-full sm:flex-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter client name..."
+                className="w-full px-4 py-3 text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
               
-              {/* Colors - Grid on mobile, Row on desktop */}
-              <div className="flex flex-wrap gap-2 sm:gap-1 justify-center sm:justify-start">
-                {TAG_COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    onClick={() => setNewTagColor(c.value)}
-                    className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg transition-all ${
-                      newTagColor === c.value 
-                        ? "scale-110 ring-2 ring-offset-2 ring-blue-500 shadow-lg" 
-                        : "hover:scale-105"
-                    }`}
-                    style={{ backgroundColor: c.value }}
-                    title={c.name}
-                  />
-                ))}
+              {/* Color Selection */}
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Choose Color</p>
+                <div className="grid grid-cols-8 gap-2">
+                  {TAG_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => setNewTagColor(c.value)}
+                      className={`aspect-square rounded-xl transition-all ${
+                        newTagColor === c.value 
+                          ? "ring-2 ring-offset-2 ring-blue-500 scale-105 shadow-lg" 
+                          : "hover:scale-110"
+                      }`}
+                      style={{ backgroundColor: c.value }}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
               </div>
               
+              {/* Add Button */}
               <button
                 onClick={handleCreate}
                 disabled={!newTagName.trim()}
-                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
                 Add Tag
               </button>
             </div>
           </div>
 
           {/* Tags List */}
-          <div className="max-h-80 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4">
+            <p className="text-[10px] uppercase tracking-wider text-stone-400 mb-3">Your Tags</p>
             {tags.length === 0 ? (
               <div className="text-center py-8 text-stone-400">
                 <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -143,45 +151,48 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
                 {tags.map((tag) => (
                   <div
                     key={tag.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 hover:bg-stone-100 transition-colors"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-stone-200 hover:border-stone-300 hover:shadow-sm transition-all"
                   >
                     {editingTag?.id === tag.id ? (
-                      <>
+                      <div className="flex-1 space-y-3">
                         <input
                           type="text"
                           value={editingTag.name}
                           onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
-                          className="flex-1 px-2 py-1 text-sm border border-stone-300 rounded"
+                          className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                           autoFocus
                         />
-                        <div className="flex gap-1">
+                        <div className="grid grid-cols-8 gap-1.5">
                           {TAG_COLORS.map((c) => (
                             <button
                               key={c.value}
                               onClick={() => setEditingTag({ ...editingTag, color: c.value })}
-                              className={`w-6 h-6 rounded transition-transform ${editingTag.color === c.value ? "scale-110 ring-2 ring-offset-1 ring-stone-400" : ""}`}
+                              className={`aspect-square rounded-lg transition-transform ${editingTag.color === c.value ? "scale-110 ring-2 ring-offset-1 ring-blue-500" : "hover:scale-105"}`}
                               style={{ backgroundColor: c.value }}
                             />
                           ))}
                         </div>
-                        <button onClick={handleUpdate} className="text-emerald-600 hover:text-emerald-700 text-sm font-medium">
-                          Save
-                        </button>
-                        <button onClick={() => setEditingTag(null)} className="text-stone-400 hover:text-stone-600 text-sm">
-                          Cancel
-                        </button>
-                      </>
+                        <div className="flex gap-2">
+                          <button onClick={handleUpdate} className="flex-1 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600">
+                            Save
+                          </button>
+                          <button onClick={() => setEditingTag(null)} className="flex-1 py-2 bg-stone-200 text-stone-600 rounded-lg text-sm font-medium hover:bg-stone-300">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
                     ) : (
                       <>
                         <div
-                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          className="w-5 h-5 rounded-full flex-shrink-0 shadow-sm"
                           style={{ backgroundColor: tag.color }}
                         />
                         <span className="flex-1 font-medium text-stone-700">{tag.name}</span>
-                        <span className="text-xs text-stone-400">{tag.stone_count || 0} stones</span>
+                        <span className="text-xs text-stone-400 bg-stone-100 px-2 py-1 rounded-full">{tag.stone_count || 0} stones</span>
                         <button
                           onClick={() => setEditingTag({ id: tag.id, name: tag.name, color: tag.color })}
-                          className="p-1.5 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit tag"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -189,7 +200,8 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
                         </button>
                         <button
                           onClick={() => onDeleteTag(tag.id)}
-                          className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete tag"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1370,7 +1382,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
     const isSelected = selectedStones?.has(stone.id);
     const isExpanded = selectedStone?.id === stone.id;
 
-    return (
+  return (
       <motion.div
         layout
         initial={false}
@@ -1571,10 +1583,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
 
       {/* Desktop Table View */}
       <div className="hidden md:block glass rounded-2xl border border-white/50 overflow-hidden shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-stone-200 bg-stone-50/50">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-stone-200 bg-stone-50/50">
                 <th className="px-4 py-4 text-center">
                   <input
                     type="checkbox"
@@ -1583,28 +1595,28 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
                   />
                 </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                  <SortButton field="sku">SKU</SortButton>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">Image</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                  <SortButton field="shape">Shape</SortButton>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                  <SortButton field="weightCt">Weight</SortButton>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
-                  <SortButton field="measurements">Measurements</SortButton>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                  <SortButton field="pricePerCt">Price/ct</SortButton>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                  <SortButton field="priceTotal">Total</SortButton>
-                </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
-                  <SortButton field="treatment">Treatment</SortButton>
-                </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                <SortButton field="sku">SKU</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">Image</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                <SortButton field="shape">Shape</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                <SortButton field="weightCt">Weight</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
+                <SortButton field="measurements">Measurements</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                <SortButton field="pricePerCt">Price/ct</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                <SortButton field="priceTotal">Total</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
+                <SortButton field="treatment">Treatment</SortButton>
+              </th>
                 <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                   <span className="flex items-center gap-1">
                     <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1613,17 +1625,17 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     Tags
                   </span>
                 </th>
-                <th className="px-4 py-4 text-right text-xs font-semibold text-stone-600 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {stones.map((stone, index) => {
-                const isExpanded = selectedStone?.id === stone.id;
-                return (
+              <th className="px-4 py-4 text-right text-xs font-semibold text-stone-600 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100">
+            {stones.map((stone, index) => {
+              const isExpanded = selectedStone?.id === stone.id;
+              return (
                   <React.Fragment key={stone.id}>
-                    <motion.tr
+                  <motion.tr
                       initial={false}
-                      animate={{ opacity: 1, y: 0 }}
+                    animate={{ opacity: 1, y: 0 }}
                       onClick={(e) => {
                         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
                         onToggleSelection(stone.id);
@@ -1644,30 +1656,30 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
-                          {stone.imageUrl ? (
-                            <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">N/A</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-stone-700">{stone.shape}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-stone-800">{stone.weightCt} ct</td>
-                      <td className="px-4 py-3 text-sm text-stone-600 hidden lg:table-cell">{stone.measurements}</td>
-                      <td className="px-4 py-3 text-sm text-stone-700">
-                        ${stone.pricePerCt?.toLocaleString() || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-stone-800">
-                        ${stone.priceTotal?.toLocaleString() || '-'}
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell">
-                        <span className="badge badge-neutral">{stone.treatment || 'N/A'}</span>
-                      </td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
+                        {stone.imageUrl ? (
+                          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">N/A</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-stone-700">{stone.shape}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-stone-800">{stone.weightCt} ct</td>
+                    <td className="px-4 py-3 text-sm text-stone-600 hidden lg:table-cell">{stone.measurements}</td>
+                    <td className="px-4 py-3 text-sm text-stone-700">
+                      ${stone.pricePerCt?.toLocaleString() || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-stone-800">
+                      ${stone.priceTotal?.toLocaleString() || '-'}
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      <span className="badge badge-neutral">{stone.treatment || 'N/A'}</span>
+                    </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
                           {stoneTags?.[stone.sku]?.map((tag) => (
@@ -1689,39 +1701,39 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           />
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => onToggle(stone)}
-                          className={`px-4 py-2 rounded-xl text-xs font-medium transition-all ${
-                            isExpanded
-                              ? 'bg-primary-500 text-white'
-                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                          }`}
-                        >
-                          {isExpanded ? 'Hide' : 'Details'}
-                        </button>
-                      </td>
-                    </motion.tr>
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.tr
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                        >
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => onToggle(stone)}
+                        className={`px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                          isExpanded
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                        }`}
+                      >
+                        {isExpanded ? 'Hide' : 'Details'}
+                      </button>
+                    </td>
+                  </motion.tr>
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.tr
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
                           <td colSpan={10} className="bg-stone-50 border-t border-stone-200">
-                            <StoneDetails stone={stone} />
-                          </td>
-                        </motion.tr>
-                      )}
-                    </AnimatePresence>
+                          <StoneDetails stone={stone} />
+                        </td>
+                      </motion.tr>
+                    )}
+                  </AnimatePresence>
                   </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+    </div>
     </>
   );
 };
@@ -1743,7 +1755,7 @@ Video: ${stone.videoUrl || 'N/A'}
 Certificate: ${stone.certificateUrl || 'N/A'}
 
 Best regards,
-Eshed Diamonds`;
+Gemstar`;
 
 const createEmailHtml = (stone) => `<!DOCTYPE html>
 <html>
@@ -1768,7 +1780,7 @@ ${stone.certificateUrl ? `<a href="${stone.certificateUrl}" style="color: #10b98
 </div>
 </div>
 <div style="background: #f5f5f4; padding: 16px; text-align: center; font-size: 12px; color: #78716c;">
-Best regards, Eshed Diamonds
+Best regards, Gemstar
 </div>
 </div>
 </body>
@@ -2065,15 +2077,14 @@ const StoneSearchPage = () => {
 
     // Create workbook and worksheet
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = "ESHED Diamonds";
+    workbook.creator = "Gemstar";
     workbook.created = new Date();
     
-    const worksheet = workbook.addWorksheet("Selected Stones", {
-      views: [{ state: "frozen", ySplit: 6 }], // Freeze header rows including banner
-    });
+    const worksheet = workbook.addWorksheet("Selected Stones");
 
-    // Define columns with widths
+    // Define columns with widths (added # column for numbering)
     worksheet.columns = [
+      { key: "num", width: 5 },
       { key: "sku", width: 18 },
       { key: "shape", width: 12 },
       { key: "weight", width: 14 },
@@ -2093,16 +2104,16 @@ const StoneSearchPage = () => {
 
     // Create styled text header
     // Row 1: Company Name
-    worksheet.mergeCells("A1:O1");
+    worksheet.mergeCells("A1:P1");
     const titleCell = worksheet.getCell("A1");
-    titleCell.value = "◆  E S H E D  ◆";
+    titleCell.value = "◆  G E M S T A R  ◆";
     titleCell.font = { bold: true, size: 22, color: { argb: "FF10B981" }, name: "Arial" };
     titleCell.alignment = { vertical: "middle", horizontal: "center" };
     titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
     worksheet.getRow(1).height = 35;
 
     // Row 2: Tagline
-    worksheet.mergeCells("A2:O2");
+    worksheet.mergeCells("A2:P2");
     const taglineCell = worksheet.getCell("A2");
     taglineCell.value = "Premium Gemstones & Diamonds";
     taglineCell.font = { size: 12, color: { argb: "FFD1D5DB" }, name: "Arial", italic: true };
@@ -2111,7 +2122,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(2).height = 22;
 
     // Row 3: Locations
-    worksheet.mergeCells("A3:O3");
+    worksheet.mergeCells("A3:P3");
     const locationsCell = worksheet.getCell("A3");
     locationsCell.value = "NYC  ·  LOS ANGELES  ·  TEL AVIV  ·  HONG KONG";
     locationsCell.font = { size: 10, color: { argb: "FF9CA3AF" }, name: "Arial" };
@@ -2119,40 +2130,132 @@ const StoneSearchPage = () => {
     locationsCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
     worksheet.getRow(3).height = 20;
 
-    // Add summary section (row 4-5)
+    // Calculate totals
     const totalPrice = selectedData.reduce((sum, s) => sum + (s.priceTotal || 0), 0);
     const totalWeight = selectedData.reduce((sum, s) => sum + (s.weightCt || 0), 0);
-    const date = new Date().toLocaleDateString("en-GB");
+    const now = new Date();
+    const date = now.toLocaleDateString("en-GB");
+    const time = now.toLocaleTimeString("en-GB");
 
-    worksheet.mergeCells("A4:O4");
-    worksheet.getRow(4).height = 8; // Spacer
+    // Row 4: Spacer
+    worksheet.mergeCells("A4:P4");
+    worksheet.getRow(4).height = 10;
 
-    worksheet.mergeCells("A5:D5");
-    worksheet.getCell("A5").value = `📅 Date: ${date}`;
-    worksheet.getCell("A5").font = { bold: true, size: 11, color: { argb: "FF1F2937" } };
-    worksheet.getCell("A5").alignment = { vertical: "middle", horizontal: "left" };
+    // ═══════════════════════════════════════════════════════════════
+    // INFO TABLES (Row 5-7)
+    // ═══════════════════════════════════════════════════════════════
+    
+    const tableBorder = {
+      top: { style: "thin", color: { argb: "FF10B981" } },
+      bottom: { style: "thin", color: { argb: "FF10B981" } },
+      left: { style: "thin", color: { argb: "FF10B981" } },
+      right: { style: "thin", color: { argb: "FF10B981" } },
+    };
+    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF10B981" } };
+    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6F7F1" } };
 
-    worksheet.mergeCells("E5:H5");
-    worksheet.getCell("E5").value = `💎 Stones: ${selectedData.length} | Weight: ${totalWeight.toFixed(2)} ct`;
-    worksheet.getCell("E5").font = { bold: true, size: 11, color: { argb: "FF1F2937" } };
-    worksheet.getCell("E5").alignment = { vertical: "middle", horizontal: "center" };
+    // === LEFT TABLE: Date/Time/Website ===
+    
+    // Row 5: Date
+    worksheet.getCell("A5").value = "Date";
+    worksheet.getCell("A5").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("A5").fill = lightFill;
+    worksheet.getCell("A5").border = tableBorder;
+    worksheet.getCell("A5").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.mergeCells("B5:C5");
+    worksheet.getCell("B5").value = date;
+    worksheet.getCell("B5").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("B5").border = tableBorder;
+    worksheet.getCell("B5").alignment = { vertical: "middle", horizontal: "center" };
 
-    worksheet.mergeCells("I5:O5");
-    worksheet.getCell("I5").value = `💰 Total Value: $${totalPrice.toLocaleString()}`;
-    worksheet.getCell("I5").font = { bold: true, size: 11, color: { argb: "FF10B981" } };
-    worksheet.getCell("I5").alignment = { vertical: "middle", horizontal: "right" };
+    // Row 6: Time
+    worksheet.getCell("A6").value = "Time";
+    worksheet.getCell("A6").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("A6").fill = lightFill;
+    worksheet.getCell("A6").border = tableBorder;
+    worksheet.getCell("A6").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.mergeCells("B6:C6");
+    worksheet.getCell("B6").value = time;
+    worksheet.getCell("B6").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("B6").border = tableBorder;
+    worksheet.getCell("B6").alignment = { vertical: "middle", horizontal: "center" };
 
-    worksheet.getRow(5).height = 28;
-    worksheet.getRow(5).eachCell((cell) => {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-      cell.border = {
-        bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
-      };
-    });
+    // Row 7: Website Link
+    worksheet.mergeCells("A7:C7");
+    worksheet.getCell("A7").value = { text: "🌐 www.gems.net", hyperlink: "https://www.gems.net" };
+    worksheet.getCell("A7").font = { bold: true, size: 10, color: { argb: "FF10B981" }, underline: true };
+    worksheet.getCell("A7").fill = lightFill;
+    worksheet.getCell("A7").border = tableBorder;
+    worksheet.getCell("A7").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Add header row (row 6)
-    const headers = ["SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Lab", "Price/ct ($)", "Total ($)", "DNA", "Certificate", "Image", "Video"];
-    const headerRow = worksheet.getRow(6);
+    // === RIGHT TABLE: Cts/Pcs Summary ===
+    
+    // Row 5: Headers
+    worksheet.getCell("E5").value = "";
+    worksheet.getCell("E5").fill = headerFill;
+    worksheet.getCell("E5").border = tableBorder;
+    
+    worksheet.getCell("F5").value = "Cts";
+    worksheet.getCell("F5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+    worksheet.getCell("F5").fill = headerFill;
+    worksheet.getCell("F5").border = tableBorder;
+    worksheet.getCell("F5").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("G5").value = "Pcs";
+    worksheet.getCell("G5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+    worksheet.getCell("G5").fill = headerFill;
+    worksheet.getCell("G5").border = tableBorder;
+    worksheet.getCell("G5").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Row 6: Total
+    worksheet.getCell("E6").value = "Total";
+    worksheet.getCell("E6").font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("E6").border = tableBorder;
+    worksheet.getCell("E6").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("F6").value = totalWeight.toFixed(2);
+    worksheet.getCell("F6").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("F6").border = tableBorder;
+    worksheet.getCell("F6").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("G6").value = selectedData.length;
+    worksheet.getCell("G6").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("G6").border = tableBorder;
+    worksheet.getCell("G6").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Row 7: Selected (same as total in this case)
+    worksheet.getCell("E7").value = "SELECTED";
+    worksheet.getCell("E7").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("E7").fill = lightFill;
+    worksheet.getCell("E7").border = tableBorder;
+    worksheet.getCell("E7").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("F7").value = totalWeight.toFixed(2);
+    worksheet.getCell("F7").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("F7").fill = lightFill;
+    worksheet.getCell("F7").border = tableBorder;
+    worksheet.getCell("F7").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("G7").value = selectedData.length;
+    worksheet.getCell("G7").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("G7").fill = lightFill;
+    worksheet.getCell("G7").border = tableBorder;
+    worksheet.getCell("G7").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Set row heights
+    worksheet.getRow(5).height = 22;
+    worksheet.getRow(6).height = 22;
+    worksheet.getRow(7).height = 22;
+
+    // Row 8: Spacer before main table
+    worksheet.mergeCells("A8:P8");
+    worksheet.getRow(8).height = 10;
+
+    // Add header row (row 9)
+    const headers = ["#", "SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Lab", "Price/ct ($)", "Total ($)", "DNA", "Certificate", "Image", "Video"];
+    const headerRow = worksheet.getRow(9);
     headers.forEach((header, index) => {
       headerRow.getCell(index + 1).value = header;
     });
@@ -2187,6 +2290,7 @@ const StoneSearchPage = () => {
     // Add data rows
     selectedData.forEach((stone, index) => {
       const row = worksheet.addRow({
+        num: index + 1,
         sku: stone.sku || "",
         shape: stone.shape || "",
         weight: stone.weightCt || "",
@@ -2203,6 +2307,11 @@ const StoneSearchPage = () => {
         image: stone.imageUrl || "",
         video: stone.videoUrl || "",
       });
+      
+      // Style the number cell
+      const numCell = row.getCell("num");
+      numCell.font = { size: 9, color: { argb: "FF6B7280" }, name: "Arial" };
+      numCell.alignment = { vertical: "middle", horizontal: "center" };
 
       // Zebra striping (alternating row colors)
       const isEvenRow = index % 2 === 0;
@@ -2222,10 +2331,10 @@ const StoneSearchPage = () => {
           right: { style: "thin", color: { argb: "FFE5E7EB" } },
         };
 
-        // Alignment
+        // Alignment (first 10 columns centered, rest left-aligned)
         cell.alignment = {
           vertical: "middle",
-          horizontal: colNumber <= 9 ? "center" : "left",
+          horizontal: colNumber <= 10 ? "center" : "left",
         };
 
         // Font
@@ -2271,16 +2380,72 @@ const StoneSearchPage = () => {
       row.height = 22;
     });
 
-    // Add auto-filter on header row (row 6)
-    worksheet.autoFilter = {
-      from: { row: 6, column: 1 },
-      to: { row: 6 + selectedData.length, column: 15 },
+    // Auto-filter removed to prevent dropdown arrows in info tables
+
+    // ═══════════════════════════════════════════════════════════════
+    // FOOTER SECTION
+    // ═══════════════════════════════════════════════════════════════
+    
+    const footerStartRow = 10 + selectedData.length;
+    
+    // Spacer row
+    worksheet.mergeCells(`A${footerStartRow}:P${footerStartRow}`);
+    worksheet.getRow(footerStartRow).height = 15;
+
+    // Footer background row
+    worksheet.mergeCells(`A${footerStartRow + 1}:P${footerStartRow + 1}`);
+    const footerBgRow = worksheet.getRow(footerStartRow + 1);
+    footerBgRow.height = 8;
+    worksheet.getCell(`A${footerStartRow + 1}`).fill = { 
+      type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } 
     };
+
+    // Footer Row 1: Company & Tagline
+    worksheet.mergeCells(`A${footerStartRow + 2}:P${footerStartRow + 2}`);
+    const footerCell1 = worksheet.getCell(`A${footerStartRow + 2}`);
+    footerCell1.value = "◆  GEMSTAR  ◆  Premium Gemstones & Diamonds";
+    footerCell1.font = { bold: true, size: 12, color: { argb: "FF10B981" }, name: "Arial" };
+    footerCell1.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 2).height = 28;
+
+    // Footer Row 2: Locations
+    worksheet.mergeCells(`A${footerStartRow + 3}:P${footerStartRow + 3}`);
+    const footerCell2 = worksheet.getCell(`A${footerStartRow + 3}`);
+    footerCell2.value = "📍 NEW YORK  ·  TEL AVIV  ·  HONG KONG  ·  LOS ANGELES";
+    footerCell2.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
+    footerCell2.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 3).height = 22;
+
+    // Footer Row 3: Contact Info
+    worksheet.mergeCells(`A${footerStartRow + 4}:P${footerStartRow + 4}`);
+    const footerCell3 = worksheet.getCell(`A${footerStartRow + 4}`);
+    footerCell3.value = "📞 +1 (212) 869-0544  ·  ✉ info@gems.net  ·  🌐 www.gems.net";
+    footerCell3.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
+    footerCell3.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell3.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 4).height = 22;
+
+    // Footer Row 4: Disclaimer
+    worksheet.mergeCells(`A${footerStartRow + 5}:P${footerStartRow + 5}`);
+    const footerCell4 = worksheet.getCell(`A${footerStartRow + 5}`);
+    footerCell4.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
+    footerCell4.font = { size: 9, color: { argb: "FF9CA3AF" }, name: "Arial", italic: true };
+    footerCell4.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell4.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 5).height = 20;
+
+    // Footer bottom accent line
+    worksheet.mergeCells(`A${footerStartRow + 6}:P${footerStartRow + 6}`);
+    const footerAccent = worksheet.getCell(`A${footerStartRow + 6}`);
+    footerAccent.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF10B981" } };
+    worksheet.getRow(footerStartRow + 6).height = 5;
 
     // Generate and download
     const buffer = await workbook.xlsx.writeBuffer();
     const exportDate = new Date().toISOString().split("T")[0];
-    const filename = `ESHED_Export_${exportDate}.xlsx`;
+    const filename = `Gemstar_Export_${exportDate}.xlsx`;
     saveAs(new Blob([buffer]), filename);
   };
 
@@ -2512,7 +2677,7 @@ const StoneSearchPage = () => {
                 )}
                 </div>
                 {/* View Mode Toggle */}
-                <div className="flex items-center gap-2 p-1 rounded-xl bg-stone-100">
+              <div className="flex items-center gap-2 p-1 rounded-xl bg-stone-100">
                 <button
                   onClick={() => setViewMode("table")}
                   className={`p-2 rounded-lg transition-all ${viewMode === "table" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
