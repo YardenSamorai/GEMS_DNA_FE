@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -41,6 +43,10 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) =
       maxPrice: "",
       minCarat: "",
       maxCarat: "",
+      minLength: "",
+      maxLength: "",
+      minWidth: "",
+      maxWidth: "",
       shape: "All shapes",
       treatment: "All treatments",
       category: "All categories",
@@ -53,6 +59,10 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) =
     filters.maxPrice,
     filters.minCarat,
     filters.maxCarat,
+    filters.minLength,
+    filters.maxLength,
+    filters.minWidth,
+    filters.maxWidth,
     !filters.shape.includes("All") && filters.shape,
     !filters.treatment.includes("All") && filters.treatment,
     !filters.category.includes("All") && filters.category,
@@ -160,6 +170,62 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) =
           />
         </div>
 
+        {/* Measurements - Length & Width */}
+        <div className="sm:col-span-2 lg:col-span-4 p-4 rounded-xl bg-stone-50/50 border border-stone-200/50">
+          <label className="block text-xs font-semibold text-stone-600 mb-3 flex items-center gap-2">
+            <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+            Measurements (mm)
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Length Min</label>
+              <input
+                type="number"
+                value={filters.minLength}
+                onChange={handleChange("minLength")}
+                placeholder="From"
+                step="0.01"
+                className="input-modern text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Length Max</label>
+              <input
+                type="number"
+                value={filters.maxLength}
+                onChange={handleChange("maxLength")}
+                placeholder="To"
+                step="0.01"
+                className="input-modern text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Width Min</label>
+              <input
+                type="number"
+                value={filters.minWidth}
+                onChange={handleChange("minWidth")}
+                placeholder="From"
+                step="0.01"
+                className="input-modern text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-stone-400 mb-1">Width Max</label>
+              <input
+                type="number"
+                value={filters.maxWidth}
+                onChange={handleChange("maxWidth")}
+                placeholder="To"
+                step="0.01"
+                className="input-modern text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Category */}
         <div>
           <label className="block text-xs font-medium text-stone-500 mb-1.5">Category</label>
@@ -193,13 +259,27 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions }) =
 };
 
 /* ---------------- Stone Card (Mobile) ---------------- */
-const StoneCard = ({ stone, onToggle, isExpanded }) => (
+const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection }) => (
   <motion.div
     layout
-    className="glass rounded-2xl border border-white/50 overflow-hidden shadow-md"
+    onClick={(e) => {
+      // Don't toggle if clicking on button, checkbox, or link
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A' || e.target.closest('button') || e.target.closest('a')) return;
+      onToggleSelection(stone.id);
+    }}
+    className={`glass rounded-2xl border overflow-hidden shadow-md cursor-pointer ${isSelected ? 'border-primary-400 bg-primary-50/30' : 'border-white/50'}`}
   >
     <div className="p-4">
       <div className="flex gap-4">
+        {/* Checkbox */}
+        <div className="flex items-start pt-1">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelection(stone.id)}
+            className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
+          />
+        </div>
         {/* Image */}
         <div className="w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0">
           {stone.imageUrl ? (
@@ -368,7 +448,7 @@ const DetailItem = ({ label, value }) => (
 );
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected }) => {
   if (loading) {
     return (
       <div className="glass rounded-2xl border border-white/50 p-12">
@@ -430,6 +510,14 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
         <table className="w-full">
           <thead>
             <tr className="border-b border-stone-200 bg-stone-50/50">
+              <th className="px-4 py-4 text-center">
+                <input
+                  type="checkbox"
+                  checked={allSelected && stones.length > 0}
+                  onChange={onToggleSelectAll}
+                  className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
+                />
+              </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="sku">SKU</SortButton>
               </th>
@@ -465,8 +553,21 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.02 }}
-                    className={`hover:bg-stone-50/50 transition-colors ${isExpanded ? 'bg-primary-50/30' : ''}`}
+                    onClick={(e) => {
+                      // Don't toggle if clicking on button or checkbox
+                      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+                      onToggleSelection(stone.id);
+                    }}
+                    className={`hover:bg-stone-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary-50/30' : ''} ${selectedStones?.has(stone.id) ? 'bg-primary-50/50' : ''}`}
                   >
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedStones?.has(stone.id) || false}
+                        onChange={() => onToggleSelection(stone.id)}
+                        className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
                     </td>
@@ -511,7 +612,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                        <td colSpan={9} className="bg-stone-50 border-t border-stone-200">
+                        <td colSpan={10} className="bg-stone-50 border-t border-stone-200">
                           <StoneDetails stone={stone} />
                         </td>
                       </motion.tr>
@@ -583,6 +684,10 @@ const StoneSearchPage = () => {
     maxPrice: "",
     minCarat: "",
     maxCarat: "",
+    minLength: "",
+    maxLength: "",
+    minWidth: "",
+    maxWidth: "",
     shape: "All shapes",
     treatment: "All treatments",
     category: "All categories",
@@ -590,6 +695,7 @@ const StoneSearchPage = () => {
 
   const [stones, setStones] = useState([]);
   const [selectedStone, setSelectedStone] = useState(null);
+  const [selectedStones, setSelectedStones] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -597,6 +703,258 @@ const StoneSearchPage = () => {
   const [progress, setProgress] = useState(0);
   const [sortConfig, setSortConfig] = useState({ field: "sku", direction: "asc" });
   const [viewMode, setViewMode] = useState("table");
+
+  // Toggle single stone selection
+  const toggleStoneSelection = (stoneId) => {
+    setSelectedStones((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(stoneId)) {
+        newSet.delete(stoneId);
+      } else {
+        newSet.add(stoneId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select/Deselect all visible stones
+  const toggleSelectAll = () => {
+    const visibleIds = paginatedStones.map((s) => s.id);
+    const allSelected = visibleIds.every((id) => selectedStones.has(id));
+    
+    setSelectedStones((prev) => {
+      const newSet = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => newSet.delete(id));
+      } else {
+        visibleIds.forEach((id) => newSet.add(id));
+      }
+      return newSet;
+    });
+  };
+
+  // Clear all selections
+  const clearSelection = () => {
+    setSelectedStones(new Set());
+  };
+
+  // Export selected stones to Excel with styling
+  const exportToExcel = async () => {
+    const selectedData = stones.filter((s) => selectedStones.has(s.id));
+    
+    if (selectedData.length === 0) {
+      alert("Please select at least one stone to export.");
+      return;
+    }
+
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "ESHED Diamonds";
+    workbook.created = new Date();
+    
+    const worksheet = workbook.addWorksheet("Selected Stones", {
+      views: [{ state: "frozen", ySplit: 6 }], // Freeze header rows including banner
+    });
+
+    // Define columns with widths
+    worksheet.columns = [
+      { key: "sku", width: 18 },
+      { key: "shape", width: 12 },
+      { key: "weight", width: 14 },
+      { key: "measurements", width: 22 },
+      { key: "color", width: 10 },
+      { key: "clarity", width: 10 },
+      { key: "treatment", width: 15 },
+      { key: "origin", width: 12 },
+      { key: "lab", width: 10 },
+      { key: "pricePerCt", width: 14 },
+      { key: "priceTotal", width: 14 },
+      { key: "certificate", width: 20 },
+      { key: "image", width: 20 },
+      { key: "video", width: 20 },
+    ];
+
+    // Create styled text header
+    // Row 1: Company Name
+    worksheet.mergeCells("A1:N1");
+    const titleCell = worksheet.getCell("A1");
+    titleCell.value = "◆  E S H E D  ◆";
+    titleCell.font = { bold: true, size: 22, color: { argb: "FF10B981" }, name: "Arial" };
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(1).height = 35;
+
+    // Row 2: Tagline
+    worksheet.mergeCells("A2:N2");
+    const taglineCell = worksheet.getCell("A2");
+    taglineCell.value = "Premium Gemstones & Diamonds";
+    taglineCell.font = { size: 12, color: { argb: "FFD1D5DB" }, name: "Arial", italic: true };
+    taglineCell.alignment = { vertical: "middle", horizontal: "center" };
+    taglineCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(2).height = 22;
+
+    // Row 3: Locations
+    worksheet.mergeCells("A3:N3");
+    const locationsCell = worksheet.getCell("A3");
+    locationsCell.value = "NYC  ·  LOS ANGELES  ·  TEL AVIV  ·  HONG KONG";
+    locationsCell.font = { size: 10, color: { argb: "FF9CA3AF" }, name: "Arial" };
+    locationsCell.alignment = { vertical: "middle", horizontal: "center" };
+    locationsCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(3).height = 20;
+
+    // Add summary section (row 4-5)
+    const totalPrice = selectedData.reduce((sum, s) => sum + (s.priceTotal || 0), 0);
+    const totalWeight = selectedData.reduce((sum, s) => sum + (s.weightCt || 0), 0);
+    const date = new Date().toLocaleDateString("en-GB");
+
+    worksheet.mergeCells("A4:N4");
+    worksheet.getRow(4).height = 8; // Spacer
+
+    worksheet.mergeCells("A5:D5");
+    worksheet.getCell("A5").value = `📅 Date: ${date}`;
+    worksheet.getCell("A5").font = { bold: true, size: 11, color: { argb: "FF1F2937" } };
+    worksheet.getCell("A5").alignment = { vertical: "middle", horizontal: "left" };
+
+    worksheet.mergeCells("E5:H5");
+    worksheet.getCell("E5").value = `💎 Stones: ${selectedData.length} | Weight: ${totalWeight.toFixed(2)} ct`;
+    worksheet.getCell("E5").font = { bold: true, size: 11, color: { argb: "FF1F2937" } };
+    worksheet.getCell("E5").alignment = { vertical: "middle", horizontal: "center" };
+
+    worksheet.mergeCells("I5:N5");
+    worksheet.getCell("I5").value = `💰 Total Value: $${totalPrice.toLocaleString()}`;
+    worksheet.getCell("I5").font = { bold: true, size: 11, color: { argb: "FF10B981" } };
+    worksheet.getCell("I5").alignment = { vertical: "middle", horizontal: "right" };
+
+    worksheet.getRow(5).height = 28;
+    worksheet.getRow(5).eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+      cell.border = {
+        bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+      };
+    });
+
+    // Add header row (row 6)
+    const headers = ["SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Lab", "Price/ct ($)", "Total ($)", "Certificate", "Image", "Video"];
+    const headerRow = worksheet.getRow(6);
+    headers.forEach((header, index) => {
+      headerRow.getCell(index + 1).value = header;
+    });
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF10B981" }, // Emerald green
+      };
+      cell.font = {
+        bold: true,
+        color: { argb: "FFFFFFFF" },
+        size: 11,
+        name: "Arial",
+      };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "center",
+      };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FF059669" } },
+        bottom: { style: "thin", color: { argb: "FF059669" } },
+        left: { style: "thin", color: { argb: "FF059669" } },
+        right: { style: "thin", color: { argb: "FF059669" } },
+      };
+    });
+
+    // Add data rows
+    selectedData.forEach((stone, index) => {
+      const row = worksheet.addRow({
+        sku: stone.sku || "",
+        shape: stone.shape || "",
+        weight: stone.weightCt || "",
+        measurements: stone.measurements || "",
+        color: stone.color || "",
+        clarity: stone.clarity || "",
+        treatment: stone.treatment || "",
+        origin: stone.origin || "",
+        lab: stone.lab || "",
+        pricePerCt: stone.pricePerCt || "",
+        priceTotal: stone.priceTotal || "",
+        certificate: stone.certificateUrl || "",
+        image: stone.imageUrl || "",
+        video: stone.videoUrl || "",
+      });
+
+      // Zebra striping (alternating row colors)
+      const isEvenRow = index % 2 === 0;
+      row.eachCell((cell, colNumber) => {
+        // Background color
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: isEvenRow ? "FFF9FAFB" : "FFFFFFFF" },
+        };
+        
+        // Border
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE5E7EB" } },
+          bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+          left: { style: "thin", color: { argb: "FFE5E7EB" } },
+          right: { style: "thin", color: { argb: "FFE5E7EB" } },
+        };
+
+        // Alignment
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: colNumber <= 9 ? "center" : "left",
+        };
+
+        // Font
+        cell.font = {
+          size: 10,
+          name: "Arial",
+          color: { argb: "FF1F2937" },
+        };
+      });
+
+      // Format price columns as currency
+      const pricePerCtCell = row.getCell("pricePerCt");
+      const priceTotalCell = row.getCell("priceTotal");
+      if (stone.pricePerCt) {
+        pricePerCtCell.numFmt = '"$"#,##0.00';
+      }
+      if (stone.priceTotal) {
+        priceTotalCell.numFmt = '"$"#,##0.00';
+        priceTotalCell.font = { ...priceTotalCell.font, bold: true };
+      }
+
+      // Make URLs clickable
+      if (stone.certificateUrl) {
+        row.getCell("certificate").value = { text: "View Certificate", hyperlink: stone.certificateUrl };
+        row.getCell("certificate").font = { color: { argb: "FF10B981" }, underline: true, size: 10 };
+      }
+      if (stone.imageUrl) {
+        row.getCell("image").value = { text: "View Image", hyperlink: stone.imageUrl };
+        row.getCell("image").font = { color: { argb: "FF10B981" }, underline: true, size: 10 };
+      }
+      if (stone.videoUrl) {
+        row.getCell("video").value = { text: "View Video", hyperlink: stone.videoUrl };
+        row.getCell("video").font = { color: { argb: "FF10B981" }, underline: true, size: 10 };
+      }
+
+      row.height = 22;
+    });
+
+    // Add auto-filter on header row (row 6)
+    worksheet.autoFilter = {
+      from: { row: 6, column: 1 },
+      to: { row: 6 + selectedData.length, column: 14 },
+    };
+
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const exportDate = new Date().toISOString().split("T")[0];
+    const filename = `ESHED_Export_${exportDate}.xlsx`;
+    saveAs(new Blob([buffer]), filename);
+  };
 
   const handleSort = (field) => {
     setSortConfig((prev) => ({
@@ -686,12 +1044,31 @@ const StoneSearchPage = () => {
   }, [stones]);
 
   const filteredStones = useMemo(() => {
+    // Helper to parse measurements string like "11.92-7.85-5.60" into { length, width, depth }
+    const parseMeasurements = (measurements) => {
+      if (!measurements) return { length: null, width: null, depth: null };
+      const parts = measurements.split('-').map(p => parseFloat(p.trim()));
+      return {
+        length: parts[0] && !isNaN(parts[0]) ? parts[0] : null,
+        width: parts[1] && !isNaN(parts[1]) ? parts[1] : null,
+        depth: parts[2] && !isNaN(parts[2]) ? parts[2] : null,
+      };
+    };
+
     return stones.filter((stone) => {
       if (filters.sku && !stone.sku?.toLowerCase().includes(filters.sku.toLowerCase())) return false;
       if (filters.minPrice && stone.priceTotal != null && stone.priceTotal < Number(filters.minPrice)) return false;
       if (filters.maxPrice && stone.priceTotal != null && stone.priceTotal > Number(filters.maxPrice)) return false;
       if (filters.minCarat && stone.weightCt != null && stone.weightCt < Number(filters.minCarat)) return false;
       if (filters.maxCarat && stone.weightCt != null && stone.weightCt > Number(filters.maxCarat)) return false;
+      
+      // Measurements filter (length and width)
+      const dims = parseMeasurements(stone.measurements);
+      if (filters.minLength && dims.length != null && dims.length < Number(filters.minLength)) return false;
+      if (filters.maxLength && dims.length != null && dims.length > Number(filters.maxLength)) return false;
+      if (filters.minWidth && dims.width != null && dims.width < Number(filters.minWidth)) return false;
+      if (filters.maxWidth && dims.width != null && dims.width > Number(filters.maxWidth)) return false;
+      
       if (filters.shape !== "All shapes" && stone.shape !== filters.shape) return false;
       if (filters.treatment !== "All treatments" && stone.treatment !== filters.treatment) return false;
       if (filters.category !== "All categories" && stone.category !== filters.category) return false;
@@ -731,7 +1108,29 @@ const StoneSearchPage = () => {
                   {loading ? 'Loading...' : `${totalItems.toLocaleString()} stones available`}
                 </p>
               </div>
-              <div className="flex items-center gap-2 p-1 rounded-xl bg-stone-100">
+              <div className="flex items-center gap-3">
+                {/* Export Button */}
+                {selectedStones.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={clearSelection}
+                      className="px-3 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors"
+                    >
+                      Clear ({selectedStones.size})
+                    </button>
+                    <button
+                      onClick={exportToExcel}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/25 transition-all"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Export Excel ({selectedStones.size})
+                    </button>
+                  </div>
+                )}
+                {/* View Mode Toggle */}
+                <div className="flex items-center gap-2 p-1 rounded-xl bg-stone-100">
                 <button
                   onClick={() => setViewMode("table")}
                   className={`p-2 rounded-lg transition-all ${viewMode === "table" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
@@ -748,6 +1147,7 @@ const StoneSearchPage = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                   </svg>
                 </button>
+                </div>
               </div>
             </div>
           </div>
@@ -770,6 +1170,10 @@ const StoneSearchPage = () => {
               error={error}
               sortConfig={sortConfig}
               onSort={handleSort}
+              selectedStones={selectedStones}
+              onToggleSelection={toggleStoneSelection}
+              onToggleSelectAll={toggleSelectAll}
+              allSelected={paginatedStones.length > 0 && paginatedStones.every((s) => selectedStones.has(s.id))}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -797,6 +1201,8 @@ const StoneSearchPage = () => {
                     stone={stone}
                     onToggle={(s) => setSelectedStone(selectedStone?.id === s.id ? null : s)}
                     isExpanded={selectedStone?.id === stone.id}
+                    isSelected={selectedStones.has(stone.id)}
+                    onToggleSelection={toggleStoneSelection}
                   />
                 ))
               )}
