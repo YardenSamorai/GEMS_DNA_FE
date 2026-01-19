@@ -291,31 +291,65 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     pdf.text('📞 +1 (212) 869-0544  •  ✉ info@gems.net  •  🌐 www.gems.net', pageWidth / 2, footerY + 4, { align: 'center' });
   };
 
-  // Helper: Load image as base64 using Image element (handles CORS better)
+  // Helper: Load image as base64 using fetch with CORS proxy
   const loadImage = async (url) => {
     if (!url) return null;
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
-        } catch (e) {
-          console.log('Canvas error:', e);
-          resolve(null);
+    
+    // Try multiple methods to load image
+    const methods = [
+      // Method 1: Direct fetch (works if server has CORS enabled)
+      async () => {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      },
+      // Method 2: Using corsproxy.io
+      async () => {
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      },
+      // Method 3: Using allorigins
+      async () => {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      }
+    ];
+    
+    for (const method of methods) {
+      try {
+        const result = await Promise.race([
+          method(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000))
+        ]);
+        if (result && result.startsWith('data:')) {
+          return result;
         }
-      };
-      img.onerror = () => resolve(null);
-      // Add timestamp to bypass cache and trigger CORS
-      img.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
-      // Timeout after 5 seconds
-      setTimeout(() => resolve(null), 5000);
-    });
+      } catch (e) {
+        console.log('Image load method failed:', e.message);
+        continue;
+      }
+    }
+    
+    return null;
   };
 
   // Calculate total pages
