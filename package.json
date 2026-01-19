@@ -26,6 +26,8 @@
     "framer-motion": "^12.7.3",
     "fs": "^0.0.1-security",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.483.0",
     "neon-cli": "^0.10.1",
     "pg": "^8.14.0",

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { Html5Qrcode } from "html5-qrcode";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 const ITEMS_PER_PAGE = 50;
 const API_BASE = "https://gems-dna-be.vercel.app";
@@ -211,6 +213,384 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
   saveAs(blob, filename);
 };
 
+/* ---------------- PDF Catalog Generator ---------------- */
+const generatePDFCatalog = async (selectedStones, options = {}) => {
+  if (!selectedStones || selectedStones.length === 0) {
+    alert("Please select stones to generate PDF");
+    return;
+  }
+
+  const { 
+    layout = 'grid', // 'grid' or 'list'
+    showPrices = true,
+    itemsPerPage = layout === 'grid' ? 6 : 4
+  } = options;
+
+  // Create PDF - A4 size
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 15;
+  const contentWidth = pageWidth - (margin * 2);
+
+  // Colors
+  const primaryColor = [16, 185, 129]; // Emerald green
+  const darkColor = [31, 41, 55];
+  const lightGray = [156, 163, 175];
+
+  // Helper: Add header to each page
+  const addHeader = (pageNum, totalPages) => {
+    // Top accent bar
+    pdf.setFillColor(...primaryColor);
+    pdf.rect(0, 0, pageWidth, 8, 'F');
+    
+    // Company name
+    pdf.setFontSize(24);
+    pdf.setTextColor(...darkColor);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('GEMSTAR', margin, 20);
+    
+    // Tagline
+    pdf.setFontSize(10);
+    pdf.setTextColor(...lightGray);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Premium Gemstones & Diamonds', margin, 26);
+    
+    // Date and page number on right
+    pdf.setFontSize(9);
+    const date = new Date().toLocaleDateString('en-GB');
+    pdf.text(date, pageWidth - margin, 20, { align: 'right' });
+    pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, 26, { align: 'right' });
+    
+    // Separator line
+    pdf.setDrawColor(...primaryColor);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, 32, pageWidth - margin, 32);
+    
+    return 38; // Return Y position after header
+  };
+
+  // Helper: Add footer to each page
+  const addFooter = () => {
+    const footerY = pageHeight - 15;
+    
+    // Footer line
+    pdf.setDrawColor(...lightGray);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+    
+    // Contact info
+    pdf.setFontSize(8);
+    pdf.setTextColor(...lightGray);
+    pdf.text('📍 New York  •  Tel Aviv  •  Hong Kong  •  Los Angeles', pageWidth / 2, footerY, { align: 'center' });
+    pdf.text('📞 +1 (212) 869-0544  •  ✉ info@gems.net  •  🌐 www.gems.net', pageWidth / 2, footerY + 4, { align: 'center' });
+  };
+
+  // Helper: Load image as base64 using Image element (handles CORS better)
+  const loadImage = async (url) => {
+    if (!url) return null;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        } catch (e) {
+          console.log('Canvas error:', e);
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      // Add timestamp to bypass cache and trigger CORS
+      img.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+      // Timeout after 5 seconds
+      setTimeout(() => resolve(null), 5000);
+    });
+  };
+
+  // Calculate total pages
+  const totalPages = Math.ceil(selectedStones.length / itemsPerPage) + 1; // +1 for cover
+
+  // === COVER PAGE ===
+  let currentPage = 1;
+  
+  // Cover background
+  pdf.setFillColor(31, 41, 55);
+  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+  
+  // Accent bar
+  pdf.setFillColor(...primaryColor);
+  pdf.rect(0, pageHeight * 0.4, pageWidth, 3, 'F');
+  
+  // Company name
+  pdf.setFontSize(48);
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('GEMSTAR', pageWidth / 2, pageHeight * 0.35, { align: 'center' });
+  
+  // Tagline
+  pdf.setFontSize(14);
+  pdf.setTextColor(...primaryColor);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, pageHeight * 0.35 + 12, { align: 'center' });
+  
+  // Catalog title
+  pdf.setFontSize(28);
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.55, { align: 'center' });
+  
+  // Summary info
+  pdf.setFontSize(12);
+  pdf.setTextColor(...lightGray);
+  const totalWeight = selectedStones.reduce((sum, s) => sum + (s.weightCt || 0), 0);
+  pdf.text(`${selectedStones.length} Stones  •  ${totalWeight.toFixed(2)} Total Carats`, pageWidth / 2, pageHeight * 0.55 + 12, { align: 'center' });
+  
+  // Date
+  pdf.setFontSize(11);
+  pdf.text(new Date().toLocaleDateString('en-GB', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  }), pageWidth / 2, pageHeight * 0.55 + 22, { align: 'center' });
+  
+  // Contact info at bottom
+  pdf.setFontSize(10);
+  pdf.setTextColor(...lightGray);
+  pdf.text('www.gems.net', pageWidth / 2, pageHeight - 30, { align: 'center' });
+  pdf.text('+1 (212) 869-0544  •  info@gems.net', pageWidth / 2, pageHeight - 24, { align: 'center' });
+
+  // === CONTENT PAGES ===
+  if (layout === 'grid') {
+    // Grid layout: 2 columns x 3 rows = 6 items per page
+    const cols = 2;
+    const rows = 3;
+    const cardWidth = (contentWidth - 10) / cols;
+    const cardHeight = 72;
+    
+    for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
+      pdf.addPage();
+      currentPage++;
+      let startY = addHeader(currentPage, totalPages);
+      
+      const pageStones = selectedStones.slice(i, i + itemsPerPage);
+      
+      for (let j = 0; j < pageStones.length; j++) {
+        const stone = pageStones[j];
+        const col = j % cols;
+        const row = Math.floor(j / cols);
+        
+        const x = margin + (col * (cardWidth + 10));
+        const y = startY + (row * (cardHeight + 8));
+        
+        // Card background
+        pdf.setFillColor(249, 250, 251);
+        pdf.roundedRect(x, y, cardWidth, cardHeight, 3, 3, 'F');
+        
+        // Card border
+        pdf.setDrawColor(229, 231, 235);
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(x, y, cardWidth, cardHeight, 3, 3, 'S');
+        
+        // Image placeholder
+        const imgSize = 35;
+        pdf.setFillColor(229, 231, 235);
+        pdf.rect(x + 5, y + 5, imgSize, imgSize, 'F');
+        
+        // Load and add image if available
+        if (stone.imageUrl) {
+          try {
+            const imgData = await loadImage(stone.imageUrl);
+            if (imgData) {
+              pdf.addImage(imgData, 'JPEG', x + 5, y + 5, imgSize, imgSize);
+            }
+          } catch (e) {
+            // Image failed, keep placeholder
+          }
+        }
+        
+        // Stone details
+        const textX = x + imgSize + 10;
+        const textWidth = cardWidth - imgSize - 15;
+        
+        // SKU
+        pdf.setFontSize(10);
+        pdf.setTextColor(...darkColor);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(stone.sku || 'N/A', textX, y + 12);
+        
+        // Shape & Weight
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...darkColor);
+        pdf.text(`${stone.shape || 'N/A'} • ${stone.weightCt || '?'}ct`, textX, y + 19);
+        
+        // Category indicator
+        const category = (stone.category || '').toLowerCase();
+        let catColor = lightGray;
+        let catLabel = 'Gem';
+        if (category.includes('emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
+        else if (category.includes('fancy')) { catColor = [251, 191, 36]; catLabel = 'Fancy'; }
+        else if (category.includes('diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
+        
+        pdf.setFontSize(7);
+        pdf.setTextColor(...catColor);
+        pdf.text(catLabel.toUpperCase(), textX, y + 25);
+        
+        // Details
+        pdf.setFontSize(8);
+        pdf.setTextColor(...lightGray);
+        if (category.includes('emerald')) {
+          pdf.text(`Treatment: ${stone.treatment || 'N/A'}`, textX, y + 32);
+          pdf.text(`Origin: ${stone.origin || 'N/A'}`, textX, y + 37);
+        } else {
+          pdf.text(`Color: ${stone.color || 'N/A'} • Clarity: ${stone.clarity || 'N/A'}`, textX, y + 32);
+          if (stone.cut) pdf.text(`Cut: ${stone.cut}`, textX, y + 37);
+        }
+        pdf.text(`Lab: ${stone.lab || 'N/A'}`, textX, y + 42);
+        
+        // Price (if enabled)
+        if (showPrices && stone.priceTotal) {
+          pdf.setFontSize(11);
+          pdf.setTextColor(...primaryColor);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`$${stone.priceTotal.toLocaleString()}`, x + cardWidth - 5, y + cardHeight - 8, { align: 'right' });
+        }
+        
+        // DNA Link - Button style
+        const dnaLinkX = x + 5;
+        const dnaLinkY = y + cardHeight - 10;
+        pdf.setFillColor(139, 92, 246); // Purple background
+        pdf.roundedRect(dnaLinkX, dnaLinkY, 22, 7, 1.5, 1.5, 'F');
+        pdf.setFontSize(6);
+        pdf.setTextColor(255, 255, 255); // White text
+        pdf.setFont('helvetica', 'bold');
+        pdf.textWithLink('View DNA', dnaLinkX + 2.5, dnaLinkY + 5, { url: `https://gems-dna.com/${stone.sku}` });
+      }
+      
+      addFooter();
+    }
+  } else {
+    // List layout: Full width cards, 4 per page
+    const cardHeight = 50;
+    
+    for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
+      pdf.addPage();
+      currentPage++;
+      let y = addHeader(currentPage, totalPages);
+      
+      const pageStones = selectedStones.slice(i, i + itemsPerPage);
+      
+      for (let j = 0; j < pageStones.length; j++) {
+        const stone = pageStones[j];
+        
+        // Card background
+        pdf.setFillColor(249, 250, 251);
+        pdf.roundedRect(margin, y, contentWidth, cardHeight, 3, 3, 'F');
+        
+        // Card border
+        pdf.setDrawColor(229, 231, 235);
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(margin, y, contentWidth, cardHeight, 3, 3, 'S');
+        
+        // Image placeholder
+        const imgSize = 40;
+        pdf.setFillColor(229, 231, 235);
+        pdf.rect(margin + 5, y + 5, imgSize, imgSize, 'F');
+        
+        // Load and add image
+        if (stone.imageUrl) {
+          try {
+            const imgData = await loadImage(stone.imageUrl);
+            if (imgData) {
+              pdf.addImage(imgData, 'JPEG', margin + 5, y + 5, imgSize, imgSize);
+            }
+          } catch (e) {
+            // Keep placeholder
+          }
+        }
+        
+        const textX = margin + imgSize + 15;
+        
+        // SKU & Shape
+        pdf.setFontSize(12);
+        pdf.setTextColor(...darkColor);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`${stone.sku}  •  ${stone.shape || 'N/A'}  •  ${stone.weightCt || '?'}ct`, textX, y + 12);
+        
+        // Category
+        const category = (stone.category || '').toLowerCase();
+        let catColor = lightGray;
+        let catLabel = 'Gemstone';
+        if (category.includes('emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
+        else if (category.includes('fancy')) { catColor = [251, 191, 36]; catLabel = 'Fancy Diamond'; }
+        else if (category.includes('diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
+        
+        pdf.setFontSize(8);
+        pdf.setTextColor(...catColor);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(catLabel.toUpperCase(), textX, y + 19);
+        
+        // Details row 1
+        pdf.setFontSize(9);
+        pdf.setTextColor(...lightGray);
+        pdf.setFont('helvetica', 'normal');
+        if (category.includes('emerald')) {
+          pdf.text(`Treatment: ${stone.treatment || 'N/A'}  •  Origin: ${stone.origin || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
+        } else {
+          pdf.text(`Color: ${stone.color || 'N/A'}  •  Clarity: ${stone.clarity || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
+        }
+        
+        // Details row 2
+        pdf.text(`Measurements: ${stone.measurements || 'N/A'}  •  Ratio: ${stone.ratio || 'N/A'}`, textX, y + 35);
+        
+        // Price
+        if (showPrices && stone.priceTotal) {
+          pdf.setFontSize(14);
+          pdf.setTextColor(...primaryColor);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`$${stone.priceTotal.toLocaleString()}`, pageWidth - margin - 5, y + 20, { align: 'right' });
+          
+          if (stone.pricePerCt) {
+            pdf.setFontSize(9);
+            pdf.setTextColor(...lightGray);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`$${stone.pricePerCt.toLocaleString()}/ct`, pageWidth - margin - 5, y + 27, { align: 'right' });
+          }
+        }
+        
+        // DNA Link - Button style
+        const dnaLinkX = pageWidth - margin - 28;
+        const dnaLinkY = y + 36;
+        pdf.setFillColor(139, 92, 246); // Purple background
+        pdf.roundedRect(dnaLinkX, dnaLinkY, 25, 8, 2, 2, 'F');
+        pdf.setFontSize(7);
+        pdf.setTextColor(255, 255, 255); // White text
+        pdf.setFont('helvetica', 'bold');
+        pdf.textWithLink('View DNA', dnaLinkX + 3, dnaLinkY + 5.5, { url: `https://gems-dna.com/${stone.sku}` });
+        
+        y += cardHeight + 8;
+      }
+      
+      addFooter();
+    }
+  }
+
+  // Save PDF
+  const filename = `Gemstar_Catalog_${new Date().toISOString().split('T')[0]}_${selectedStones.length}pcs.pdf`;
+  pdf.save(filename);
+};
+
 /* ---------------- Category Export Choice Modal ---------------- */
 const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
   if (!isOpen) return null;
@@ -319,6 +699,160 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
               className="w-full py-2.5 text-stone-600 hover:text-stone-800 font-medium transition-colors"
             >
               Cancel
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+/* ---------------- PDF Options Modal ---------------- */
+const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating }) => {
+  const [layout, setLayout] = useState('grid');
+  const [showPrices, setShowPrices] = useState(true);
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-red-500 to-pink-500 px-6 py-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              PDF Catalog
+            </h2>
+            <p className="text-white/80 text-sm mt-1">
+              Generate a professional catalog with {stoneCount} stones
+            </p>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-6">
+            {/* Layout Selection */}
+            <div>
+              <h3 className="font-semibold text-stone-700 mb-3">Layout Style</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setLayout('grid')}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    layout === 'grid'
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  <div className="grid grid-cols-2 gap-1 mb-2">
+                    {[1,2,3,4].map(i => (
+                      <div key={i} className={`h-4 rounded ${layout === 'grid' ? 'bg-red-300' : 'bg-stone-300'}`} />
+                    ))}
+                  </div>
+                  <span className={`text-sm font-medium ${layout === 'grid' ? 'text-red-700' : 'text-stone-600'}`}>
+                    Grid (6/page)
+                  </span>
+                </button>
+                
+                <button
+                  onClick={() => setLayout('list')}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    layout === 'list'
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  <div className="space-y-1 mb-2">
+                    {[1,2,3].map(i => (
+                      <div key={i} className={`h-3 rounded ${layout === 'list' ? 'bg-red-300' : 'bg-stone-300'}`} />
+                    ))}
+                  </div>
+                  <span className={`text-sm font-medium ${layout === 'list' ? 'text-red-700' : 'text-stone-600'}`}>
+                    List (4/page)
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Options */}
+            <div>
+              <h3 className="font-semibold text-stone-700 mb-3">Options</h3>
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 cursor-pointer hover:bg-stone-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={showPrices}
+                  onChange={(e) => setShowPrices(e.target.checked)}
+                  className="w-5 h-5 rounded border-stone-300 text-red-500 focus:ring-red-500"
+                />
+                <div>
+                  <span className="font-medium text-stone-700">Show Prices</span>
+                  <p className="text-xs text-stone-500">Include price information in the catalog</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Preview info */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 border border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-red-700">
+                    {Math.ceil(stoneCount / (layout === 'grid' ? 6 : 4)) + 1} pages
+                  </p>
+                  <p className="text-xs text-red-600">
+                    Including cover page
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex gap-3 px-6 py-4 bg-stone-50 border-t border-stone-200">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 text-stone-600 hover:text-stone-800 font-medium transition-colors rounded-lg hover:bg-stone-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onGenerate({ layout, showPrices })}
+              disabled={isGenerating}
+              className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Generate PDF
+                </>
+              )}
             </button>
           </div>
         </motion.div>
@@ -736,7 +1270,16 @@ const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, on
 };
 
 /* ---------------- Export Modal ---------------- */
-const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
+const ExportModal = ({ 
+  isOpen, 
+  onClose, 
+  selectedStones, 
+  onExport,
+  title = "Export Preview",
+  subtitle = null,
+  buttonText = "Export",
+  buttonColor = "from-emerald-500 to-emerald-600"
+}) => {
   const [globalMarkup, setGlobalMarkup] = useState(0);
   const [priceOverrides, setPriceOverrides] = useState({});
 
@@ -838,7 +1381,7 @@ const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r from-emerald-500 to-emerald-600">
+          <div className={`px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r ${buttonColor}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -847,8 +1390,8 @@ const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-white">Export Preview</h2>
-                  <p className="text-emerald-100 text-xs sm:text-sm">{selectedStones.length} stones selected</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-white">{title}</h2>
+                  <p className="text-white/80 text-xs sm:text-sm">{subtitle || `${selectedStones.length} stones selected`}</p>
                 </div>
               </div>
               <button
@@ -1078,13 +1621,12 @@ const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
                 </button>
                 <button
                   onClick={handleExport}
-                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+                  className={`flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-white bg-gradient-to-r ${buttonColor} rounded-xl hover:opacity-90 shadow-lg transition-all flex items-center justify-center gap-2`}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <span className="hidden sm:inline">Export Excel</span>
-                  <span className="sm:hidden">Export</span>
+                  <span>{buttonText}</span>
                 </button>
               </div>
             </div>
@@ -1861,9 +2403,10 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
     }}
     className={`rounded-2xl border-2 overflow-hidden shadow-md cursor-pointer transition-all duration-200 ${
       isSelected 
-        ? 'border-emerald-500 bg-emerald-100 shadow-emerald-200 shadow-lg' 
+        ? 'shadow-lg' 
         : 'border-stone-200 bg-white hover:border-stone-300'
     }`}
+    style={isSelected ? { borderColor: '#2FAB81', backgroundColor: '#2FAB8120' } : {}}
   >
     <div className="p-4">
       <div className="flex gap-4">
@@ -2141,9 +2684,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
         animate={{ opacity: 1 }}
         className={`rounded-2xl border overflow-hidden shadow-sm transition-colors duration-200 ${
           isSelected 
-            ? 'border-emerald-400 bg-emerald-50 shadow-emerald-100 ring-2 ring-emerald-200' 
+            ? 'ring-2' 
             : 'border-stone-200 bg-white'
         }`}
+        style={isSelected ? { borderColor: '#2FAB81', backgroundColor: '#2FAB8115', boxShadow: '0 0 0 2px #2FAB8140' } : {}}
       >
         {/* Main Card Content */}
         <div 
@@ -2412,11 +2956,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                       }}
                       className={`transition-colors cursor-pointer ${
                         selectedStones?.has(stone.id) 
-                          ? 'bg-emerald-50 border-l-4 border-l-emerald-500 hover:bg-emerald-100/70' 
+                          ? 'border-l-4' 
                           : isExpanded 
                             ? 'bg-primary-50/30 hover:bg-stone-50/50' 
                             : 'hover:bg-stone-50/50'
                       }`}
+                      style={selectedStones?.has(stone.id) ? { backgroundColor: '#2FAB8115', borderLeftColor: '#2FAB81' } : {}}
                     >
                       <td className="px-4 py-3 text-center">
                         <input
@@ -2597,6 +3142,10 @@ const StoneSearchPage = () => {
   const [drawerStone, setDrawerStone] = useState(null); // DNA Drawer
   const [showCategoryExportModal, setShowCategoryExportModal] = useState(false); // Category export choice
   const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
+  const [showPDFModal, setShowPDFModal] = useState(false); // PDF Catalog modal
+  const [pdfGenerating, setPdfGenerating] = useState(false); // PDF generation loading state
+  const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
+  const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const exportButtonRef = useRef(null);
@@ -4008,92 +4557,191 @@ const StoneSearchPage = () => {
                 const totalWeight = selectedStonesArray.reduce((sum, s) => sum + (s.weightCt || 0), 0);
                 
                 return (
-                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                  {/* Left side - Selection info */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-emerald-700">
-                      {selectedStones.size} selected
-                    </span>
-                    <span className="text-xs text-emerald-600">
-                      ({totalWeight.toFixed(2)} cts)
-                    </span>
-                    {/* Category badges */}
-                    <div className="flex flex-wrap gap-1">
-                      {categories.map(([cat, count]) => (
-                        <span 
-                          key={cat}
-                          className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                            cat.toLowerCase().includes('emerald') 
-                              ? 'bg-green-100 text-green-700' 
-                              : cat.toLowerCase().includes('fancy')
-                              ? 'bg-amber-100 text-amber-700'
-                              : cat.toLowerCase().includes('diamond')
-                              ? 'bg-blue-100 text-blue-700'
-                              : cat.toLowerCase().includes('ruby')
-                              ? 'bg-red-100 text-red-700'
-                              : cat.toLowerCase().includes('sapphire')
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : 'bg-stone-100 text-stone-700'
-                          }`}
-                        >
-                          {cat}: {count}
-                        </span>
-                      ))}
-                    </div>
-                    <button
-                      onClick={clearSelection}
-                      className="px-3 py-1.5 text-xs sm:text-sm text-stone-600 hover:text-stone-800 hover:bg-white rounded-lg transition-colors"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  
-                  {/* Right side - Action buttons */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleExportClick}
-                      className="flex items-center justify-center gap-2 px-5 py-2.5 sm:px-6 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-sm font-medium rounded-lg shadow-md transition-all min-w-[100px]"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Excel
-                    </button>
-                    {/* Labels Dropdown */}
-                    <div className="relative group">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl border" style={{ backgroundColor: '#2FAB8115', borderColor: '#2FAB8140' }}>
+                  {/* Top/Left - Selection info and Actions button on mobile */}
+                  <div className="flex items-center justify-between gap-2 w-full sm:w-auto">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium" style={{ color: '#2FAB81' }}>
+                        {selectedStones.size} selected
+                      </span>
+                      <span className="text-xs" style={{ color: '#2FAB81CC' }}>
+                        ({totalWeight.toFixed(2)} cts)
+                      </span>
+                      {/* Category badges - hidden on very small screens */}
+                      <div className="hidden xs:flex flex-wrap gap-1">
+                        {categories.slice(0, 2).map(([cat, count]) => (
+                          <span 
+                            key={cat}
+                            className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                              cat.toLowerCase().includes('emerald') 
+                                ? 'bg-green-100 text-green-700' 
+                                : cat.toLowerCase().includes('fancy')
+                                ? 'bg-amber-100 text-amber-700'
+                                : cat.toLowerCase().includes('diamond')
+                                ? 'bg-blue-100 text-blue-700'
+                                : cat.toLowerCase().includes('ruby')
+                                ? 'bg-red-100 text-red-700'
+                                : cat.toLowerCase().includes('sapphire')
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : 'bg-stone-100 text-stone-700'
+                            }`}
+                          >
+                            {cat}: {count}
+                          </span>
+                        ))}
+                        {categories.length > 2 && (
+                          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-stone-100 text-stone-700">
+                            +{categories.length - 2}
+                          </span>
+                        )}
+                      </div>
                       <button
-                        className="flex items-center justify-center gap-2 px-5 py-2.5 sm:px-6 sm:py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white text-sm font-medium rounded-lg shadow-md transition-all min-w-[100px]"
-                        title="Labels for Niimbot"
+                        onClick={clearSelection}
+                        className="px-2 py-1 text-xs text-stone-600 hover:text-stone-800 hover:bg-white rounded-lg transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  
+                  {/* Actions Dropdown - visible on mobile in this row */}
+                    <div className="relative group sm:hidden">
+                      <button
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900 text-white text-sm font-medium rounded-lg shadow-md transition-all"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                        </svg>
+                        Actions
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      
+                      {/* Mobile Dropdown Menu - opens upward */}
+                      <div className="absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
+                        <button
+                          onClick={handleExportClick}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <span className="font-medium">Excel</span>
+                        </button>
+                        <button
+                          onClick={() => setShowPDFPriceModal(true)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <span className="font-medium">PDF</span>
+                        </button>
+                        <button
+                          onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                          </div>
+                          <span className="font-medium">Labels</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Desktop Actions Dropdown - hidden on mobile */}
+                  <div className="relative group hidden sm:block">
+                    <button
+                      className="flex items-center justify-center gap-2 px-5 py-2.5 sm:px-6 sm:py-2.5 bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900 text-white text-sm font-medium rounded-lg shadow-md transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
                       </svg>
-                      Labels
+                      Actions
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
+                    
+                    {/* Actions Dropdown Menu */}
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
+                      {/* Export Section */}
+                      <div className="px-3 py-2 bg-stone-50 border-b border-stone-200">
+                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Export</span>
+                      </div>
+                      
+                      <button
+                        onClick={handleExportClick}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium">Export to Excel</span>
+                          <p className="text-xs text-stone-500">Spreadsheet with all details</p>
+                        </div>
+                      </button>
+                      
+                      <button
+                        onClick={() => setShowPDFPriceModal(true)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium">Generate PDF Catalog</span>
+                          <p className="text-xs text-stone-500">Professional catalog with images</p>
+                        </div>
+                      </button>
+                      
+                      {/* Labels Section */}
+                      <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
+                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Labels</span>
+                      </div>
+                      
                       <button
                         onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                       >
-                        <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download Excel
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium">Niimbot Labels</span>
+                          <p className="text-xs text-stone-500">Download label Excel</p>
+                        </div>
                       </button>
+                      
                       <button
                         onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), true)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                       >
-                        <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                        </svg>
-                        Share to Niimbot
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium">Share to Niimbot</span>
+                          <p className="text-xs text-stone-500">Send directly to app</p>
+                        </div>
                       </button>
                     </div>
-                  </div>
                   </div>
                 </div>
                 );
@@ -4202,58 +4850,67 @@ const StoneSearchPage = () => {
         </div>
       </div>
 
-      {/* Floating Buttons */}
+      {/* Floating Actions Button */}
       <AnimatePresence>
         {showFloatingExport && (
           <motion.div
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            className="fixed right-6 bottom-6 z-40 flex flex-col gap-3"
+            className="fixed right-6 bottom-6 z-40"
           >
-            {/* Floating Labels Button */}
             <div className="relative group">
               <button
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-2xl shadow-2xl shadow-purple-500/30 transition-all hover:scale-105"
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900 text-white font-medium rounded-2xl shadow-2xl shadow-stone-500/30 transition-all hover:scale-105"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
                 </svg>
-                <span>Labels ({selectedStones.size})</span>
+                <span>Actions ({selectedStones.size})</span>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
               </button>
-              {/* Dropdown menu - appears above */}
-              <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-stone-200 overflow-hidden">
+              
+              {/* Floating Actions Dropdown - appears above */}
+              <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-stone-200 overflow-hidden">
+                <button
+                  onClick={handleExportClick}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Export to Excel</span>
+                </button>
+                
+                <button
+                  onClick={() => setShowPDFPriceModal(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Generate PDF</span>
+                </button>
+                
                 <button
                   onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download Excel
-                </button>
-                <button
-                  onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), true)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                 >
-                  <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  Share to Niimbot
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Niimbot Labels</span>
                 </button>
               </div>
             </div>
-            
-            {/* Floating Export Button */}
-            <button
-              onClick={handleExportClick}
-              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-2xl shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span>Export ({selectedStones.size})</span>
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -4298,6 +4955,49 @@ const StoneSearchPage = () => {
         onCreateTag={createTag}
         onDeleteTag={deleteTag}
         onUpdateTag={updateTag}
+      />
+
+      {/* PDF Price Adjustment Modal (Step 1) */}
+      <ExportModal
+        isOpen={showPDFPriceModal}
+        onClose={() => setShowPDFPriceModal(false)}
+        selectedStones={stones.filter((s) => selectedStones.has(s.id))}
+        onExport={(modifiedStones) => {
+          setPdfStonesWithPrices(modifiedStones);
+          setShowPDFPriceModal(false);
+          setShowPDFModal(true);
+        }}
+        title="Adjust Prices for PDF"
+        subtitle="Modify prices before generating the catalog"
+        buttonText="Continue to PDF Options"
+        buttonColor="from-red-500 to-pink-500"
+      />
+
+      {/* PDF Options Modal (Step 2) */}
+      <PDFOptionsModal
+        isOpen={showPDFModal}
+        onClose={() => {
+          setShowPDFModal(false);
+          setPdfStonesWithPrices([]);
+        }}
+        stoneCount={pdfStonesWithPrices.length || selectedStones.size}
+        isGenerating={pdfGenerating}
+        onGenerate={async (options) => {
+          setPdfGenerating(true);
+          try {
+            const stonesToUse = pdfStonesWithPrices.length > 0 
+              ? pdfStonesWithPrices 
+              : stones.filter(s => selectedStones.has(s.id));
+            await generatePDFCatalog(stonesToUse, options);
+            setShowPDFModal(false);
+            setPdfStonesWithPrices([]);
+          } catch (err) {
+            console.error('PDF generation failed:', err);
+            alert('Failed to generate PDF. Please try again.');
+          } finally {
+            setPdfGenerating(false);
+          }
+        }}
       />
 
       {/* DNA Drawer */}
