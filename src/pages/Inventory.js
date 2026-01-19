@@ -50,6 +50,167 @@ const shareToWhatsApp = (stone, includePrice = false) => {
   window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
 };
 
+/* ---------------- Price Encoding (BARELOVSK) ---------------- */
+const encodePriceBARELOVSK = (price) => {
+  if (!price || price <= 0) return "B-";
+  
+  // Round to nearest integer
+  const rounded = Math.round(price);
+  const priceStr = rounded.toString();
+  
+  // Letter mapping
+  const digitToLetter = {
+    '1': 'H',
+    '2': 'A',
+    '3': 'R',
+    '4': 'E',
+    '5': 'L',
+    '6': 'O',
+    '7': 'V',
+    '8': 'S',
+    '9': 'K',
+    '0': 'i'
+  };
+  
+  let encoded = 'B'; // Always starts with B
+  let i = 0;
+  
+  while (i < priceStr.length) {
+    // Check for trailing zeros - use Z (000) or Y (00)
+    const remaining = priceStr.substring(i);
+    
+    if (remaining === '000' || (remaining.length >= 3 && remaining.slice(-3) === '000' && i === priceStr.length - 3)) {
+      // Check if remaining is exactly "000" at the end
+      if (remaining === '000') {
+        encoded += 'Z';
+        break;
+      }
+    }
+    
+    if (remaining === '00' || (remaining.length >= 2 && remaining.slice(-2) === '00' && i === priceStr.length - 2)) {
+      // Check if remaining is exactly "00" at the end
+      if (remaining === '00') {
+        encoded += 'Y';
+        break;
+      }
+    }
+    
+    // Check for 000 pattern
+    if (i <= priceStr.length - 3 && priceStr.substring(i, i + 3) === '000') {
+      encoded += 'Z';
+      i += 3;
+      continue;
+    }
+    
+    // Check for 00 pattern
+    if (i <= priceStr.length - 2 && priceStr.substring(i, i + 2) === '00') {
+      encoded += 'Y';
+      i += 2;
+      continue;
+    }
+    
+    // Single digit
+    encoded += digitToLetter[priceStr[i]] || priceStr[i];
+    i++;
+  }
+  
+  return encoded;
+};
+
+/* ---------------- Export for Niimbot Labels ---------------- */
+const exportForLabels = async (selectedStones, shareMode = false) => {
+  if (!selectedStones || selectedStones.length === 0) {
+    alert("Please select stones to export");
+    return;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Gemstar Labels";
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet("Labels");
+
+  // Set column widths
+  worksheet.columns = [
+    { key: "details", width: 25 },
+    { key: "qr", width: 35 },
+  ];
+
+  // Add header row
+  const headerRow = worksheet.addRow(["Details", "QR Code URL"]);
+  headerRow.font = { bold: true, size: 12 };
+  headerRow.alignment = { horizontal: "center", vertical: "middle" };
+  headerRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+  headerRow.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
+
+  // Add data rows
+  selectedStones.forEach((stone) => {
+    const priceCode = encodePriceBARELOVSK(stone.pricePerCt); // Price per carat
+    
+    // Build details string with line breaks (no Hebrew labels)
+    const details = [
+      `${stone.weightCt || '?'}`,
+      `${stone.lab || 'N/A'}`,
+      `${stone.treatment || 'N/A'}`,
+      `${priceCode}`
+    ].join('\n');
+
+    const qrUrl = `https://gems-dna.com/${stone.sku}`;
+
+    const row = worksheet.addRow([details, qrUrl]);
+    
+    // Style the row - centered
+    row.height = 80; // Taller rows for multi-line content
+    
+    // Center the details column
+    row.getCell(1).alignment = { 
+      horizontal: "center", 
+      vertical: "middle",
+      wrapText: true
+    };
+    
+    // Center the QR URL column
+    row.getCell(2).alignment = { 
+      horizontal: "center", 
+      vertical: "middle"
+    };
+  });
+
+  // Generate file
+  const buffer = await workbook.xlsx.writeBuffer();
+  const filename = `Labels_${new Date().toISOString().split("T")[0]}_${selectedStones.length}pcs.xlsx`;
+  
+  // Share mode - use Web Share API
+  if (shareMode && navigator.canShare) {
+    const file = new File([buffer], filename, {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Niimbot Labels",
+          text: `${selectedStones.length} stone labels for printing`,
+        });
+        return;
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.log("Share failed, falling back to download");
+        } else {
+          return; // User cancelled
+        }
+      }
+    }
+  }
+  
+  // Fallback: Download
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  saveAs(blob, filename);
+};
+
 /* ---------------- Tags Management Modal ---------------- */
 const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTag }) => {
   const [newTagName, setNewTagName] = useState("");
@@ -3097,6 +3258,41 @@ const StoneSearchPage = () => {
                       </svg>
                       Export Excel ({selectedStones.size})
                     </button>
+                    {/* Labels Dropdown */}
+                    <div className="relative group">
+                      <button
+                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-xl shadow-lg shadow-purple-500/25 transition-all"
+                        title="Labels for Niimbot"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        Labels ({selectedStones.size})
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
+                        <button
+                          onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
+                        >
+                          <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download Excel
+                        </button>
+                        <button
+                          onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), true)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
+                        >
+                          <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                          Share to Niimbot
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
                 </div>
