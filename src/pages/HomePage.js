@@ -105,13 +105,9 @@ const BarChart = ({ data, maxValue }) => {
   );
 };
 
-// Sync Preview Dialog Component
-const SyncPreviewDialog = ({ isOpen, onClose, preview, onConfirm, syncing }) => {
-  const [activeTab, setActiveTab] = useState('summary');
-  
-  if (!isOpen || !preview) return null;
-  
-  const { summary, changes, hasMore } = preview;
+// Sync Confirmation Dialog Component (Simple version due to Vercel timeout limits)
+const SyncConfirmDialog = ({ isOpen, onClose, onConfirm, syncing, currentStats }) => {
+  if (!isOpen) return null;
   
   return (
     <AnimatePresence>
@@ -127,208 +123,82 @@ const SyncPreviewDialog = ({ isOpen, onClose, preview, onConfirm, syncing }) => 
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-white">🔄 SOAP Sync Preview</h2>
-              <p className="text-white/80 text-sm">Review changes before syncing</p>
-            </div>
-            <button onClick={onClose} className="text-white/80 hover:text-white">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-stone-50 border-b">
-            <div className="bg-white rounded-xl p-3 text-center border">
-              <p className="text-2xl font-bold text-emerald-600">+{summary.newStones}</p>
-              <p className="text-xs text-stone-500">New Stones</p>
-            </div>
-            <div className="bg-white rounded-xl p-3 text-center border">
-              <p className="text-2xl font-bold text-blue-600">{summary.updatedStones}</p>
-              <p className="text-xs text-stone-500">Updated</p>
-            </div>
-            <div className="bg-white rounded-xl p-3 text-center border">
-              <p className="text-2xl font-bold text-red-600">-{summary.removedStones}</p>
-              <p className="text-xs text-stone-500">Removed</p>
-            </div>
-            <div className="bg-white rounded-xl p-3 text-center border">
-              <p className="text-2xl font-bold text-stone-600">{summary.unchangedStones}</p>
-              <p className="text-xs text-stone-500">Unchanged</p>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex border-b bg-white">
-            {['summary', 'new', 'updated', 'removed'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === tab
-                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                    : 'text-stone-500 hover:text-stone-700 hover:bg-stone-50'
-                }`}
-              >
-                {tab === 'summary' && '📊 Summary'}
-                {tab === 'new' && `🆕 New (${summary.newStones})`}
-                {tab === 'updated' && `✏️ Updated (${summary.updatedStones})`}
-                {tab === 'removed' && `🗑️ Removed (${summary.removedStones})`}
-              </button>
-            ))}
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+            <h2 className="text-xl font-bold text-white">🔄 Sync SOAP Data</h2>
+            <p className="text-white/80 text-sm">Update inventory from Barak SOAP API</p>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-auto p-4">
-            {activeTab === 'summary' && (
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <h3 className="font-semibold text-blue-800 mb-2">📦 Data Overview</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-stone-500">Total in SOAP:</span>
-                      <span className="ml-2 font-semibold">{summary.totalInSoap}</span>
-                    </div>
-                    <div>
-                      <span className="text-stone-500">Total in DB:</span>
-                      <span className="ml-2 font-semibold">{summary.totalInDb}</span>
-                    </div>
-                  </div>
+          <div className="p-6 space-y-4">
+            {/* Current Stats */}
+            <div className="bg-stone-50 rounded-xl p-4">
+              <h3 className="font-semibold text-stone-700 mb-3">📊 Current Database</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-emerald-600">{currentStats?.totalStones || 0}</p>
+                  <p className="text-xs text-stone-500">Total Stones</p>
                 </div>
-                
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <h3 className="font-semibold text-amber-800 mb-2">⚠️ Important</h3>
-                  <p className="text-sm text-amber-700">
-                    Clicking "Confirm Sync" will replace all current data in the database with the new SOAP data.
-                    This action cannot be undone.
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-600">{Object.keys(currentStats?.categories || {}).length}</p>
+                  <p className="text-xs text-stone-500">Categories</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Warning */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <h4 className="font-semibold text-amber-800">Important</h4>
+                  <p className="text-sm text-amber-700 mt-1">
+                    This will fetch the latest data from Barak SOAP API and replace all current stones in the database.
+                    Prices will be doubled (x2) before saving.
                   </p>
                 </div>
               </div>
-            )}
+            </div>
 
-            {activeTab === 'new' && (
-              <div className="space-y-2">
-                {changes.new.length === 0 ? (
-                  <p className="text-center text-stone-500 py-8">No new stones to add</p>
-                ) : (
-                  <>
-                    {changes.new.map((item) => (
-                      <div key={item.sku} className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                        <p className="font-mono font-semibold text-emerald-700">{item.sku}</p>
-                        <div className="text-xs text-stone-600 mt-1 grid grid-cols-3 gap-2">
-                          <span>Weight: {item.fields.weight}ct</span>
-                          <span>Price/ct: ${item.fields.price_per_carat?.toLocaleString()}</span>
-                          <span>Location: {item.fields.branch || 'N/A'}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {hasMore.new && (
-                      <p className="text-center text-stone-400 text-sm py-2">
-                        +{summary.newStones - 50} more stones...
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'updated' && (
-              <div className="space-y-2">
-                {changes.updated.length === 0 ? (
-                  <p className="text-center text-stone-500 py-8">No stones to update</p>
-                ) : (
-                  <>
-                    {changes.updated.map((item) => (
-                      <div key={item.sku} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="font-mono font-semibold text-blue-700 mb-2">{item.sku}</p>
-                        <div className="space-y-1">
-                          {Object.entries(item.changes).map(([field, change]) => (
-                            <div key={field} className="flex items-center text-xs">
-                              <span className="text-stone-500 w-24">{field}:</span>
-                              <span className="text-red-500 line-through mr-2">
-                                {field.includes('price') ? `$${change.old?.toLocaleString() || 'N/A'}` : (change.old || 'N/A')}
-                              </span>
-                              <span className="text-emerald-600 font-semibold">
-                                → {field.includes('price') ? `$${change.new?.toLocaleString() || 'N/A'}` : (change.new || 'N/A')}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {hasMore.updated && (
-                      <p className="text-center text-stone-400 text-sm py-2">
-                        +{summary.updatedStones - 50} more updates...
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'removed' && (
-              <div className="space-y-2">
-                {changes.removed.length === 0 ? (
-                  <p className="text-center text-stone-500 py-8">No stones to remove</p>
-                ) : (
-                  <>
-                    {changes.removed.map((item) => (
-                      <div key={item.sku} className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p className="font-mono font-semibold text-red-700">{item.sku}</p>
-                        <p className="text-xs text-stone-500 mt-1">
-                          Will be removed from database
-                        </p>
-                      </div>
-                    ))}
-                    {hasMore.removed && (
-                      <p className="text-center text-stone-400 text-sm py-2">
-                        +{summary.removedStones - 50} more removals...
-                      </p>
-                    )}
-                  </>
-                )}
+            {/* Sync Progress */}
+            {syncing && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <div>
+                    <p className="font-semibold text-blue-800">Syncing in progress...</p>
+                    <p className="text-sm text-blue-600">This may take up to 30 seconds</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="border-t bg-stone-50 px-6 py-4 flex items-center justify-between">
-            <p className="text-sm text-stone-500">
-              Total changes: <span className="font-semibold">{summary.newStones + summary.updatedStones + summary.removedStones}</span>
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onConfirm}
-                disabled={syncing}
-                className={`px-6 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
-                  syncing
-                    ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                {syncing ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Syncing...
-                  </>
-                ) : (
-                  <>✅ Confirm Sync</>
-                )}
-              </button>
-            </div>
+          <div className="border-t bg-stone-50 px-6 py-4 flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              disabled={syncing}
+              className="px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={syncing}
+              className={`px-6 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${
+                syncing
+                  ? 'bg-blue-400 text-white cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {syncing ? 'Syncing...' : '✅ Start Sync'}
+            </button>
           </div>
         </motion.div>
       </motion.div>
@@ -345,9 +215,7 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
-  const [showSyncPreview, setShowSyncPreview] = useState(false);
-  const [syncPreviewData, setSyncPreviewData] = useState(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [stats, setStats] = useState({
     totalStones: 0,
     totalValue: 0,
@@ -445,31 +313,13 @@ const HomePage = () => {
     }
   };
 
-  // Fetch sync preview
-  const handleSyncClick = async () => {
-    if (loadingPreview) return;
-    
-    setLoadingPreview(true);
+  // Open sync dialog
+  const handleSyncClick = () => {
     setSyncResult(null);
-    
-    try {
-      const res = await fetch(`${API_BASE}/api/sync/preview`);
-      const data = await res.json();
-      
-      if (data.success) {
-        setSyncPreviewData(data);
-        setShowSyncPreview(true);
-      } else {
-        setSyncResult({ type: 'error', message: `❌ ${data.error || 'Failed to fetch preview'}` });
-      }
-    } catch (error) {
-      setSyncResult({ type: 'error', message: `❌ ${error.message || 'Connection error'}` });
-    } finally {
-      setLoadingPreview(false);
-    }
+    setShowSyncDialog(true);
   };
 
-  // Confirm and execute sync
+  // Execute sync
   const handleConfirmSync = async () => {
     if (syncing) return;
     
@@ -484,7 +334,7 @@ const HomePage = () => {
       const data = await res.json();
       
       if (data.success) {
-        setShowSyncPreview(false);
+        setShowSyncDialog(false);
         setSyncResult({ type: 'success', message: `✅ Synced ${data.count} stones!` });
         // Refresh the page data after 2 seconds
         setTimeout(() => {
@@ -566,22 +416,22 @@ const HomePage = () => {
               )}
               <button
                 onClick={handleSyncClick}
-                disabled={loadingPreview || syncing}
+                disabled={syncing}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
-                  loadingPreview || syncing
+                  syncing
                     ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.02]'
                 }`}
               >
                 <svg 
-                  className={`w-4 h-4 ${loadingPreview ? 'animate-spin' : ''}`} 
+                  className="w-4 h-4" 
                   fill="none" 
                   viewBox="0 0 24 24" 
                   stroke="currentColor"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                {loadingPreview ? 'Loading...' : 'Sync SOAP Data'}
+                Sync SOAP Data
               </button>
             </div>
           </div>
@@ -991,13 +841,13 @@ const HomePage = () => {
         </motion.div>
       </div>
 
-      {/* Sync Preview Dialog */}
-      <SyncPreviewDialog
-        isOpen={showSyncPreview}
-        onClose={() => setShowSyncPreview(false)}
-        preview={syncPreviewData}
+      {/* Sync Confirmation Dialog */}
+      <SyncConfirmDialog
+        isOpen={showSyncDialog}
+        onClose={() => setShowSyncDialog(false)}
         onConfirm={handleConfirmSync}
         syncing={syncing}
+        currentStats={stats}
       />
     </div>
   );
