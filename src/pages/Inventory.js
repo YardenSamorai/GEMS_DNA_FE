@@ -360,7 +360,7 @@ const DIAMOND_COLUMNS = [
   { key: "fluorescence", header: "Fluor.", width: 10 },
   { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
   { key: "priceTotal", header: "Total ($)", width: 14 },
-  { key: "rapPrice", header: "Rap ($)", width: 12 },
+  { key: "rapPrice", header: "Rap %", width: 10 },
   { key: "location", header: "Location", width: 10 },
   { key: "cut", header: "Cut", width: 10 },
   { key: "polish", header: "Polish", width: 10 },
@@ -388,7 +388,7 @@ const FANCY_COLUMNS = [
   { key: "fluorescence", header: "Fluor.", width: 10 },
   { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
   { key: "priceTotal", header: "Total ($)", width: 14 },
-  { key: "rapPrice", header: "Rap ($)", width: 12 },
+  { key: "rapPrice", header: "Rap %", width: 10 },
   { key: "location", header: "Location", width: 10 },
   { key: "cut", header: "Cut", width: 10 },
   { key: "polish", header: "Polish", width: 10 },
@@ -3183,8 +3183,8 @@ const StoneSearchPage = () => {
         row.getCell(priceTotalCol + 1).numFmt = '"$"#,##0';
         row.getCell(priceTotalCol + 1).font = { size: 9, color: { argb: "FF1F2937" }, bold: true };
       }
-      if (rapPriceCol >= 0 && stone.rapPrice) {
-        row.getCell(rapPriceCol + 1).numFmt = '"$"#,##0';
+      if (rapPriceCol >= 0 && stone.rapPrice != null) {
+        row.getCell(rapPriceCol + 1).numFmt = '0"%"';
       }
 
       // Make links clickable
@@ -3638,8 +3638,8 @@ const StoneSearchPage = () => {
         row.getCell(priceTotalCol + 1).numFmt = '"$"#,##0';
         row.getCell(priceTotalCol + 1).font = { size: 10, name: "Arial", color: { argb: "FF1F2937" }, bold: true };
       }
-      if (rapPriceCol >= 0 && stone.rapPrice) {
-        row.getCell(rapPriceCol + 1).numFmt = '"$"#,##0';
+      if (rapPriceCol >= 0 && stone.rapPrice != null) {
+        row.getCell(rapPriceCol + 1).numFmt = '0"%"';
       }
 
       // Make URLs clickable (only if column exists)
