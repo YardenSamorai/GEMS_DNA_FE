@@ -2581,6 +2581,7 @@ const StoneSearchPage = () => {
   const [showFloatingExport, setShowFloatingExport] = useState(false);
   const [drawerStone, setDrawerStone] = useState(null); // DNA Drawer
   const [showCategoryExportModal, setShowCategoryExportModal] = useState(false); // Category export choice
+  const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const exportButtonRef = useRef(null);
@@ -2868,6 +2869,7 @@ const StoneSearchPage = () => {
     
     // If only one category, go directly to export modal
     if (categoryCount === 1) {
+      setExportMode('combined');
       setShowExportModal(true);
     } else {
       // Multiple categories - show choice modal
@@ -2878,11 +2880,8 @@ const StoneSearchPage = () => {
   // Handle category export choice
   const handleCategoryExportChoice = (choice) => {
     setShowCategoryExportModal(false);
-    if (choice === 'separate') {
-      exportToExcelSeparate();
-    } else {
-      setShowExportModal(true); // Combined uses the regular modal
-    }
+    setExportMode(choice === 'separate' ? 'separate' : 'combined');
+    setShowExportModal(true); // Always show the price adjustment modal
   };
 
   // Export to Excel with separate sheets per category
@@ -4247,9 +4246,18 @@ const StoneSearchPage = () => {
       {/* Export Modal */}
       <ExportModal
         isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
+        onClose={() => {
+          setShowExportModal(false);
+          setExportMode('combined'); // Reset to default
+        }}
         selectedStones={stones.filter((s) => selectedStones.has(s.id))}
-        onExport={exportToExcel}
+        onExport={(modifiedStones) => {
+          if (exportMode === 'separate') {
+            exportToExcelSeparate(modifiedStones);
+          } else {
+            exportToExcel(modifiedStones);
+          }
+        }}
       />
 
       {/* Category Export Choice Modal */}
