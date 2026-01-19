@@ -222,11 +222,23 @@ const DiamondCard = () => {
                   >
                     <DetailCard icon="💎" title="Shape" value={details.shape} />
                     <DetailCard icon="⚖️" title="Carat Weight" value={`${details.carat} ct`} />
+                    {details.color && <DetailCard icon="🎨" title="Color" value={details.color} />}
                     <DetailCard icon="✨" title="Clarity" value={details.clarity} />
                     <DetailCard icon="🏛️" title="Lab" value={details.lab} />
+                    {details.fluorescence && <DetailCard icon="💡" title="Fluorescence" value={details.fluorescence} />}
                     <DetailCard icon="🌍" title="Origin" value={details.origin} />
                     <DetailCard icon="📐" title="Ratio" value={details.ratio} />
                     <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
+                    
+                    {/* Diamond-specific fields */}
+                    {details.cut && <DetailCard icon="✂️" title="Cut" value={details.cut} />}
+                    {details.polish && <DetailCard icon="✨" title="Polish" value={details.polish} />}
+                    {details.symmetry && <DetailCard icon="⚖️" title="Symmetry" value={details.symmetry} />}
+                    {details.table_percent && <DetailCard icon="📊" title="Table %" value={`${details.table_percent}%`} />}
+                    {details.depth_percent && <DetailCard icon="📏" title="Depth %" value={`${details.depth_percent}%`} />}
+                    {details.rap_price !== null && details.rap_price !== undefined && (
+                      <DetailCard icon="💰" title="Rap %" value={`${details.rap_price}%`} />
+                    )}
                     
                     {isSignedIn && (
                       <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-primary-50 to-accent-50 border border-primary-200">
@@ -266,6 +278,17 @@ const DiamondCard = () => {
                       } 
                     />
                     <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
+                    
+                    {/* Diamond-specific technical specs */}
+                    {details.cut && <DetailCard icon="✂️" title="Cut" value={details.cut} />}
+                    {details.polish && <DetailCard icon="✨" title="Polish" value={details.polish} />}
+                    {details.symmetry && <DetailCard icon="⚖️" title="Symmetry" value={details.symmetry} />}
+                    {details.table_percent && <DetailCard icon="📊" title="Table %" value={`${details.table_percent}%`} />}
+                    {details.depth_percent && <DetailCard icon="📏" title="Depth %" value={`${details.depth_percent}%`} />}
+                    {details.fluorescence && <DetailCard icon="💡" title="Fluorescence" value={details.fluorescence} />}
+                    {details.rap_price !== null && details.rap_price !== undefined && (
+                      <DetailCard icon="💰" title="Rap %" value={`${details.rap_price}%`} />
+                    )}
                   </motion.div>
                 )}
 
