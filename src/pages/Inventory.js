@@ -748,6 +748,21 @@ const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
     }
   }, [isOpen]);
 
+  // Get category color dot
+  const getCategoryDot = (category) => {
+    const cat = (category || '').toLowerCase();
+    if (cat.includes('emerald')) {
+      return <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" title="Emerald" />;
+    }
+    if (cat.includes('fancy')) {
+      return <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" title="Fancy" />;
+    }
+    if (cat.includes('diamond')) {
+      return <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" title="Diamond" />;
+    }
+    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-stone-400" title="Other" />;
+  };
+
   if (!isOpen) return null;
 
   // Calculate adjusted prices (based on Price Per Carat)
@@ -903,6 +918,7 @@ const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
                     {/* Top Row: SKU, Shape, Weight */}
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
+                        {getCategoryDot(stone.category)}
                         <span className="font-mono text-sm font-bold text-emerald-600">{stone.sku}</span>
                         <span className="text-xs text-stone-500 bg-stone-100 px-2 py-0.5 rounded">{stone.shape}</span>
                       </div>
@@ -985,7 +1001,10 @@ const ExportModal = ({ isOpen, onClose, selectedStones, onExport }) => {
                   return (
                     <tr key={stone.id} className={index % 2 === 0 ? "bg-white" : "bg-stone-50/50"}>
                       <td className="px-4 py-3">
-                        <span className="font-mono text-sm font-medium text-emerald-600">{stone.sku}</span>
+                        <div className="flex items-center gap-2">
+                          {getCategoryDot(stone.category)}
+                          <span className="font-mono text-sm font-medium text-emerald-600">{stone.sku}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-stone-700">{stone.shape}</td>
                       <td className="px-4 py-3 text-sm text-stone-700 text-center">{stone.weightCt}ct</td>
