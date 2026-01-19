@@ -2108,6 +2108,8 @@ const LoadingBar = ({ active, progress }) => {
 
 /* ---------------- Filters ---------------- */
 const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tags, onManageTags }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
   const handleChange = (field) => (e) => {
     onChange({ ...filters, [field]: e.target.value });
   };
@@ -2150,7 +2152,11 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
 
   return (
     <div className="glass rounded-2xl shadow-lg border border-white/50 p-5 mb-6">
-      <div className="flex items-center justify-between mb-4">
+      {/* Clickable Header */}
+      <div 
+        className="flex items-center justify-between cursor-pointer select-none"
+        onClick={() => setIsOpen(!isOpen)}
+      >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
             <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2164,15 +2170,35 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
             )}
           </div>
         </div>
-        <button
-          onClick={handleClear}
-          className="text-sm font-medium text-primary-600 hover:text-primary-700 px-3 py-1.5 rounded-lg hover:bg-primary-50 transition-colors"
-        >
-          Clear all
-        </button>
+        <div className="flex items-center gap-2">
+          {isOpen && activeFiltersCount > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleClear(); }}
+              className="text-sm font-medium text-primary-600 hover:text-primary-700 px-3 py-1.5 rounded-lg hover:bg-primary-50 transition-colors"
+            >
+              Clear all
+            </button>
+          )}
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isOpen ? 'bg-primary-100 rotate-180' : 'bg-stone-100'}`}>
+            <svg className="w-4 h-4 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      {/* Collapsible Content */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* SKU Search */}
         <div className="sm:col-span-2 lg:col-span-1">
           <label className="block text-xs font-medium text-stone-500 mb-1.5">Search by SKU</label>
@@ -2386,6 +2412,10 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
           </div>
         </div>
       </div>
+    </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
