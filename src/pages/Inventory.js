@@ -2952,10 +2952,18 @@ const StoneSearchPage = () => {
   const createCategorySheet = (workbook, sheetName, data, columns, accentColor) => {
     const worksheet = workbook.addWorksheet(sheetName);
     const colCount = columns.length;
-    const lastCol = String.fromCharCode(64 + colCount); // A=65, so +64 gives us A, B, C...
+    const lastCol = colCount <= 26 
+      ? String.fromCharCode(64 + colCount)
+      : 'A' + String.fromCharCode(64 + colCount - 26);
     
     // Set columns
     worksheet.columns = columns.map(col => ({ key: col.key, width: col.width }));
+
+    // Calculate totals
+    const totalWeight = data.reduce((sum, s) => sum + (s.weightCt || 0), 0);
+    const now = new Date();
+    const date = now.toLocaleDateString("en-GB");
+    const time = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
     // Header styling
     worksheet.mergeCells(`A1:${lastCol}1`);
@@ -2975,19 +2983,127 @@ const StoneSearchPage = () => {
     worksheet.getRow(2).height = 18;
 
     // Summary row
-    const totalWeight = data.reduce((sum, s) => sum + (s.weightCt || 0), 0);
     worksheet.mergeCells(`A3:${lastCol}3`);
-    worksheet.getCell("A3").value = `${data.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${new Date().toLocaleDateString("en-GB")}`;
+    worksheet.getCell("A3").value = `${data.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${date}`;
     worksheet.getCell("A3").font = { size: 10, color: { argb: "FF9CA3AF" } };
     worksheet.getCell("A3").alignment = { vertical: "middle", horizontal: "center" };
     worksheet.getCell("A3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
     worksheet.getRow(3).height = 18;
 
-    // Spacer
+    // Spacer row 4
     worksheet.getRow(4).height = 8;
 
-    // Column headers (row 5)
-    const headerRow = worksheet.getRow(5);
+    // === Summary Tables (rows 5-7) ===
+    const tableBorder = {
+      top: { style: "thin", color: { argb: accentColor } },
+      bottom: { style: "thin", color: { argb: accentColor } },
+      left: { style: "thin", color: { argb: accentColor } },
+      right: { style: "thin", color: { argb: accentColor } },
+    };
+    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
+    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6F7F1" } };
+
+    // === LEFT TABLE: Date/Time/Website ===
+    
+    // Row 5: Date
+    worksheet.getCell("A5").value = "Date";
+    worksheet.getCell("A5").font = { bold: true, size: 10, color: { argb: accentColor } };
+    worksheet.getCell("A5").fill = lightFill;
+    worksheet.getCell("A5").border = tableBorder;
+    worksheet.getCell("A5").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.mergeCells("B5:C5");
+    worksheet.getCell("B5").value = date;
+    worksheet.getCell("B5").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("B5").border = tableBorder;
+    worksheet.getCell("B5").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Row 6: Time
+    worksheet.getCell("A6").value = "Time";
+    worksheet.getCell("A6").font = { bold: true, size: 10, color: { argb: accentColor } };
+    worksheet.getCell("A6").fill = lightFill;
+    worksheet.getCell("A6").border = tableBorder;
+    worksheet.getCell("A6").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.mergeCells("B6:C6");
+    worksheet.getCell("B6").value = time;
+    worksheet.getCell("B6").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("B6").border = tableBorder;
+    worksheet.getCell("B6").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Row 7: Website Link
+    worksheet.mergeCells("A7:C7");
+    worksheet.getCell("A7").value = { text: "🌐 www.gems.net", hyperlink: "https://www.gems.net" };
+    worksheet.getCell("A7").font = { bold: true, size: 10, color: { argb: accentColor }, underline: true };
+    worksheet.getCell("A7").fill = lightFill;
+    worksheet.getCell("A7").border = tableBorder;
+    worksheet.getCell("A7").alignment = { vertical: "middle", horizontal: "center" };
+
+    // === RIGHT TABLE: Cts/Pcs Summary ===
+    
+    // Row 5: Headers
+    worksheet.getCell("E5").value = "";
+    worksheet.getCell("E5").fill = headerFill;
+    worksheet.getCell("E5").border = tableBorder;
+    
+    worksheet.getCell("F5").value = "Cts";
+    worksheet.getCell("F5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+    worksheet.getCell("F5").fill = headerFill;
+    worksheet.getCell("F5").border = tableBorder;
+    worksheet.getCell("F5").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("G5").value = "Pcs";
+    worksheet.getCell("G5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+    worksheet.getCell("G5").fill = headerFill;
+    worksheet.getCell("G5").border = tableBorder;
+    worksheet.getCell("G5").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Row 6: Total
+    worksheet.getCell("E6").value = "Total";
+    worksheet.getCell("E6").font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("E6").border = tableBorder;
+    worksheet.getCell("E6").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("F6").value = totalWeight.toFixed(2);
+    worksheet.getCell("F6").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("F6").border = tableBorder;
+    worksheet.getCell("F6").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("G6").value = data.length;
+    worksheet.getCell("G6").font = { size: 10, color: { argb: "FF1F2937" } };
+    worksheet.getCell("G6").border = tableBorder;
+    worksheet.getCell("G6").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Row 7: Selected (same as total for category sheet)
+    worksheet.getCell("E7").value = "SELECTED";
+    worksheet.getCell("E7").font = { bold: true, size: 10, color: { argb: accentColor } };
+    worksheet.getCell("E7").fill = lightFill;
+    worksheet.getCell("E7").border = tableBorder;
+    worksheet.getCell("E7").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("F7").value = totalWeight.toFixed(2);
+    worksheet.getCell("F7").font = { bold: true, size: 10, color: { argb: accentColor } };
+    worksheet.getCell("F7").fill = lightFill;
+    worksheet.getCell("F7").border = tableBorder;
+    worksheet.getCell("F7").alignment = { vertical: "middle", horizontal: "center" };
+    
+    worksheet.getCell("G7").value = data.length;
+    worksheet.getCell("G7").font = { bold: true, size: 10, color: { argb: accentColor } };
+    worksheet.getCell("G7").fill = lightFill;
+    worksheet.getCell("G7").border = tableBorder;
+    worksheet.getCell("G7").alignment = { vertical: "middle", horizontal: "center" };
+
+    // Set row heights for summary tables
+    worksheet.getRow(5).height = 22;
+    worksheet.getRow(6).height = 22;
+    worksheet.getRow(7).height = 22;
+
+    // Row 8: Spacer before main table
+    worksheet.mergeCells(`A8:${lastCol}8`);
+    worksheet.getRow(8).height = 10;
+
+    // Column headers (row 9)
+    const headerRow = worksheet.getRow(9);
     columns.forEach((col, index) => {
       headerRow.getCell(index + 1).value = col.header;
     });
@@ -3001,7 +3117,7 @@ const StoneSearchPage = () => {
       };
     });
 
-    // Data rows
+    // Data rows (starting from row 10)
     const dnaBaseUrl = "https://gems-dna.com";
     data.forEach((stone, index) => {
       const rowData = {};
@@ -3108,7 +3224,8 @@ const StoneSearchPage = () => {
     const lastColLetter = getColLetter(colCount);
 
     // FOOTER SECTION
-    const footerStartRow = 6 + data.length;
+    // Data rows start at row 10, so footer starts after: 10 + data.length
+    const footerStartRow = 10 + data.length;
     
     // Spacer row
     worksheet.mergeCells(`A${footerStartRow}:${lastColLetter}${footerStartRow}`);
