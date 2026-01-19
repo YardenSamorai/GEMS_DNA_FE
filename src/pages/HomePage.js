@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -228,7 +228,9 @@ const HomePage = () => {
   const { user } = useUser();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [stones, setStones] = useState([]);
+  const searchRef = useRef(null);
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
@@ -325,8 +327,43 @@ const HomePage = () => {
   const handleQuickSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      setShowSuggestions(false);
       navigate(`/inventory?search=${encodeURIComponent(searchQuery.trim())}`);
     }
+  };
+
+  // Get SKU suggestions based on search query
+  const skuSuggestions = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) return [];
+    const query = searchQuery.toLowerCase();
+    return stones
+      .filter(s => s.sku?.toLowerCase().includes(query))
+      .slice(0, 8) // Limit to 8 suggestions
+      .map(s => ({
+        sku: s.sku,
+        shape: s.shape,
+        category: s.category,
+        weightCt: s.weightCt,
+        imageUrl: s.imageUrl
+      }));
+  }, [searchQuery, stones]);
+
+  // Click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle suggestion click
+  const handleSuggestionClick = (sku) => {
+    setSearchQuery(sku);
+    setShowSuggestions(false);
+    navigate(`/inventory?search=${encodeURIComponent(sku)}`);
   };
 
   // Open sync info dialog
@@ -405,18 +442,23 @@ const HomePage = () => {
           </div>
         </motion.div>
 
-        {/* Quick Search Bar */}
+        {/* Quick Search Bar with Autocomplete */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="mb-6"
+          ref={searchRef}
         >
           <form onSubmit={handleQuickSearch} className="relative">
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
               placeholder="Quick search by SKU..."
               className="w-full px-5 py-4 pl-12 text-lg bg-white border border-stone-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
             />
@@ -429,6 +471,53 @@ const HomePage = () => {
             >
               Search
             </button>
+            
+            {/* Autocomplete Suggestions */}
+            <AnimatePresence>
+              {showSuggestions && skuSuggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-white border border-stone-200 rounded-xl shadow-lg z-50 overflow-hidden"
+                >
+                  {skuSuggestions.map((stone, index) => (
+                    <button
+                      key={stone.sku}
+                      type="button"
+                      onClick={() => handleSuggestionClick(stone.sku)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-emerald-50 transition-colors ${
+                        index !== skuSuggestions.length - 1 ? 'border-b border-stone-100' : ''
+                      }`}
+                    >
+                      {/* Stone Image */}
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 flex-shrink-0">
+                        {stone.imageUrl ? (
+                          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-stone-400">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      {/* Stone Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-mono font-semibold text-stone-800">{stone.sku}</p>
+                        <p className="text-sm text-stone-500 truncate">
+                          {stone.shape} • {stone.weightCt?.toFixed(2)}ct • {stone.category}
+                        </p>
+                      </div>
+                      {/* Arrow */}
+                      <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </form>
         </motion.div>
 
