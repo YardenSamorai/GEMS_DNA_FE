@@ -2969,9 +2969,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
                         />
                       </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
-                    </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
+                      </td>
                     <td className="px-4 py-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
                         {stone.imageUrl ? (
@@ -3474,7 +3474,6 @@ const StoneSearchPage = () => {
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "GEMS DNA";
-    workn
     workbook.created = new Date();
 
     // Load banner image for header
