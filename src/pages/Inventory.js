@@ -211,6 +211,196 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
   saveAs(blob, filename);
 };
 
+/* ---------------- Category Export Choice Modal ---------------- */
+const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
+  if (!isOpen) return null;
+  
+  const emeraldCount = categories.emeralds || 0;
+  const fancyCount = categories.fancy || 0;
+  const diamondCount = categories.diamonds || 0;
+  const otherCount = categories.other || 0;
+  
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-500 to-blue-500 px-6 py-4">
+            <h2 className="text-xl font-bold text-white">Export Options</h2>
+            <p className="text-white/80 text-sm mt-1">
+              You selected multiple categories
+            </p>
+          </div>
+          
+          {/* Content */}
+          <div className="p-6">
+            {/* Summary */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {emeraldCount > 0 && (
+                <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                  💚 Emeralds: {emeraldCount}
+                </span>
+              )}
+              {fancyCount > 0 && (
+                <span className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
+                  💛 Fancy: {fancyCount}
+                </span>
+              )}
+              {diamondCount > 0 && (
+                <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                  💎 Diamonds: {diamondCount}
+                </span>
+              )}
+              {otherCount > 0 && (
+                <span className="px-3 py-1.5 bg-stone-100 text-stone-700 rounded-full text-sm font-medium">
+                  🔷 Other: {otherCount}
+                </span>
+              )}
+            </div>
+            
+            {/* Options */}
+            <div className="space-y-3">
+              <button
+                onClick={() => onChoose('separate')}
+                className="w-full p-4 border-2 border-emerald-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition-all text-left group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-stone-800">Separate Sheets</h3>
+                    <p className="text-sm text-stone-500">
+                      Each category in its own sheet with specific columns
+                    </p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => onChoose('combined')}
+                className="w-full p-4 border-2 border-blue-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-left group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-stone-800">Combined Sheet</h3>
+                    <p className="text-sm text-stone-500">
+                      All stones in one sheet with all columns
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+          
+          {/* Footer */}
+          <div className="px-6 py-4 bg-stone-50 border-t border-stone-200">
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 text-stone-600 hover:text-stone-800 font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+/* ---------------- Column Configurations ---------------- */
+const EMERALD_COLUMNS = [
+  { key: "num", header: "#", width: 5 },
+  { key: "sku", header: "SKU", width: 18 },
+  { key: "shape", header: "Shape", width: 12 },
+  { key: "weight", header: "Weight (ct)", width: 12 },
+  { key: "measurements", header: "Measurements", width: 20 },
+  { key: "ratio", header: "Ratio", width: 8 },
+  { key: "treatment", header: "Treatment", width: 18 },
+  { key: "origin", header: "Origin", width: 12 },
+  { key: "location", header: "Location", width: 10 },
+  { key: "lab", header: "Lab", width: 10 },
+  { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
+  { key: "priceTotal", header: "Total ($)", width: 14 },
+  { key: "dna", header: "DNA", width: 12 },
+  { key: "certificate", header: "Certificate", width: 15 },
+  { key: "image", header: "Image", width: 12 },
+  { key: "video", header: "Video", width: 12 },
+];
+
+const DIAMOND_COLUMNS = [
+  { key: "num", header: "#", width: 5 },
+  { key: "sku", header: "SKU", width: 18 },
+  { key: "shape", header: "Shape", width: 12 },
+  { key: "weight", header: "Weight (ct)", width: 12 },
+  { key: "color", header: "Color", width: 8 },
+  { key: "clarity", header: "Clarity", width: 10 },
+  { key: "measurements", header: "Measurements", width: 20 },
+  { key: "ratio", header: "Ratio", width: 8 },
+  { key: "lab", header: "Lab", width: 10 },
+  { key: "fluorescence", header: "Fluor.", width: 10 },
+  { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
+  { key: "priceTotal", header: "Total ($)", width: 14 },
+  { key: "rapPrice", header: "Rap ($)", width: 12 },
+  { key: "location", header: "Location", width: 10 },
+  { key: "cut", header: "Cut", width: 10 },
+  { key: "polish", header: "Polish", width: 10 },
+  { key: "symmetry", header: "Symmetry", width: 10 },
+  { key: "tablePercent", header: "Table %", width: 10 },
+  { key: "depthPercent", header: "Depth %", width: 10 },
+  { key: "dna", header: "DNA", width: 12 },
+  { key: "certificate", header: "Certificate", width: 15 },
+  { key: "image", header: "Image", width: 12 },
+  { key: "video", header: "Video", width: 12 },
+];
+
+const FANCY_COLUMNS = [
+  { key: "num", header: "#", width: 5 },
+  { key: "sku", header: "SKU", width: 18 },
+  { key: "shape", header: "Shape", width: 12 },
+  { key: "weight", header: "Weight (ct)", width: 12 },
+  { key: "fancyIntensity", header: "Intensity", width: 12 },
+  { key: "fancyColor", header: "Fancy Color", width: 14 },
+  { key: "fancyOvertone", header: "Overtone", width: 12 },
+  { key: "clarity", header: "Clarity", width: 10 },
+  { key: "measurements", header: "Measurements", width: 20 },
+  { key: "ratio", header: "Ratio", width: 8 },
+  { key: "lab", header: "Lab", width: 10 },
+  { key: "fluorescence", header: "Fluor.", width: 10 },
+  { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
+  { key: "priceTotal", header: "Total ($)", width: 14 },
+  { key: "rapPrice", header: "Rap ($)", width: 12 },
+  { key: "location", header: "Location", width: 10 },
+  { key: "cut", header: "Cut", width: 10 },
+  { key: "polish", header: "Polish", width: 10 },
+  { key: "symmetry", header: "Symmetry", width: 10 },
+  { key: "tablePercent", header: "Table %", width: 10 },
+  { key: "depthPercent", header: "Depth %", width: 10 },
+  { key: "dna", header: "DNA", width: 12 },
+  { key: "certificate", header: "Certificate", width: 15 },
+  { key: "image", header: "Image", width: 12 },
+  { key: "video", header: "Video", width: 12 },
+];
+
 /* ---------------- Tags Management Modal ---------------- */
 const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTag }) => {
   const [newTagName, setNewTagName] = useState("");
@@ -2390,6 +2580,7 @@ const StoneSearchPage = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showFloatingExport, setShowFloatingExport] = useState(false);
   const [drawerStone, setDrawerStone] = useState(null); // DNA Drawer
+  const [showCategoryExportModal, setShowCategoryExportModal] = useState(false); // Category export choice
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const exportButtonRef = useRef(null);
@@ -2647,7 +2838,333 @@ const StoneSearchPage = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [stones]); // Re-create when stones change so handleBarcodeScan has access to latest stones
 
-  // Export selected stones to Excel with styling
+  // Determine category of stones
+  const getCategoryBreakdown = (stonesArray) => {
+    return stonesArray.reduce((acc, stone) => {
+      const cat = (stone.category || '').toLowerCase();
+      if (cat.includes('emerald')) {
+        acc.emeralds = (acc.emeralds || 0) + 1;
+      } else if (cat.includes('fancy')) {
+        acc.fancy = (acc.fancy || 0) + 1;
+      } else if (cat.includes('diamond')) {
+        acc.diamonds = (acc.diamonds || 0) + 1;
+      } else {
+        acc.other = (acc.other || 0) + 1;
+      }
+      return acc;
+    }, {});
+  };
+
+  // Handle export button click - check categories first
+  const handleExportClick = () => {
+    const selectedData = stones.filter((s) => selectedStones.has(s.id));
+    if (selectedData.length === 0) {
+      alert("Please select at least one stone to export.");
+      return;
+    }
+    
+    const breakdown = getCategoryBreakdown(selectedData);
+    const categoryCount = [breakdown.emeralds, breakdown.diamonds, breakdown.fancy, breakdown.other].filter(Boolean).length;
+    
+    // If only one category, go directly to export modal
+    if (categoryCount === 1) {
+      setShowExportModal(true);
+    } else {
+      // Multiple categories - show choice modal
+      setShowCategoryExportModal(true);
+    }
+  };
+
+  // Handle category export choice
+  const handleCategoryExportChoice = (choice) => {
+    setShowCategoryExportModal(false);
+    if (choice === 'separate') {
+      exportToExcelSeparate();
+    } else {
+      setShowExportModal(true); // Combined uses the regular modal
+    }
+  };
+
+  // Export to Excel with separate sheets per category
+  const exportToExcelSeparate = async (customStones = null) => {
+    const selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
+    
+    // Separate by category
+    const emeralds = selectedData.filter(s => (s.category || '').toLowerCase().includes('emerald'));
+    const fancy = selectedData.filter(s => (s.category || '').toLowerCase().includes('fancy'));
+    const diamonds = selectedData.filter(s => {
+      const cat = (s.category || '').toLowerCase();
+      return cat.includes('diamond') && !cat.includes('fancy');
+    });
+    const others = selectedData.filter(s => {
+      const cat = (s.category || '').toLowerCase();
+      return !cat.includes('emerald') && !cat.includes('diamond') && !cat.includes('fancy');
+    });
+
+    // Debug log
+    console.log('📊 Export Separate Sheets:', {
+      total: selectedData.length,
+      emeralds: emeralds.length,
+      fancy: fancy.length,
+      diamonds: diamonds.length,
+      others: others.length,
+      categories: [...new Set(selectedData.map(s => s.category))]
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Gemstar";
+    workbook.created = new Date();
+
+    // Create sheet for Emeralds
+    if (emeralds.length > 0) {
+      console.log('Creating Emeralds sheet with', emeralds.length, 'stones');
+      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981");
+    }
+
+    // Create sheet for Fancy
+    if (fancy.length > 0) {
+      console.log('Creating Fancy sheet with', fancy.length, 'stones');
+      createCategorySheet(workbook, "Fancy", fancy, FANCY_COLUMNS, "FFFBBF24");
+    }
+
+    // Create sheet for Diamonds
+    if (diamonds.length > 0) {
+      console.log('Creating Diamonds sheet with', diamonds.length, 'stones');
+      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6");
+    }
+
+    // Create sheet for Others (use Emerald columns as default)
+    if (others.length > 0) {
+      console.log('Creating Other Gems sheet with', others.length, 'stones');
+      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6");
+    }
+
+    console.log('Total sheets in workbook:', workbook.worksheets.length);
+
+    // Generate and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const exportDate = new Date().toISOString().split("T")[0];
+    const filename = `Gemstar_Export_${exportDate}.xlsx`;
+    saveAs(new Blob([buffer]), filename);
+  };
+
+  // Helper: Create a category-specific sheet
+  const createCategorySheet = (workbook, sheetName, data, columns, accentColor) => {
+    const worksheet = workbook.addWorksheet(sheetName);
+    const colCount = columns.length;
+    const lastCol = String.fromCharCode(64 + colCount); // A=65, so +64 gives us A, B, C...
+    
+    // Set columns
+    worksheet.columns = columns.map(col => ({ key: col.key, width: col.width }));
+
+    // Header styling
+    worksheet.mergeCells(`A1:${lastCol}1`);
+    const titleCell = worksheet.getCell("A1");
+    titleCell.value = `◆  G E M S T A R  -  ${sheetName.toUpperCase()}  ◆`;
+    titleCell.font = { bold: true, size: 18, color: { argb: accentColor }, name: "Arial" };
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(1).height = 30;
+
+    // Tagline
+    worksheet.mergeCells(`A2:${lastCol}2`);
+    worksheet.getCell("A2").value = "Premium Gemstones & Diamonds";
+    worksheet.getCell("A2").font = { size: 10, color: { argb: "FFD1D5DB" }, italic: true };
+    worksheet.getCell("A2").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(2).height = 18;
+
+    // Summary row
+    const totalWeight = data.reduce((sum, s) => sum + (s.weightCt || 0), 0);
+    worksheet.mergeCells(`A3:${lastCol}3`);
+    worksheet.getCell("A3").value = `${data.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${new Date().toLocaleDateString("en-GB")}`;
+    worksheet.getCell("A3").font = { size: 10, color: { argb: "FF9CA3AF" } };
+    worksheet.getCell("A3").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(3).height = 18;
+
+    // Spacer
+    worksheet.getRow(4).height = 8;
+
+    // Column headers (row 5)
+    const headerRow = worksheet.getRow(5);
+    columns.forEach((col, index) => {
+      headerRow.getCell(index + 1).value = col.header;
+    });
+    headerRow.height = 26;
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = {
+        bottom: { style: "thin", color: { argb: "FF1F2937" } },
+      };
+    });
+
+    // Data rows
+    const dnaBaseUrl = "https://gems-dna.com";
+    data.forEach((stone, index) => {
+      const rowData = {};
+      columns.forEach(col => {
+        switch (col.key) {
+          case 'num': rowData.num = index + 1; break;
+          case 'sku': rowData.sku = stone.sku || ''; break;
+          case 'shape': rowData.shape = stone.shape || ''; break;
+          case 'weight': rowData.weight = stone.weightCt || ''; break;
+          case 'measurements': rowData.measurements = stone.measurements || ''; break;
+          case 'ratio': rowData.ratio = stone.ratio || ''; break;
+          case 'treatment': rowData.treatment = stone.treatment || ''; break;
+          case 'origin': rowData.origin = stone.origin || ''; break;
+          case 'location': rowData.location = stone.location || ''; break;
+          case 'lab': rowData.lab = stone.lab || ''; break;
+          case 'pricePerCt': rowData.pricePerCt = stone.pricePerCt || ''; break;
+          case 'priceTotal': rowData.priceTotal = stone.priceTotal || ''; break;
+          case 'color': rowData.color = stone.color || ''; break;
+          case 'clarity': rowData.clarity = stone.clarity || ''; break;
+          case 'fluorescence': rowData.fluorescence = stone.fluorescence || ''; break;
+          case 'rapPrice': rowData.rapPrice = stone.rapPrice || ''; break;
+          case 'cut': rowData.cut = stone.cut || ''; break;
+          case 'polish': rowData.polish = stone.polish || ''; break;
+          case 'symmetry': rowData.symmetry = stone.symmetry || ''; break;
+          case 'tablePercent': rowData.tablePercent = stone.tablePercent || ''; break;
+          case 'depthPercent': rowData.depthPercent = stone.depthPercent || ''; break;
+          // Fancy fields
+          case 'fancyIntensity': rowData.fancyIntensity = stone.fancyIntensity || ''; break;
+          case 'fancyColor': rowData.fancyColor = stone.fancyColor || ''; break;
+          case 'fancyOvertone': rowData.fancyOvertone = stone.fancyOvertone || ''; break;
+          case 'fancyColor2': rowData.fancyColor2 = stone.fancyColor2 || ''; break;
+          case 'fancyOvertone2': rowData.fancyOvertone2 = stone.fancyOvertone2 || ''; break;
+          // Links
+          case 'dna': rowData.dna = stone.sku || ''; break;
+          case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
+          case 'image': rowData.image = stone.imageUrl || ''; break;
+          case 'video': rowData.video = stone.videoUrl || ''; break;
+          default: rowData[col.key] = '';
+        }
+      });
+
+      const row = worksheet.addRow(rowData);
+      row.height = 20;
+
+      // Style data rows
+      const isEvenRow = index % 2 === 0;
+      row.eachCell((cell, colNumber) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isEvenRow ? "FFF9FAFB" : "FFFFFFFF" } };
+        cell.font = { size: 9, color: { argb: "FF1F2937" } };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = { bottom: { style: "thin", color: { argb: "FFE5E7EB" } } };
+      });
+
+      // Format price columns
+      const pricePerCtCol = columns.findIndex(c => c.key === 'pricePerCt');
+      const priceTotalCol = columns.findIndex(c => c.key === 'priceTotal');
+      const rapPriceCol = columns.findIndex(c => c.key === 'rapPrice');
+      
+      if (pricePerCtCol >= 0 && stone.pricePerCt) {
+        row.getCell(pricePerCtCol + 1).numFmt = '"$"#,##0';
+      }
+      if (priceTotalCol >= 0 && stone.priceTotal) {
+        row.getCell(priceTotalCol + 1).numFmt = '"$"#,##0';
+        row.getCell(priceTotalCol + 1).font = { size: 9, color: { argb: "FF1F2937" }, bold: true };
+      }
+      if (rapPriceCol >= 0 && stone.rapPrice) {
+        row.getCell(rapPriceCol + 1).numFmt = '"$"#,##0';
+      }
+
+      // Make links clickable
+      const dnaCol = columns.findIndex(c => c.key === 'dna');
+      const certCol = columns.findIndex(c => c.key === 'certificate');
+      const imgCol = columns.findIndex(c => c.key === 'image');
+      const vidCol = columns.findIndex(c => c.key === 'video');
+
+      if (dnaCol >= 0 && stone.sku) {
+        row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: `${dnaBaseUrl}/${stone.sku}` };
+        row.getCell(dnaCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 9, bold: true };
+      }
+      if (certCol >= 0 && stone.certificateUrl) {
+        row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
+        row.getCell(certCol + 1).font = { color: { argb: accentColor }, underline: true, size: 9 };
+      }
+      if (imgCol >= 0 && stone.imageUrl) {
+        row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
+        row.getCell(imgCol + 1).font = { color: { argb: accentColor }, underline: true, size: 9 };
+      }
+      if (vidCol >= 0 && stone.videoUrl) {
+        row.getCell(vidCol + 1).value = { text: "Video", hyperlink: stone.videoUrl };
+        row.getCell(vidCol + 1).font = { color: { argb: accentColor }, underline: true, size: 9 };
+      }
+    });
+
+    // Helper to get column letter for footer
+    const getColLetter = (num) => {
+      let letter = '';
+      while (num > 0) {
+        const remainder = (num - 1) % 26;
+        letter = String.fromCharCode(65 + remainder) + letter;
+        num = Math.floor((num - 1) / 26);
+      }
+      return letter;
+    };
+    const lastColLetter = getColLetter(colCount);
+
+    // FOOTER SECTION
+    const footerStartRow = 6 + data.length;
+    
+    // Spacer row
+    worksheet.mergeCells(`A${footerStartRow}:${lastColLetter}${footerStartRow}`);
+    worksheet.getRow(footerStartRow).height = 15;
+
+    // Footer background row
+    worksheet.mergeCells(`A${footerStartRow + 1}:${lastColLetter}${footerStartRow + 1}`);
+    worksheet.getRow(footerStartRow + 1).height = 8;
+    worksheet.getCell(`A${footerStartRow + 1}`).fill = { 
+      type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } 
+    };
+
+    // Footer Row 1: Company & Tagline
+    worksheet.mergeCells(`A${footerStartRow + 2}:${lastColLetter}${footerStartRow + 2}`);
+    const footerCell1 = worksheet.getCell(`A${footerStartRow + 2}`);
+    footerCell1.value = "◆  GEMSTAR  ◆  Premium Gemstones & Diamonds";
+    footerCell1.font = { bold: true, size: 12, color: { argb: accentColor }, name: "Arial" };
+    footerCell1.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 2).height = 28;
+
+    // Footer Row 2: Locations
+    worksheet.mergeCells(`A${footerStartRow + 3}:${lastColLetter}${footerStartRow + 3}`);
+    const footerCell2 = worksheet.getCell(`A${footerStartRow + 3}`);
+    footerCell2.value = "📍 NEW YORK  ·  TEL AVIV  ·  HONG KONG  ·  LOS ANGELES";
+    footerCell2.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
+    footerCell2.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 3).height = 22;
+
+    // Footer Row 3: Contact Info
+    worksheet.mergeCells(`A${footerStartRow + 4}:${lastColLetter}${footerStartRow + 4}`);
+    const footerCell3 = worksheet.getCell(`A${footerStartRow + 4}`);
+    footerCell3.value = "📞 +1 (212) 869-0544  ·  ✉ info@gems.net  ·  🌐 www.gems.net";
+    footerCell3.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
+    footerCell3.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell3.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 4).height = 22;
+
+    // Footer Row 4: Disclaimer
+    worksheet.mergeCells(`A${footerStartRow + 5}:${lastColLetter}${footerStartRow + 5}`);
+    const footerCell4 = worksheet.getCell(`A${footerStartRow + 5}`);
+    footerCell4.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
+    footerCell4.font = { size: 9, color: { argb: "FF9CA3AF" }, name: "Arial", italic: true };
+    footerCell4.alignment = { vertical: "middle", horizontal: "center" };
+    footerCell4.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 5).height = 20;
+
+    // Footer bottom accent line
+    worksheet.mergeCells(`A${footerStartRow + 6}:${lastColLetter}${footerStartRow + 6}`);
+    const footerAccent = worksheet.getCell(`A${footerStartRow + 6}`);
+    footerAccent.fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
+    worksheet.getRow(footerStartRow + 6).height = 5;
+  };
+
+  // Export selected stones to Excel with styling (combined - all columns)
   const exportToExcel = async (customStones = null) => {
     const selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
     
@@ -2656,46 +3173,90 @@ const StoneSearchPage = () => {
       return;
     }
 
+    // Determine which columns to use based on category
+    const breakdown = getCategoryBreakdown(selectedData);
+    const isOnlyEmeralds = breakdown.emeralds > 0 && !breakdown.diamonds && !breakdown.fancy && !breakdown.other;
+    const isOnlyDiamonds = breakdown.diamonds > 0 && !breakdown.emeralds && !breakdown.fancy && !breakdown.other;
+    const isOnlyFancy = breakdown.fancy > 0 && !breakdown.emeralds && !breakdown.diamonds && !breakdown.other;
+    
+    let columnsToUse;
+    let sheetName;
+    let accentColor = "FF10B981"; // Default emerald green
+    
+    if (isOnlyEmeralds) {
+      columnsToUse = EMERALD_COLUMNS;
+      sheetName = "Emeralds";
+      accentColor = "FF10B981";
+    } else if (isOnlyFancy) {
+      columnsToUse = FANCY_COLUMNS;
+      sheetName = "Fancy Diamonds";
+      accentColor = "FFFBBF24"; // Yellow/amber for fancy
+    } else if (isOnlyDiamonds) {
+      columnsToUse = DIAMOND_COLUMNS;
+      sheetName = "Diamonds";
+      accentColor = "FF3B82F6";
+    } else {
+      // Mixed - use all possible columns (union of both)
+      columnsToUse = [
+        { key: "num", header: "#", width: 5 },
+        { key: "sku", header: "SKU", width: 18 },
+        { key: "shape", header: "Shape", width: 12 },
+        { key: "weight", header: "Weight (ct)", width: 12 },
+        { key: "color", header: "Color", width: 8 },
+        { key: "clarity", header: "Clarity", width: 10 },
+        { key: "measurements", header: "Measurements", width: 20 },
+        { key: "ratio", header: "Ratio", width: 8 },
+        { key: "treatment", header: "Treatment", width: 18 },
+        { key: "origin", header: "Origin", width: 12 },
+        { key: "location", header: "Location", width: 10 },
+        { key: "lab", header: "Lab", width: 10 },
+        { key: "fluorescence", header: "Fluor.", width: 10 },
+        { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
+        { key: "priceTotal", header: "Total ($)", width: 14 },
+        { key: "dna", header: "DNA", width: 12 },
+        { key: "certificate", header: "Certificate", width: 15 },
+        { key: "image", header: "Image", width: 12 },
+        { key: "video", header: "Video", width: 12 },
+      ];
+      sheetName = "Selected Stones";
+      accentColor = "FF8B5CF6"; // Purple for mixed
+    }
+
     // Create workbook and worksheet
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Gemstar";
     workbook.created = new Date();
     
-    const worksheet = workbook.addWorksheet("Selected Stones");
+    const worksheet = workbook.addWorksheet(sheetName);
+    const colCount = columnsToUse.length;
 
-    // Define columns with widths (added # column for numbering)
-    worksheet.columns = [
-      { key: "num", width: 5 },
-      { key: "sku", width: 18 },
-      { key: "shape", width: 12 },
-      { key: "weight", width: 14 },
-      { key: "measurements", width: 22 },
-      { key: "color", width: 10 },
-      { key: "clarity", width: 10 },
-      { key: "treatment", width: 20 },
-      { key: "origin", width: 12 },
-      { key: "location", width: 12 },
-      { key: "lab", width: 10 },
-      { key: "pricePerCt", width: 14 },
-      { key: "priceTotal", width: 14 },
-      { key: "dna", width: 15 },
-      { key: "certificate", width: 20 },
-      { key: "image", width: 20 },
-      { key: "video", width: 20 },
-    ];
+    // Define columns with widths
+    worksheet.columns = columnsToUse.map(col => ({ key: col.key, width: col.width }));
+    
+    // Helper to get column letter
+    const getColLetter = (num) => {
+      let letter = '';
+      while (num > 0) {
+        const remainder = (num - 1) % 26;
+        letter = String.fromCharCode(65 + remainder) + letter;
+        num = Math.floor((num - 1) / 26);
+      }
+      return letter;
+    };
+    const lastCol = getColLetter(colCount);
 
     // Create styled text header
     // Row 1: Company Name
-    worksheet.mergeCells("A1:Q1");
+    worksheet.mergeCells(`A1:${lastCol}1`);
     const titleCell = worksheet.getCell("A1");
-    titleCell.value = "◆  G E M S T A R  ◆";
-    titleCell.font = { bold: true, size: 22, color: { argb: "FF10B981" }, name: "Arial" };
+    titleCell.value = `◆  G E M S T A R  -  ${sheetName.toUpperCase()}  ◆`;
+    titleCell.font = { bold: true, size: 20, color: { argb: accentColor }, name: "Arial" };
     titleCell.alignment = { vertical: "middle", horizontal: "center" };
     titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
     worksheet.getRow(1).height = 35;
 
     // Row 2: Tagline
-    worksheet.mergeCells("A2:Q2");
+    worksheet.mergeCells(`A2:${lastCol}2`);
     const taglineCell = worksheet.getCell("A2");
     taglineCell.value = "Premium Gemstones & Diamonds";
     taglineCell.font = { size: 12, color: { argb: "FFD1D5DB" }, name: "Arial", italic: true };
@@ -2704,7 +3265,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(2).height = 22;
 
     // Row 3: Locations
-    worksheet.mergeCells("A3:Q3");
+    worksheet.mergeCells(`A3:${lastCol}3`);
     const locationsCell = worksheet.getCell("A3");
     locationsCell.value = "NYC  ·  LOS ANGELES  ·  TEL AVIV  ·  HONG KONG";
     locationsCell.font = { size: 10, color: { argb: "FF9CA3AF" }, name: "Arial" };
@@ -2720,7 +3281,7 @@ const StoneSearchPage = () => {
     const time = now.toLocaleTimeString("en-GB");
 
     // Row 4: Spacer
-    worksheet.mergeCells("A4:Q4");
+    worksheet.mergeCells(`A4:${lastCol}4`);
     worksheet.getRow(4).height = 10;
 
     // ═══════════════════════════════════════════════════════════════
@@ -2728,13 +3289,13 @@ const StoneSearchPage = () => {
     // ═══════════════════════════════════════════════════════════════
     
     const tableBorder = {
-      top: { style: "thin", color: { argb: "FF10B981" } },
-      bottom: { style: "thin", color: { argb: "FF10B981" } },
-      left: { style: "thin", color: { argb: "FF10B981" } },
-      right: { style: "thin", color: { argb: "FF10B981" } },
+      top: { style: "thin", color: { argb: accentColor } },
+      bottom: { style: "thin", color: { argb: accentColor } },
+      left: { style: "thin", color: { argb: accentColor } },
+      right: { style: "thin", color: { argb: accentColor } },
     };
-    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF10B981" } };
-    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6F7F1" } };
+    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
+    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: isOnlyDiamonds ? "FFE6F0FF" : "FFE6F7F1" } };
 
     // === LEFT TABLE: Date/Time/Website ===
     
@@ -2809,19 +3370,19 @@ const StoneSearchPage = () => {
 
     // Row 7: Selected (same as total in this case)
     worksheet.getCell("E7").value = "SELECTED";
-    worksheet.getCell("E7").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("E7").font = { bold: true, size: 10, color: { argb: accentColor } };
     worksheet.getCell("E7").fill = lightFill;
     worksheet.getCell("E7").border = tableBorder;
     worksheet.getCell("E7").alignment = { vertical: "middle", horizontal: "center" };
     
     worksheet.getCell("F7").value = totalWeight.toFixed(2);
-    worksheet.getCell("F7").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("F7").font = { bold: true, size: 10, color: { argb: accentColor } };
     worksheet.getCell("F7").fill = lightFill;
     worksheet.getCell("F7").border = tableBorder;
     worksheet.getCell("F7").alignment = { vertical: "middle", horizontal: "center" };
     
     worksheet.getCell("G7").value = selectedData.length;
-    worksheet.getCell("G7").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
+    worksheet.getCell("G7").font = { bold: true, size: 10, color: { argb: accentColor } };
     worksheet.getCell("G7").fill = lightFill;
     worksheet.getCell("G7").border = tableBorder;
     worksheet.getCell("G7").alignment = { vertical: "middle", horizontal: "center" };
@@ -2832,21 +3393,20 @@ const StoneSearchPage = () => {
     worksheet.getRow(7).height = 22;
 
     // Row 8: Spacer before main table
-    worksheet.mergeCells("A8:Q8");
+    worksheet.mergeCells(`A8:${lastCol}8`);
     worksheet.getRow(8).height = 10;
 
-    // Add header row (row 9)
-    const headers = ["#", "SKU", "Shape", "Weight (ct)", "Measurements", "Color", "Clarity", "Treatment", "Origin", "Location", "Lab", "Price/ct ($)", "Total ($)", "DNA", "Certificate", "Image", "Video"];
+    // Add header row (row 9) - use dynamic columns
     const headerRow = worksheet.getRow(9);
-    headers.forEach((header, index) => {
-      headerRow.getCell(index + 1).value = header;
+    columnsToUse.forEach((col, index) => {
+      headerRow.getCell(index + 1).value = col.header;
     });
     headerRow.height = 28;
     headerRow.eachCell((cell) => {
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FF10B981" }, // Emerald green
+        fgColor: { argb: accentColor },
       };
       cell.font = {
         bold: true,
@@ -2859,37 +3419,58 @@ const StoneSearchPage = () => {
         horizontal: "center",
       };
       cell.border = {
-        top: { style: "thin", color: { argb: "FF059669" } },
-        bottom: { style: "thin", color: { argb: "FF059669" } },
-        left: { style: "thin", color: { argb: "FF059669" } },
-        right: { style: "thin", color: { argb: "FF059669" } },
+        top: { style: "thin", color: { argb: "FF1F2937" } },
+        bottom: { style: "thin", color: { argb: "FF1F2937" } },
+        left: { style: "thin", color: { argb: "FF1F2937" } },
+        right: { style: "thin", color: { argb: "FF1F2937" } },
       };
     });
 
     // DNA base URL (use production URL)
     const dnaBaseUrl = "https://gems-dna.com";
 
-    // Add data rows
+    // Add data rows using dynamic columns
     selectedData.forEach((stone, index) => {
-      const row = worksheet.addRow({
-        num: index + 1,
-        sku: stone.sku || "",
-        shape: stone.shape || "",
-        weight: stone.weightCt || "",
-        measurements: stone.measurements || "",
-        color: stone.color || "",
-        clarity: stone.clarity || "",
-        treatment: stone.treatment || "",
-        origin: stone.origin || "",
-        location: stone.location || "",
-        lab: stone.lab || "",
-        pricePerCt: stone.pricePerCt || "",
-        priceTotal: stone.priceTotal || "",
-        dna: stone.sku || "",
-        certificate: stone.certificateUrl || "",
-        image: stone.imageUrl || "",
-        video: stone.videoUrl || "",
+      const rowData = {};
+      columnsToUse.forEach(col => {
+        switch (col.key) {
+          case 'num': rowData.num = index + 1; break;
+          case 'sku': rowData.sku = stone.sku || ''; break;
+          case 'shape': rowData.shape = stone.shape || ''; break;
+          case 'weight': rowData.weight = stone.weightCt || ''; break;
+          case 'measurements': rowData.measurements = stone.measurements || ''; break;
+          case 'ratio': rowData.ratio = stone.ratio || ''; break;
+          case 'treatment': rowData.treatment = stone.treatment || ''; break;
+          case 'origin': rowData.origin = stone.origin || ''; break;
+          case 'location': rowData.location = stone.location || ''; break;
+          case 'lab': rowData.lab = stone.lab || ''; break;
+          case 'pricePerCt': rowData.pricePerCt = stone.pricePerCt || ''; break;
+          case 'priceTotal': rowData.priceTotal = stone.priceTotal || ''; break;
+          case 'color': rowData.color = stone.color || ''; break;
+          case 'clarity': rowData.clarity = stone.clarity || ''; break;
+          case 'fluorescence': rowData.fluorescence = stone.fluorescence || ''; break;
+          case 'rapPrice': rowData.rapPrice = stone.rapPrice || ''; break;
+          case 'cut': rowData.cut = stone.cut || ''; break;
+          case 'polish': rowData.polish = stone.polish || ''; break;
+          case 'symmetry': rowData.symmetry = stone.symmetry || ''; break;
+          case 'tablePercent': rowData.tablePercent = stone.tablePercent || ''; break;
+          case 'depthPercent': rowData.depthPercent = stone.depthPercent || ''; break;
+          // Fancy fields
+          case 'fancyIntensity': rowData.fancyIntensity = stone.fancyIntensity || ''; break;
+          case 'fancyColor': rowData.fancyColor = stone.fancyColor || ''; break;
+          case 'fancyOvertone': rowData.fancyOvertone = stone.fancyOvertone || ''; break;
+          case 'fancyColor2': rowData.fancyColor2 = stone.fancyColor2 || ''; break;
+          case 'fancyOvertone2': rowData.fancyOvertone2 = stone.fancyOvertone2 || ''; break;
+          // Links
+          case 'dna': rowData.dna = stone.sku || ''; break;
+          case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
+          case 'image': rowData.image = stone.imageUrl || ''; break;
+          case 'video': rowData.video = stone.videoUrl || ''; break;
+          default: rowData[col.key] = '';
+        }
       });
+
+      const row = worksheet.addRow(rowData);
       
       // Style the number cell
       const numCell = row.getCell("num");
@@ -2928,42 +3509,49 @@ const StoneSearchPage = () => {
         };
       });
 
-      // Format price columns as currency
-      const pricePerCtCell = row.getCell("pricePerCt");
-      const priceTotalCell = row.getCell("priceTotal");
-      if (stone.pricePerCt) {
-        pricePerCtCell.numFmt = '"$"#,##0.00';
+      // Format price columns as currency (only if column exists)
+      const pricePerCtCol = columnsToUse.findIndex(c => c.key === 'pricePerCt');
+      const priceTotalCol = columnsToUse.findIndex(c => c.key === 'priceTotal');
+      const rapPriceCol = columnsToUse.findIndex(c => c.key === 'rapPrice');
+      
+      if (pricePerCtCol >= 0 && stone.pricePerCt) {
+        row.getCell(pricePerCtCol + 1).numFmt = '"$"#,##0';
       }
-      if (stone.priceTotal) {
-        priceTotalCell.numFmt = '"$"#,##0.00';
-        priceTotalCell.font = { ...priceTotalCell.font, bold: true };
+      if (priceTotalCol >= 0 && stone.priceTotal) {
+        row.getCell(priceTotalCol + 1).numFmt = '"$"#,##0';
+        row.getCell(priceTotalCol + 1).font = { size: 10, name: "Arial", color: { argb: "FF1F2937" }, bold: true };
+      }
+      if (rapPriceCol >= 0 && stone.rapPrice) {
+        row.getCell(rapPriceCol + 1).numFmt = '"$"#,##0';
       }
 
-      // Make URLs clickable
-      // DNA Link
-      if (stone.sku) {
+      // Make URLs clickable (only if column exists)
+      const dnaCol = columnsToUse.findIndex(c => c.key === 'dna');
+      const certCol = columnsToUse.findIndex(c => c.key === 'certificate');
+      const imgCol = columnsToUse.findIndex(c => c.key === 'image');
+      const vidCol = columnsToUse.findIndex(c => c.key === 'video');
+
+      if (dnaCol >= 0 && stone.sku) {
         const dnaUrl = `${dnaBaseUrl}/${stone.sku}`;
-        row.getCell("dna").value = { text: "View DNA", hyperlink: dnaUrl };
-        row.getCell("dna").font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, bold: true };
-        row.getCell("dna").alignment = { vertical: "middle", horizontal: "center" };
+        row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: dnaUrl };
+        row.getCell(dnaCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, bold: true };
+        row.getCell(dnaCol + 1).alignment = { vertical: "middle", horizontal: "center" };
       }
-      if (stone.certificateUrl) {
-        row.getCell("certificate").value = { text: "View Certificate", hyperlink: stone.certificateUrl };
-        row.getCell("certificate").font = { color: { argb: "FF10B981" }, underline: true, size: 10 };
+      if (certCol >= 0 && stone.certificateUrl) {
+        row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
+        row.getCell(certCol + 1).font = { color: { argb: accentColor }, underline: true, size: 10 };
       }
-      if (stone.imageUrl) {
-        row.getCell("image").value = { text: "View Image", hyperlink: stone.imageUrl };
-        row.getCell("image").font = { color: { argb: "FF10B981" }, underline: true, size: 10 };
+      if (imgCol >= 0 && stone.imageUrl) {
+        row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
+        row.getCell(imgCol + 1).font = { color: { argb: accentColor }, underline: true, size: 10 };
       }
-      if (stone.videoUrl) {
-        row.getCell("video").value = { text: "View Video", hyperlink: stone.videoUrl };
-        row.getCell("video").font = { color: { argb: "FF10B981" }, underline: true, size: 10 };
+      if (vidCol >= 0 && stone.videoUrl) {
+        row.getCell(vidCol + 1).value = { text: "Video", hyperlink: stone.videoUrl };
+        row.getCell(vidCol + 1).font = { color: { argb: accentColor }, underline: true, size: 10 };
       }
 
       row.height = 22;
     });
-
-    // Auto-filter removed to prevent dropdown arrows in info tables
 
     // ═══════════════════════════════════════════════════════════════
     // FOOTER SECTION
@@ -2972,11 +3560,11 @@ const StoneSearchPage = () => {
     const footerStartRow = 10 + selectedData.length;
     
     // Spacer row
-    worksheet.mergeCells(`A${footerStartRow}:Q${footerStartRow}`);
+    worksheet.mergeCells(`A${footerStartRow}:${lastCol}${footerStartRow}`);
     worksheet.getRow(footerStartRow).height = 15;
 
     // Footer background row
-    worksheet.mergeCells(`A${footerStartRow + 1}:Q${footerStartRow + 1}`);
+    worksheet.mergeCells(`A${footerStartRow + 1}:${lastCol}${footerStartRow + 1}`);
     const footerBgRow = worksheet.getRow(footerStartRow + 1);
     footerBgRow.height = 8;
     worksheet.getCell(`A${footerStartRow + 1}`).fill = { 
@@ -2984,16 +3572,16 @@ const StoneSearchPage = () => {
     };
 
     // Footer Row 1: Company & Tagline
-    worksheet.mergeCells(`A${footerStartRow + 2}:Q${footerStartRow + 2}`);
+    worksheet.mergeCells(`A${footerStartRow + 2}:${lastCol}${footerStartRow + 2}`);
     const footerCell1 = worksheet.getCell(`A${footerStartRow + 2}`);
     footerCell1.value = "◆  GEMSTAR  ◆  Premium Gemstones & Diamonds";
-    footerCell1.font = { bold: true, size: 12, color: { argb: "FF10B981" }, name: "Arial" };
+    footerCell1.font = { bold: true, size: 12, color: { argb: accentColor }, name: "Arial" };
     footerCell1.alignment = { vertical: "middle", horizontal: "center" };
     footerCell1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
     worksheet.getRow(footerStartRow + 2).height = 28;
 
     // Footer Row 2: Locations
-    worksheet.mergeCells(`A${footerStartRow + 3}:Q${footerStartRow + 3}`);
+    worksheet.mergeCells(`A${footerStartRow + 3}:${lastCol}${footerStartRow + 3}`);
     const footerCell2 = worksheet.getCell(`A${footerStartRow + 3}`);
     footerCell2.value = "📍 NEW YORK  ·  TEL AVIV  ·  HONG KONG  ·  LOS ANGELES";
     footerCell2.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
@@ -3002,7 +3590,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(footerStartRow + 3).height = 22;
 
     // Footer Row 3: Contact Info
-    worksheet.mergeCells(`A${footerStartRow + 4}:Q${footerStartRow + 4}`);
+    worksheet.mergeCells(`A${footerStartRow + 4}:${lastCol}${footerStartRow + 4}`);
     const footerCell3 = worksheet.getCell(`A${footerStartRow + 4}`);
     footerCell3.value = "📞 +1 (212) 869-0544  ·  ✉ info@gems.net  ·  🌐 www.gems.net";
     footerCell3.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
@@ -3011,7 +3599,7 @@ const StoneSearchPage = () => {
     worksheet.getRow(footerStartRow + 4).height = 22;
 
     // Footer Row 4: Disclaimer
-    worksheet.mergeCells(`A${footerStartRow + 5}:Q${footerStartRow + 5}`);
+    worksheet.mergeCells(`A${footerStartRow + 5}:${lastCol}${footerStartRow + 5}`);
     const footerCell4 = worksheet.getCell(`A${footerStartRow + 5}`);
     footerCell4.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
     footerCell4.font = { size: 9, color: { argb: "FF9CA3AF" }, name: "Arial", italic: true };
@@ -3020,9 +3608,9 @@ const StoneSearchPage = () => {
     worksheet.getRow(footerStartRow + 5).height = 20;
 
     // Footer bottom accent line
-    worksheet.mergeCells(`A${footerStartRow + 6}:Q${footerStartRow + 6}`);
+    worksheet.mergeCells(`A${footerStartRow + 6}:${lastCol}${footerStartRow + 6}`);
     const footerAccent = worksheet.getCell(`A${footerStartRow + 6}`);
-    footerAccent.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF10B981" } };
+    footerAccent.fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
     worksheet.getRow(footerStartRow + 6).height = 5;
 
     // Generate and download
@@ -3106,6 +3694,19 @@ const StoneSearchPage = () => {
           treatment: row.treatment ?? "",
           category: row.category ?? "",
           location: row.location ?? "",
+          // Diamond-specific fields
+          cut: row.cut ?? "",
+          polish: row.polish ?? "",
+          symmetry: row.symmetry ?? "",
+          tablePercent: row.tablePercent != null ? Number(row.tablePercent) : null,
+          depthPercent: row.depthPercent != null ? Number(row.depthPercent) : null,
+          rapPrice: row.rapPrice != null ? Number(row.rapPrice) : null,
+          // Fancy-specific fields
+          fancyIntensity: row.fancyIntensity ?? "",
+          fancyColor: row.fancyColor ?? "",
+          fancyOvertone: row.fancyOvertone ?? "",
+          fancyColor2: row.fancyColor2 ?? "",
+          fancyOvertone2: row.fancyOvertone2 ?? "",
         }));
         setStones(normalized);
       } catch (err) {
@@ -3218,19 +3819,21 @@ const StoneSearchPage = () => {
       <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="mb-6">
+            {/* Title Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-stone-800 mb-2">Stone Inventory</h1>
-                <p className="text-stone-500">
+                <h1 className="text-2xl sm:text-3xl font-bold text-stone-800 mb-1">Stone Inventory</h1>
+                <p className="text-stone-500 text-sm sm:text-base">
                   {loading ? 'Loading...' : `${totalItems.toLocaleString()} stones available`}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                {/* Scan Button */}
+              
+              {/* View Mode Toggle + Scan - Always visible */}
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowScanner(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-white font-medium rounded-xl shadow-lg transition-all"
+                  className="flex items-center justify-center gap-2 p-2.5 sm:px-4 sm:py-2.5 bg-stone-800 hover:bg-stone-700 text-white font-medium rounded-xl shadow-lg transition-all"
                   title="Scan barcode"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3239,83 +3842,131 @@ const StoneSearchPage = () => {
                   <span className="hidden sm:inline">Scan</span>
                 </button>
                 
-                {/* Export Button */}
-                <div ref={exportButtonRef}>
-                {selectedStones.size > 0 && (
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-stone-100">
+                  <button
+                    onClick={() => setViewMode("table")}
+                    className={`p-2 rounded-lg transition-all ${viewMode === "table" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={`p-2 rounded-lg transition-all ${viewMode === "grid" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Action Buttons - Shows when stones are selected */}
+            <div ref={exportButtonRef}>
+              {selectedStones.size > 0 && (() => {
+                // Calculate category breakdown
+                const selectedStonesArray = stones.filter(s => selectedStones.has(s.id));
+                const categoryBreakdown = selectedStonesArray.reduce((acc, stone) => {
+                  const cat = stone.category || stone.shape || 'Other';
+                  acc[cat] = (acc[cat] || 0) + 1;
+                  return acc;
+                }, {});
+                const categories = Object.entries(categoryBreakdown);
+                const totalWeight = selectedStonesArray.reduce((sum, s) => sum + (s.weightCt || 0), 0);
+                
+                return (
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                  {/* Left side - Selection info */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-emerald-700">
+                      {selectedStones.size} selected
+                    </span>
+                    <span className="text-xs text-emerald-600">
+                      ({totalWeight.toFixed(2)} cts)
+                    </span>
+                    {/* Category badges */}
+                    <div className="flex flex-wrap gap-1">
+                      {categories.map(([cat, count]) => (
+                        <span 
+                          key={cat}
+                          className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                            cat.toLowerCase().includes('emerald') 
+                              ? 'bg-green-100 text-green-700' 
+                              : cat.toLowerCase().includes('fancy')
+                              ? 'bg-amber-100 text-amber-700'
+                              : cat.toLowerCase().includes('diamond')
+                              ? 'bg-blue-100 text-blue-700'
+                              : cat.toLowerCase().includes('ruby')
+                              ? 'bg-red-100 text-red-700'
+                              : cat.toLowerCase().includes('sapphire')
+                              ? 'bg-indigo-100 text-indigo-700'
+                              : 'bg-stone-100 text-stone-700'
+                          }`}
+                        >
+                          {cat}: {count}
+                        </span>
+                      ))}
+                    </div>
                     <button
                       onClick={clearSelection}
-                      className="px-3 py-2 text-sm text-stone-600 hover:text-stone-800 transition-colors"
+                      className="px-3 py-1.5 text-xs sm:text-sm text-stone-600 hover:text-stone-800 hover:bg-white rounded-lg transition-colors"
                     >
-                      Clear ({selectedStones.size})
+                      Clear
                     </button>
+                  </div>
+                  
+                  {/* Right side - Action buttons */}
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setShowExportModal(true)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/25 transition-all"
+                      onClick={handleExportClick}
+                      className="flex items-center justify-center gap-2 px-5 py-2.5 sm:px-6 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-sm font-medium rounded-lg shadow-md transition-all min-w-[100px]"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      Export Excel ({selectedStones.size})
+                      Excel
                     </button>
                     {/* Labels Dropdown */}
                     <div className="relative group">
                       <button
-                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-xl shadow-lg shadow-purple-500/25 transition-all"
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 sm:px-6 sm:py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white text-sm font-medium rounded-lg shadow-md transition-all min-w-[100px]"
                         title="Labels for Niimbot"
                       >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        Labels ({selectedStones.size})
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      Labels
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
+                      <button
+                        onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
+                        Download Excel
                       </button>
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
-                        <button
-                          onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
-                        >
-                          <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                          Download Excel
-                        </button>
-                        <button
-                          onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), true)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
-                        >
-                          <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                          </svg>
-                          Share to Niimbot
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), true)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
+                      >
+                        <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        Share to Niimbot
+                      </button>
                     </div>
                   </div>
-                )}
+                  </div>
                 </div>
-                {/* View Mode Toggle */}
-              <div className="flex items-center gap-2 p-1 rounded-xl bg-stone-100">
-                <button
-                  onClick={() => setViewMode("table")}
-                  className={`p-2 rounded-lg transition-all ${viewMode === "table" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`p-2 rounded-lg transition-all ${viewMode === "grid" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                </button>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -3420,21 +4071,59 @@ const StoneSearchPage = () => {
         </div>
       </div>
 
-      {/* Floating Export Button */}
+      {/* Floating Buttons */}
       <AnimatePresence>
         {showFloatingExport && (
-          <motion.button
+          <motion.div
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            onClick={() => setShowExportModal(true)}
-            className="fixed right-6 bottom-6 z-40 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-2xl shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105"
+            className="fixed right-6 bottom-6 z-40 flex flex-col gap-3"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span>Export ({selectedStones.size})</span>
-          </motion.button>
+            {/* Floating Labels Button */}
+            <div className="relative group">
+              <button
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-2xl shadow-2xl shadow-purple-500/30 transition-all hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span>Labels ({selectedStones.size})</span>
+              </button>
+              {/* Dropdown menu - appears above */}
+              <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-stone-200 overflow-hidden">
+                <button
+                  onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download Excel
+                </button>
+                <button
+                  onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
+                >
+                  <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  Share to Niimbot
+                </button>
+              </div>
+            </div>
+            
+            {/* Floating Export Button */}
+            <button
+              onClick={handleExportClick}
+              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-2xl shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Export ({selectedStones.size})</span>
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -3444,6 +4133,14 @@ const StoneSearchPage = () => {
         onClose={() => setShowExportModal(false)}
         selectedStones={stones.filter((s) => selectedStones.has(s.id))}
         onExport={exportToExcel}
+      />
+
+      {/* Category Export Choice Modal */}
+      <CategoryExportModal
+        isOpen={showCategoryExportModal}
+        onClose={() => setShowCategoryExportModal(false)}
+        categories={getCategoryBreakdown(stones.filter((s) => selectedStones.has(s.id)))}
+        onChoose={handleCategoryExportChoice}
       />
 
       {/* Barcode Scanner Modal */}
