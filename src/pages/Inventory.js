@@ -1545,14 +1545,10 @@ const treatmentOptions = [
 
 const locationOptions = [
   "All locations",
-  "NY",
-  "LA", 
-  "HK",
-  "IL",
-  "EY",
-  "EH",
-  "EL",
-  "EM",
+  "New York",
+  "Los Angeles", 
+  "Hong Kong",
+  "Israel",
 ];
 
 /* ---------------- Progress Bar ---------------- */
