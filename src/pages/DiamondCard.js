@@ -14,6 +14,22 @@ const DiamondCard = () => {
   const [activeTab, setActiveTab] = useState('details');
   const { isSignedIn } = useUser();
 
+  // Helper functions to detect stone category
+  const isEmerald = () => {
+    const category = (details?.category || '').toLowerCase();
+    return category.includes('emerald');
+  };
+
+  const isDiamond = () => {
+    const category = (details?.category || '').toLowerCase();
+    return category.includes('diamond') && !category.includes('fancy');
+  };
+
+  const isFancy = () => {
+    const category = (details?.category || '').toLowerCase();
+    return category.includes('fancy');
+  };
+
   useEffect(() => {
     if (!stone_id) return;
 
@@ -74,7 +90,7 @@ const DiamondCard = () => {
             <div className="w-16 h-16 border-4 border-primary-200 rounded-full"></div>
             <div className="w-16 h-16 border-4 border-primary-500 rounded-full border-t-transparent animate-spin absolute inset-0"></div>
           </div>
-          <p className="text-stone-500 font-medium">Loading diamond details...</p>
+          <p className="text-stone-500 font-medium">Loading stone details...</p>
         </div>
       </div>
     );
@@ -122,7 +138,7 @@ const DiamondCard = () => {
                   <span className="text-stone-400 text-sm">ID: {details.stone_id}</span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                  {details.shape} • {details.carat} ct • {details.clarity}
+                  {details.shape} • {details.carat} ct {(isDiamond() || isFancy()) && details.clarity ? `• ${details.clarity}` : ''}
                 </h1>
               </div>
               {isSignedIn && (
@@ -151,7 +167,7 @@ const DiamondCard = () => {
                   ) : (
                     <img 
                       src={details.picture || "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg"} 
-                      alt="Diamond"
+                      alt="Stone"
                       className="w-full h-full object-cover"
                     />
                   )}
@@ -164,7 +180,7 @@ const DiamondCard = () => {
                       <div className="rounded-xl overflow-hidden bg-stone-100 aspect-square shadow-md card-hover">
                         <img 
                           src={details.picture} 
-                          alt="Diamond" 
+                          alt="Stone" 
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -220,24 +236,63 @@ const DiamondCard = () => {
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.3 }}
                   >
+                    {/* Common fields for all stones */}
                     <DetailCard icon="💎" title="Shape" value={details.shape} />
                     <DetailCard icon="⚖️" title="Carat Weight" value={`${details.carat} ct`} />
-                    {details.color && <DetailCard icon="🎨" title="Color" value={details.color} />}
-                    <DetailCard icon="✨" title="Clarity" value={details.clarity} />
+                    
+                    {/* Diamond & Fancy specific: Color */}
+                    {(isDiamond() || isFancy()) && details.color && (
+                      <DetailCard icon="🎨" title="Color" value={details.color} />
+                    )}
+                    
+                    {/* Diamond & Fancy specific: Clarity */}
+                    {(isDiamond() || isFancy()) && (
+                      <DetailCard icon="✨" title="Clarity" value={details.clarity} />
+                    )}
+                    
+                    {/* Common: Lab */}
                     <DetailCard icon="🏛️" title="Lab" value={details.lab} />
-                    {details.fluorescence && <DetailCard icon="💡" title="Fluorescence" value={details.fluorescence} />}
+                    
+                    {/* Diamond & Fancy specific: Fluorescence */}
+                    {(isDiamond() || isFancy()) && details.fluorescence && (
+                      <DetailCard icon="💡" title="Fluorescence" value={details.fluorescence} />
+                    )}
+                    
+                    {/* Common: Origin */}
                     <DetailCard icon="🌍" title="Origin" value={details.origin} />
+                    
+                    {/* Emerald specific: Treatment */}
+                    {isEmerald() && details.treatment && (
+                      <DetailCard icon="💧" title="Treatment" value={details.treatment} />
+                    )}
+                    
+                    {/* Common: Ratio & Measurements */}
                     <DetailCard icon="📐" title="Ratio" value={details.ratio} />
                     <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
                     
-                    {/* Diamond-specific fields */}
-                    {details.cut && <DetailCard icon="✂️" title="Cut" value={details.cut} />}
-                    {details.polish && <DetailCard icon="✨" title="Polish" value={details.polish} />}
-                    {details.symmetry && <DetailCard icon="⚖️" title="Symmetry" value={details.symmetry} />}
-                    {details.table_percent && <DetailCard icon="📊" title="Table %" value={`${details.table_percent}%`} />}
-                    {details.depth_percent && <DetailCard icon="📏" title="Depth %" value={`${details.depth_percent}%`} />}
-                    {details.rap_price !== null && details.rap_price !== undefined && (
-                      <DetailCard icon="💰" title="Rap %" value={`${details.rap_price}%`} />
+                    {/* Diamond & Fancy specific: Cut, Polish, Symmetry */}
+                    {(isDiamond() || isFancy()) && (
+                      <>
+                        {details.cut && <DetailCard icon="✂️" title="Cut" value={details.cut} />}
+                        {details.polish && <DetailCard icon="✨" title="Polish" value={details.polish} />}
+                        {details.symmetry && <DetailCard icon="⚖️" title="Symmetry" value={details.symmetry} />}
+                        {details.table_percent && <DetailCard icon="📊" title="Table %" value={`${details.table_percent}%`} />}
+                        {details.depth_percent && <DetailCard icon="📏" title="Depth %" value={`${details.depth_percent}%`} />}
+                        {details.rap_price !== null && details.rap_price !== undefined && (
+                          <DetailCard icon="💰" title="Rap %" value={`${details.rap_price}%`} />
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Fancy specific: Fancy Color details */}
+                    {isFancy() && (
+                      <>
+                        {details.fancy_intensity && <DetailCard icon="🌈" title="Fancy Intensity" value={details.fancy_intensity} />}
+                        {details.fancy_color && <DetailCard icon="🎨" title="Fancy Color" value={details.fancy_color} />}
+                        {details.fancy_overtone && <DetailCard icon="✨" title="Overtone" value={details.fancy_overtone} />}
+                        {details.fancy_color_2 && <DetailCard icon="🎨" title="Secondary Color" value={details.fancy_color_2} />}
+                        {details.fancy_overtone_2 && <DetailCard icon="✨" title="Secondary Overtone" value={details.fancy_overtone_2} />}
+                      </>
                     )}
                     
                     {isSignedIn && (
@@ -261,6 +316,7 @@ const DiamondCard = () => {
                     transition={{ duration: 0.3 }}
                   >
                     <DetailCard icon="🔢" title="Stone ID" value={details.stone_id} />
+                    {details.category && <DetailCard icon="📁" title="Category" value={details.category} />}
                     <DetailCard 
                       icon="📜" 
                       title="Certificate #" 
@@ -279,15 +335,33 @@ const DiamondCard = () => {
                     />
                     <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
                     
-                    {/* Diamond-specific technical specs */}
-                    {details.cut && <DetailCard icon="✂️" title="Cut" value={details.cut} />}
-                    {details.polish && <DetailCard icon="✨" title="Polish" value={details.polish} />}
-                    {details.symmetry && <DetailCard icon="⚖️" title="Symmetry" value={details.symmetry} />}
-                    {details.table_percent && <DetailCard icon="📊" title="Table %" value={`${details.table_percent}%`} />}
-                    {details.depth_percent && <DetailCard icon="📏" title="Depth %" value={`${details.depth_percent}%`} />}
-                    {details.fluorescence && <DetailCard icon="💡" title="Fluorescence" value={details.fluorescence} />}
-                    {details.rap_price !== null && details.rap_price !== undefined && (
-                      <DetailCard icon="💰" title="Rap %" value={`${details.rap_price}%`} />
+                    {/* Emerald specific: Treatment in specs */}
+                    {isEmerald() && details.treatment && (
+                      <DetailCard icon="💧" title="Treatment" value={details.treatment} />
+                    )}
+                    
+                    {/* Diamond & Fancy specific technical specs */}
+                    {(isDiamond() || isFancy()) && (
+                      <>
+                        {details.cut && <DetailCard icon="✂️" title="Cut" value={details.cut} />}
+                        {details.polish && <DetailCard icon="✨" title="Polish" value={details.polish} />}
+                        {details.symmetry && <DetailCard icon="⚖️" title="Symmetry" value={details.symmetry} />}
+                        {details.table_percent && <DetailCard icon="📊" title="Table %" value={`${details.table_percent}%`} />}
+                        {details.depth_percent && <DetailCard icon="📏" title="Depth %" value={`${details.depth_percent}%`} />}
+                        {details.fluorescence && <DetailCard icon="💡" title="Fluorescence" value={details.fluorescence} />}
+                        {details.rap_price !== null && details.rap_price !== undefined && (
+                          <DetailCard icon="💰" title="Rap %" value={`${details.rap_price}%`} />
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Fancy specific: Fancy Color details in specs */}
+                    {isFancy() && (
+                      <>
+                        {details.fancy_intensity && <DetailCard icon="🌈" title="Fancy Intensity" value={details.fancy_intensity} />}
+                        {details.fancy_color && <DetailCard icon="🎨" title="Fancy Color" value={details.fancy_color} />}
+                        {details.fancy_overtone && <DetailCard icon="✨" title="Overtone" value={details.fancy_overtone} />}
+                      </>
                     )}
                   </motion.div>
                 )}
