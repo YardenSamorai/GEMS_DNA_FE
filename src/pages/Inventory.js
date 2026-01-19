@@ -291,65 +291,29 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     pdf.text('📞 +1 (212) 869-0544  •  ✉ info@gems.net  •  🌐 www.gems.net', pageWidth / 2, footerY + 4, { align: 'center' });
   };
 
-  // Helper: Load image as base64 using fetch with CORS proxy
+  // Helper: Load image as base64 using our backend proxy
   const loadImage = async (url) => {
     if (!url) return null;
     
-    // Try multiple methods to load image
-    const methods = [
-      // Method 1: Direct fetch (works if server has CORS enabled)
-      async () => {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-      },
-      // Method 2: Using corsproxy.io
-      async () => {
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-      },
-      // Method 3: Using allorigins
-      async () => {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
+    try {
+      // Use our backend proxy to bypass CORS
+      const proxyUrl = `https://gems-dna-be.vercel.app/api/image-proxy?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
+      
+      if (!response.ok) {
+        console.log('Image proxy failed:', response.status);
+        return null;
       }
-    ];
-    
-    for (const method of methods) {
-      try {
-        const result = await Promise.race([
-          method(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000))
-        ]);
-        if (result && result.startsWith('data:')) {
-          return result;
-        }
-      } catch (e) {
-        console.log('Image load method failed:', e.message);
-        continue;
+      
+      const data = await response.json();
+      if (data.image && data.image.startsWith('data:')) {
+        return data.image;
       }
+      return null;
+    } catch (e) {
+      console.log('Image load failed:', e.message);
+      return null;
     }
-    
-    return null;
   };
 
   // Calculate total pages
