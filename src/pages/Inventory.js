@@ -3473,31 +3473,51 @@ const StoneSearchPage = () => {
     });
 
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = "Gemstar";
+    workbook.creator = "GEMS DNA";
+    workn
     workbook.created = new Date();
+
+    // Load banner image for header
+    let bannerImageId = null;
+    try {
+      const bannerResponse = await fetch('/Banner2.png');
+      const bannerBlob = await bannerResponse.blob();
+      const bannerBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(bannerBlob);
+      });
+      bannerImageId = workbook.addImage({
+        base64: bannerBase64,
+        extension: 'png',
+      });
+      console.log('Banner image loaded successfully');
+    } catch (e) {
+      console.log('Could not load banner image:', e.message);
+    }
 
     // Create sheet for Emeralds
     if (emeralds.length > 0) {
       console.log('Creating Emeralds sheet with', emeralds.length, 'stones');
-      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981");
+      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981", bannerImageId);
     }
 
     // Create sheet for Fancy
     if (fancy.length > 0) {
       console.log('Creating Fancy sheet with', fancy.length, 'stones');
-      createCategorySheet(workbook, "Fancy", fancy, FANCY_COLUMNS, "FFFBBF24");
+      createCategorySheet(workbook, "Fancy", fancy, FANCY_COLUMNS, "FFFBBF24", bannerImageId);
     }
 
     // Create sheet for Diamonds
     if (diamonds.length > 0) {
       console.log('Creating Diamonds sheet with', diamonds.length, 'stones');
-      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6");
+      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6", bannerImageId);
     }
 
     // Create sheet for Others (use Emerald columns as default)
     if (others.length > 0) {
       console.log('Creating Other Gems sheet with', others.length, 'stones');
-      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6");
+      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6", bannerImageId);
     }
 
     console.log('Total sheets in workbook:', workbook.worksheets.length);
@@ -3510,7 +3530,7 @@ const StoneSearchPage = () => {
   };
 
   // Helper: Create a category-specific sheet
-  const createCategorySheet = (workbook, sheetName, data, columns, accentColor) => {
+  const createCategorySheet = (workbook, sheetName, data, columns, accentColor, bannerImageId = null) => {
     const worksheet = workbook.addWorksheet(sheetName);
     const colCount = columns.length;
     const lastCol = colCount <= 26 
@@ -3526,30 +3546,37 @@ const StoneSearchPage = () => {
     const date = now.toLocaleDateString("en-GB");
     const time = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-    // Header styling
-    worksheet.mergeCells(`A1:${lastCol}1`);
-    const titleCell = worksheet.getCell("A1");
-    titleCell.value = `◆  G E M S T A R  -  ${sheetName.toUpperCase()}  ◆`;
-    titleCell.font = { bold: true, size: 18, color: { argb: accentColor }, name: "Arial" };
-    titleCell.alignment = { vertical: "middle", horizontal: "center" };
-    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(1).height = 30;
+    // === BANNER IMAGE HEADER ===
+    if (bannerImageId !== null) {
+      // Add banner image spanning across columns
+      worksheet.addImage(bannerImageId, {
+        tl: { col: 0, row: 0 },
+        ext: { width: 800, height: 60 }  // Adjust size as needed
+      });
+      // Make row 1 tall enough for the banner
+      worksheet.getRow(1).height = 50;
+      worksheet.mergeCells(`A1:${lastCol}1`);
+    } else {
+      // Fallback: Text header if no banner
+      worksheet.mergeCells(`A1:${lastCol}1`);
+      const titleCell = worksheet.getCell("A1");
+      titleCell.value = `◆  GEMS DNA  -  ${sheetName.toUpperCase()}  ◆`;
+      titleCell.font = { bold: true, size: 18, color: { argb: accentColor }, name: "Arial" };
+      titleCell.alignment = { vertical: "middle", horizontal: "center" };
+      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+      worksheet.getRow(1).height = 30;
+    }
 
-    // Tagline
+    // Category & Summary row
     worksheet.mergeCells(`A2:${lastCol}2`);
-    worksheet.getCell("A2").value = "Premium Gemstones & Diamonds";
-    worksheet.getCell("A2").font = { size: 10, color: { argb: "FFD1D5DB" }, italic: true };
+    worksheet.getCell("A2").value = `${sheetName.toUpperCase()}  ·  ${data.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${date}`;
+    worksheet.getCell("A2").font = { size: 11, color: { argb: "FFFFFFFF" }, bold: true };
     worksheet.getCell("A2").alignment = { vertical: "middle", horizontal: "center" };
-    worksheet.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(2).height = 18;
+    worksheet.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
+    worksheet.getRow(2).height = 24;
 
-    // Summary row
-    worksheet.mergeCells(`A3:${lastCol}3`);
-    worksheet.getCell("A3").value = `${data.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${date}`;
-    worksheet.getCell("A3").font = { size: 10, color: { argb: "FF9CA3AF" } };
-    worksheet.getCell("A3").alignment = { vertical: "middle", horizontal: "center" };
-    worksheet.getCell("A3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(3).height = 18;
+    // Spacer row
+    worksheet.getRow(3).height = 8;
 
     // Spacer row 4
     worksheet.getRow(4).height = 8;
