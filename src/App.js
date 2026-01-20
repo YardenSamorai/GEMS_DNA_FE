@@ -4,6 +4,7 @@ import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-reac
 import DiamondCard from "./pages/DiamondCard";
 import HomePage from "./pages/HomePage";
 import JewelryPage from "./pages/JewelryPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import { Toaster } from "react-hot-toast";
 import Inventory from "./pages/Inventory";
 
@@ -217,6 +218,9 @@ function AppContent() {
           <Header />
           <main className="flex-1">
             <Routes>
+              {/* Landing/Onboarding Page */}
+              <Route path="/" element={<OnboardingPage />} />
+
               <Route
                 path="/dashboard"
                 element={
