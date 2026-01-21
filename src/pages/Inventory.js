@@ -2199,16 +2199,24 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
           >
             <div className="pt-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* SKU Search */}
-        <div className="sm:col-span-2 lg:col-span-1">
-          <label className="block text-xs font-medium text-stone-500 mb-1.5">Search by SKU</label>
-          <input
-            type="text"
+        {/* SKU Search - Bulk Support */}
+        <div className="sm:col-span-2 lg:col-span-2">
+          <label className="block text-xs font-medium text-stone-500 mb-1.5">
+            Search by SKU 
+            <span className="text-stone-400 font-normal ml-1">(comma or line separated for bulk)</span>
+          </label>
+          <textarea
             value={filters.sku}
             onChange={handleChange("sku")}
-            placeholder="e.g. T9548"
-            className="input-modern"
+            placeholder="e.g. T9548, T9549, T9550&#10;or one SKU per line"
+            className="input-modern min-h-[60px] resize-y"
+            rows={2}
           />
+          {filters.sku && filters.sku.includes(',') || filters.sku?.includes('\n') ? (
+            <p className="text-xs text-emerald-600 mt-1">
+              🔍 Searching {filters.sku.split(/[,\n]/).filter(s => s.trim()).length} SKUs
+            </p>
+          ) : null}
         </div>
 
         {/* Price Range */}
@@ -4483,7 +4491,20 @@ const StoneSearchPage = () => {
     };
 
     return stones.filter((stone) => {
-      if (filters.sku && !stone.sku?.toLowerCase().includes(filters.sku.toLowerCase())) return false;
+      // Bulk SKU support - check if SKU matches any in the list
+      if (filters.sku) {
+        const skuList = filters.sku
+          .split(/[,\n]/)
+          .map(s => s.trim().toLowerCase())
+          .filter(s => s.length > 0);
+        
+        if (skuList.length > 0) {
+          const stoneSku = stone.sku?.toLowerCase() || '';
+          // Check if stone SKU matches or contains any of the filter SKUs
+          const matches = skuList.some(filterSku => stoneSku.includes(filterSku));
+          if (!matches) return false;
+        }
+      }
       if (filters.minPrice && stone.priceTotal != null && stone.priceTotal < Number(filters.minPrice)) return false;
       if (filters.maxPrice && stone.priceTotal != null && stone.priceTotal > Number(filters.maxPrice)) return false;
       if (filters.minCarat && stone.weightCt != null && stone.weightCt < Number(filters.minCarat)) return false;
