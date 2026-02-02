@@ -148,14 +148,30 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
   // Add data rows
   selectedStones.forEach((stone) => {
     const priceCode = encodePriceBARELOVSK(stone.pricePerCt); // Price per carat
+    const category = (stone.category || '').toLowerCase();
+    const sku = (stone.sku || '').toUpperCase();
     
-    // Build details string with line breaks (no Hebrew labels)
-    const details = [
-      `${stone.weightCt || '?'}`,
-      `${stone.lab || 'N/A'}`,
-      `${stone.treatment || 'N/A'}`,
-      `${priceCode}`
-    ].join('\n');
+    // Check if diamond or fancy: by category OR by SKU starting with T (diamond SKU pattern)
+    const isDiamondOrFancy = category.includes('diamond') || category.includes('fancy') || sku.startsWith('T');
+    
+    // Build details string based on category
+    // Diamonds & Fancy: Weight, Lab, Color Clarity (same line, no separator)
+    // Emeralds & Others: Weight, Lab, Treatment, Price code
+    let details;
+    if (isDiamondOrFancy) {
+      details = [
+        `${stone.weightCt || '?'} ct`,
+        stone.lab || null,
+        `${stone.color || ''} ${stone.clarity || ''}`.trim() || null
+      ].filter(Boolean).join('\n');
+    } else {
+      details = [
+        `${stone.weightCt || '?'}`,
+        stone.lab || null,
+        stone.treatment || null,
+        priceCode
+      ].filter(Boolean).join('\n');
+    }
 
     const qrUrl = `https://gems-dna.com/${stone.sku}`;
 
