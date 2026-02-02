@@ -155,14 +155,14 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
     const isDiamondOrFancy = category.includes('diamond') || category.includes('fancy') || sku.startsWith('T');
     
     // Build details string based on category
-    // Diamonds & Fancy: Weight, Lab, Color Clarity (same line, no separator)
+    // Diamonds & Fancy: Weight, Lab, Color  Clarity (same line, extra space)
     // Emeralds & Others: Weight, Lab, Treatment, Price code
     let details;
     if (isDiamondOrFancy) {
       details = [
-        `${stone.weightCt || '?'} ct`,
+        `${stone.weightCt || '?'}`,
         stone.lab || null,
-        `${stone.color || ''} ${stone.clarity || ''}`.trim() || null
+        `${stone.color || ''}   ${stone.clarity || ''}`.trim() || null
       ].filter(Boolean).join('\n');
     } else {
       details = [
