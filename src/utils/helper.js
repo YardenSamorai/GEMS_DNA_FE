@@ -3,7 +3,7 @@ import { mapping } from "./const";
 export const encryptPrice = (price) => {
   if (!price) return "N/A";
 
-  const strPrice = price.toString(); // מוודא שגם string יעבוד
+  const strPrice = Math.round(Number(price)).toString(); // עיגול למספר שלם כדי למנוע בעיות עם נקודה עשרונית
   const trailingEncrypted = [];
   let encrypted = "";
   let i = 0;
