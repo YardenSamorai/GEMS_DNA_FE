@@ -2966,6 +2966,9 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
           {stone.lab && (
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">{stone.lab}</span>
           )}
+          {stone.location && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">📍 {stone.location}</span>
+          )}
         </div>
         {/* Price */}
         <div className="pt-1">
