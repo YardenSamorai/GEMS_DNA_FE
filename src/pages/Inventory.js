@@ -2090,6 +2090,12 @@ const treatmentOptions = [
   "Significant",
 ];
 
+const pairStatusOptions = [
+  "All",
+  "Pair",
+  "Single",
+];
+
 const locationOptions = [
   "All locations",
   "New York",
@@ -2137,6 +2143,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
       category: "All categories",
       tag: "All tags",
       location: "All locations",
+      pairStatus: "All",
     });
   };
 
@@ -2155,6 +2162,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
     !filters.category.includes("All") && filters.category,
     !filters.tag.includes("All") && filters.tag,
     !filters.location.includes("All") && filters.location,
+    filters.pairStatus !== "All" && filters.pairStatus,
   ].filter(Boolean).length;
 
   return (
@@ -2386,6 +2394,25 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
           >
             {locationOptions.map((loc) => (
               <option key={loc} value={loc}>{loc}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Pair Status */}
+        <div>
+          <label className="block text-xs font-medium text-stone-500 mb-1.5 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            Pair Status
+          </label>
+          <select
+            value={filters.pairStatus}
+            onChange={handleChange("pairStatus")}
+            className="input-modern"
+          >
+            {pairStatusOptions.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
         </div>
@@ -2652,6 +2679,118 @@ const DetailItem = ({ label, value }) => (
     <p className="text-sm font-medium text-stone-800 truncate">{value || 'N/A'}</p>
   </div>
 );
+
+/* ---------------- Pair Card (shows two stones side by side) ---------------- */
+const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags }) => {
+  const StoneSide = ({ stone, label }) => (
+    <div className="flex-1 min-w-0">
+      {/* Image */}
+      <div className="w-full aspect-square rounded-xl overflow-hidden bg-stone-100 mb-3">
+        {stone.imageUrl ? (
+          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-stone-300">
+            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+        )}
+      </div>
+      {/* Info */}
+      <div className="space-y-1.5">
+        <span className="inline-block text-xs font-mono font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
+          {stone.sku}
+        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-stone-800">{stone.shape}</span>
+          <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-stone-500">
+          {stone.measurements && <span>{stone.measurements}</span>}
+        </div>
+        <div className="flex flex-wrap gap-1 mt-1">
+          {stone.origin && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600">{stone.origin}</span>
+          )}
+          {stone.treatment && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">{stone.treatment}</span>
+          )}
+          {stone.lab && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">{stone.lab}</span>
+          )}
+        </div>
+        {/* Price */}
+        <div className="pt-1">
+          <span className="text-base font-bold text-stone-900">${stone.priceTotal?.toLocaleString() || '-'}</span>
+          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt?.toLocaleString() || '-'}/ct)</span>
+        </div>
+      </div>
+      {/* View DNA button */}
+      <button
+        onClick={() => onViewDNA && onViewDNA(stone)}
+        className="mt-3 w-full py-2 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        View DNA
+      </button>
+    </div>
+  );
+
+  // Calculate combined weight
+  const combinedWeight = ((stoneA.weightCt || 0) + (stoneB ? stoneB.weightCt || 0 : 0)).toFixed(2);
+  const combinedPrice = ((stoneA.priceTotal || 0) + (stoneB ? stoneB.priceTotal || 0 : 0));
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border-2 border-emerald-200 bg-white overflow-hidden shadow-md hover:shadow-lg hover:border-emerald-300 transition-all"
+    >
+      {/* Pair Header */}
+      <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          <span className="text-white font-semibold text-sm">Pair</span>
+        </div>
+        <div className="flex items-center gap-3 text-white/90 text-xs">
+          <span>⚖️ {combinedWeight} ct</span>
+          <span>💰 ${combinedPrice.toLocaleString()}</span>
+        </div>
+      </div>
+
+      {/* Two stones side by side */}
+      <div className="p-4">
+        <div className="flex gap-4">
+          <StoneSide stone={stoneA} label="Stone 1" />
+          {/* Divider */}
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-px h-full bg-stone-200 relative">
+              <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 bg-white border border-stone-200 rounded-full w-8 h-8 flex items-center justify-center">
+                <span className="text-xs font-bold text-emerald-500">+</span>
+              </div>
+            </div>
+          </div>
+          {stoneB ? (
+            <StoneSide stone={stoneB} label="Stone 2" />
+          ) : (
+            <div className="flex-1 min-w-0 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 p-6">
+              <svg className="w-8 h-8 text-stone-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-stone-400 text-center font-medium">Pair stone not in inventory</p>
+              <p className="text-[10px] text-stone-300 mt-1">{stoneA.pairSku}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 /* ---------------- Table (Desktop) ---------------- */
 const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA }) => {
@@ -3185,6 +3324,7 @@ const StoneSearchPage = () => {
     category: "All categories",
     tag: "All tags",
     location: "All locations",
+    pairStatus: "All",
   });
 
   const [stones, setStones] = useState([]);
@@ -4570,6 +4710,10 @@ const StoneSearchPage = () => {
       if (filters.category !== "All categories" && stone.category !== filters.category) return false;
       if (filters.location !== "All locations" && stone.location !== filters.location) return false;
       
+      // Pair status filter
+      if (filters.pairStatus === "Pair" && !stone.pairSku) return false;
+      if (filters.pairStatus === "Single" && stone.pairSku) return false;
+
       // Tag filter
       if (filters.tag !== "All tags") {
         const stoneTagList = stoneTags[stone.sku] || [];
@@ -4609,10 +4753,38 @@ const StoneSearchPage = () => {
     return sorted;
   }, [filteredStones, sortConfig, selectedStones]);
 
-  const totalItems = sortedStones.length;
+  // Group stones into pairs when pair filter is active
+  const pairedGroups = useMemo(() => {
+    if (filters.pairStatus !== "Pair") return null;
+    
+    const allStones = sortedStones;
+    const skuMap = {};
+    // Build a lookup of all stones (including non-filtered) to find pair partners
+    stones.forEach(s => { skuMap[s.sku] = s; });
+    
+    const visited = new Set();
+    const groups = [];
+    
+    allStones.forEach(stone => {
+      if (visited.has(stone.sku)) return;
+      visited.add(stone.sku);
+      
+      if (stone.pairSku) {
+        visited.add(stone.pairSku);
+        const partner = skuMap[stone.pairSku] || null;
+        groups.push({ stoneA: stone, stoneB: partner });
+      }
+    });
+    
+    return groups;
+  }, [sortedStones, stones, filters.pairStatus]);
+
+  const isPairView = filters.pairStatus === "Pair" && pairedGroups;
+  const totalItems = isPairView ? pairedGroups.length : sortedStones.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedStones = sortedStones.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedPairs = isPairView ? pairedGroups.slice(startIndex, startIndex + ITEMS_PER_PAGE) : [];
 
   return (
     <>
@@ -4626,7 +4798,7 @@ const StoneSearchPage = () => {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-stone-800 mb-1">Stone Inventory</h1>
                 <p className="text-stone-500 text-sm sm:text-base">
-                  {loading ? 'Loading...' : `${totalItems.toLocaleString()} stones available`}
+                  {loading ? 'Loading...' : isPairView ? `${totalItems.toLocaleString()} pairs found` : `${totalItems.toLocaleString()} stones available`}
                 </p>
               </div>
               
@@ -4881,7 +5053,42 @@ const StoneSearchPage = () => {
           />
 
           {/* Content */}
-          {viewMode === "table" ? (
+          {isPairView ? (
+            /* Pair View - always show as cards */
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+              {loading ? (
+                [...Array(4)].map((_, i) => (
+                  <div key={i} className="rounded-2xl border border-emerald-100 p-4 animate-pulse">
+                    <div className="h-8 bg-emerald-100 rounded-xl mb-4"></div>
+                    <div className="flex gap-4">
+                      <div className="flex-1 space-y-3">
+                        <div className="aspect-square rounded-xl bg-stone-200"></div>
+                        <div className="h-4 bg-stone-200 rounded w-1/2"></div>
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <div className="aspect-square rounded-xl bg-stone-200"></div>
+                        <div className="h-4 bg-stone-200 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : error ? (
+                <div className="col-span-full text-center py-12 text-red-500">{error}</div>
+              ) : paginatedPairs.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-stone-500">No pairs found</div>
+              ) : (
+                paginatedPairs.map((pair, idx) => (
+                  <PairCard
+                    key={pair.stoneA.sku + '-' + (pair.stoneB?.sku || 'missing')}
+                    stoneA={pair.stoneA}
+                    stoneB={pair.stoneB}
+                    onViewDNA={setDrawerStone}
+                    stoneTags={stoneTags}
+                  />
+                ))
+              )}
+            </div>
+          ) : viewMode === "table" ? (
             <StonesTable
               stones={paginatedStones}
               onToggle={(stone) => setSelectedStone(selectedStone?.id === stone.id ? null : stone)}
