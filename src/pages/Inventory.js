@@ -2119,6 +2119,268 @@ const LoadingBar = ({ active, progress }) => {
   );
 };
 
+/* ---------------- Shape Icons ---------------- */
+const ShapeIcon = ({ shape, isActive }) => {
+  const color = isActive ? '#059669' : '#a8a29e';
+  const size = 32;
+  
+  const shapeKey = shape?.toUpperCase?.() || '';
+  
+  // Round / RD / BR
+  if (shapeKey === 'RD' || shapeKey === 'ROUND' || shapeKey === 'BR' || shapeKey === 'BRILLIANT') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="14" stroke={color} strokeWidth="1.5"/>
+        <path d="M20 6 L26 16 L34 20 L26 24 L20 34 L14 24 L6 20 L14 16 Z" stroke={color} strokeWidth="1" fill="none"/>
+        <line x1="20" y1="6" x2="20" y2="34" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="6" y1="20" x2="34" y2="20" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Pear / PS
+  if (shapeKey === 'PS' || shapeKey === 'PEAR') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <path d="M20 5 C20 5 10 15 10 25 C10 31 14.5 35 20 35 C25.5 35 30 31 30 25 C30 15 20 5 20 5Z" stroke={color} strokeWidth="1.5" fill="none"/>
+        <line x1="20" y1="5" x2="20" y2="35" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Oval / OV
+  if (shapeKey === 'OV' || shapeKey === 'OVAL') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <ellipse cx="20" cy="20" rx="10" ry="15" stroke={color} strokeWidth="1.5"/>
+        <line x1="20" y1="5" x2="20" y2="35" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="10" y1="20" x2="30" y2="20" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Cushion / CU
+  if (shapeKey === 'CU' || shapeKey === 'CUSHION') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <rect x="8" y="8" width="24" height="24" rx="6" stroke={color} strokeWidth="1.5"/>
+        <line x1="8" y1="20" x2="32" y2="20" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="20" y1="8" x2="20" y2="32" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Heart / HS
+  if (shapeKey === 'HS' || shapeKey === 'HEART') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <path d="M20 35 L7 22 C4 19 4 13 8 10 C12 7 16 9 20 14 C24 9 28 7 32 10 C36 13 36 19 33 22 Z" stroke={color} strokeWidth="1.5" fill="none"/>
+      </svg>
+    );
+  }
+  
+  // Marquise / MQ
+  if (shapeKey === 'MQ' || shapeKey === 'MARQUISE') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <path d="M20 4 C26 12 30 18 30 20 C30 22 26 28 20 36 C14 28 10 22 10 20 C10 18 14 12 20 4Z" stroke={color} strokeWidth="1.5" fill="none"/>
+        <line x1="20" y1="4" x2="20" y2="36" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Emerald / EM
+  if (shapeKey === 'EM' || shapeKey === 'EMERALD') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <path d="M12 6 L28 6 L32 10 L32 30 L28 34 L12 34 L8 30 L8 10 Z" stroke={color} strokeWidth="1.5" fill="none"/>
+        <line x1="8" y1="20" x2="32" y2="20" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="20" y1="6" x2="20" y2="34" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="12" y1="6" x2="8" y2="10" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="28" y1="6" x2="32" y2="10" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Radiant / RA
+  if (shapeKey === 'RA' || shapeKey === 'RADIANT') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <path d="M13 6 L27 6 L34 13 L34 27 L27 34 L13 34 L6 27 L6 13 Z" stroke={color} strokeWidth="1.5" fill="none"/>
+        <line x1="6" y1="20" x2="34" y2="20" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="20" y1="6" x2="20" y2="34" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Princess / PR
+  if (shapeKey === 'PR' || shapeKey === 'PRINCESS') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <rect x="8" y="8" width="24" height="24" stroke={color} strokeWidth="1.5"/>
+        <line x1="8" y1="8" x2="32" y2="32" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="32" y1="8" x2="8" y2="32" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+  
+  // Asscher / AS
+  if (shapeKey === 'AS' || shapeKey === 'ASSCHER') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <rect x="8" y="8" width="24" height="24" stroke={color} strokeWidth="1.5"/>
+        <rect x="13" y="13" width="14" height="14" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="8" y1="8" x2="13" y2="13" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="32" y1="8" x2="27" y2="13" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="8" y1="32" x2="13" y2="27" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+        <line x1="32" y1="32" x2="27" y2="27" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+
+  // Trillion / TR
+  if (shapeKey === 'TR' || shapeKey === 'TRILLION' || shapeKey === 'TRILLIANT') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <path d="M20 6 L34 32 L6 32 Z" stroke={color} strokeWidth="1.5" fill="none"/>
+        <line x1="20" y1="6" x2="20" y2="32" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+
+  // Baguette / BG
+  if (shapeKey === 'BG' || shapeKey === 'BAGUETTE') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+        <rect x="10" y="6" width="20" height="28" stroke={color} strokeWidth="1.5"/>
+        <line x1="10" y1="20" x2="30" y2="20" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+      </svg>
+    );
+  }
+
+  // Default / Other shapes
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+      <path d="M20 4 L35 15 L30 34 L10 34 L5 15 Z" stroke={color} strokeWidth="1.5" fill="none"/>
+      <line x1="20" y1="4" x2="20" y2="34" stroke={color} strokeWidth="0.5" opacity="0.5"/>
+    </svg>
+  );
+};
+
+/* ---------------- Shape Filter with Show More ---------------- */
+const MAIN_SHAPES = ['BGT', 'CU', 'MQ', 'BR', 'EM', 'PS', 'OV'];
+
+const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
+  const [showMore, setShowMore] = useState(false);
+
+  // Separate main shapes and others
+  const mainShapes = shapes.filter(s => s === 'All shapes' || MAIN_SHAPES.includes(s.toUpperCase()));
+  const otherShapes = shapes.filter(s => s !== 'All shapes' && !MAIN_SHAPES.includes(s.toUpperCase()));
+
+  // "All" is active when no shapes are selected
+  const isAllActive = activeShapes.length === 0;
+
+  const ShapeButton = ({ shape }) => {
+    const isAll = shape === "All shapes";
+    const isActive = isAll ? isAllActive : activeShapes.includes(shape);
+    return (
+      <button
+        key={shape}
+        onClick={() => {
+          if (isAll) {
+            // Click "All" → clear selection
+            onToggle([]);
+          } else {
+            // Toggle this shape
+            if (activeShapes.includes(shape)) {
+              onToggle(activeShapes.filter(s => s !== shape));
+            } else {
+              onToggle([...activeShapes, shape]);
+            }
+          }
+        }}
+        className={`flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-150 w-[72px] h-[72px] sm:w-20 sm:h-20 ${
+          isAll
+            ? `text-sm font-semibold ${isActive ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'}`
+            : `${isActive ? 'bg-emerald-50 border-emerald-500 shadow-md' : 'bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50'}`
+        }`}
+      >
+        {isAll ? (
+          <span>All</span>
+        ) : (
+          <>
+            <ShapeIcon shape={shape} isActive={isActive} />
+            <span className={`text-[10px] mt-1 font-medium ${isActive ? 'text-emerald-700' : 'text-stone-500'}`}>
+              {shape}
+            </span>
+          </>
+        )}
+      </button>
+    );
+  };
+
+  return (
+    <div className="sm:col-span-2 lg:col-span-4">
+      <label className="block text-xs font-medium text-stone-500 mb-2">
+        Shape
+        {activeShapes.length > 0 && (
+          <span className="ml-2 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+            {activeShapes.length} selected
+          </span>
+        )}
+      </label>
+      {/* Main shapes */}
+      <div className="flex flex-wrap gap-2">
+        {mainShapes.map((shape) => (
+          <ShapeButton key={shape} shape={shape} />
+        ))}
+      </div>
+      {/* Show more / less */}
+      {otherShapes.length > 0 && (
+        <>
+          <button
+            onClick={() => setShowMore(!showMore)}
+            className="mt-2 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1"
+          >
+            {showMore ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+                Show less
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                Show more ({otherShapes.length})
+              </>
+            )}
+          </button>
+          <AnimatePresence>
+            {showMore && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {otherShapes.map((shape) => (
+                    <ShapeButton key={shape} shape={shape} />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+    </div>
+  );
+};
+
 /* ---------------- Filters ---------------- */
 const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tags, onManageTags }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -2138,7 +2400,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
       maxLength: "",
       minWidth: "",
       maxWidth: "",
-      shape: "All shapes",
+      shape: [],
       treatment: "All treatments",
       category: "All categories",
       tag: "All tags",
@@ -2157,7 +2419,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
     filters.maxLength,
     filters.minWidth,
     filters.maxWidth,
-    !filters.shape.includes("All") && filters.shape,
+    filters.shape.length > 0,
     !filters.treatment.includes("All") && filters.treatment,
     !filters.category.includes("All") && filters.category,
     !filters.tag.includes("All") && filters.tag,
@@ -2256,19 +2518,8 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
           />
         </div>
 
-        {/* Shape */}
-        <div>
-          <label className="block text-xs font-medium text-stone-500 mb-1.5">Shape</label>
-          <select
-            value={filters.shape}
-            onChange={handleChange("shape")}
-            className="input-modern"
-          >
-            {shapesOptions.map((shape) => (
-              <option key={shape} value={shape}>{shape}</option>
-            ))}
-          </select>
-        </div>
+        {/* Shape - Visual Buttons */}
+        <ShapeFilter shapes={shapesOptions} activeShapes={filters.shape} onToggle={(shapes) => onChange({ ...filters, shape: shapes })} />
 
         {/* Carat Range */}
         <div>
@@ -2681,7 +2932,7 @@ const DetailItem = ({ label, value }) => (
 );
 
 /* ---------------- Pair Card (shows two stones side by side) ---------------- */
-const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags }) => {
+const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSelection }) => {
   const StoneSide = ({ stone, label }) => (
     <div className="flex-1 min-w-0">
       {/* Image */}
@@ -2747,11 +2998,27 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags }) => {
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border-2 border-emerald-200 bg-white overflow-hidden shadow-md hover:shadow-lg hover:border-emerald-300 transition-all"
+      className={`rounded-2xl border-2 bg-white overflow-hidden shadow-md hover:shadow-lg transition-all ${
+        isSelected 
+          ? 'border-emerald-500 ring-2 ring-emerald-300' 
+          : 'border-emerald-200 hover:border-emerald-300'
+      }`}
     >
       {/* Pair Header */}
-      <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 flex items-center justify-between">
+      <div 
+        className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 flex items-center justify-between cursor-pointer"
+        onClick={() => onToggleSelection && onToggleSelection()}
+      >
         <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isSelected || false}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelection && onToggleSelection();
+            }}
+            className="w-4 h-4 rounded border-white/50 text-emerald-300 focus:ring-emerald-300 cursor-pointer"
+          />
           <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
           </svg>
@@ -2938,6 +3205,11 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 {stone.lab && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
                     {stone.lab}
+                  </span>
+                )}
+                {stone.location && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                    📍 {stone.location}
                   </span>
                 )}
               </div>
@@ -3319,7 +3591,7 @@ const StoneSearchPage = () => {
     maxLength: "",
     minWidth: "",
     maxWidth: "",
-    shape: "All shapes",
+    shape: [],
     treatment: "All treatments",
     category: "All categories",
     tag: "All tags",
@@ -4078,12 +4350,30 @@ const StoneSearchPage = () => {
 
   // Export selected stones to Excel with styling (combined - all columns)
   const exportToExcel = async (customStones = null) => {
-    const selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
+    let selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
     
     if (selectedData.length === 0) {
       alert("Please select at least one stone to export.");
       return;
     }
+
+    // Reorder: place paired stones adjacent to each other
+    const ordered = [];
+    const visited = new Set();
+    const skuMap = {};
+    selectedData.forEach(s => { skuMap[s.sku] = s; });
+    
+    selectedData.forEach(stone => {
+      if (visited.has(stone.sku)) return;
+      visited.add(stone.sku);
+      ordered.push(stone);
+      // If this stone has a pair partner in the selection, place it right after
+      if (stone.pairSku && skuMap[stone.pairSku] && !visited.has(stone.pairSku)) {
+        visited.add(stone.pairSku);
+        ordered.push(skuMap[stone.pairSku]);
+      }
+    });
+    selectedData = ordered;
 
     // Determine which columns to use based on category
     const breakdown = getCategoryBreakdown(selectedData);
@@ -4705,7 +4995,7 @@ const StoneSearchPage = () => {
       if (filters.minWidth && dims.width != null && dims.width < Number(filters.minWidth)) return false;
       if (filters.maxWidth && dims.width != null && dims.width > Number(filters.maxWidth)) return false;
       
-      if (filters.shape !== "All shapes" && stone.shape !== filters.shape) return false;
+      if (filters.shape.length > 0 && !filters.shape.includes(stone.shape)) return false;
       if (filters.treatment !== "All treatments" && stone.treatment?.toLowerCase() !== filters.treatment.toLowerCase()) return false;
       if (filters.category !== "All categories" && stone.category !== filters.category) return false;
       if (filters.location !== "All locations" && stone.location !== filters.location) return false;
@@ -5055,6 +5345,41 @@ const StoneSearchPage = () => {
           {/* Content */}
           {isPairView ? (
             /* Pair View - always show as cards */
+            <>
+            {/* Select All Pairs Bar */}
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                onClick={() => {
+                  const scrollY = window.scrollY;
+                  const allPairIds = paginatedPairs.flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]);
+                  const allSelected = allPairIds.length > 0 && allPairIds.every(id => selectedStones.has(id));
+                  setSelectedStones(prev => {
+                    const newSet = new Set(prev);
+                    if (allSelected) {
+                      allPairIds.forEach(id => newSet.delete(id));
+                    } else {
+                      allPairIds.forEach(id => newSet.add(id));
+                    }
+                    return newSet;
+                  });
+                  requestAnimationFrame(() => window.scrollTo(0, scrollY));
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={paginatedPairs.length > 0 && paginatedPairs.flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]).every(id => selectedStones.has(id))}
+                  className="w-3.5 h-3.5 rounded border-emerald-300 text-emerald-500 pointer-events-none"
+                />
+                Select All Pairs
+              </button>
+              {selectedStones.size > 0 && isPairView && (
+                <span className="text-xs text-stone-500">
+                  {Math.ceil(selectedStones.size / 2)} pair{Math.ceil(selectedStones.size / 2) !== 1 ? 's' : ''} selected ({selectedStones.size} stones)
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
               {loading ? (
                 [...Array(4)].map((_, i) => (
@@ -5077,17 +5402,36 @@ const StoneSearchPage = () => {
               ) : paginatedPairs.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-stone-500">No pairs found</div>
               ) : (
-                paginatedPairs.map((pair, idx) => (
-                  <PairCard
-                    key={pair.stoneA.sku + '-' + (pair.stoneB?.sku || 'missing')}
-                    stoneA={pair.stoneA}
-                    stoneB={pair.stoneB}
-                    onViewDNA={setDrawerStone}
-                    stoneTags={stoneTags}
-                  />
-                ))
+                paginatedPairs.map((pair, idx) => {
+                  const pairIds = [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])];
+                  const isPairSelected = pairIds.every(id => selectedStones.has(id));
+                  return (
+                    <PairCard
+                      key={pair.stoneA.sku + '-' + (pair.stoneB?.sku || 'missing')}
+                      stoneA={pair.stoneA}
+                      stoneB={pair.stoneB}
+                      onViewDNA={setDrawerStone}
+                      stoneTags={stoneTags}
+                      isSelected={isPairSelected}
+                      onToggleSelection={() => {
+                        const scrollY = window.scrollY;
+                        setSelectedStones(prev => {
+                          const newSet = new Set(prev);
+                          if (isPairSelected) {
+                            pairIds.forEach(id => newSet.delete(id));
+                          } else {
+                            pairIds.forEach(id => newSet.add(id));
+                          }
+                          return newSet;
+                        });
+                        requestAnimationFrame(() => window.scrollTo(0, scrollY));
+                      }}
+                    />
+                  );
+                })
               )}
             </div>
+            </>
           ) : viewMode === "table" ? (
             <StonesTable
               stones={paginatedStones}
