@@ -135,7 +135,19 @@ const DiamondCard = () => {
                     </svg>
                     {details.lab}
                   </span>
-                  <span className="text-stone-400 text-sm">ID: {details.stone_id}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(details.stone_id);
+                      toast.success('SKU copied!', { duration: 1500, style: { fontSize: '14px' } });
+                    }}
+                    className="flex items-center gap-1.5 text-stone-400 text-sm hover:text-white transition-colors group cursor-pointer"
+                    title="Click to copy SKU"
+                  >
+                    <span>ID: {details.stone_id}</span>
+                    <svg className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-white">
                   {details.shape} • {details.carat} ct {(isDiamond() || isFancy()) && details.clarity ? `• ${details.clarity}` : ''}
