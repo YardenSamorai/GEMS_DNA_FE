@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
@@ -295,6 +295,25 @@ const DiamondCard = () => {
                       </>
                     )}
                     
+                    {/* Pair Stone */}
+                    {details.pair_stone && (
+                      <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 hover:border-indigo-300 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">💎</span>
+                          <span className="text-stone-600 font-medium">Pair Stone</span>
+                        </div>
+                        <Link
+                          to={`/${details.pair_stone}`}
+                          className="text-indigo-600 hover:text-indigo-700 font-semibold underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-500 transition-colors flex items-center gap-1"
+                        >
+                          {details.pair_stone}
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </Link>
+                      </div>
+                    )}
+
                     {isSignedIn && (
                       <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-primary-50 to-accent-50 border border-primary-200">
                         <div className="flex items-center justify-between">

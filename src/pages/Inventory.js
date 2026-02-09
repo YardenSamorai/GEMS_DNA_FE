@@ -879,6 +879,7 @@ const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating
 const EMERALD_COLUMNS = [
   { key: "num", header: "#", width: 5 },
   { key: "sku", header: "SKU", width: 18 },
+  { key: "pairSku", header: "Pair SKU", width: 18 },
   { key: "shape", header: "Shape", width: 12 },
   { key: "weight", header: "Weight (ct)", width: 12 },
   { key: "measurements", header: "Measurements", width: 20 },
@@ -898,6 +899,7 @@ const EMERALD_COLUMNS = [
 const DIAMOND_COLUMNS = [
   { key: "num", header: "#", width: 5 },
   { key: "sku", header: "SKU", width: 18 },
+  { key: "pairSku", header: "Pair SKU", width: 18 },
   { key: "shape", header: "Shape", width: 12 },
   { key: "weight", header: "Weight (ct)", width: 12 },
   { key: "color", header: "Color", width: 8 },
@@ -924,6 +926,7 @@ const DIAMOND_COLUMNS = [
 const FANCY_COLUMNS = [
   { key: "num", header: "#", width: 5 },
   { key: "sku", header: "SKU", width: 18 },
+  { key: "pairSku", header: "Pair SKU", width: 18 },
   { key: "shape", header: "Shape", width: 12 },
   { key: "weight", header: "Weight (ct)", width: 12 },
   { key: "fancyIntensity", header: "Intensity", width: 12 },
@@ -1120,19 +1123,19 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
                         <span className="text-xs text-stone-400 bg-stone-100 px-2 py-1 rounded-full">{tag.stone_count || 0} stones</span>
                         <button
                           onClick={() => setEditingTag({ id: tag.id, name: tag.name, color: tag.color })}
-                          className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
                           title="Edit tag"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                           </svg>
                         </button>
                         <button
                           onClick={() => onDeleteTag(tag.id)}
-                          className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
                           title="Delete tag"
                         >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
@@ -1222,10 +1225,13 @@ const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, on
                     >
                       {tag.name}
                       <button
-                        onClick={() => onRemoveTag(stoneSku, tag.id)}
-                        className="hover:bg-white/20 rounded-full p-0.5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveTag(stoneSku, tag.id);
+                        }}
+                        className="hover:bg-white/20 rounded-full p-1.5 min-w-[24px] min-h-[24px] flex items-center justify-center touch-manipulation"
                       >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
@@ -2956,6 +2962,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="sku">SKU</SortButton>
               </th>
+              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 uppercase tracking-wider">Pair</th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">Image</th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="shape">Shape</SortButton>
@@ -3020,6 +3027,17 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {stone.pairSku ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700">
+                            Pair
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-stone-100 text-stone-500">
+                            Single
+                          </span>
+                        )}
                       </td>
                     <td className="px-4 py-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
@@ -3097,7 +3115,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                          <td colSpan={11} className="bg-stone-50 border-t border-stone-200">
+                          <td colSpan={12} className="bg-stone-50 border-t border-stone-200">
                           <StoneDetails stone={stone} onViewDNA={onViewDNA} />
                         </td>
                       </motion.tr>
@@ -3767,7 +3785,7 @@ const StoneSearchPage = () => {
           case 'shape': rowData.shape = stone.shape || ''; break;
           case 'weight': rowData.weight = stone.weightCt || ''; break;
           case 'measurements': rowData.measurements = stone.measurements || ''; break;
-          case 'ratio': rowData.ratio = stone.ratio || ''; break;
+          case 'ratio': rowData.ratio = stone.ratio != null && stone.ratio !== '' ? Number(Number(stone.ratio).toFixed(2)) : ''; break;
           case 'treatment': rowData.treatment = stone.treatment || ''; break;
           case 'origin': rowData.origin = stone.origin || ''; break;
           case 'location': rowData.location = stone.location || ''; break;
@@ -3789,6 +3807,8 @@ const StoneSearchPage = () => {
           case 'fancyOvertone': rowData.fancyOvertone = stone.fancyOvertone || ''; break;
           case 'fancyColor2': rowData.fancyColor2 = stone.fancyColor2 || ''; break;
           case 'fancyOvertone2': rowData.fancyOvertone2 = stone.fancyOvertone2 || ''; break;
+          // Pair
+          case 'pairSku': rowData.pairSku = stone.pairSku || ''; break;
           // Links
           case 'dna': rowData.dna = stone.sku || ''; break;
           case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
@@ -3809,6 +3829,12 @@ const StoneSearchPage = () => {
         cell.alignment = { vertical: "middle", horizontal: "center" };
         cell.border = { bottom: { style: "thin", color: { argb: "FFE5E7EB" } } };
       });
+
+      // Format ratio column to always show 2 decimal places
+      const ratioCol = columns.findIndex(c => c.key === 'ratio');
+      if (ratioCol >= 0 && rowData.ratio !== '') {
+        row.getCell(ratioCol + 1).numFmt = '0.00';
+      }
 
       // Format price columns
       const pricePerCtCol = columns.findIndex(c => c.key === 'pricePerCt');
@@ -3831,10 +3857,15 @@ const StoneSearchPage = () => {
       const certCol = columns.findIndex(c => c.key === 'certificate');
       const imgCol = columns.findIndex(c => c.key === 'image');
       const vidCol = columns.findIndex(c => c.key === 'video');
+      const pairSkuCol = columns.findIndex(c => c.key === 'pairSku');
 
       if (dnaCol >= 0 && stone.sku) {
         row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: `${dnaBaseUrl}/${stone.sku}` };
         row.getCell(dnaCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 9, bold: true };
+      }
+      if (pairSkuCol >= 0 && stone.pairSku) {
+        row.getCell(pairSkuCol + 1).value = { text: stone.pairSku, hyperlink: `${dnaBaseUrl}/${stone.pairSku}` };
+        row.getCell(pairSkuCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 9 };
       }
       if (certCol >= 0 && stone.certificateUrl) {
         row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
@@ -3956,6 +3987,7 @@ const StoneSearchPage = () => {
       columnsToUse = [
         { key: "num", header: "#", width: 5 },
         { key: "sku", header: "SKU", width: 18 },
+        { key: "pairSku", header: "Pair SKU", width: 18 },
         { key: "shape", header: "Shape", width: 12 },
         { key: "weight", header: "Weight (ct)", width: 12 },
         { key: "color", header: "Color", width: 8 },
@@ -4195,7 +4227,7 @@ const StoneSearchPage = () => {
           case 'shape': rowData.shape = stone.shape || ''; break;
           case 'weight': rowData.weight = stone.weightCt || ''; break;
           case 'measurements': rowData.measurements = stone.measurements || ''; break;
-          case 'ratio': rowData.ratio = stone.ratio || ''; break;
+          case 'ratio': rowData.ratio = stone.ratio != null && stone.ratio !== '' ? Number(Number(stone.ratio).toFixed(2)) : ''; break;
           case 'treatment': rowData.treatment = stone.treatment || ''; break;
           case 'origin': rowData.origin = stone.origin || ''; break;
           case 'location': rowData.location = stone.location || ''; break;
@@ -4217,6 +4249,8 @@ const StoneSearchPage = () => {
           case 'fancyOvertone': rowData.fancyOvertone = stone.fancyOvertone || ''; break;
           case 'fancyColor2': rowData.fancyColor2 = stone.fancyColor2 || ''; break;
           case 'fancyOvertone2': rowData.fancyOvertone2 = stone.fancyOvertone2 || ''; break;
+          // Pair
+          case 'pairSku': rowData.pairSku = stone.pairSku || ''; break;
           // Links
           case 'dna': rowData.dna = stone.sku || ''; break;
           case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
@@ -4265,6 +4299,12 @@ const StoneSearchPage = () => {
         };
       });
 
+      // Format ratio column to always show 2 decimal places
+      const ratioCol = columnsToUse.findIndex(c => c.key === 'ratio');
+      if (ratioCol >= 0 && rowData.ratio !== '') {
+        row.getCell(ratioCol + 1).numFmt = '0.00';
+      }
+
       // Format price columns as currency (only if column exists)
       const pricePerCtCol = columnsToUse.findIndex(c => c.key === 'pricePerCt');
       const priceTotalCol = columnsToUse.findIndex(c => c.key === 'priceTotal');
@@ -4286,12 +4326,17 @@ const StoneSearchPage = () => {
       const certCol = columnsToUse.findIndex(c => c.key === 'certificate');
       const imgCol = columnsToUse.findIndex(c => c.key === 'image');
       const vidCol = columnsToUse.findIndex(c => c.key === 'video');
+      const pairSkuCol = columnsToUse.findIndex(c => c.key === 'pairSku');
 
       if (dnaCol >= 0 && stone.sku) {
         const dnaUrl = `${dnaBaseUrl}/${stone.sku}`;
         row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: dnaUrl };
         row.getCell(dnaCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, bold: true };
         row.getCell(dnaCol + 1).alignment = { vertical: "middle", horizontal: "center" };
+      }
+      if (pairSkuCol >= 0 && stone.pairSku) {
+        row.getCell(pairSkuCol + 1).value = { text: stone.pairSku, hyperlink: `${dnaBaseUrl}/${stone.pairSku}` };
+        row.getCell(pairSkuCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10 };
       }
       if (certCol >= 0 && stone.certificateUrl) {
         row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
@@ -4463,6 +4508,8 @@ const StoneSearchPage = () => {
           fancyOvertone: row.fancyOvertone ?? "",
           fancyColor2: row.fancyColor2 ?? "",
           fancyOvertone2: row.fancyOvertone2 ?? "",
+          // Pair stone
+          pairSku: row.pairSku ?? null,
         }));
         setStones(normalized);
       } catch (err) {
