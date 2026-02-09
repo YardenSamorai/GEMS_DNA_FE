@@ -274,6 +274,11 @@ const DiamondCard = () => {
                     <DetailCard icon="📐" title="Ratio" value={details.ratio} />
                     <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
                     
+                    {/* Location - only for signed-in users */}
+                    {isSignedIn && details.location && (
+                      <DetailCard icon="📍" title="Location" value={details.location} />
+                    )}
+                    
                     {/* Diamond & Fancy specific: Cut, Polish, Symmetry */}
                     {(isDiamond() || isFancy()) && (
                       <>
