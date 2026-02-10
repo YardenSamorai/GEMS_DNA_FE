@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import GemstoneDetails from '../components/GemstoneDetails';
 
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
+
 const JewelryPage = () => {
   const { modelNumber } = useParams();
   const [item, setItem] = useState(null);
@@ -10,7 +12,7 @@ const JewelryPage = () => {
   useEffect(() => {
     const fetchItem = async () => {
       try {
-        const res = await fetch(`https://gems-dna-be.onrender.com/api/jewelry/${modelNumber}`);
+        const res = await fetch(`${API_BASE}/api/jewelry/${modelNumber}`);
         if (!res.ok) throw new Error('Item not found');
         const data = await res.json();
         setItem(data);

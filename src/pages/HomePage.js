@@ -4,7 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from 'framer-motion';
 
 // API base URL from .env
-const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.vercel.app';
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
 
 // Animated Counter Hook
 const useAnimatedCounter = (end, duration = 1500, startOnView = true) => {
@@ -106,61 +106,129 @@ const BarChart = ({ data, maxValue }) => {
   );
 };
 
-// Sync Info Dialog Component (Shows how to sync due to Vercel timeout limits)
+// Phase labels for progress display
+const SYNC_PHASE_LABELS = {
+  idle: 'Ready to sync',
+  starting: 'Starting sync...',
+  connecting: 'Connecting to SOAP API...',
+  parsing: 'Parsing stone data...',
+  processing: 'Processing stones...',
+  clearing: 'Preparing database...',
+  inserting: 'Saving stones to database...',
+  complete: 'Sync complete!',
+  error: 'Sync failed',
+};
+
+// Sync Info Dialog Component
 const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
-  const [copied, setCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState(null);
-  
-  if (!isOpen) return null;
+  const [syncResult, setSyncResult] = useState(null); // 'success' | 'error' | null
+  const [syncMessage, setSyncMessage] = useState('');
+  const [progress, setProgress] = useState({ phase: 'idle', progress: 0, detail: '', totalStones: 0, processedStones: 0 });
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const pollingRef = useRef(null);
+  const timerRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   const syncCommand = 'cd GEMS_DNA_BE && node api/stones/importFromSoap.js';
-  
+
+  // Cleanup polling and timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const startPolling = () => {
+    // Poll progress every 800ms
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/sync/progress`);
+        const data = await res.json();
+        setProgress(data);
+        
+        if (!data.active && data.phase === 'complete') {
+          stopPolling();
+        }
+      } catch (err) {
+        // Silently continue polling
+      }
+    }, 800);
+  };
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      setSyncResult(null);
+      setSyncMessage('');
+      setElapsedTime(0);
+      setProgress({ phase: 'starting', progress: 0, detail: 'Starting sync...', totalStones: 0, processedStones: 0 });
+      startTimeRef.current = Date.now();
+      
+      // Start elapsed timer
+      timerRef.current = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+
+      // Start polling for progress
+      startPolling();
+      
+      const response = await fetch(`${API_BASE}/api/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      const data = await response.json();
+      stopPolling();
+      
+      if (data.success) {
+        setProgress({ phase: 'complete', progress: 100, detail: `Successfully synced ${data.count || ''} stones!`, totalStones: data.count || 0, processedStones: data.count || 0 });
+        setSyncResult('success');
+        setSyncMessage(`${data.count || ''} stones imported successfully`);
+        if (onSyncComplete) onSyncComplete();
+      } else {
+        setProgress(prev => ({ ...prev, phase: 'error', progress: 0 }));
+        setSyncResult('error');
+        setSyncMessage(data.error || 'Sync failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      stopPolling();
+      setProgress(prev => ({ ...prev, phase: 'error', progress: 0 }));
+      setSyncResult('error');
+      setSyncMessage('Connection error. Make sure the backend server is running.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const copyCommand = () => {
     navigator.clipboard.writeText(syncCommand);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSync = async () => {
-    try {
-      setSyncing(true);
-      setSyncStatus({ type: 'info', message: 'Syncing inventory from SOAP API... This may take up to 60 seconds.' });
-      
-      const response = await fetch(`${API_BASE}/api/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setSyncStatus({ 
-          type: 'success', 
-          message: `✅ Sync completed! ${data.count || ''} stones imported successfully.`
-        });
-        // Refresh dashboard data immediately
-        if (onSyncComplete) {
-          onSyncComplete();
-        }
-      } else {
-        setSyncStatus({ 
-          type: 'error', 
-          message: data.error || 'Failed to sync. Please try again or run from terminal.' 
-        });
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-      setSyncStatus({ 
-        type: 'error', 
-        message: 'Connection error. Make sure the backend server is running.' 
-      });
-    } finally {
-      setSyncing(false);
-    }
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
   };
+
+  if (!isOpen) return null;
   
   return (
     <AnimatePresence>
@@ -168,172 +236,231 @@ const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm"
+        onClick={syncing ? undefined : onClose}
       >
         <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          transition={{ type: "spring", duration: 0.4 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-            <h2 className="text-xl font-bold text-white">🔄 Sync SOAP Data</h2>
-            <p className="text-white/80 text-sm">Update inventory from Barak SOAP API</p>
+          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Sync Inventory
+                </h2>
+                <p className="text-white/80 text-xs sm:text-sm mt-0.5">Update from Barak SOAP API</p>
+              </div>
+              {!syncing && (
+                <button onClick={onClose} className="text-white/80 hover:text-white transition-colors p-1">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Content */}
-          <div className="p-6 space-y-4">
-            {/* Current Stats */}
-            <div className="bg-stone-50 rounded-xl p-4">
-              <h3 className="font-semibold text-stone-700 mb-3">📊 Current Database</h3>
+          {/* Scrollable Content */}
+          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+            {/* Current Stats - compact */}
+            <div className="bg-stone-50 rounded-xl p-3 sm:p-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-emerald-600">{currentStats?.totalStones || 0}</p>
-                  <p className="text-xs text-stone-500">Total Stones</p>
+                  <p className="text-xl sm:text-2xl font-bold text-emerald-600">{currentStats?.totalStones || 0}</p>
+                  <p className="text-[11px] sm:text-xs text-stone-500">Stones in DB</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">{Object.keys(currentStats?.categories || {}).length}</p>
-                  <p className="text-xs text-stone-500">Categories</p>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{Object.keys(currentStats?.categories || {}).length}</p>
+                  <p className="text-[11px] sm:text-xs text-stone-500">Categories</p>
                 </div>
               </div>
             </div>
-            
-            {/* Sync Status */}
-            {syncStatus && (
-              <div className={`rounded-xl p-4 ${
-                syncStatus.type === 'success' 
-                  ? 'bg-emerald-50 border border-emerald-200' 
-                  : syncStatus.type === 'error'
-                  ? 'bg-red-50 border border-red-200'
-                  : 'bg-blue-50 border border-blue-200'
-              }`}>
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">
-                    {syncStatus.type === 'success' ? '✅' : syncStatus.type === 'error' ? '❌' : 'ℹ️'}
-                  </span>
-                  <div>
-                    <h4 className={`font-semibold ${
-                      syncStatus.type === 'success' 
-                        ? 'text-emerald-800' 
-                        : syncStatus.type === 'error'
-                        ? 'text-red-800'
-                        : 'text-blue-800'
-                    }`}>
-                      {syncStatus.type === 'success' ? 'Sync Started' : syncStatus.type === 'error' ? 'Sync Failed' : 'Sync Info'}
-                    </h4>
-                    <p className={`text-sm mt-1 ${
-                      syncStatus.type === 'success' 
-                        ? 'text-emerald-700' 
-                        : syncStatus.type === 'error'
-                        ? 'text-red-700'
-                        : 'text-blue-700'
-                    }`}>
-                      {syncStatus.message}
-                    </p>
+
+            {/* Progress Section - shown during/after sync */}
+            {(syncing || syncResult) && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }} 
+                animate={{ opacity: 1, height: 'auto' }}
+                className="space-y-3"
+              >
+                {/* Progress Bar */}
+                <div className="bg-stone-50 rounded-xl p-3 sm:p-4 space-y-3">
+                  {/* Phase label + elapsed time */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-medium text-stone-700">
+                      {SYNC_PHASE_LABELS[progress.phase] || progress.phase}
+                    </span>
+                    {syncing && (
+                      <span className="text-[11px] sm:text-xs text-stone-400 font-mono tabular-nums">
+                        {formatTime(elapsedTime)}
+                      </span>
+                    )}
                   </div>
+
+                  {/* Bar */}
+                  <div className="w-full bg-stone-200 rounded-full h-3 sm:h-4 overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full ${
+                        syncResult === 'error' 
+                          ? 'bg-red-500' 
+                          : syncResult === 'success' 
+                          ? 'bg-emerald-500' 
+                          : 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress.progress}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  </div>
+
+                  {/* Detail line */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] sm:text-xs text-stone-500 truncate flex-1 mr-2">
+                      {progress.detail}
+                    </p>
+                    <span className="text-xs sm:text-sm font-bold text-stone-600 tabular-nums flex-shrink-0">
+                      {progress.progress}%
+                    </span>
+                  </div>
+
+                  {/* Stone counter during insert phase */}
+                  {progress.totalStones > 0 && syncing && progress.phase === 'inserting' && (
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-stone-500">
+                      <svg className="w-3.5 h-3.5 text-emerald-500 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                      </svg>
+                      <span>{progress.processedStones.toLocaleString()} / {progress.totalStones.toLocaleString()} stones</span>
+                    </div>
+                  )}
                 </div>
-              </div>
+
+                {/* Result Banner */}
+                {syncResult && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`rounded-xl p-3 sm:p-4 flex items-start gap-3 ${
+                      syncResult === 'success' 
+                        ? 'bg-emerald-50 border border-emerald-200' 
+                        : 'bg-red-50 border border-red-200'
+                    }`}
+                  >
+                    <span className="text-xl flex-shrink-0">{syncResult === 'success' ? '✅' : '❌'}</span>
+                    <div className="min-w-0">
+                      <h4 className={`font-semibold text-sm ${syncResult === 'success' ? 'text-emerald-800' : 'text-red-800'}`}>
+                        {syncResult === 'success' ? 'Sync Complete!' : 'Sync Failed'}
+                      </h4>
+                      <p className={`text-xs mt-0.5 ${syncResult === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {syncMessage}
+                      </p>
+                      {syncResult === 'success' && (
+                        <p className="text-[11px] text-emerald-600 mt-1">Completed in {formatTime(elapsedTime)}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
             )}
 
             {/* Sync Button */}
             <button
               onClick={handleSync}
               disabled={syncing}
-              className={`w-full py-3 px-4 rounded-xl font-semibold text-white transition-all ${
+              className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-semibold text-white text-sm sm:text-base transition-all ${
                 syncing
                   ? 'bg-stone-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 hover:shadow-lg'
+                  : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg active:scale-[0.98]'
               }`}
             >
               {syncing ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Syncing...
+                  Syncing in progress...
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  Start Sync Now
+                  {syncResult === 'success' ? 'Sync Again' : syncResult === 'error' ? 'Retry Sync' : 'Start Sync Now'}
                 </span>
               )}
             </button>
 
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-stone-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-stone-500">Or</span>
-              </div>
+            {/* Collapsible Terminal Section */}
+            <div className="border border-stone-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowTerminal(!showTerminal)}
+                className="w-full flex items-center justify-between px-3 sm:px-4 py-2.5 text-xs sm:text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <span>💻</span>
+                  <span>Alternative: Run from Terminal</span>
+                </span>
+                <svg className={`w-4 h-4 transition-transform ${showTerminal ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              <AnimatePresence>
+                {showTerminal && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-3 sm:px-4 pb-3 space-y-2 border-t border-stone-100">
+                      <div className="bg-stone-900 rounded-lg p-2.5 sm:p-3 mt-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <code className="text-emerald-400 text-[11px] sm:text-xs font-mono truncate">{syncCommand}</code>
+                          <button
+                            onClick={copyCommand}
+                            className="flex-shrink-0 px-2 py-1 text-[10px] sm:text-xs font-medium bg-stone-700 text-white rounded-md hover:bg-stone-600 transition-colors"
+                          >
+                            {copied ? '✅' : '📋'}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-stone-500">Run this command in your project terminal. Wait ~30 seconds then refresh.</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Info about Terminal sync */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">ℹ️</span>
-                <div>
-                  <h4 className="font-semibold text-blue-800">Sync from Terminal</h4>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Alternatively, run the sync command from your terminal:
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Command to copy */}
-            <div className="bg-stone-900 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <code className="text-emerald-400 text-sm font-mono">{syncCommand}</code>
-                <button
-                  onClick={copyCommand}
-                  className="ml-3 px-3 py-1.5 text-xs font-medium bg-stone-700 text-white rounded-lg hover:bg-stone-600 transition-colors"
-                >
-                  {copied ? '✅ Copied!' : '📋 Copy'}
-                </button>
-              </div>
-            </div>
-
-            {/* Steps */}
-            <div className="bg-stone-50 rounded-xl p-4">
-              <h4 className="font-semibold text-stone-700 mb-2">📝 Steps:</h4>
-              <ol className="text-sm text-stone-600 space-y-1 list-decimal list-inside">
-                <li>Open terminal in your project folder</li>
-                <li>Copy and run the command above</li>
-                <li>Wait for sync to complete (~30 seconds)</li>
-                <li>Refresh this page to see updated data</li>
-              </ol>
-            </div>
-
-            {/* Auto sync info */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">⏰</span>
-                <div>
-                  <h4 className="font-semibold text-emerald-800">Auto Sync</h4>
-                  <p className="text-sm text-emerald-700 mt-1">
-                    The system automatically syncs every 5 hours via scheduled task.
-                  </p>
-                </div>
-              </div>
+            {/* Auto sync info - compact */}
+            <div className="flex items-center gap-2 px-1 text-[11px] sm:text-xs text-stone-400">
+              <span>⏰</span>
+              <span>Auto-syncs every 5 hours via scheduled task</span>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="border-t bg-stone-50 px-6 py-4 flex justify-end">
+          <div className="border-t bg-stone-50 px-4 sm:px-5 py-3 flex justify-end flex-shrink-0">
             <button
               onClick={onClose}
-              className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={syncing}
+              className={`px-5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                syncing
+                  ? 'text-stone-400 bg-stone-200 cursor-not-allowed'
+                  : 'text-white bg-emerald-600 hover:bg-emerald-700'
+              }`}
             >
-              Got it
+              {syncing ? 'Please wait...' : 'Close'}
             </button>
           </div>
         </motion.div>

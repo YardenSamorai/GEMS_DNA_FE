@@ -9,7 +9,7 @@ import "jspdf-autotable";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
-const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.vercel.app';
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
 
 /* ---------------- Tag Colors ---------------- */
 const TAG_COLORS = [

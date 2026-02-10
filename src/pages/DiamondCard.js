@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 
 // API base URL from .env
-const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.vercel.app';
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
 
 const DiamondCard = () => {
   const { stone_id } = useParams();
