@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = "https://gems-dna-be.vercel.app";
+// API base URL from .env
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.vercel.app';
 
 // Animated Counter Hook
 const useAnimatedCounter = (end, duration = 1500, startOnView = true) => {
@@ -124,7 +125,7 @@ const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
   const handleSync = async () => {
     try {
       setSyncing(true);
-      setSyncStatus({ type: 'info', message: 'Starting sync...' });
+      setSyncStatus({ type: 'info', message: 'Syncing inventory from SOAP API... This may take up to 60 seconds.' });
       
       const response = await fetch(`${API_BASE}/api/sync`, {
         method: 'POST',
@@ -138,25 +139,23 @@ const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
       if (data.success) {
         setSyncStatus({ 
           type: 'success', 
-          message: 'Sync started successfully! It may take 30-60 seconds to complete. Refresh the page in a minute to see updated data.' 
+          message: `✅ Sync completed! ${data.count || ''} stones imported successfully.`
         });
-        // Call callback to refresh data after a delay
+        // Refresh dashboard data immediately
         if (onSyncComplete) {
-          setTimeout(() => {
-            onSyncComplete();
-          }, 60000); // Refresh after 60 seconds
+          onSyncComplete();
         }
       } else {
         setSyncStatus({ 
           type: 'error', 
-          message: data.error || 'Failed to start sync' 
+          message: data.error || 'Failed to sync. Please try again or run from terminal.' 
         });
       }
     } catch (error) {
       console.error('Sync error:', error);
       setSyncStatus({ 
         type: 'error', 
-        message: 'Failed to start sync. Please try running from terminal instead.' 
+        message: 'Connection error. Make sure the backend server is running.' 
       });
     } finally {
       setSyncing(false);

@@ -8,7 +8,8 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 const ITEMS_PER_PAGE = 50;
-const API_BASE = "https://gems-dna-be.vercel.app";
+// API base URL from .env
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.vercel.app';
 
 /* ---------------- Tag Colors ---------------- */
 const TAG_COLORS = [
@@ -313,7 +314,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     
     try {
       // Use our backend proxy to bypass CORS
-      const proxyUrl = `https://gems-dna-be.vercel.app/api/image-proxy?url=${encodeURIComponent(url)}`;
+      const proxyUrl = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`;
       const response = await fetch(proxyUrl);
       
       if (!response.ok) {

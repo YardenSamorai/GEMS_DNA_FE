@@ -7,6 +7,9 @@ import { barakURL } from "../utils/const";
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 
+// API base URL from .env
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.vercel.app';
+
 const DiamondCard = () => {
   const { stone_id } = useParams();
   const [details, setDetails] = useState(null);
@@ -33,7 +36,7 @@ const DiamondCard = () => {
   useEffect(() => {
     if (!stone_id) return;
 
-    fetch(`https://gems-dna-be.vercel.app/api/stones/${stone_id}`)
+    fetch(`${API_BASE}/api/stones/${stone_id}`)
       .then((res) => res.json())
       .then((data) => {
         setDetails(data);
