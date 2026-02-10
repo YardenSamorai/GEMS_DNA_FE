@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -876,6 +877,29 @@ const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating
   );
 };
 
+/* ---------------- SVG to PNG Helper for Excel Logo ---------------- */
+const svgToPngBase64 = (svgUrl, width = 600, height = 340) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      // Draw SVG onto canvas, centered
+      const scale = Math.min(width / img.width, height / img.height) * 0.85;
+      const x = (width - img.width * scale) / 2;
+      const y = (height - img.height * scale) / 2;
+      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+      const base64 = canvas.toDataURL('image/png').split(',')[1];
+      resolve(base64);
+    };
+    img.onerror = () => reject(new Error('Failed to load SVG'));
+    img.src = svgUrl;
+  });
+};
+
 /* ---------------- Column Configurations ---------------- */
 const EMERALD_COLUMNS = [
   { key: "num", header: "#", width: 5 },
@@ -892,6 +916,7 @@ const EMERALD_COLUMNS = [
   { key: "priceTotal", header: "Total ($)", width: 14 },
   { key: "dna", header: "DNA", width: 12 },
   { key: "certificate", header: "Certificate", width: 15 },
+  { key: "appendix", header: "Appendix", width: 14 },
   { key: "image", header: "Image", width: 12 },
   { key: "video", header: "Video", width: 12 },
 ];
@@ -918,6 +943,7 @@ const DIAMOND_COLUMNS = [
   { key: "depthPercent", header: "Depth %", width: 10 },
   { key: "dna", header: "DNA", width: 12 },
   { key: "certificate", header: "Certificate", width: 15 },
+  { key: "appendix", header: "Appendix", width: 14 },
   { key: "image", header: "Image", width: 12 },
   { key: "video", header: "Video", width: 12 },
 ];
@@ -946,6 +972,7 @@ const FANCY_COLUMNS = [
   { key: "depthPercent", header: "Depth %", width: 10 },
   { key: "dna", header: "DNA", width: 12 },
   { key: "certificate", header: "Certificate", width: 15 },
+  { key: "appendix", header: "Appendix", width: 14 },
   { key: "image", header: "Image", width: 12 },
   { key: "video", header: "Video", width: 12 },
 ];
@@ -1300,12 +1327,14 @@ const ExportModal = ({
 }) => {
   const [globalMarkup, setGlobalMarkup] = useState(0);
   const [priceOverrides, setPriceOverrides] = useState({});
+  const [includeAppendix, setIncludeAppendix] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setGlobalMarkup(0);
       setPriceOverrides({});
+      setIncludeAppendix(true);
     }
   }, [isOpen]);
 
@@ -1378,7 +1407,7 @@ const ExportModal = ({
       pricePerCt: getAdjustedPricePerCt(stone),
       priceTotal: getAdjustedTotal(stone),
     }));
-    onExport(stonesWithAdjustedPrices);
+    onExport(stonesWithAdjustedPrices, { includeAppendix });
     onClose();
   };
 
@@ -1618,6 +1647,18 @@ const ExportModal = ({
 
           {/* Footer */}
           <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-stone-200 bg-stone-50">
+            {/* Options Row */}
+            <div className="flex items-center gap-4 mb-3 pb-3 border-b border-stone-200">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeAppendix}
+                  onChange={(e) => setIncludeAppendix(e.target.checked)}
+                  className="w-4 h-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-xs sm:text-sm text-stone-700 font-medium">Include GRS Appendix</span>
+              </label>
+            </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="text-xs sm:text-sm text-stone-600 text-center sm:text-left space-y-1 sm:space-y-0">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1">
@@ -3579,6 +3620,7 @@ Best regards, Gemstar
 
 /* ---------------- Main Page ---------------- */
 const StoneSearchPage = () => {
+  const { user } = useUser();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   
@@ -3915,7 +3957,7 @@ const StoneSearchPage = () => {
   };
 
   // Export to Excel with separate sheets per category
-  const exportToExcelSeparate = async (customStones = null) => {
+  const exportToExcelSeparate = async (customStones = null, options = {}) => {
     const selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
     
     // Separate by category
@@ -3944,47 +3986,43 @@ const StoneSearchPage = () => {
     workbook.creator = "GEMS DNA";
     workbook.created = new Date();
 
-    // Load banner image for header
-    let bannerImageId = null;
+    // Load logo image for header (SVG converted to PNG)
+    let logoImageId = null;
     try {
-      const bannerResponse = await fetch('/Banner2.png');
-      const bannerBlob = await bannerResponse.blob();
-      const bannerBase64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.readAsDataURL(bannerBlob);
-      });
-      bannerImageId = workbook.addImage({
-        base64: bannerBase64,
+      const logoBase64 = await svgToPngBase64('/gemstarlogo.svg', 600, 340);
+      logoImageId = workbook.addImage({
+        base64: logoBase64,
         extension: 'png',
       });
-      console.log('Banner image loaded successfully');
+      console.log('Logo image loaded successfully');
     } catch (e) {
-      console.log('Could not load banner image:', e.message);
+      console.log('Could not load logo image:', e.message);
     }
+
+    const { includeAppendix = true } = options;
 
     // Create sheet for Emeralds
     if (emeralds.length > 0) {
       console.log('Creating Emeralds sheet with', emeralds.length, 'stones');
-      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981", bannerImageId);
+      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981", logoImageId, includeAppendix);
     }
 
     // Create sheet for Fancy
     if (fancy.length > 0) {
       console.log('Creating Fancy sheet with', fancy.length, 'stones');
-      createCategorySheet(workbook, "Fancy", fancy, FANCY_COLUMNS, "FFFBBF24", bannerImageId);
+      createCategorySheet(workbook, "Fancy", fancy, FANCY_COLUMNS, "FFFBBF24", logoImageId, includeAppendix);
     }
 
     // Create sheet for Diamonds
     if (diamonds.length > 0) {
       console.log('Creating Diamonds sheet with', diamonds.length, 'stones');
-      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6", bannerImageId);
+      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6", logoImageId, includeAppendix);
     }
 
     // Create sheet for Others (use Emerald columns as default)
     if (others.length > 0) {
       console.log('Creating Other Gems sheet with', others.length, 'stones');
-      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6", bannerImageId);
+      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6", logoImageId, includeAppendix);
     }
 
     console.log('Total sheets in workbook:', workbook.worksheets.length);
@@ -3997,15 +4035,26 @@ const StoneSearchPage = () => {
   };
 
   // Helper: Create a category-specific sheet
-  const createCategorySheet = (workbook, sheetName, data, columns, accentColor, bannerImageId = null) => {
+  const createCategorySheet = (workbook, sheetName, data, columns, accentColor, logoImageId = null, includeAppendix = true) => {
+    // Filter out appendix column if not included
+    const effectiveColumns = includeAppendix ? columns : columns.filter(c => c.key !== 'appendix');
     const worksheet = workbook.addWorksheet(sheetName);
-    const colCount = columns.length;
-    const lastCol = colCount <= 26 
-      ? String.fromCharCode(64 + colCount)
-      : 'A' + String.fromCharCode(64 + colCount - 26);
+    const colCount = effectiveColumns.length;
+    
+    // Helper to get column letter
+    const getColLetter = (num) => {
+      let letter = '';
+      while (num > 0) {
+        const remainder = (num - 1) % 26;
+        letter = String.fromCharCode(65 + remainder) + letter;
+        num = Math.floor((num - 1) / 26);
+      }
+      return letter;
+    };
+    const lastCol = getColLetter(colCount);
     
     // Set columns
-    worksheet.columns = columns.map(col => ({ key: col.key, width: col.width }));
+    worksheet.columns = effectiveColumns.map(col => ({ key: col.key, width: col.width }));
 
     // Calculate totals
     const totalWeight = data.reduce((sum, s) => sum + (s.weightCt || 0), 0);
@@ -4013,170 +4062,158 @@ const StoneSearchPage = () => {
     const date = now.toLocaleDateString("en-GB");
     const time = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-    // === BANNER IMAGE HEADER ===
-    if (bannerImageId !== null) {
-      // Add banner image spanning across columns
-      worksheet.addImage(bannerImageId, {
-        tl: { col: 0, row: 0 },
-        ext: { width: 800, height: 60 }  // Adjust size as needed
+    // === ROW 1-4: LOGO HEADER (centered, white background) ===
+    worksheet.mergeCells(`A1:${lastCol}4`);
+    worksheet.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
+    worksheet.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getRow(1).height = 20;
+    worksheet.getRow(2).height = 40;
+    worksheet.getRow(3).height = 40;
+    worksheet.getRow(4).height = 40;
+    
+    if (logoImageId !== null) {
+      worksheet.addImage(logoImageId, {
+        tl: { col: Math.max(0, (colCount - 5) / 2), row: 0.5 },
+        ext: { width: 460, height: 200 }
       });
-      // Make row 1 tall enough for the banner
-      worksheet.getRow(1).height = 50;
-      worksheet.mergeCells(`A1:${lastCol}1`);
     } else {
-      // Fallback: Text header if no banner
-      worksheet.mergeCells(`A1:${lastCol}1`);
-      const titleCell = worksheet.getCell("A1");
-      titleCell.value = `◆  GEMS DNA  -  ${sheetName.toUpperCase()}  ◆`;
-      titleCell.font = { bold: true, size: 18, color: { argb: accentColor }, name: "Arial" };
-      titleCell.alignment = { vertical: "middle", horizontal: "center" };
-      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-      worksheet.getRow(1).height = 30;
+      worksheet.getCell("A1").value = "GEMSTAR";
+      worksheet.getCell("A1").font = { bold: true, size: 22, color: { argb: "FF1F2937" }, name: "Arial" };
     }
 
-    // Category & Summary row
-    worksheet.mergeCells(`A2:${lastCol}2`);
-    worksheet.getCell("A2").value = `${sheetName.toUpperCase()}  ·  ${data.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${date}`;
-    worksheet.getCell("A2").font = { size: 11, color: { argb: "FFFFFFFF" }, bold: true };
-    worksheet.getCell("A2").alignment = { vertical: "middle", horizontal: "center" };
-    worksheet.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
-    worksheet.getRow(2).height = 24;
+    // === ROW 5: Separator line (dark) ===
+    worksheet.mergeCells(`A5:${lastCol}5`);
+    worksheet.getCell("A5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(5).height = 4;
 
-    // Spacer row
-    worksheet.getRow(3).height = 8;
-
-    // Spacer row 4
-    worksheet.getRow(4).height = 8;
-
-    // === Summary Tables (rows 5-7) ===
-    const tableBorder = {
-      top: { style: "thin", color: { argb: accentColor } },
-      bottom: { style: "thin", color: { argb: accentColor } },
-      left: { style: "thin", color: { argb: accentColor } },
-      right: { style: "thin", color: { argb: accentColor } },
-    };
-    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
-    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6F7F1" } };
-
-    // === LEFT TABLE: Date/Time/Website ===
-    
-    // Row 5: Date
-    worksheet.getCell("A5").value = "Date";
-    worksheet.getCell("A5").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("A5").fill = lightFill;
-    worksheet.getCell("A5").border = tableBorder;
-    worksheet.getCell("A5").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.mergeCells("B5:C5");
-    worksheet.getCell("B5").value = date;
-    worksheet.getCell("B5").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("B5").border = tableBorder;
-    worksheet.getCell("B5").alignment = { vertical: "middle", horizontal: "center" };
-
-    // Row 6: Time
-    worksheet.getCell("A6").value = "Time";
-    worksheet.getCell("A6").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("A6").fill = lightFill;
-    worksheet.getCell("A6").border = tableBorder;
+    // === ROW 6: Category summary bar ===
+    worksheet.mergeCells(`A6:${lastCol}6`);
+    worksheet.getCell("A6").value = `${sheetName.toUpperCase()}  ·  ${data.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${date}`;
+    worksheet.getCell("A6").font = { size: 11, color: { argb: "FF1F2937" }, bold: true, name: "Arial" };
     worksheet.getCell("A6").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.mergeCells("B6:C6");
-    worksheet.getCell("B6").value = time;
-    worksheet.getCell("B6").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("B6").border = tableBorder;
-    worksheet.getCell("B6").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A6").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    worksheet.getRow(6).height = 26;
 
-    // Row 7: Website Link
-    worksheet.mergeCells("A7:C7");
-    worksheet.getCell("A7").value = { text: "🌐 www.gems.net", hyperlink: "https://www.gems.net" };
-    worksheet.getCell("A7").font = { bold: true, size: 10, color: { argb: accentColor }, underline: true };
-    worksheet.getCell("A7").fill = lightFill;
-    worksheet.getCell("A7").border = tableBorder;
-    worksheet.getCell("A7").alignment = { vertical: "middle", horizontal: "center" };
+    // === ROW 7: Spacer ===
+    worksheet.mergeCells(`A7:${lastCol}7`);
+    worksheet.getRow(7).height = 6;
 
-    // === RIGHT TABLE: Cts/Pcs Summary ===
-    
-    // Row 5: Headers
-    worksheet.getCell("E5").value = "";
-    worksheet.getCell("E5").fill = headerFill;
-    worksheet.getCell("E5").border = tableBorder;
-    
-    worksheet.getCell("F5").value = "Cts";
-    worksheet.getCell("F5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
-    worksheet.getCell("F5").fill = headerFill;
-    worksheet.getCell("F5").border = tableBorder;
-    worksheet.getCell("F5").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("G5").value = "Pcs";
-    worksheet.getCell("G5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
-    worksheet.getCell("G5").fill = headerFill;
-    worksheet.getCell("G5").border = tableBorder;
-    worksheet.getCell("G5").alignment = { vertical: "middle", horizontal: "center" };
+    // === ROWS 8-10: Summary Tables ===
+    const tableBorder = {
+      top: { style: "thin", color: { argb: "FFE5E7EB" } },
+      bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+      left: { style: "thin", color: { argb: "FFE5E7EB" } },
+      right: { style: "thin", color: { argb: "FFE5E7EB" } },
+    };
+    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
 
-    // Row 6: Total
-    worksheet.getCell("E6").value = "Total";
-    worksheet.getCell("E6").font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("E6").border = tableBorder;
-    worksheet.getCell("E6").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("F6").value = totalWeight.toFixed(2);
-    worksheet.getCell("F6").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("F6").border = tableBorder;
-    worksheet.getCell("F6").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("G6").value = data.length;
-    worksheet.getCell("G6").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("G6").border = tableBorder;
-    worksheet.getCell("G6").alignment = { vertical: "middle", horizontal: "center" };
+    // LEFT TABLE: Date / Time / Website
+    const leftTableFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
 
-    // Row 7: Selected (same as total for category sheet)
-    worksheet.getCell("E7").value = "SELECTED";
-    worksheet.getCell("E7").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("E7").fill = lightFill;
-    worksheet.getCell("E7").border = tableBorder;
-    worksheet.getCell("E7").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("F7").value = totalWeight.toFixed(2);
-    worksheet.getCell("F7").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("F7").fill = lightFill;
-    worksheet.getCell("F7").border = tableBorder;
-    worksheet.getCell("F7").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("G7").value = data.length;
-    worksheet.getCell("G7").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("G7").fill = lightFill;
-    worksheet.getCell("G7").border = tableBorder;
-    worksheet.getCell("G7").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A8").value = "Date";
+    worksheet.getCell("A8").font = { bold: true, size: 9, color: { argb: "FF6B7280" }, name: "Arial" };
+    worksheet.getCell("A8").fill = leftTableFill;
+    worksheet.getCell("A8").border = tableBorder;
+    worksheet.getCell("A8").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.mergeCells("B8:C8");
+    worksheet.getCell("B8").value = date;
+    worksheet.getCell("B8").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("B8").fill = leftTableFill;
+    worksheet.getCell("B8").border = tableBorder;
+    worksheet.getCell("B8").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Set row heights for summary tables
-    worksheet.getRow(5).height = 22;
-    worksheet.getRow(6).height = 22;
-    worksheet.getRow(7).height = 22;
+    worksheet.getCell("A9").value = "Time";
+    worksheet.getCell("A9").font = { bold: true, size: 9, color: { argb: "FF6B7280" }, name: "Arial" };
+    worksheet.getCell("A9").fill = leftTableFill;
+    worksheet.getCell("A9").border = tableBorder;
+    worksheet.getCell("A9").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.mergeCells("B9:C9");
+    worksheet.getCell("B9").value = time;
+    worksheet.getCell("B9").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("B9").fill = leftTableFill;
+    worksheet.getCell("B9").border = tableBorder;
+    worksheet.getCell("B9").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Row 8: Spacer before main table
-    worksheet.mergeCells(`A8:${lastCol}8`);
-    worksheet.getRow(8).height = 10;
+    worksheet.mergeCells("A10:C10");
+    worksheet.getCell("A10").value = { text: "www.gems.net", hyperlink: "https://www.gems.net" };
+    worksheet.getCell("A10").font = { bold: true, size: 9, color: { argb: accentColor }, underline: true, name: "Arial" };
+    worksheet.getCell("A10").fill = leftTableFill;
+    worksheet.getCell("A10").border = tableBorder;
+    worksheet.getCell("A10").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Column headers (row 9)
-    const headerRow = worksheet.getRow(9);
-    columns.forEach((col, index) => {
+    // RIGHT TABLE: Cts / Pcs 
+    worksheet.getCell("E8").value = "";
+    worksheet.getCell("E8").fill = headerFill;
+    worksheet.getCell("E8").border = tableBorder;
+    worksheet.getCell("F8").value = "Cts";
+    worksheet.getCell("F8").font = { bold: true, size: 9, color: { argb: "FFFFFFFF" }, name: "Arial" };
+    worksheet.getCell("F8").fill = headerFill;
+    worksheet.getCell("F8").border = tableBorder;
+    worksheet.getCell("F8").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("G8").value = "Pcs";
+    worksheet.getCell("G8").font = { bold: true, size: 9, color: { argb: "FFFFFFFF" }, name: "Arial" };
+    worksheet.getCell("G8").fill = headerFill;
+    worksheet.getCell("G8").border = tableBorder;
+    worksheet.getCell("G8").alignment = { vertical: "middle", horizontal: "center" };
+
+    worksheet.getCell("E9").value = "Total";
+    worksheet.getCell("E9").font = { bold: true, size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("E9").border = tableBorder;
+    worksheet.getCell("E9").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("F9").value = totalWeight.toFixed(2);
+    worksheet.getCell("F9").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("F9").border = tableBorder;
+    worksheet.getCell("F9").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("G9").value = data.length;
+    worksheet.getCell("G9").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("G9").border = tableBorder;
+    worksheet.getCell("G9").alignment = { vertical: "middle", horizontal: "center" };
+
+    worksheet.getCell("E10").value = "Selected";
+    worksheet.getCell("E10").font = { bold: true, size: 9, color: { argb: accentColor }, name: "Arial" };
+    worksheet.getCell("E10").fill = lightFill;
+    worksheet.getCell("E10").border = tableBorder;
+    worksheet.getCell("E10").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("F10").value = totalWeight.toFixed(2);
+    worksheet.getCell("F10").font = { bold: true, size: 9, color: { argb: accentColor }, name: "Arial" };
+    worksheet.getCell("F10").fill = lightFill;
+    worksheet.getCell("F10").border = tableBorder;
+    worksheet.getCell("F10").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("G10").value = data.length;
+    worksheet.getCell("G10").font = { bold: true, size: 9, color: { argb: accentColor }, name: "Arial" };
+    worksheet.getCell("G10").fill = lightFill;
+    worksheet.getCell("G10").border = tableBorder;
+    worksheet.getCell("G10").alignment = { vertical: "middle", horizontal: "center" };
+
+    worksheet.getRow(8).height = 20;
+    worksheet.getRow(9).height = 20;
+    worksheet.getRow(10).height = 20;
+
+    // === ROW 11: Spacer ===
+    worksheet.mergeCells(`A11:${lastCol}11`);
+    worksheet.getRow(11).height = 8;
+
+    // === ROW 12: Column headers ===
+    const headerRow = worksheet.getRow(12);
+    effectiveColumns.forEach((col, index) => {
       headerRow.getCell(index + 1).value = col.header;
     });
     headerRow.height = 26;
     headerRow.eachCell((cell) => {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10, name: "Arial" };
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.border = {
-        bottom: { style: "thin", color: { argb: "FF1F2937" } },
+        bottom: { style: "medium", color: { argb: accentColor } },
       };
     });
 
-    // Data rows (starting from row 10)
+    // Data rows (starting from row 13)
     const dnaBaseUrl = "https://gems-dna.com";
     data.forEach((stone, index) => {
       const rowData = {};
-      columns.forEach(col => {
+      effectiveColumns.forEach(col => {
         switch (col.key) {
           case 'num': rowData.num = index + 1; break;
           case 'sku': rowData.sku = stone.sku || ''; break;
@@ -4210,6 +4247,7 @@ const StoneSearchPage = () => {
           // Links
           case 'dna': rowData.dna = stone.sku || ''; break;
           case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
+          case 'appendix': rowData.appendix = ''; break;
           case 'image': rowData.image = stone.imageUrl || ''; break;
           case 'video': rowData.video = stone.videoUrl || ''; break;
           default: rowData[col.key] = '';
@@ -4229,15 +4267,15 @@ const StoneSearchPage = () => {
       });
 
       // Format ratio column to always show 2 decimal places
-      const ratioCol = columns.findIndex(c => c.key === 'ratio');
+      const ratioCol = effectiveColumns.findIndex(c => c.key === 'ratio');
       if (ratioCol >= 0 && rowData.ratio !== '') {
         row.getCell(ratioCol + 1).numFmt = '0.00';
       }
 
       // Format price columns
-      const pricePerCtCol = columns.findIndex(c => c.key === 'pricePerCt');
-      const priceTotalCol = columns.findIndex(c => c.key === 'priceTotal');
-      const rapPriceCol = columns.findIndex(c => c.key === 'rapPrice');
+      const pricePerCtCol = effectiveColumns.findIndex(c => c.key === 'pricePerCt');
+      const priceTotalCol = effectiveColumns.findIndex(c => c.key === 'priceTotal');
+      const rapPriceCol = effectiveColumns.findIndex(c => c.key === 'rapPrice');
       
       if (pricePerCtCol >= 0 && stone.pricePerCt) {
         row.getCell(pricePerCtCol + 1).numFmt = '"$"#,##0';
@@ -4251,11 +4289,12 @@ const StoneSearchPage = () => {
       }
 
       // Make links clickable
-      const dnaCol = columns.findIndex(c => c.key === 'dna');
-      const certCol = columns.findIndex(c => c.key === 'certificate');
-      const imgCol = columns.findIndex(c => c.key === 'image');
-      const vidCol = columns.findIndex(c => c.key === 'video');
-      const pairSkuCol = columns.findIndex(c => c.key === 'pairSku');
+      const dnaCol = effectiveColumns.findIndex(c => c.key === 'dna');
+      const certCol = effectiveColumns.findIndex(c => c.key === 'certificate');
+      const appendixCol = effectiveColumns.findIndex(c => c.key === 'appendix');
+      const imgCol = effectiveColumns.findIndex(c => c.key === 'image');
+      const vidCol = effectiveColumns.findIndex(c => c.key === 'video');
+      const pairSkuCol = effectiveColumns.findIndex(c => c.key === 'pairSku');
 
       if (dnaCol >= 0 && stone.sku) {
         row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: `${dnaBaseUrl}/${stone.sku}` };
@@ -4269,6 +4308,15 @@ const StoneSearchPage = () => {
         row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
         row.getCell(certCol + 1).font = { color: { argb: accentColor }, underline: true, size: 9 };
       }
+      if (appendixCol >= 0 && stone.lab && stone.lab.toUpperCase() === "GRS" && stone.certificateUrl) {
+        const certMatch = stone.certificateUrl.match(/\/([^/]+)\.pdf$/i);
+        if (certMatch) {
+          const certNum = certMatch[1];
+          const appendixUrl = `https://app.barakdiamonds.com/Gemstones/Output/StoneImages/${certNum}-ap.pdf`;
+          row.getCell(appendixCol + 1).value = { text: "Appendix", hyperlink: appendixUrl };
+          row.getCell(appendixCol + 1).font = { color: { argb: accentColor }, underline: true, size: 9 };
+        }
+      }
       if (imgCol >= 0 && stone.imageUrl) {
         row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
         row.getCell(imgCol + 1).font = { color: { argb: accentColor }, underline: true, size: 9 };
@@ -4279,78 +4327,38 @@ const StoneSearchPage = () => {
       }
     });
 
-    // Helper to get column letter for footer
-    const getColLetter = (num) => {
-      let letter = '';
-      while (num > 0) {
-        const remainder = (num - 1) % 26;
-        letter = String.fromCharCode(65 + remainder) + letter;
-        num = Math.floor((num - 1) / 26);
-      }
-      return letter;
-    };
-    const lastColLetter = getColLetter(colCount);
-
     // FOOTER SECTION
-    // Data rows start at row 10, so footer starts after: 10 + data.length
-    const footerStartRow = 10 + data.length;
+    // Data rows start at row 13, so footer starts after: 13 + data.length
+    const footerStartRow = 13 + data.length;
     
     // Spacer row
-    worksheet.mergeCells(`A${footerStartRow}:${lastColLetter}${footerStartRow}`);
-    worksheet.getRow(footerStartRow).height = 15;
+    worksheet.mergeCells(`A${footerStartRow}:${lastCol}${footerStartRow}`);
+    worksheet.getRow(footerStartRow).height = 12;
 
-    // Footer background row
-    worksheet.mergeCells(`A${footerStartRow + 1}:${lastColLetter}${footerStartRow + 1}`);
-    worksheet.getRow(footerStartRow + 1).height = 8;
-    worksheet.getCell(`A${footerStartRow + 1}`).fill = { 
-      type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } 
-    };
+    // Footer Row 1: Contact info (dark background)
+    const israelEmails = ["yarden@eshed.com", "eyal@eshed.com", "meirav@eshed.com", "le@gems.net"];
+    const userEmail = user?.primaryEmailAddress?.emailAddress || "";
+    const footerPhoneNumber = israelEmails.includes(userEmail.toLowerCase()) ? "+972.3.575.1137" : "+1 (212) 869-0544";
+    worksheet.mergeCells(`A${footerStartRow + 1}:${lastCol}${footerStartRow + 1}`);
+    const footerContact = worksheet.getCell(`A${footerStartRow + 1}`);
+    footerContact.value = `\u{1F4DE} ${footerPhoneNumber}  \u00B7  \u2709 info@gems.net  \u00B7  \u{1F310} www.gems.net`;
+    footerContact.font = { size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+    footerContact.alignment = { vertical: "middle", horizontal: "center" };
+    footerContact.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 1).height = 26;
 
-    // Footer Row 1: Company & Tagline
-    worksheet.mergeCells(`A${footerStartRow + 2}:${lastColLetter}${footerStartRow + 2}`);
-    const footerCell1 = worksheet.getCell(`A${footerStartRow + 2}`);
-    footerCell1.value = "◆  GEMSTAR  ◆  Premium Gemstones & Diamonds";
-    footerCell1.font = { bold: true, size: 12, color: { argb: accentColor }, name: "Arial" };
-    footerCell1.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 2).height = 28;
-
-    // Footer Row 2: Locations
-    worksheet.mergeCells(`A${footerStartRow + 3}:${lastColLetter}${footerStartRow + 3}`);
-    const footerCell2 = worksheet.getCell(`A${footerStartRow + 3}`);
-    footerCell2.value = "📍 NEW YORK  ·  TEL AVIV  ·  HONG KONG  ·  LOS ANGELES";
-    footerCell2.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
-    footerCell2.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 3).height = 22;
-
-    // Footer Row 3: Contact Info
-    worksheet.mergeCells(`A${footerStartRow + 4}:${lastColLetter}${footerStartRow + 4}`);
-    const footerCell3 = worksheet.getCell(`A${footerStartRow + 4}`);
-    footerCell3.value = "📞 +1 (212) 869-0544  ·  ✉ info@gems.net  ·  🌐 www.gems.net";
-    footerCell3.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
-    footerCell3.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell3.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 4).height = 22;
-
-    // Footer Row 4: Disclaimer
-    worksheet.mergeCells(`A${footerStartRow + 5}:${lastColLetter}${footerStartRow + 5}`);
-    const footerCell4 = worksheet.getCell(`A${footerStartRow + 5}`);
-    footerCell4.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
-    footerCell4.font = { size: 9, color: { argb: "FF9CA3AF" }, name: "Arial", italic: true };
-    footerCell4.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell4.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 5).height = 20;
-
-    // Footer bottom accent line
-    worksheet.mergeCells(`A${footerStartRow + 6}:${lastColLetter}${footerStartRow + 6}`);
-    const footerAccent = worksheet.getCell(`A${footerStartRow + 6}`);
-    footerAccent.fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
-    worksheet.getRow(footerStartRow + 6).height = 5;
+    // Footer Row 2: Disclaimer (dark background)
+    worksheet.mergeCells(`A${footerStartRow + 2}:${lastCol}${footerStartRow + 2}`);
+    const footerDisclaimer = worksheet.getCell(`A${footerStartRow + 2}`);
+    footerDisclaimer.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
+    footerDisclaimer.font = { size: 9, color: { argb: "FF10B981" }, name: "Arial", italic: true };
+    footerDisclaimer.alignment = { vertical: "middle", horizontal: "center" };
+    footerDisclaimer.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 2).height = 22;
   };
 
   // Export selected stones to Excel with styling (combined - all columns)
-  const exportToExcel = async (customStones = null) => {
+  const exportToExcel = async (customStones = null, options = {}) => {
     let selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
     
     if (selectedData.length === 0) {
@@ -4418,6 +4426,7 @@ const StoneSearchPage = () => {
         { key: "priceTotal", header: "Total ($)", width: 14 },
         { key: "dna", header: "DNA", width: 12 },
         { key: "certificate", header: "Certificate", width: 15 },
+        { key: "appendix", header: "Appendix", width: 14 },
         { key: "image", header: "Image", width: 12 },
         { key: "video", header: "Video", width: 12 },
       ];
@@ -4425,10 +4434,28 @@ const StoneSearchPage = () => {
       accentColor = "FF8B5CF6"; // Purple for mixed
     }
 
+    // Filter out appendix column if not included
+    const { includeAppendix = true } = options;
+    if (!includeAppendix) {
+      columnsToUse = columnsToUse.filter(c => c.key !== 'appendix');
+    }
+
     // Create workbook and worksheet
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Gemstar";
     workbook.created = new Date();
+
+    // Load logo image (SVG -> PNG)
+    let logoImageId = null;
+    try {
+      const logoBase64 = await svgToPngBase64('/gemstarlogo.svg', 600, 340);
+      logoImageId = workbook.addImage({
+        base64: logoBase64,
+        extension: 'png',
+      });
+    } catch (e) {
+      console.log('Could not load logo image:', e.message);
+    }
     
     const worksheet = workbook.addWorksheet(sheetName);
     const colCount = columnsToUse.length;
@@ -4448,159 +4475,149 @@ const StoneSearchPage = () => {
     };
     const lastCol = getColLetter(colCount);
 
-    // Create styled text header
-    // Row 1: Company Name
-    worksheet.mergeCells(`A1:${lastCol}1`);
-    const titleCell = worksheet.getCell("A1");
-    titleCell.value = `◆  G E M S T A R  -  ${sheetName.toUpperCase()}  ◆`;
-    titleCell.font = { bold: true, size: 20, color: { argb: accentColor }, name: "Arial" };
-    titleCell.alignment = { vertical: "middle", horizontal: "center" };
-    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(1).height = 35;
-
-    // Row 2: Tagline
-    worksheet.mergeCells(`A2:${lastCol}2`);
-    const taglineCell = worksheet.getCell("A2");
-    taglineCell.value = "Premium Gemstones & Diamonds";
-    taglineCell.font = { size: 12, color: { argb: "FFD1D5DB" }, name: "Arial", italic: true };
-    taglineCell.alignment = { vertical: "middle", horizontal: "center" };
-    taglineCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(2).height = 22;
-
-    // Row 3: Locations
-    worksheet.mergeCells(`A3:${lastCol}3`);
-    const locationsCell = worksheet.getCell("A3");
-    locationsCell.value = "NYC  ·  LOS ANGELES  ·  TEL AVIV  ·  HONG KONG";
-    locationsCell.font = { size: 10, color: { argb: "FF9CA3AF" }, name: "Arial" };
-    locationsCell.alignment = { vertical: "middle", horizontal: "center" };
-    locationsCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(3).height = 20;
-
     // Calculate totals
-    const totalPrice = selectedData.reduce((sum, s) => sum + (s.priceTotal || 0), 0);
     const totalWeight = selectedData.reduce((sum, s) => sum + (s.weightCt || 0), 0);
     const now = new Date();
     const date = now.toLocaleDateString("en-GB");
     const time = now.toLocaleTimeString("en-GB");
 
-    // Row 4: Spacer
-    worksheet.mergeCells(`A4:${lastCol}4`);
-    worksheet.getRow(4).height = 10;
+    // === ROW 1-4: LOGO HEADER (centered, white background) ===
+    worksheet.mergeCells(`A1:${lastCol}4`);
+    worksheet.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
+    worksheet.getCell("A1").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getRow(1).height = 20;
+    worksheet.getRow(2).height = 40;
+    worksheet.getRow(3).height = 40;
+    worksheet.getRow(4).height = 40;
+    
+    if (logoImageId !== null) {
+      worksheet.addImage(logoImageId, {
+        tl: { col: Math.max(0, (colCount - 5) / 2), row: 0.5 },
+        ext: { width: 460, height: 200 }
+      });
+    } else {
+      worksheet.getCell("A1").value = "GEMSTAR";
+      worksheet.getCell("A1").font = { bold: true, size: 22, color: { argb: "FF1F2937" }, name: "Arial" };
+    }
+
+    // === ROW 5: Separator line (dark) ===
+    worksheet.mergeCells(`A5:${lastCol}5`);
+    worksheet.getCell("A5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(5).height = 4;
+
+    // === ROW 6: Category summary bar ===
+    worksheet.mergeCells(`A6:${lastCol}6`);
+    worksheet.getCell("A6").value = `${sheetName.toUpperCase()}  ·  ${selectedData.length} stones  ·  ${totalWeight.toFixed(2)} cts  ·  ${date}`;
+    worksheet.getCell("A6").font = { size: 11, color: { argb: "FF1F2937" }, bold: true, name: "Arial" };
+    worksheet.getCell("A6").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A6").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    worksheet.getRow(6).height = 26;
+
+    // === ROW 7: Spacer ===
+    worksheet.mergeCells(`A7:${lastCol}7`);
+    worksheet.getRow(7).height = 6;
 
     // ═══════════════════════════════════════════════════════════════
-    // INFO TABLES (Row 5-7)
+    // INFO TABLES (Rows 8-10)
     // ═══════════════════════════════════════════════════════════════
     
     const tableBorder = {
-      top: { style: "thin", color: { argb: accentColor } },
-      bottom: { style: "thin", color: { argb: accentColor } },
-      left: { style: "thin", color: { argb: accentColor } },
-      right: { style: "thin", color: { argb: accentColor } },
+      top: { style: "thin", color: { argb: "FFE5E7EB" } },
+      bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+      left: { style: "thin", color: { argb: "FFE5E7EB" } },
+      right: { style: "thin", color: { argb: "FFE5E7EB" } },
     };
-    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
-    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: isOnlyDiamonds ? "FFE6F0FF" : "FFE6F7F1" } };
+    const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    const lightFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
 
-    // === LEFT TABLE: Date/Time/Website ===
-    
-    // Row 5: Date
-    worksheet.getCell("A5").value = "Date";
-    worksheet.getCell("A5").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
-    worksheet.getCell("A5").fill = lightFill;
-    worksheet.getCell("A5").border = tableBorder;
-    worksheet.getCell("A5").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.mergeCells("B5:C5");
-    worksheet.getCell("B5").value = date;
-    worksheet.getCell("B5").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("B5").border = tableBorder;
-    worksheet.getCell("B5").alignment = { vertical: "middle", horizontal: "center" };
+    // LEFT TABLE: Date / Time / Website
+    const leftTableFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
 
-    // Row 6: Time
-    worksheet.getCell("A6").value = "Time";
-    worksheet.getCell("A6").font = { bold: true, size: 10, color: { argb: "FF10B981" } };
-    worksheet.getCell("A6").fill = lightFill;
-    worksheet.getCell("A6").border = tableBorder;
-    worksheet.getCell("A6").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.mergeCells("B6:C6");
-    worksheet.getCell("B6").value = time;
-    worksheet.getCell("B6").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("B6").border = tableBorder;
-    worksheet.getCell("B6").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A8").value = "Date";
+    worksheet.getCell("A8").font = { bold: true, size: 9, color: { argb: "FF6B7280" }, name: "Arial" };
+    worksheet.getCell("A8").fill = leftTableFill;
+    worksheet.getCell("A8").border = tableBorder;
+    worksheet.getCell("A8").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.mergeCells("B8:C8");
+    worksheet.getCell("B8").value = date;
+    worksheet.getCell("B8").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("B8").fill = leftTableFill;
+    worksheet.getCell("B8").border = tableBorder;
+    worksheet.getCell("B8").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Row 7: Website Link
-    worksheet.mergeCells("A7:C7");
-    worksheet.getCell("A7").value = { text: "🌐 www.gems.net", hyperlink: "https://www.gems.net" };
-    worksheet.getCell("A7").font = { bold: true, size: 10, color: { argb: "FF10B981" }, underline: true };
-    worksheet.getCell("A7").fill = lightFill;
-    worksheet.getCell("A7").border = tableBorder;
-    worksheet.getCell("A7").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("A9").value = "Time";
+    worksheet.getCell("A9").font = { bold: true, size: 9, color: { argb: "FF6B7280" }, name: "Arial" };
+    worksheet.getCell("A9").fill = leftTableFill;
+    worksheet.getCell("A9").border = tableBorder;
+    worksheet.getCell("A9").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.mergeCells("B9:C9");
+    worksheet.getCell("B9").value = time;
+    worksheet.getCell("B9").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("B9").fill = leftTableFill;
+    worksheet.getCell("B9").border = tableBorder;
+    worksheet.getCell("B9").alignment = { vertical: "middle", horizontal: "center" };
 
-    // === RIGHT TABLE: Cts/Pcs Summary ===
-    
-    // Row 5: Headers
-    worksheet.getCell("E5").value = "";
-    worksheet.getCell("E5").fill = headerFill;
-    worksheet.getCell("E5").border = tableBorder;
-    
-    worksheet.getCell("F5").value = "Cts";
-    worksheet.getCell("F5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
-    worksheet.getCell("F5").fill = headerFill;
-    worksheet.getCell("F5").border = tableBorder;
-    worksheet.getCell("F5").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("G5").value = "Pcs";
-    worksheet.getCell("G5").font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
-    worksheet.getCell("G5").fill = headerFill;
-    worksheet.getCell("G5").border = tableBorder;
-    worksheet.getCell("G5").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.mergeCells("A10:C10");
+    worksheet.getCell("A10").value = { text: "www.gems.net", hyperlink: "https://www.gems.net" };
+    worksheet.getCell("A10").font = { bold: true, size: 9, color: { argb: accentColor }, underline: true, name: "Arial" };
+    worksheet.getCell("A10").fill = leftTableFill;
+    worksheet.getCell("A10").border = tableBorder;
+    worksheet.getCell("A10").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Row 6: Total
-    worksheet.getCell("E6").value = "Total";
-    worksheet.getCell("E6").font = { bold: true, size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("E6").border = tableBorder;
-    worksheet.getCell("E6").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("F6").value = totalWeight.toFixed(2);
-    worksheet.getCell("F6").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("F6").border = tableBorder;
-    worksheet.getCell("F6").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("G6").value = selectedData.length;
-    worksheet.getCell("G6").font = { size: 10, color: { argb: "FF1F2937" } };
-    worksheet.getCell("G6").border = tableBorder;
-    worksheet.getCell("G6").alignment = { vertical: "middle", horizontal: "center" };
+    // RIGHT TABLE: Cts / Pcs
+    worksheet.getCell("E8").value = "";
+    worksheet.getCell("E8").fill = headerFill;
+    worksheet.getCell("E8").border = tableBorder;
+    worksheet.getCell("F8").value = "Cts";
+    worksheet.getCell("F8").font = { bold: true, size: 9, color: { argb: "FFFFFFFF" }, name: "Arial" };
+    worksheet.getCell("F8").fill = headerFill;
+    worksheet.getCell("F8").border = tableBorder;
+    worksheet.getCell("F8").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("G8").value = "Pcs";
+    worksheet.getCell("G8").font = { bold: true, size: 9, color: { argb: "FFFFFFFF" }, name: "Arial" };
+    worksheet.getCell("G8").fill = headerFill;
+    worksheet.getCell("G8").border = tableBorder;
+    worksheet.getCell("G8").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Row 7: Selected (same as total in this case)
-    worksheet.getCell("E7").value = "SELECTED";
-    worksheet.getCell("E7").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("E7").fill = lightFill;
-    worksheet.getCell("E7").border = tableBorder;
-    worksheet.getCell("E7").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("F7").value = totalWeight.toFixed(2);
-    worksheet.getCell("F7").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("F7").fill = lightFill;
-    worksheet.getCell("F7").border = tableBorder;
-    worksheet.getCell("F7").alignment = { vertical: "middle", horizontal: "center" };
-    
-    worksheet.getCell("G7").value = selectedData.length;
-    worksheet.getCell("G7").font = { bold: true, size: 10, color: { argb: accentColor } };
-    worksheet.getCell("G7").fill = lightFill;
-    worksheet.getCell("G7").border = tableBorder;
-    worksheet.getCell("G7").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("E9").value = "Total";
+    worksheet.getCell("E9").font = { bold: true, size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("E9").border = tableBorder;
+    worksheet.getCell("E9").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("F9").value = totalWeight.toFixed(2);
+    worksheet.getCell("F9").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("F9").border = tableBorder;
+    worksheet.getCell("F9").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("G9").value = selectedData.length;
+    worksheet.getCell("G9").font = { size: 9, color: { argb: "FF1F2937" }, name: "Arial" };
+    worksheet.getCell("G9").border = tableBorder;
+    worksheet.getCell("G9").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Set row heights
-    worksheet.getRow(5).height = 22;
-    worksheet.getRow(6).height = 22;
-    worksheet.getRow(7).height = 22;
+    worksheet.getCell("E10").value = "Selected";
+    worksheet.getCell("E10").font = { bold: true, size: 9, color: { argb: accentColor }, name: "Arial" };
+    worksheet.getCell("E10").fill = lightFill;
+    worksheet.getCell("E10").border = tableBorder;
+    worksheet.getCell("E10").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("F10").value = totalWeight.toFixed(2);
+    worksheet.getCell("F10").font = { bold: true, size: 9, color: { argb: accentColor }, name: "Arial" };
+    worksheet.getCell("F10").fill = lightFill;
+    worksheet.getCell("F10").border = tableBorder;
+    worksheet.getCell("F10").alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getCell("G10").value = selectedData.length;
+    worksheet.getCell("G10").font = { bold: true, size: 9, color: { argb: accentColor }, name: "Arial" };
+    worksheet.getCell("G10").fill = lightFill;
+    worksheet.getCell("G10").border = tableBorder;
+    worksheet.getCell("G10").alignment = { vertical: "middle", horizontal: "center" };
 
-    // Row 8: Spacer before main table
-    worksheet.mergeCells(`A8:${lastCol}8`);
-    worksheet.getRow(8).height = 10;
+    worksheet.getRow(8).height = 20;
+    worksheet.getRow(9).height = 20;
+    worksheet.getRow(10).height = 20;
 
-    // Add header row (row 9) - use dynamic columns
-    const headerRow = worksheet.getRow(9);
+    // === ROW 11: Spacer ===
+    worksheet.mergeCells(`A11:${lastCol}11`);
+    worksheet.getRow(11).height = 8;
+
+    // === ROW 12: Column headers ===
+    const headerRow = worksheet.getRow(12);
     columnsToUse.forEach((col, index) => {
       headerRow.getCell(index + 1).value = col.header;
     });
@@ -4609,7 +4626,7 @@ const StoneSearchPage = () => {
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: accentColor },
+        fgColor: { argb: "FF1F2937" },
       };
       cell.font = {
         bold: true,
@@ -4622,10 +4639,7 @@ const StoneSearchPage = () => {
         horizontal: "center",
       };
       cell.border = {
-        top: { style: "thin", color: { argb: "FF1F2937" } },
-        bottom: { style: "thin", color: { argb: "FF1F2937" } },
-        left: { style: "thin", color: { argb: "FF1F2937" } },
-        right: { style: "thin", color: { argb: "FF1F2937" } },
+        bottom: { style: "medium", color: { argb: accentColor } },
       };
     });
 
@@ -4669,6 +4683,7 @@ const StoneSearchPage = () => {
           // Links
           case 'dna': rowData.dna = stone.sku || ''; break;
           case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
+          case 'appendix': rowData.appendix = ''; break;
           case 'image': rowData.image = stone.imageUrl || ''; break;
           case 'video': rowData.video = stone.videoUrl || ''; break;
           default: rowData[col.key] = '';
@@ -4739,6 +4754,7 @@ const StoneSearchPage = () => {
       // Make URLs clickable (only if column exists)
       const dnaCol = columnsToUse.findIndex(c => c.key === 'dna');
       const certCol = columnsToUse.findIndex(c => c.key === 'certificate');
+      const appendixCol = columnsToUse.findIndex(c => c.key === 'appendix');
       const imgCol = columnsToUse.findIndex(c => c.key === 'image');
       const vidCol = columnsToUse.findIndex(c => c.key === 'video');
       const pairSkuCol = columnsToUse.findIndex(c => c.key === 'pairSku');
@@ -4757,6 +4773,15 @@ const StoneSearchPage = () => {
         row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
         row.getCell(certCol + 1).font = { color: { argb: accentColor }, underline: true, size: 10 };
       }
+      if (appendixCol >= 0 && stone.lab && stone.lab.toUpperCase() === "GRS" && stone.certificateUrl) {
+        const certMatch = stone.certificateUrl.match(/\/([^/]+)\.pdf$/i);
+        if (certMatch) {
+          const certNum = certMatch[1];
+          const appendixUrl = `https://app.barakdiamonds.com/Gemstones/Output/StoneImages/${certNum}-ap.pdf`;
+          row.getCell(appendixCol + 1).value = { text: "Appendix", hyperlink: appendixUrl };
+          row.getCell(appendixCol + 1).font = { color: { argb: accentColor }, underline: true, size: 10 };
+        }
+      }
       if (imgCol >= 0 && stone.imageUrl) {
         row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
         row.getCell(imgCol + 1).font = { color: { argb: accentColor }, underline: true, size: 10 };
@@ -4773,61 +4798,33 @@ const StoneSearchPage = () => {
     // FOOTER SECTION
     // ═══════════════════════════════════════════════════════════════
     
-    const footerStartRow = 10 + selectedData.length;
+    // Data rows start at row 13, so footer starts after: 13 + selectedData.length
+    const footerStartRow = 13 + selectedData.length;
     
     // Spacer row
     worksheet.mergeCells(`A${footerStartRow}:${lastCol}${footerStartRow}`);
-    worksheet.getRow(footerStartRow).height = 15;
+    worksheet.getRow(footerStartRow).height = 12;
 
-    // Footer background row
+    // Footer Row 1: Contact info (dark background)
+    const israelEmails = ["yarden@eshed.com", "eyal@eshed.com", "meirav@eshed.com", "le@gems.net"];
+    const userEmail = user?.primaryEmailAddress?.emailAddress || "";
+    const footerPhoneNumber = israelEmails.includes(userEmail.toLowerCase()) ? "+972.3.575.1137" : "+1 (212) 869-0544";
     worksheet.mergeCells(`A${footerStartRow + 1}:${lastCol}${footerStartRow + 1}`);
-    const footerBgRow = worksheet.getRow(footerStartRow + 1);
-    footerBgRow.height = 8;
-    worksheet.getCell(`A${footerStartRow + 1}`).fill = { 
-      type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } 
-    };
+    const footerContact = worksheet.getCell(`A${footerStartRow + 1}`);
+    footerContact.value = `\u{1F4DE} ${footerPhoneNumber}  \u00B7  \u2709 info@gems.net  \u00B7  \u{1F310} www.gems.net`;
+    footerContact.font = { size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+    footerContact.alignment = { vertical: "middle", horizontal: "center" };
+    footerContact.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 1).height = 26;
 
-    // Footer Row 1: Company & Tagline
+    // Footer Row 2: Disclaimer (dark background)
     worksheet.mergeCells(`A${footerStartRow + 2}:${lastCol}${footerStartRow + 2}`);
-    const footerCell1 = worksheet.getCell(`A${footerStartRow + 2}`);
-    footerCell1.value = "◆  GEMSTAR  ◆  Premium Gemstones & Diamonds";
-    footerCell1.font = { bold: true, size: 12, color: { argb: accentColor }, name: "Arial" };
-    footerCell1.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 2).height = 28;
-
-    // Footer Row 2: Locations
-    worksheet.mergeCells(`A${footerStartRow + 3}:${lastCol}${footerStartRow + 3}`);
-    const footerCell2 = worksheet.getCell(`A${footerStartRow + 3}`);
-    footerCell2.value = "📍 NEW YORK  ·  TEL AVIV  ·  HONG KONG  ·  LOS ANGELES";
-    footerCell2.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
-    footerCell2.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 3).height = 22;
-
-    // Footer Row 3: Contact Info
-    worksheet.mergeCells(`A${footerStartRow + 4}:${lastCol}${footerStartRow + 4}`);
-    const footerCell3 = worksheet.getCell(`A${footerStartRow + 4}`);
-    footerCell3.value = "📞 +1 (212) 869-0544  ·  ✉ info@gems.net  ·  🌐 www.gems.net";
-    footerCell3.font = { size: 10, color: { argb: "FFD1D5DB" }, name: "Arial" };
-    footerCell3.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell3.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 4).height = 22;
-
-    // Footer Row 4: Disclaimer
-    worksheet.mergeCells(`A${footerStartRow + 5}:${lastCol}${footerStartRow + 5}`);
-    const footerCell4 = worksheet.getCell(`A${footerStartRow + 5}`);
-    footerCell4.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
-    footerCell4.font = { size: 9, color: { argb: "FF9CA3AF" }, name: "Arial", italic: true };
-    footerCell4.alignment = { vertical: "middle", horizontal: "center" };
-    footerCell4.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    worksheet.getRow(footerStartRow + 5).height = 20;
-
-    // Footer bottom accent line
-    worksheet.mergeCells(`A${footerStartRow + 6}:${lastCol}${footerStartRow + 6}`);
-    const footerAccent = worksheet.getCell(`A${footerStartRow + 6}`);
-    footerAccent.fill = { type: "pattern", pattern: "solid", fgColor: { argb: accentColor } };
-    worksheet.getRow(footerStartRow + 6).height = 5;
+    const footerDisclaimer = worksheet.getCell(`A${footerStartRow + 2}`);
+    footerDisclaimer.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
+    footerDisclaimer.font = { size: 9, color: { argb: "FF10B981" }, name: "Arial", italic: true };
+    footerDisclaimer.alignment = { vertical: "middle", horizontal: "center" };
+    footerDisclaimer.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    worksheet.getRow(footerStartRow + 2).height = 22;
 
     // Generate and download
     const buffer = await workbook.xlsx.writeBuffer();
@@ -5595,11 +5592,11 @@ const StoneSearchPage = () => {
           setExportMode('combined'); // Reset to default
         }}
         selectedStones={stones.filter((s) => selectedStones.has(s.id))}
-        onExport={(modifiedStones) => {
+        onExport={(modifiedStones, options = {}) => {
           if (exportMode === 'separate') {
-            exportToExcelSeparate(modifiedStones);
+            exportToExcelSeparate(modifiedStones, options);
           } else {
-            exportToExcel(modifiedStones);
+            exportToExcel(modifiedStones, options);
           }
         }}
       />
