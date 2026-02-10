@@ -4978,8 +4978,8 @@ const StoneSearchPage = () => {
         
         if (skuList.length > 0) {
           const stoneSku = stone.sku?.toLowerCase() || '';
-          // Check if stone SKU matches or contains any of the filter SKUs
-          const matches = skuList.some(filterSku => stoneSku.includes(filterSku));
+          // Check if stone SKU exactly matches any of the filter SKUs
+          const matches = skuList.some(filterSku => stoneSku === filterSku);
           if (!matches) return false;
         }
       }
