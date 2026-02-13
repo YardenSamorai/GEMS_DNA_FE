@@ -2433,6 +2433,8 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
       sku: "",
       minPrice: "",
       maxPrice: "",
+      minPricePerCt: "",
+      maxPricePerCt: "",
       minCarat: "",
       maxCarat: "",
       minLength: "",
@@ -2452,6 +2454,8 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
     filters.sku,
     filters.minPrice,
     filters.maxPrice,
+    filters.minPricePerCt,
+    filters.maxPricePerCt,
     filters.minCarat,
     filters.maxCarat,
     filters.minLength,
@@ -2552,6 +2556,28 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
             type="number"
             value={filters.maxPrice}
             onChange={handleChange("maxPrice")}
+            placeholder="To"
+            className="input-modern"
+          />
+        </div>
+
+        {/* Price Per Carat Range */}
+        <div>
+          <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Price/ct ($)</label>
+          <input
+            type="number"
+            value={filters.minPricePerCt}
+            onChange={handleChange("minPricePerCt")}
+            placeholder="From"
+            className="input-modern"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-stone-500 mb-1.5">Max Price/ct ($)</label>
+          <input
+            type="number"
+            value={filters.maxPricePerCt}
+            onChange={handleChange("maxPricePerCt")}
             placeholder="To"
             className="input-modern"
           />
@@ -3628,6 +3654,8 @@ const StoneSearchPage = () => {
     sku: initialSearch,
     minPrice: "",
     maxPrice: "",
+    minPricePerCt: "",
+    maxPricePerCt: "",
     minCarat: "",
     maxCarat: "",
     minLength: "",
@@ -4982,6 +5010,8 @@ const StoneSearchPage = () => {
       }
       if (filters.minPrice && stone.priceTotal != null && stone.priceTotal < Number(filters.minPrice)) return false;
       if (filters.maxPrice && stone.priceTotal != null && stone.priceTotal > Number(filters.maxPrice)) return false;
+      if (filters.minPricePerCt && stone.pricePerCt != null && stone.pricePerCt < Number(filters.minPricePerCt)) return false;
+      if (filters.maxPricePerCt && stone.pricePerCt != null && stone.pricePerCt > Number(filters.maxPricePerCt)) return false;
       if (filters.minCarat && stone.weightCt != null && stone.weightCt < Number(filters.minCarat)) return false;
       if (filters.maxCarat && stone.weightCt != null && stone.weightCt > Number(filters.maxCarat)) return false;
       
