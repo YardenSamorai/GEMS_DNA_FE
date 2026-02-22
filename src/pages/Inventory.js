@@ -54,6 +54,24 @@ const shareToWhatsApp = (stone, includePrice = false) => {
   window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
 };
 
+/* ---------------- WhatsApp Bulk Share (multiple stones) ---------------- */
+const shareMultipleToWhatsApp = (selectedStonesArray) => {
+  if (!selectedStonesArray || selectedStonesArray.length === 0) return;
+
+  let message = `*${selectedStonesArray.length} Stones - DNA Links*\n\n`;
+
+  selectedStonesArray.forEach((stone, idx) => {
+    const dnaUrl = `https://gems-dna.com/${stone.sku}`;
+    message += `${idx + 1}. *${stone.shape || 'Gemstone'}* ${stone.weightCt || '?'}ct`;
+    if (stone.color) message += ` | ${stone.color}`;
+    message += ` — SKU: ${stone.sku}\n`;
+    message += `   ${dnaUrl}\n\n`;
+  });
+
+  const encodedMessage = encodeURIComponent(message.trim());
+  window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+};
+
 /* ---------------- Price Encoding (BARELOVSK) ---------------- */
 const encodePriceBARELOVSK = (price) => {
   if (!price || price <= 0) return "B-";
@@ -5262,6 +5280,18 @@ const StoneSearchPage = () => {
                           </div>
                           <span className="font-medium">Labels</span>
                         </button>
+                        <button
+                          onClick={() => shareMultipleToWhatsApp(stones.filter(s => selectedStones.has(s.id)))}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors border-t border-stone-100"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                              <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.29-.175-2.868.852.852-2.868-.175-.29A8 8 0 1112 20z"/>
+                            </svg>
+                          </div>
+                          <span className="font-medium">WhatsApp DNA</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -5337,18 +5367,24 @@ const StoneSearchPage = () => {
                         </div>
                       </button>
                       
+                      {/* Share Section */}
+                      <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
+                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Share</span>
+                      </div>
+                      
                       <button
-                        onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), true)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
+                        onClick={() => shareMultipleToWhatsApp(stones.filter(s => selectedStones.has(s.id)))}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                            <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.29-.175-2.868.852.852-2.868-.175-.29A8 8 0 1112 20z"/>
                           </svg>
                         </div>
                         <div>
-                          <span className="font-medium">Share to Niimbot</span>
-                          <p className="text-xs text-stone-500">Send directly to app</p>
+                          <span className="font-medium">WhatsApp DNA Links</span>
+                          <p className="text-xs text-stone-500">Send DNA links via WhatsApp</p>
                         </div>
                       </button>
                     </div>
@@ -5573,6 +5609,11 @@ const StoneSearchPage = () => {
               
               {/* Floating Actions Dropdown - appears above */}
               <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-stone-200 overflow-hidden">
+                {/* Export Section */}
+                <div className="px-3 py-2 bg-stone-50 border-b border-stone-200">
+                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Export</span>
+                </div>
+                
                 <button
                   onClick={handleExportClick}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
@@ -5582,7 +5623,10 @@ const StoneSearchPage = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
-                  <span className="font-medium">Export to Excel</span>
+                  <div>
+                    <span className="font-medium">Export to Excel</span>
+                    <p className="text-xs text-stone-500">Spreadsheet with all details</p>
+                  </div>
                 </button>
                 
                 <button
@@ -5594,19 +5638,51 @@ const StoneSearchPage = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <span className="font-medium">Generate PDF</span>
+                  <div>
+                    <span className="font-medium">Generate PDF Catalog</span>
+                    <p className="text-xs text-stone-500">Professional catalog with images</p>
+                  </div>
                 </button>
+                
+                {/* Labels Section */}
+                <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
+                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Labels</span>
+                </div>
                 
                 <button
                   onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
                     <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
-                  <span className="font-medium">Niimbot Labels</span>
+                  <div>
+                    <span className="font-medium">Niimbot Labels</span>
+                    <p className="text-xs text-stone-500">Download label Excel</p>
+                  </div>
+                </button>
+                
+                {/* Share Section */}
+                <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
+                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Share</span>
+                </div>
+                
+                <button
+                  onClick={() => shareMultipleToWhatsApp(stones.filter(s => selectedStones.has(s.id)))}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                      <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.29-.175-2.868.852.852-2.868-.175-.29A8 8 0 1112 20z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="font-medium">WhatsApp DNA Links</span>
+                    <p className="text-xs text-stone-500">Send DNA links via WhatsApp</p>
+                  </div>
                 </button>
               </div>
             </div>
