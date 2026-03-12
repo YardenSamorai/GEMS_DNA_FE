@@ -5018,6 +5018,9 @@ const StoneSearchPage = () => {
           fancyOvertone2: row.fancyOvertone2 ?? "",
           // Pair stone
           pairSku: row.pairSku ?? null,
+          // Grouping
+          groupingType: row.groupingType ?? "",
+          box: row.box ?? "",
         }));
         setStones(normalized);
       } catch (err) {
