@@ -516,9 +516,9 @@ const HomePage = () => {
           // Categories
           const cat = (stone.category || 'Other').toLowerCase();
           if (cat.includes('emerald')) categories['Emerald'] = (categories['Emerald'] || 0) + 1;
-          else if (cat.includes('fancy')) categories['Fancy'] = (categories['Fancy'] || 0) + 1;
+          else if (cat.includes('fancy')) categories['Fancy Diamonds'] = (categories['Fancy Diamonds'] || 0) + 1;
           else if (cat.includes('diamond')) categories['Diamond'] = (categories['Diamond'] || 0) + 1;
-          else categories['Other'] = (categories['Other'] || 0) + 1;
+          else categories['Gemstones'] = (categories['Gemstones'] || 0) + 1;
           
           // Locations
           const loc = stone.location || 'Unknown';
@@ -626,8 +626,8 @@ const HomePage = () => {
   const categoryColors = {
     'Emerald': '#10b981',
     'Diamond': '#3b82f6',
-    'Fancy': '#f59e0b',
-    'Other': '#6b7280'
+    'Fancy Diamonds': '#f59e0b',
+    'Gemstones': '#6b7280'
   };
 
   const categoryChartData = Object.entries(stats.categories).map(([name, value]) => ({

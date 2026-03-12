@@ -76,64 +76,34 @@ const shareMultipleToWhatsApp = (selectedStonesArray) => {
 const encodePriceBARELOVSK = (price) => {
   if (!price || price <= 0) return "B-";
   
-  // Round to nearest integer
   const rounded = Math.round(price);
   const priceStr = rounded.toString();
   
-  // Letter mapping
   const digitToLetter = {
-    '1': 'H',
-    '2': 'A',
-    '3': 'R',
-    '4': 'E',
-    '5': 'L',
-    '6': 'O',
-    '7': 'V',
-    '8': 'S',
-    '9': 'K',
-    '0': 'i'
+    '1': 'H', '2': 'A', '3': 'R', '4': 'E', '5': 'L',
+    '6': 'O', '7': 'V', '8': 'S', '9': 'K'
   };
   
-  let encoded = 'B'; // Always starts with B
+  let encoded = 'B';
   let i = 0;
   
   while (i < priceStr.length) {
-    // Check for trailing zeros - use Z (000) or Y (00)
-    const remaining = priceStr.substring(i);
-    
-    if (remaining === '000' || (remaining.length >= 3 && remaining.slice(-3) === '000' && i === priceStr.length - 3)) {
-      // Check if remaining is exactly "000" at the end
-      if (remaining === '000') {
-        encoded += 'Z';
-        break;
+    if (priceStr[i] === '0') {
+      let zeroCount = 0;
+      while (i < priceStr.length && priceStr[i] === '0') {
+        zeroCount++;
+        i++;
       }
+      // Order: I(0) → Y(00) → Z(000)
+      const remainder = zeroCount % 3;
+      const zCount = Math.floor(zeroCount / 3);
+      if (remainder === 1) encoded += 'I';
+      if (remainder === 2) encoded += 'Y';
+      for (let j = 0; j < zCount; j++) encoded += 'Z';
+    } else {
+      encoded += digitToLetter[priceStr[i]];
+      i++;
     }
-    
-    if (remaining === '00' || (remaining.length >= 2 && remaining.slice(-2) === '00' && i === priceStr.length - 2)) {
-      // Check if remaining is exactly "00" at the end
-      if (remaining === '00') {
-        encoded += 'Y';
-        break;
-      }
-    }
-    
-    // Check for 000 pattern
-    if (i <= priceStr.length - 3 && priceStr.substring(i, i + 3) === '000') {
-      encoded += 'Z';
-      i += 3;
-      continue;
-    }
-    
-    // Check for 00 pattern
-    if (i <= priceStr.length - 2 && priceStr.substring(i, i + 2) === '00') {
-      encoded += 'Y';
-      i += 2;
-      continue;
-    }
-    
-    // Single digit
-    encoded += digitToLetter[priceStr[i]] || priceStr[i];
-    i++;
   }
   
   return encoded;
@@ -174,22 +144,33 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
     // Check if diamond or fancy: by category OR by SKU starting with T (diamond SKU pattern)
     const isDiamondOrFancy = category.includes('diamond') || category.includes('fancy') || sku.startsWith('T');
     
-    // Build details string based on category
-    // Diamonds & Fancy: Weight, Lab, Color  Clarity (same line, extra space)
-    // Emeralds & Others: Weight, Lab, Treatment, Price code
+    // Clarity: "insignificant" → "Ins."
+    const clarity = (stone.clarity || '').toLowerCase() === 'insignificant' 
+      ? 'Ins' 
+      : (stone.clarity || '');
+    
+    // Treatment: "insignificant" → "Ins.", default to "Minor" if empty
+    const rawTreatment = stone.treatment || 'Minor';
+    const treatment = rawTreatment.toLowerCase() === 'insignificant' ? 'Ins' : rawTreatment;
+    
+    // Hide price if ≥50K per carat
+    const showPrice = stone.pricePerCt < 50000;
+    
+    const lab = (stone.lab && stone.lab.toUpperCase() !== 'N/A') ? stone.lab : null;
+    
     let details;
     if (isDiamondOrFancy) {
       details = [
         `${stone.weightCt || '?'}`,
-        stone.lab || null,
-        `${stone.color || ''}   ${stone.clarity || ''}`.trim() || null
+        lab,
+        `${stone.color || ''}   ${clarity}`.trim() || null
       ].filter(Boolean).join('\n');
     } else {
       details = [
         `${stone.weightCt || '?'}`,
-        stone.lab || null,
-        stone.treatment || null,
-        priceCode
+        lab,
+        treatment,
+        showPrice ? priceCode : null
       ].filter(Boolean).join('\n');
     }
 
@@ -2465,6 +2446,8 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
       tag: "All tags",
       location: "All locations",
       pairStatus: "All",
+      groupingType: "All types",
+      box: "",
     });
   };
 
@@ -2486,6 +2469,8 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
     !filters.tag.includes("All") && filters.tag,
     !filters.location.includes("All") && filters.location,
     filters.pairStatus !== "All" && filters.pairStatus,
+    !filters.groupingType.includes("All") && filters.groupingType,
+    filters.box,
   ].filter(Boolean).length;
 
   return (
@@ -2751,6 +2736,42 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
           </select>
         </div>
 
+        {/* Grouping Type */}
+        <div>
+          <label className="block text-xs font-medium text-stone-500 mb-1.5 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            Grouping Type
+          </label>
+          <select
+            value={filters.groupingType}
+            onChange={handleChange("groupingType")}
+            className="input-modern"
+          >
+            {["All types", "Single", "Pair", "Set", "Parcel", "Side Stones", "Melee"].map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Box */}
+        <div>
+          <label className="block text-xs font-medium text-stone-500 mb-1.5 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            Box
+          </label>
+          <input
+            type="text"
+            value={filters.box}
+            onChange={handleChange("box")}
+            placeholder="Search box..."
+            className="input-modern"
+          />
+        </div>
+
         {/* Client Tag */}
         <div>
           <label className="block text-xs font-medium text-stone-500 mb-1.5 flex items-center gap-1.5">
@@ -2792,6 +2813,15 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
 };
 
 /* ---------------- Stone Card (Grid) ---------------- */
+const shortTreatment = (t) => {
+  if (!t) return 'N/A';
+  const lower = t.toLowerCase().trim();
+  if (lower === 'insignificant') return 'Ins';
+  if (lower === 'insignificant to minor') return 'Ins - Min';
+  if (lower === 'moderate') return 'Mod';
+  return t;
+};
+
 const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA }) => (
   <motion.div
     layout
@@ -2842,10 +2872,15 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
               {stone.weightCt} ct
             </span>
           </div>
-          <div className="mt-2 flex items-center gap-3 text-sm text-stone-500">
-            <span>${stone.priceTotal?.toLocaleString() || '-'}</span>
-            <span>•</span>
-            <span>{stone.treatment || 'N/A'}</span>
+          <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-stone-500">
+            <span><span className="text-stone-400">Total:</span> <span className="font-semibold text-stone-800">${stone.priceTotal?.toLocaleString() || '-'}</span></span>
+            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt?.toLocaleString() || '-'}</span>
+            <span><span className="text-stone-400">Measurements:</span> {stone.measurements || 'N/A'}</span>
+            <span><span className="text-stone-400">Ratio:</span> {stone.ratio || 'N/A'}</span>
+            <span><span className="text-stone-400">Treatment:</span> {shortTreatment(stone.treatment)}</span>
+            <span><span className="text-stone-400">Lab:</span> {stone.lab || 'N/A'}</span>
+            <span><span className="text-stone-400">Location:</span> {stone.location || 'N/A'}</span>
+            <span><span className="text-stone-400">Type:</span> {stone.pairSku ? 'Pair' : 'Single'}</span>
           </div>
           
           {/* Tags */}
@@ -3465,6 +3500,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 <SortButton field="treatment">Treatment</SortButton>
               </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
+                <SortButton field="lab">Lab</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
+                <SortButton field="ratio">Ratio</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="location">Location</SortButton>
               </th>
                 <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
@@ -3507,10 +3548,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-sm font-medium text-primary-600">{stone.sku}</span>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-2 text-center whitespace-nowrap">
                         {stone.pairSku ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700">
                             Pair
@@ -3521,29 +3562,35 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           </span>
                         )}
                       </td>
-                    <td className="px-4 py-3">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
+                    <td className="px-3 py-2">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
                         {stone.imageUrl ? (
                           <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">N/A</div>
+                          <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-stone-700">{stone.shape}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-stone-800">{stone.weightCt} ct</td>
-                    <td className="px-4 py-3 text-sm text-stone-600 hidden lg:table-cell">{stone.measurements}</td>
-                    <td className="px-4 py-3 text-sm text-stone-700">
+                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{stone.shape}</td>
+                    <td className="px-3 py-2 text-xs font-medium text-stone-800 whitespace-nowrap">{stone.weightCt} ct</td>
+                    <td className="px-3 py-2 text-xs text-stone-600 whitespace-nowrap hidden lg:table-cell">{stone.measurements}</td>
+                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">
                       ${stone.pricePerCt?.toLocaleString() || '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-stone-800">
+                    <td className="px-3 py-2 text-xs font-semibold text-stone-800 whitespace-nowrap">
                       ${stone.priceTotal?.toLocaleString() || '-'}
                     </td>
-                    <td className="px-4 py-3 hidden xl:table-cell">
-                      <span className="badge badge-neutral">{stone.treatment || 'N/A'}</span>
+                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
+                      <span className="badge badge-neutral text-xs">{shortTreatment(stone.treatment)}</span>
                     </td>
-                    <td className="px-4 py-3 hidden xl:table-cell">
-                      <span className="text-sm text-stone-600">{stone.location || 'N/A'}</span>
+                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
+                      <span className="text-xs text-stone-600">{stone.lab || 'N/A'}</span>
+                    </td>
+                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
+                      <span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span>
+                    </td>
+                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
+                      <span className="text-xs text-stone-600">{stone.location || 'N/A'}</span>
                     </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
@@ -3686,6 +3733,8 @@ const StoneSearchPage = () => {
     tag: "All tags",
     location: "All locations",
     pairStatus: "All",
+    groupingType: "All types",
+    box: "",
   });
 
   const [stones, setStones] = useState([]);
@@ -5048,6 +5097,12 @@ const StoneSearchPage = () => {
       // Pair status filter
       if (filters.pairStatus === "Pair" && !stone.pairSku) return false;
       if (filters.pairStatus === "Single" && stone.pairSku) return false;
+
+      // Grouping type filter
+      if (filters.groupingType !== "All types" && stone.groupingType?.toLowerCase() !== filters.groupingType.toLowerCase()) return false;
+
+      // Box filter (free text, includes match)
+      if (filters.box && !(stone.box || '').toLowerCase().includes(filters.box.toLowerCase())) return false;
 
       // Tag filter
       if (filters.tag !== "All tags") {
