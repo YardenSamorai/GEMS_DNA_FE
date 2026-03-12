@@ -2819,6 +2819,7 @@ const shortTreatment = (t) => {
   if (lower === 'insignificant') return 'Ins';
   if (lower === 'insignificant to minor') return 'Ins - Min';
   if (lower === 'moderate') return 'Mod';
+  if (lower === 'minor to moderate') return 'Min - Mod';
   return t;
 };
 
