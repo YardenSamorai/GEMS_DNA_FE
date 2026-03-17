@@ -463,7 +463,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         // Details
         pdf.setFontSize(8);
         pdf.setTextColor(...lightGray);
-        if (category.includes('emerald')) {
+        if (mapped.includes('Emerald')) {
           pdf.text(`Treatment: ${stone.treatment || 'N/A'}`, textX, y + 32);
           pdf.text(`Origin: ${stone.origin || 'N/A'}`, textX, y + 37);
         } else {
@@ -556,7 +556,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         pdf.setFontSize(9);
         pdf.setTextColor(...lightGray);
         pdf.setFont('helvetica', 'normal');
-        if (category.includes('emerald')) {
+        if (mapped.includes('Emerald')) {
           pdf.text(`Treatment: ${stone.treatment || 'N/A'}  •  Origin: ${stone.origin || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
         } else {
           pdf.text(`Color: ${stone.color || 'N/A'}  •  Clarity: ${stone.clarity || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
