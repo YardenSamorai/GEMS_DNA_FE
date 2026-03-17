@@ -3488,6 +3488,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="lab">Lab</SortButton>
               </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                <SortButton field="pricePerCt">PPC</SortButton>
+              </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                <SortButton field="priceTotal">Total</SortButton>
+              </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="location">Location</SortButton>
               </th>
@@ -3566,6 +3572,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="text-xs text-stone-600">{stone.lab || 'N/A'}</span>
                     </td>
+                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">
+                      ${stone.pricePerCt?.toLocaleString() || '-'}
+                    </td>
+                    <td className="px-3 py-2 text-xs font-semibold text-stone-800 whitespace-nowrap">
+                      ${stone.priceTotal?.toLocaleString() || '-'}
+                    </td>
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="text-xs text-stone-600">{stone.location || 'N/A'}</span>
                     </td>
@@ -3621,7 +3633,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                          <td colSpan={13} className="bg-stone-50 border-t border-stone-200">
+                          <td colSpan={15} className="bg-stone-50 border-t border-stone-200">
                           <StoneDetails stone={stone} onViewDNA={onViewDNA} />
                         </td>
                       </motion.tr>
