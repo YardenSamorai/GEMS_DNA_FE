@@ -4,6 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
 import { barakURL } from "../utils/const";
+import { getMappedCategories } from "../utils/categoryMap";
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 
@@ -17,21 +18,15 @@ const DiamondCard = () => {
   const [activeTab, setActiveTab] = useState('details');
   const { isSignedIn } = useUser();
 
-  // Helper functions to detect stone category
   const isEmerald = () => {
-    const category = (details?.category || '').toLowerCase();
-    return category.includes('emerald');
+    return getMappedCategories(details?.category).includes('Emerald');
   };
 
   const isDiamond = () => {
-    const category = (details?.category || '').toLowerCase();
-    return category.includes('diamond') && !category.includes('fancy');
+    return getMappedCategories(details?.category).includes('Diamond');
   };
 
-  const isFancy = () => {
-    const category = (details?.category || '').toLowerCase();
-    return category.includes('fancy');
-  };
+  const isFancy = () => false;
 
   useEffect(() => {
     if (!stone_id) return;
@@ -347,7 +342,7 @@ const DiamondCard = () => {
                     transition={{ duration: 0.3 }}
                   >
                     <DetailCard icon="🔢" title="Stone ID" value={details.stone_id} />
-                    {details.category && <DetailCard icon="📁" title="Category" value={details.category} />}
+                    {details.category && <DetailCard icon="📁" title="Category" value={getMappedCategories(details.category).join(', ')} />}
                     <DetailCard 
                       icon="📜" 
                       title="Certificate #" 

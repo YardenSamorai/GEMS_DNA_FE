@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from 'framer-motion';
+import { getMappedCategories } from "../utils/categoryMap";
 
 // API base URL from .env
 const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
@@ -513,12 +514,10 @@ const HomePage = () => {
         let totalValue = 0;
         
         allStones.forEach(stone => {
-          // Categories
-          const cat = (stone.category || 'Other').toLowerCase();
-          if (cat.includes('emerald')) categories['Emerald'] = (categories['Emerald'] || 0) + 1;
-          else if (cat.includes('fancy')) categories['Fancy Diamonds'] = (categories['Fancy Diamonds'] || 0) + 1;
-          else if (cat.includes('diamond')) categories['Diamond'] = (categories['Diamond'] || 0) + 1;
-          else categories['Gemstones'] = (categories['Gemstones'] || 0) + 1;
+          const mapped = getMappedCategories(stone.category);
+          mapped.forEach(cat => {
+            categories[cat] = (categories[cat] || 0) + 1;
+          });
           
           // Locations
           const loc = stone.location || 'Unknown';
@@ -751,7 +750,7 @@ const HomePage = () => {
                       <div className="flex-1 min-w-0">
                         <p className="font-mono font-semibold text-stone-800">{stone.sku}</p>
                         <p className="text-sm text-stone-500 truncate">
-                          {stone.shape} • {stone.weightCt?.toFixed(2)}ct • {stone.category}
+                          {stone.shape} • {stone.weightCt?.toFixed(2)}ct • {getMappedCategories(stone.category).join(', ')}
                         </p>
                       </div>
                       {/* Arrow */}

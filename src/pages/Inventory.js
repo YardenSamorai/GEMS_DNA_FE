@@ -7,6 +7,7 @@ import { saveAs } from "file-saver";
 import { Html5Qrcode } from "html5-qrcode";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { getMappedCategories } from "../utils/categoryMap";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -138,11 +139,10 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
   // Add data rows
   selectedStones.forEach((stone) => {
     const priceCode = encodePriceBARELOVSK(stone.pricePerCt); // Price per carat
-    const category = (stone.category || '').toLowerCase();
+    const mapped = getMappedCategories(stone.category);
     const sku = (stone.sku || '').toUpperCase();
     
-    // Check if diamond or fancy: by category OR by SKU starting with T (diamond SKU pattern)
-    const isDiamondOrFancy = category.includes('diamond') || category.includes('fancy') || sku.startsWith('T');
+    const isDiamondOrFancy = mapped.includes('Diamond') || sku.startsWith('T');
     
     // Clarity: "insignificant" → "Ins."
     const clarity = (stone.clarity || '').toLowerCase() === 'insignificant' 
@@ -450,13 +450,11 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         pdf.setTextColor(...darkColor);
         pdf.text(`${stone.shape || 'N/A'} • ${stone.weightCt || '?'}ct`, textX, y + 19);
         
-        // Category indicator
-        const category = (stone.category || '').toLowerCase();
+        const mapped = getMappedCategories(stone.category);
         let catColor = lightGray;
-        let catLabel = 'Gem';
-        if (category.includes('emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
-        else if (category.includes('fancy')) { catColor = [251, 191, 36]; catLabel = 'Fancy'; }
-        else if (category.includes('diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
+        let catLabel = mapped[0] || 'Gem';
+        if (mapped.includes('Emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
+        else if (mapped.includes('Diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
         
         pdf.setFontSize(7);
         pdf.setTextColor(...catColor);
@@ -543,13 +541,11 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         pdf.setFont('helvetica', 'bold');
         pdf.text(`${stone.sku}  •  ${stone.shape || 'N/A'}  •  ${stone.weightCt || '?'}ct`, textX, y + 12);
         
-        // Category
-        const category = (stone.category || '').toLowerCase();
+        const mapped = getMappedCategories(stone.category);
         let catColor = lightGray;
-        let catLabel = 'Gemstone';
-        if (category.includes('emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
-        else if (category.includes('fancy')) { catColor = [251, 191, 36]; catLabel = 'Fancy Diamond'; }
-        else if (category.includes('diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
+        let catLabel = mapped[0] || 'Gemstone';
+        if (mapped.includes('Emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
+        else if (mapped.includes('Diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
         
         pdf.setFontSize(8);
         pdf.setTextColor(...catColor);
@@ -611,7 +607,6 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
   if (!isOpen) return null;
   
   const emeraldCount = categories.emeralds || 0;
-  const fancyCount = categories.fancy || 0;
   const diamondCount = categories.diamonds || 0;
   const otherCount = categories.other || 0;
   
@@ -646,11 +641,6 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
               {emeraldCount > 0 && (
                 <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
                   💚 Emeralds: {emeraldCount}
-                </span>
-              )}
-              {fancyCount > 0 && (
-                <span className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-                  💛 Fancy: {fancyCount}
                 </span>
               )}
               {diamondCount > 0 && (
@@ -1337,19 +1327,15 @@ const ExportModal = ({
     }
   }, [isOpen]);
 
-  // Get category color dot
   const getCategoryDot = (category) => {
-    const cat = (category || '').toLowerCase();
-    if (cat.includes('emerald')) {
+    const mapped = getMappedCategories(category);
+    if (mapped.includes('Emerald')) {
       return <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" title="Emerald" />;
     }
-    if (cat.includes('fancy')) {
-      return <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" title="Fancy" />;
-    }
-    if (cat.includes('diamond')) {
+    if (mapped.includes('Diamond')) {
       return <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" title="Diamond" />;
     }
-    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-stone-400" title="Other" />;
+    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-stone-400" title={mapped[0] || 'Other'} />;
   };
 
   if (!isOpen) return null;
@@ -2965,6 +2951,8 @@ const StoneDetails = ({ stone, onViewDNA }) => {
         <DetailItem label="Ratio" value={stone.ratio} />
         <DetailItem label="Luster" value={stone.luster} />
         <DetailItem label="Fluorescence" value={stone.fluorescence} />
+        <DetailItem label="Box" value={stone.box} />
+        <DetailItem label="Grouping Type" value={stone.groupingType} />
       </div>
 
       {/* Links */}
@@ -3480,8 +3468,8 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="sku">SKU</SortButton>
               </th>
-              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 uppercase tracking-wider">Pair</th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">Image</th>
+              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 uppercase tracking-wider">Pair</th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="shape">Shape</SortButton>
               </th>
@@ -3491,20 +3479,14 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
                 <SortButton field="measurements">Measurements</SortButton>
               </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="pricePerCt">Price/ct</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="priceTotal">Total</SortButton>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
+                <SortButton field="ratio">Ratio</SortButton>
               </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="treatment">Treatment</SortButton>
               </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="lab">Lab</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
-                <SortButton field="ratio">Ratio</SortButton>
               </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="location">Location</SortButton>
@@ -3552,6 +3534,15 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
                       </td>
+                    <td className="px-3 py-2">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
+                        {stone.imageUrl ? (
+                          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
+                        )}
+                      </div>
+                    </td>
                       <td className="px-3 py-2 text-center whitespace-nowrap">
                         {stone.pairSku ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700">
@@ -3563,32 +3554,17 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           </span>
                         )}
                       </td>
-                    <td className="px-3 py-2">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
-                        {stone.imageUrl ? (
-                          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
-                        )}
-                      </div>
-                    </td>
                     <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{stone.shape}</td>
                     <td className="px-3 py-2 text-xs font-medium text-stone-800 whitespace-nowrap">{stone.weightCt} ct</td>
                     <td className="px-3 py-2 text-xs text-stone-600 whitespace-nowrap hidden lg:table-cell">{stone.measurements}</td>
-                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">
-                      ${stone.pricePerCt?.toLocaleString() || '-'}
-                    </td>
-                    <td className="px-3 py-2 text-xs font-semibold text-stone-800 whitespace-nowrap">
-                      ${stone.priceTotal?.toLocaleString() || '-'}
+                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
+                      <span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span>
                     </td>
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="badge badge-neutral text-xs">{shortTreatment(stone.treatment)}</span>
                     </td>
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="text-xs text-stone-600">{stone.lab || 'N/A'}</span>
-                    </td>
-                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
-                      <span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span>
                     </td>
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="text-xs text-stone-600">{stone.location || 'N/A'}</span>
@@ -3645,7 +3621,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                          <td colSpan={12} className="bg-stone-50 border-t border-stone-200">
+                          <td colSpan={13} className="bg-stone-50 border-t border-stone-200">
                           <StoneDetails stone={stone} onViewDNA={onViewDNA} />
                         </td>
                       </motion.tr>
@@ -4010,12 +3986,10 @@ const StoneSearchPage = () => {
   // Determine category of stones
   const getCategoryBreakdown = (stonesArray) => {
     return stonesArray.reduce((acc, stone) => {
-      const cat = (stone.category || '').toLowerCase();
-      if (cat.includes('emerald')) {
+      const mapped = getMappedCategories(stone.category);
+      if (mapped.includes('Emerald')) {
         acc.emeralds = (acc.emeralds || 0) + 1;
-      } else if (cat.includes('fancy')) {
-        acc.fancy = (acc.fancy || 0) + 1;
-      } else if (cat.includes('diamond')) {
+      } else if (mapped.includes('Diamond')) {
         acc.diamonds = (acc.diamonds || 0) + 1;
       } else {
         acc.other = (acc.other || 0) + 1;
@@ -4033,7 +4007,7 @@ const StoneSearchPage = () => {
     }
     
     const breakdown = getCategoryBreakdown(selectedData);
-    const categoryCount = [breakdown.emeralds, breakdown.diamonds, breakdown.fancy, breakdown.other].filter(Boolean).length;
+    const categoryCount = [breakdown.emeralds, breakdown.diamonds, breakdown.other].filter(Boolean).length;
     
     // If only one category, go directly to export modal
     if (categoryCount === 1) {
@@ -4056,26 +4030,20 @@ const StoneSearchPage = () => {
   const exportToExcelSeparate = async (customStones = null, options = {}) => {
     const selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
     
-    // Separate by category
-    const emeralds = selectedData.filter(s => (s.category || '').toLowerCase().includes('emerald'));
-    const fancy = selectedData.filter(s => (s.category || '').toLowerCase().includes('fancy'));
-    const diamonds = selectedData.filter(s => {
-      const cat = (s.category || '').toLowerCase();
-      return cat.includes('diamond') && !cat.includes('fancy');
-    });
+    // Separate by mapped category
+    const emeralds = selectedData.filter(s => getMappedCategories(s.category).includes('Emerald'));
+    const diamonds = selectedData.filter(s => getMappedCategories(s.category).includes('Diamond'));
     const others = selectedData.filter(s => {
-      const cat = (s.category || '').toLowerCase();
-      return !cat.includes('emerald') && !cat.includes('diamond') && !cat.includes('fancy');
+      const mapped = getMappedCategories(s.category);
+      return !mapped.includes('Emerald') && !mapped.includes('Diamond');
     });
 
-    // Debug log
-    console.log('📊 Export Separate Sheets:', {
+    console.log('Export Separate Sheets:', {
       total: selectedData.length,
       emeralds: emeralds.length,
-      fancy: fancy.length,
       diamonds: diamonds.length,
       others: others.length,
-      categories: [...new Set(selectedData.map(s => s.category))]
+      categories: [...new Set(selectedData.map(s => getMappedCategories(s.category).join(', ')))]
     });
 
     const workbook = new ExcelJS.Workbook();
@@ -4101,12 +4069,6 @@ const StoneSearchPage = () => {
     if (emeralds.length > 0) {
       console.log('Creating Emeralds sheet with', emeralds.length, 'stones');
       createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981", logoImageId, includeAppendix);
-    }
-
-    // Create sheet for Fancy
-    if (fancy.length > 0) {
-      console.log('Creating Fancy sheet with', fancy.length, 'stones');
-      createCategorySheet(workbook, "Fancy", fancy, FANCY_COLUMNS, "FFFBBF24", logoImageId, includeAppendix);
     }
 
     // Create sheet for Diamonds
@@ -4482,9 +4444,8 @@ const StoneSearchPage = () => {
 
     // Determine which columns to use based on category
     const breakdown = getCategoryBreakdown(selectedData);
-    const isOnlyEmeralds = breakdown.emeralds > 0 && !breakdown.diamonds && !breakdown.fancy && !breakdown.other;
-    const isOnlyDiamonds = breakdown.diamonds > 0 && !breakdown.emeralds && !breakdown.fancy && !breakdown.other;
-    const isOnlyFancy = breakdown.fancy > 0 && !breakdown.emeralds && !breakdown.diamonds && !breakdown.other;
+    const isOnlyEmeralds = breakdown.emeralds > 0 && !breakdown.diamonds && !breakdown.other;
+    const isOnlyDiamonds = breakdown.diamonds > 0 && !breakdown.emeralds && !breakdown.other;
     
     let columnsToUse;
     let sheetName;
@@ -4494,10 +4455,6 @@ const StoneSearchPage = () => {
       columnsToUse = EMERALD_COLUMNS;
       sheetName = "Emeralds";
       accentColor = "FF10B981";
-    } else if (isOnlyFancy) {
-      columnsToUse = FANCY_COLUMNS;
-      sheetName = "Fancy Diamonds";
-      accentColor = "FFFBBF24"; // Yellow/amber for fancy
     } else if (isOnlyDiamonds) {
       columnsToUse = DIAMOND_COLUMNS;
       sheetName = "Diamonds";
@@ -5048,8 +5005,11 @@ const StoneSearchPage = () => {
 
   const categoriesOptions = useMemo(() => {
     const set = new Set();
-    stones.forEach((s) => s.category && set.add(s.category));
-    return ["All categories", ...Array.from(set).sort()];
+    stones.forEach((s) => {
+      getMappedCategories(s.category).forEach((cat) => set.add(cat));
+    });
+    set.delete('Empty');
+    return ["All categories", ...Array.from(set).sort(), "Empty"];
   }, [stones]);
 
   const filteredStones = useMemo(() => {
@@ -5095,7 +5055,7 @@ const StoneSearchPage = () => {
       
       if (filters.shape.length > 0 && !filters.shape.includes(stone.shape)) return false;
       if (filters.treatment !== "All treatments" && stone.treatment?.toLowerCase() !== filters.treatment.toLowerCase()) return false;
-      if (filters.category !== "All categories" && stone.category !== filters.category) return false;
+      if (filters.category !== "All categories" && !getMappedCategories(stone.category).includes(filters.category)) return false;
       if (filters.location !== "All locations" && stone.location !== filters.location) return false;
       
       // Pair status filter
@@ -5236,8 +5196,8 @@ const StoneSearchPage = () => {
                 // Calculate category breakdown
                 const selectedStonesArray = stones.filter(s => selectedStones.has(s.id));
                 const categoryBreakdown = selectedStonesArray.reduce((acc, stone) => {
-                  const cat = stone.category || stone.shape || 'Other';
-                  acc[cat] = (acc[cat] || 0) + 1;
+                  const cats = getMappedCategories(stone.category);
+                  cats.forEach((cat) => { acc[cat] = (acc[cat] || 0) + 1; });
                   return acc;
                 }, {});
                 const categories = Object.entries(categoryBreakdown);
@@ -5260,15 +5220,13 @@ const StoneSearchPage = () => {
                           <span 
                             key={cat}
                             className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                              cat.toLowerCase().includes('emerald') 
+                              cat === 'Emerald'
                                 ? 'bg-green-100 text-green-700' 
-                                : cat.toLowerCase().includes('fancy')
-                                ? 'bg-amber-100 text-amber-700'
-                                : cat.toLowerCase().includes('diamond')
+                                : cat === 'Diamond'
                                 ? 'bg-blue-100 text-blue-700'
-                                : cat.toLowerCase().includes('ruby')
+                                : cat === 'Ruby'
                                 ? 'bg-red-100 text-red-700'
-                                : cat.toLowerCase().includes('sapphire')
+                                : cat === 'Sapphire'
                                 ? 'bg-indigo-100 text-indigo-700'
                                 : 'bg-stone-100 text-stone-700'
                             }`}
