@@ -2668,7 +2668,7 @@ const shortTreatment = (t) => {
   return t;
 };
 
-const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA }) => (
+const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick }) => (
   <motion.div
     layout
     onClick={(e) => {
@@ -2695,7 +2695,10 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
           />
         </div>
         {/* Image */}
-        <div className="w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0">
+        <div 
+          className={`w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
+          onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
+        >
           {stone.imageUrl ? (
             <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
           ) : (
@@ -2898,11 +2901,14 @@ const DetailItem = ({ label, value }) => (
 );
 
 /* ---------------- Pair Card (shows two stones side by side) ---------------- */
-const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSelection }) => {
+const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSelection, onImageClick }) => {
   const StoneSide = ({ stone, label }) => (
     <div className="flex-1 min-w-0">
       {/* Image */}
-      <div className="w-full aspect-square rounded-xl overflow-hidden bg-stone-100 mb-3">
+      <div 
+        className={`w-full aspect-square rounded-xl overflow-hidden bg-stone-100 mb-3 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
+        onClick={() => { if (stone.imageUrl && onImageClick) onImageClick(stone.imageUrl); }}
+      >
         {stone.imageUrl ? (
           <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
         ) : (
@@ -3029,7 +3035,7 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
 };
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick }) => {
   if (loading) {
     return (
       <div className="glass rounded-2xl border border-white/50 p-8 sm:p-12">
@@ -3123,7 +3129,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
 
             {/* Image */}
             <div className="flex-shrink-0">
-              <div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+              <div 
+                className={`w-16 h-16 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
+                onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
+              >
                 {stone.imageUrl ? (
                   <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
                 ) : (
@@ -3400,7 +3409,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
                       </td>
                     <td className="px-3 py-2">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200">
+                      <div 
+                        className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
+                        onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
+                      >
                         {stone.imageUrl ? (
                           <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
                         ) : (
@@ -3599,6 +3611,7 @@ const StoneSearchPage = () => {
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null);
   const exportButtonRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -5377,6 +5390,7 @@ const StoneSearchPage = () => {
                         });
                         requestAnimationFrame(() => window.scrollTo(0, scrollY));
                       }}
+                      onImageClick={setLightboxImage}
                     />
                   );
                 })
@@ -5402,6 +5416,7 @@ const StoneSearchPage = () => {
               onRemoveTag={removeTagFromStone}
               onManageTags={() => setShowTagsModal(true)}
               onViewDNA={setDrawerStone}
+              onImageClick={setLightboxImage}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
@@ -5437,6 +5452,7 @@ const StoneSearchPage = () => {
                     onRemoveTag={removeTagFromStone}
                     onManageTags={() => setShowTagsModal(true)}
                     onViewDNA={setDrawerStone}
+                    onImageClick={setLightboxImage}
                   />
                 ))
               )}
@@ -5683,6 +5699,42 @@ const StoneSearchPage = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <span className="font-medium">Added: {scanResult}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Image Lightbox */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setLightboxImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative max-w-3xl max-h-[85vh] w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={lightboxImage}
+                alt="Stone"
+                className="w-full h-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+              />
+              <button
+                onClick={() => setLightboxImage(null)}
+                className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-stone-600 hover:text-stone-900 hover:scale-110 transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
