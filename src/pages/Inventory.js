@@ -29,7 +29,7 @@ const TAG_COLORS = [
 const shareToWhatsApp = (stone, includePrice = false) => {
   const dnaUrl = `https://gems-dna.com/${stone.sku}`;
   
-  let message = `💎 *${stone.shape || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
+  let message = `💎 *${getDisplayShape(stone.shape) || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
   message += `📋 *Details:*\n`;
   message += `• SKU: ${stone.sku}\n`;
   message += `• Color: ${stone.color || 'N/A'}\n`;
@@ -63,7 +63,7 @@ const shareMultipleToWhatsApp = (selectedStonesArray) => {
 
   selectedStonesArray.forEach((stone, idx) => {
     const dnaUrl = `https://gems-dna.com/${stone.sku}`;
-    message += `${idx + 1}. *${stone.shape || 'Gemstone'}* ${stone.weightCt || '?'}ct`;
+    message += `${idx + 1}. *${getDisplayShape(stone.shape) || 'Gemstone'}* ${stone.weightCt || '?'}ct`;
     if (stone.color) message += ` | ${stone.color}`;
     message += ` — SKU: ${stone.sku}\n`;
     message += `   ${dnaUrl}\n\n`;
@@ -448,7 +448,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         pdf.setFontSize(9);
         pdf.setFont('helvetica', 'normal');
         pdf.setTextColor(...darkColor);
-        pdf.text(`${stone.shape || 'N/A'} • ${stone.weightCt || '?'}ct`, textX, y + 19);
+        pdf.text(`${getDisplayShape(stone.shape) || 'N/A'} • ${stone.weightCt || '?'}ct`, textX, y + 19);
         
         const mapped = getMappedCategories(stone.category);
         let catColor = lightGray;
@@ -539,7 +539,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         pdf.setFontSize(12);
         pdf.setTextColor(...darkColor);
         pdf.setFont('helvetica', 'bold');
-        pdf.text(`${stone.sku}  •  ${stone.shape || 'N/A'}  •  ${stone.weightCt || '?'}ct`, textX, y + 12);
+        pdf.text(`${stone.sku}  •  ${getDisplayShape(stone.shape) || 'N/A'}  •  ${stone.weightCt || '?'}ct`, textX, y + 12);
         
         const mapped = getMappedCategories(stone.category);
         let catColor = lightGray;
@@ -1495,7 +1495,7 @@ const ExportModal = ({
                       <div className="flex items-center gap-2">
                         {getCategoryDot(stone.category)}
                         <span className="font-mono text-sm font-bold text-emerald-600">{stone.sku}</span>
-                        <span className="text-xs text-stone-500 bg-stone-100 px-2 py-0.5 rounded">{stone.shape}</span>
+                        <span className="text-xs text-stone-500 bg-stone-100 px-2 py-0.5 rounded">{getDisplayShape(stone.shape)}</span>
                       </div>
                       <span className="text-sm font-medium text-stone-700">{stone.weightCt}ct</span>
                     </div>
@@ -1581,7 +1581,7 @@ const ExportModal = ({
                           <span className="font-mono text-sm font-medium text-emerald-600">{stone.sku}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-stone-700">{stone.shape}</td>
+                      <td className="px-4 py-3 text-sm text-stone-700">{getDisplayShape(stone.shape)}</td>
                       <td className="px-4 py-3 text-sm text-stone-700 text-center">{stone.weightCt}ct</td>
                       <td className="px-4 py-3 text-sm text-stone-500 text-right">
                         ${originalPricePerCt.toLocaleString()}
@@ -1942,7 +1942,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
                 <span className="text-emerald-100 text-xs">SKU: {stone.sku}</span>
               </div>
               <h2 className="text-xl font-bold text-white">
-                {stone.shape} • {stone.weightCt}ct
+                {getDisplayShape(stone.shape)} • {stone.weightCt}ct
               </h2>
             </div>
             <button
@@ -2037,7 +2037,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
             {/* Tab Content */}
             {activeTab === 'details' && (
               <div className="bg-stone-50 rounded-xl p-4 space-y-0">
-                <DetailRow label="Shape" value={stone.shape} />
+                <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
                 <DetailRow label="Weight" value={`${stone.weightCt} ct`} />
                 <DetailRow label="Color" value={stone.color} />
                 <DetailRow label="Clarity" value={stone.clarity} />
@@ -2137,6 +2137,114 @@ const LoadingBar = ({ active, progress }) => {
     </div>
   );
 };
+
+/* ---------------- Shape Mapping (BARAK → DNA) ---------------- */
+const SHAPE_TO_DNA = {
+  'ASH': ['Emerald'],
+  'BGT': ['Baguette'],
+  'BGT+RD': ['Baguette', 'Round'],
+  'BRIO': ['Briollete'],
+  'BR': ['Round'],
+  'CAB': ['Cabushon'],
+  'CAD': ['Cadilac'],
+  'Carre': ['Carre'],
+  'CB': ['Cushion'],
+  'CMB': ['Cushion'],
+  'CSX': ['Lucida'],
+  'CU': ['Cushion'],
+  'CU+OV': ['Cushion', 'Oval'],
+  'DROPS': ['Drop'],
+  'EC': ['Emerald'],
+  'EC-CAB': ['Cabushon'],
+  'EC+BGT': ['Emerald', 'Baguette'],
+  'EC+CU': ['Emerald', 'Cushion'],
+  'ECOV': ['Emerald', 'Oval'],
+  'ECPS': ['Emerald', 'Pear'],
+  'EM': ['Emerald'],
+  'FAN': ['Fantasy'],
+  'HD': ['High Dome'],
+  'HEX': ['Hexagon'],
+  'HM': ['Half Moon'],
+  'HS': ['Heart'],
+  'Kite': ['Shield'],
+  'Lozenge': ['Lozenge'],
+  'LUC': ['Lucida'],
+  'MIX': ['Mix'],
+  'MQ': ['Marquise'],
+  'MQ+EC': ['Marquise', 'Emerald'],
+  'MQ+TPR': ['Marquise', 'Taper'],
+  'Moval': ['Oval'],
+  'Novelty': ['Novelty'],
+  'Novelty BR': ['Novelty'],
+  'OCT': ['Octagon'],
+  'OM': ['Old Mine'],
+  'OMB': ['Old Mine'],
+  'OTHER': ['Fantasy'],
+  'OV': ['Oval'],
+  'OV Rose': ['Oval'],
+  'OV-CAB': ['Cabushon'],
+  'OV+PS': ['Oval', 'Pear'],
+  'Portrait': ['Portrait'],
+  'PR': ['Princess'],
+  'PS': ['Pear'],
+  'PS+CU': ['Pear', 'Cushion'],
+  'PS+MQ': ['Pear', 'Marquise'],
+  'PS-CAB': ['Cabushon'],
+  'RAD': ['Radiant'],
+  'RD': ['Round'],
+  'RD+CU': ['Round', 'Cushion'],
+  'RD+EC': ['Round', 'Emerald'],
+  'RD+PS': ['Round', 'Pear'],
+  'RD+TP': ['Round', 'Taper'],
+  'RD-CAB': ['Cabushon'],
+  'REJ': ['Rejection'],
+  'Rose Cut': ['Rose'],
+  'Rough': ['Rough'],
+  'RRC': ['Rose'],
+  'S.Cut': ['Step'],
+  'Shield': ['Shield'],
+  'SHI': ['Shield'],
+  'SQ': ['Carre'],
+  'SQEC': ['Emerald'],
+  'STERN': ['Stern'],
+  'Sugar': ['Sugarloaf'],
+  'TPR': ['Taper'],
+  'TR': ['Triangle'],
+  'TRI-CAB': ['Cabushon'],
+  'TRPZ': ['Trapez'],
+};
+
+const getDnaShapes = (barakShape) => {
+  if (!barakShape) return [];
+  return SHAPE_TO_DNA[barakShape] || SHAPE_TO_DNA[barakShape.trim()] || [barakShape];
+};
+
+const getDisplayShape = (barakShape) => {
+  const dna = getDnaShapes(barakShape);
+  return dna.length > 0 ? dna[0] : barakShape || '';
+};
+
+const LEVEL_1_SHAPES = [
+  'Round', 'Emerald', 'Cushion', 'Pear', 'Oval', 'Marquise',
+  'Baguette', 'Heart', 'Radiant', 'Old Mine', 'Cabushon', 'Carre',
+];
+
+const EXTRA_BARAK_FILTERS = ['ASH'];
+
+const DNA_TO_SHORT = {
+  'Emerald': 'EM', 'Round': 'RD', 'Oval': 'OV', 'Pear': 'PS',
+  'Cushion': 'CU', 'Marquise': 'MQ', 'Baguette': 'BGT', 'Cabushon': 'CAB',
+  'Heart': 'HS', 'Carre': 'SQ', 'Old Mine': 'OM', 'Radiant': 'RAD',
+  'Taper': 'TPR', 'Fantasy': 'FAN', 'Sugarloaf': 'SLF',
+  'Briollete': 'BRIO', 'Cadilac': 'CAD', 'Drop': 'DROP', 'Half Moon': 'HM',
+  'Hexagon': 'HEX', 'High Dome': 'HD', 'Lozenge': 'LOZ', 'Lucida': 'LUC',
+  'Mix': 'MIX', 'Novelty': 'NOV', 'Octagon': 'OCT', 'Portrait': 'POR',
+  'Princess': 'PR', 'Rose': 'ROSE', 'Shield': 'SHI', 'Step': 'STEP',
+  'Stern': 'STERN', 'Trapez': 'TRPZ', 'Triangle': 'TR',
+  'Rejection': 'REJ', 'Rough': 'RGH',
+};
+
+const getShortShape = (dnaName) => DNA_TO_SHORT[dnaName] || dnaName;
 
 /* ---------------- Shape Icons ---------------- */
 const ShapeIcon = ({ shape, isActive }) => {
@@ -2257,8 +2365,8 @@ const ShapeIcon = ({ shape, isActive }) => {
     );
   }
 
-  // Trillion / TR
-  if (shapeKey === 'TR' || shapeKey === 'TRILLION' || shapeKey === 'TRILLIANT') {
+  // Trillion / TR / Triangle
+  if (shapeKey === 'TR' || shapeKey === 'TRILLION' || shapeKey === 'TRILLIANT' || shapeKey === 'TRIANGLE') {
     return (
       <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
         <path d="M20 6 L34 32 L6 32 Z" stroke={color} strokeWidth="1.5" fill="none"/>
@@ -2287,17 +2395,23 @@ const ShapeIcon = ({ shape, isActive }) => {
 };
 
 /* ---------------- Shape Filter with Show More ---------------- */
-const MAIN_SHAPES = ['BGT', 'CU', 'MQ', 'BR', 'EM', 'PS', 'OV'];
-
 const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
   const [showMore, setShowMore] = useState(false);
+  const [shapeSearch, setShapeSearch] = useState('');
 
-  // Separate main shapes and others
-  const mainShapes = shapes.filter(s => s === 'All shapes' || MAIN_SHAPES.includes(s.toUpperCase()));
-  const otherShapes = shapes.filter(s => s !== 'All shapes' && !MAIN_SHAPES.includes(s.toUpperCase()));
+  const mainShapes = ['All shapes', ...LEVEL_1_SHAPES].filter(s => shapes.includes(s));
+  const otherShapes = shapes.filter(s => s !== 'All shapes' && !LEVEL_1_SHAPES.includes(s));
+  const filteredOtherShapes = otherShapes.filter(s => s.toLowerCase().includes(shapeSearch.toLowerCase()));
 
-  // "All" is active when no shapes are selected
   const isAllActive = activeShapes.length === 0;
+
+  const toggleShape = (shape) => {
+    if (activeShapes.includes(shape)) {
+      onToggle(activeShapes.filter(s => s !== shape));
+    } else {
+      onToggle([...activeShapes, shape]);
+    }
+  };
 
   const ShapeButton = ({ shape }) => {
     const isAll = shape === "All shapes";
@@ -2305,19 +2419,7 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
     return (
       <button
         key={shape}
-        onClick={() => {
-          if (isAll) {
-            // Click "All" → clear selection
-            onToggle([]);
-          } else {
-            // Toggle this shape
-            if (activeShapes.includes(shape)) {
-              onToggle(activeShapes.filter(s => s !== shape));
-            } else {
-              onToggle([...activeShapes, shape]);
-            }
-          }
-        }}
+        onClick={() => isAll ? onToggle([]) : toggleShape(shape)}
         className={`flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-150 w-[72px] h-[72px] sm:w-20 sm:h-20 ${
           isAll
             ? `text-sm font-semibold ${isActive ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'}`
@@ -2348,17 +2450,17 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
           </span>
         )}
       </label>
-      {/* Main shapes */}
+      {/* Main shapes (Level 1) */}
       <div className="flex flex-wrap gap-2">
         {mainShapes.map((shape) => (
           <ShapeButton key={shape} shape={shape} />
         ))}
       </div>
-      {/* Show more / less */}
+      {/* Show more / less (Level 2) */}
       {otherShapes.length > 0 && (
         <>
           <button
-            onClick={() => setShowMore(!showMore)}
+            onClick={() => { setShowMore(!showMore); setShapeSearch(''); }}
             className="mt-2 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1"
           >
             {showMore ? (
@@ -2386,10 +2488,41 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {otherShapes.map((shape) => (
-                    <ShapeButton key={shape} shape={shape} />
-                  ))}
+                <div className="mt-2 p-3 rounded-xl border border-stone-200 bg-stone-50/50 max-w-xs">
+                  <input
+                    type="text"
+                    value={shapeSearch}
+                    onChange={(e) => setShapeSearch(e.target.value)}
+                    placeholder="Search shapes..."
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 mb-2"
+                    autoFocus
+                  />
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredOtherShapes.map((shape) => {
+                      const isActive = activeShapes.includes(shape);
+                      return (
+                        <button
+                          key={shape}
+                          onClick={() => toggleShape(shape)}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                            isActive
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'text-stone-600 hover:bg-stone-100'
+                          }`}
+                        >
+                          <span>{shape}</span>
+                          {isActive && (
+                            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {filteredOtherShapes.length === 0 && (
+                      <span className="text-xs text-stone-400 py-2 px-3 block">No shapes found</span>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -2700,7 +2833,7 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
           <div className="flex items-start justify-between gap-2">
             <div>
               <span className="text-xs font-mono text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{stone.sku}</span>
-              <h3 className="font-semibold text-stone-800 mt-1">{stone.shape}</h3>
+              <h3 className="font-semibold text-stone-800 mt-1">{getDisplayShape(stone.shape)}</h3>
             </div>
             <span className="text-lg font-bold text-stone-800">
               {stone.weightCt} ct
@@ -2787,7 +2920,7 @@ const StoneDetails = ({ stone, onViewDNA }) => {
     <div className="p-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
         <DetailItem label="SKU" value={stone.sku} />
-        <DetailItem label="Shape" value={stone.shape} />
+        <DetailItem label="Shape" value={getDisplayShape(stone.shape)} />
         <DetailItem label="Weight" value={`${stone.weightCt} ct`} />
         <DetailItem label="Measurements" value={stone.measurements} />
         <DetailItem label="Color" value={stone.color} />
@@ -2910,7 +3043,7 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
           {stone.sku}
         </span>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-stone-800">{stone.shape}</span>
+          <span className="text-sm font-semibold text-stone-800">{getDisplayShape(stone.shape)}</span>
           <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
         </div>
         <div className="flex items-center gap-2 text-xs text-stone-500">
@@ -3138,7 +3271,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     {stone.sku}
                   </span>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm font-medium text-stone-800">{stone.shape}</span>
+                    <span className="text-sm font-medium text-stone-800">{getDisplayShape(stone.shape)}</span>
                     <span className="text-stone-300">•</span>
                     <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
                   </div>
@@ -3517,7 +3650,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
 const createEmailText = (stone) => `Stone Details
 
 SKU: ${stone.sku}
-Shape: ${stone.shape}
+Shape: ${getDisplayShape(stone.shape)}
 Weight: ${stone.weightCt} ct
 Measurements: ${stone.measurements || 'N/A'}
 Clarity: ${stone.clarity || 'N/A'}
@@ -3543,7 +3676,7 @@ const createEmailHtml = (stone) => `<!DOCTYPE html>
 ${stone.imageUrl ? `<img src="${stone.imageUrl}" style="width: 200px; height: 200px; object-fit: cover; border-radius: 8px; display: block; margin: 0 auto 20px;" />` : ''}
 <table style="width: 100%; border-collapse: collapse;">
 <tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>SKU:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.sku}</td></tr>
-<tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Shape:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.shape}</td></tr>
+<tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Shape:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${getDisplayShape(stone.shape)}</td></tr>
 <tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Weight:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.weightCt} ct</td></tr>
 <tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Measurements:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.measurements || 'N/A'}</td></tr>
 <tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Treatment:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.treatment || 'N/A'}</td></tr>
@@ -4876,7 +5009,12 @@ const StoneSearchPage = () => {
 
   const shapesOptions = useMemo(() => {
     const set = new Set();
-    stones.forEach((s) => s.shape && set.add(s.shape));
+    stones.forEach((s) => {
+      if (s.shape) {
+        getDnaShapes(s.shape).forEach(dna => set.add(dna));
+        if (EXTRA_BARAK_FILTERS.includes(s.shape)) set.add(s.shape);
+      }
+    });
     return ["All shapes", ...Array.from(set).sort()];
   }, [stones]);
 
@@ -4930,7 +5068,7 @@ const StoneSearchPage = () => {
       if (filters.minWidth && dims.width != null && dims.width < Number(filters.minWidth)) return false;
       if (filters.maxWidth && dims.width != null && dims.width > Number(filters.maxWidth)) return false;
       
-      if (filters.shape.length > 0 && !filters.shape.includes(stone.shape)) return false;
+      if (filters.shape.length > 0 && !filters.shape.includes(stone.shape) && !getDnaShapes(stone.shape).some(dna => filters.shape.includes(dna))) return false;
       if (filters.treatment !== "All treatments" && stone.treatment?.toLowerCase() !== filters.treatment.toLowerCase()) return false;
       if (filters.category !== "All categories" && !getMappedCategories(stone.category).includes(filters.category)) return false;
       if (filters.location !== "All locations" && stone.location !== filters.location) return false;
