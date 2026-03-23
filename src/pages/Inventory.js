@@ -2229,7 +2229,8 @@ const LEVEL_1_SHAPES = [
   'Baguette', 'Heart', 'Radiant', 'Old Mine', 'Cabushon', 'Carre',
 ];
 
-const EXTRA_BARAK_FILTERS = ['ASH'];
+const EXTRA_BARAK_FILTERS = ['ASH', 'TPR'];
+const BARAK_DISPLAY_NAMES = { 'ASH': 'Asscher', 'TPR': 'Taper' };
 
 const DNA_TO_SHORT = {
   'Emerald': 'EM', 'Round': 'RD', 'Oval': 'OV', 'Pear': 'PS',
@@ -2401,7 +2402,11 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
 
   const mainShapes = ['All shapes', ...LEVEL_1_SHAPES].filter(s => shapes.includes(s));
   const otherShapes = shapes.filter(s => s !== 'All shapes' && !LEVEL_1_SHAPES.includes(s));
-  const filteredOtherShapes = otherShapes.filter(s => s.toLowerCase().includes(shapeSearch.toLowerCase()));
+  const filteredOtherShapes = otherShapes.filter(s => {
+    const q = shapeSearch.toLowerCase();
+    const display = BARAK_DISPLAY_NAMES[s] || s;
+    return s.toLowerCase().includes(q) || display.toLowerCase().includes(q);
+  });
 
   const isAllActive = activeShapes.length === 0;
 
@@ -2500,6 +2505,7 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
                   <div className="max-h-48 overflow-y-auto">
                     {filteredOtherShapes.map((shape) => {
                       const isActive = activeShapes.includes(shape);
+                      const displayName = BARAK_DISPLAY_NAMES[shape] || shape;
                       return (
                         <button
                           key={shape}
@@ -2510,7 +2516,7 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
                               : 'text-stone-600 hover:bg-stone-100'
                           }`}
                         >
-                          <span>{shape}</span>
+                          <span>{displayName}</span>
                           {isActive && (
                             <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -5015,6 +5021,7 @@ const StoneSearchPage = () => {
         if (EXTRA_BARAK_FILTERS.includes(s.shape)) set.add(s.shape);
       }
     });
+    Object.values(BARAK_DISPLAY_NAMES).forEach(dn => set.delete(dn));
     return ["All shapes", ...Array.from(set).sort()];
   }, [stones]);
 
