@@ -2928,7 +2928,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Grouping Type</label>
                   <select value={filters.groupingType} onChange={handleChange("groupingType")} className="input-modern">
-                    {["All types", "Single", "Pair", "Set", "Parcel", "Fancy", "Side Stones", "Melee", "Empty"].map((opt) => (
+                    {["All types", "Single", "Pair", "Set", "Parcel", "Side Stones", "Melee", "Empty"].map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
@@ -3650,7 +3650,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="weightCt">Weight</SortButton>
               </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider">
                 Color
               </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
