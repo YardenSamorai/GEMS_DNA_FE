@@ -3665,7 +3665,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
         </td>
       );
       case 'shape': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>{stone.shape}</td>;
-      case 'color': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>{getDisplayColor(stone) || '-'}</td>;
+      case 'color': return <td key={colId} className="px-3 py-2 text-xs text-stone-700 max-w-[120px]">{getDisplayColor(stone) || '-'}</td>;
       case 'qty': return (
         <td key={colId} className={`${cellBase} text-center`}>
           <span className="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-stone-600">
@@ -5441,13 +5441,20 @@ const StoneSearchPage = () => {
     return ["All colors", ...sorted];
   }, [stones]);
 
+  const getBaseFancyColor = (fancyColorStr) => {
+    if (!fancyColorStr) return '';
+    const words = fancyColorStr.trim().split(/\s+/);
+    return words[words.length - 1];
+  };
+
   const fancyColorOptions = useMemo(() => {
     const set = new Set();
     stones.forEach((s) => {
       const mapped = getMappedCategories(s.category);
       if (!isDiamondColorStone(mapped)) {
         const fc = [s.fancyIntensity, s.fancyColor].filter(Boolean).join(' ');
-        if (fc) set.add(fc);
+        const base = getBaseFancyColor(fc);
+        if (base) set.add(base);
       }
     });
     return ["All colors", ...Array.from(set).sort()];
@@ -5521,7 +5528,7 @@ const StoneSearchPage = () => {
         const mapped = getMappedCategories(stone.category);
         if (!isDiamondColorStone(mapped)) {
           const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
-          if (fc !== filters.fancyColor) return false;
+          if (getBaseFancyColor(fc) !== filters.fancyColor) return false;
         } else {
           return false;
         }
