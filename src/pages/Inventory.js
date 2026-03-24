@@ -2249,10 +2249,13 @@ const getShortShape = (dnaName) => DNA_TO_SHORT[dnaName] || dnaName;
 
 const getDisplayColor = (stone) => {
   const mapped = getMappedCategories(stone.category);
+  if (mapped.includes('Fancy')) {
+    return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ') || stone.color || '';
+  }
   if (mapped.includes('Diamond') || mapped.includes('Emerald')) {
     return stone.color || '';
   }
-  return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
+  return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ') || stone.color || '';
 };
 
 /* ---------------- Shape Icons (faceted line-art) ---------------- */
@@ -2727,7 +2730,7 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
 };
 
 /* ---------------- Filters ---------------- */
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tags, onManageTags }) => {
+const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, tags, onManageTags }) => {
   const [isOpen, setIsOpen] = useState(false);
   
   const handleChange = (field) => (e) => {
@@ -2775,6 +2778,8 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
     !filters.tag.includes("All") && filters.tag,
     !filters.location.includes("All") && filters.location,
     !filters.groupingType.includes("All") && filters.groupingType,
+    !filters.diamondColor.includes("All") && filters.diamondColor,
+    !filters.fancyColor.includes("All") && filters.fancyColor,
     filters.box,
   ].filter(Boolean).length;
 
@@ -2930,6 +2935,22 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
                   <select value={filters.groupingType} onChange={handleChange("groupingType")} className="input-modern">
                     {["All types", "Single", "Pair", "Set", "Parcel", "Side Stones", "Melee", "Empty"].map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Diamond Color</label>
+                  <select value={filters.diamondColor} onChange={handleChange("diamondColor")} className="input-modern">
+                    {diamondColorOptions.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Fancy Color</label>
+                  <select value={filters.fancyColor} onChange={handleChange("fancyColor")} className="input-modern">
+                    {fancyColorOptions.map((c) => (
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
@@ -3646,12 +3667,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="shape">Shape</SortButton>
               </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider">
+                Color
+              </th>
               <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 tracking-wider">Qty</th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="weightCt">Weight</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider">
-                Color
               </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
                 <SortButton field="measurements">Measurements</SortButton>
@@ -3731,13 +3752,13 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         </span>
                       </td>
                     <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{stone.shape}</td>
+                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{getDisplayColor(stone) || '-'}</td>
                     <td className="px-3 py-2 text-center whitespace-nowrap">
                       <span className="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-stone-600">
                         {stone.stones ?? '-'}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs font-medium text-stone-800 whitespace-nowrap">{stone.weightCt} ct</td>
-                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{getDisplayColor(stone) || '-'}</td>
                     <td className="px-3 py-2 text-xs text-stone-600 whitespace-nowrap hidden lg:table-cell">{stone.measurements}</td>
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span>
@@ -3877,6 +3898,8 @@ const StoneSearchPage = () => {
     tag: "All tags",
     location: "All locations",
     groupingType: "All types",
+    diamondColor: "All colors",
+    fancyColor: "All colors",
     box: "",
   });
 
@@ -5187,6 +5210,46 @@ const StoneSearchPage = () => {
     return ["All categories", ...Array.from(set).sort(), "Empty"];
   }, [stones]);
 
+  const normalizeDiamondColor = (color) => {
+    if (!color) return '';
+    return color.replace(/[+-]$/, '').trim().toUpperCase();
+  };
+
+  const DIAMOND_COLOR_ORDER = ['D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+
+  const isDiamondColorStone = (mapped) => (mapped.includes('Diamond') || mapped.includes('Emerald')) && !mapped.includes('Fancy');
+
+  const diamondColorOptions = useMemo(() => {
+    const set = new Set();
+    stones.forEach((s) => {
+      const mapped = getMappedCategories(s.category);
+      if (isDiamondColorStone(mapped) && s.color) {
+        set.add(normalizeDiamondColor(s.color));
+      }
+    });
+    const sorted = Array.from(set).filter(Boolean).sort((a, b) => {
+      const ia = DIAMOND_COLOR_ORDER.indexOf(a);
+      const ib = DIAMOND_COLOR_ORDER.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+    return ["All colors", ...sorted];
+  }, [stones]);
+
+  const fancyColorOptions = useMemo(() => {
+    const set = new Set();
+    stones.forEach((s) => {
+      const mapped = getMappedCategories(s.category);
+      if (!isDiamondColorStone(mapped)) {
+        const fc = [s.fancyIntensity, s.fancyColor].filter(Boolean).join(' ');
+        if (fc) set.add(fc);
+      }
+    });
+    return ["All colors", ...Array.from(set).sort()];
+  }, [stones]);
+
   const filteredStones = useMemo(() => {
     // Helper to parse measurements string like "11.92-7.85-5.60" into { length, width, depth }
     const parseMeasurements = (measurements) => {
@@ -5238,6 +5301,27 @@ const StoneSearchPage = () => {
         if (filters.groupingType === "Empty") {
           if (stone.groupingType) return false;
         } else if (stone.groupingType?.toLowerCase() !== filters.groupingType.toLowerCase()) return false;
+      }
+
+      // Diamond color filter
+      if (filters.diamondColor !== "All colors") {
+        const mapped = getMappedCategories(stone.category);
+        if (isDiamondColorStone(mapped)) {
+          if (normalizeDiamondColor(stone.color) !== filters.diamondColor) return false;
+        } else {
+          return false;
+        }
+      }
+
+      // Fancy color filter
+      if (filters.fancyColor !== "All colors") {
+        const mapped = getMappedCategories(stone.category);
+        if (!isDiamondColorStone(mapped)) {
+          const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
+          if (fc !== filters.fancyColor) return false;
+        } else {
+          return false;
+        }
       }
 
       // Box filter (free text, includes match)
@@ -5594,6 +5678,8 @@ const StoneSearchPage = () => {
             onChange={setFilters}
             shapesOptions={shapesOptions}
             categoriesOptions={categoriesOptions}
+            diamondColorOptions={diamondColorOptions}
+            fancyColorOptions={fancyColorOptions}
             tags={tags}
             onManageTags={() => setShowTagsModal(true)}
           />
