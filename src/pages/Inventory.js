@@ -3365,6 +3365,7 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
 const DEFAULT_COLUMNS = [
   { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
   { id: 'img', label: 'Img' },
+  { id: 'category', label: 'Category', sortField: 'category' },
   { id: 'type', label: 'Type' },
   { id: 'shape', label: 'Shape', sortField: 'shape' },
   { id: 'color', label: 'Color' },
@@ -3615,6 +3616,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
     switch (colId) {
       case 'sku': return <th key={colId} className={`${base} uppercase`}><SortButton field="sku">SKU</SortButton></th>;
       case 'img': return <th key={colId} className={base}>Img</th>;
+      case 'category': return <th key={colId} className={base}><SortButton field="category">Category</SortButton></th>;
       case 'type': return <th key={colId} className={`${base} text-center`}>Type</th>;
       case 'shape': return <th key={colId} className={`${base} uppercase`}><SortButton field="shape">Shape</SortButton></th>;
       case 'color': return <th key={colId} className={base}>Color</th>;
@@ -3647,6 +3649,11 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
             )}
           </div>
+        </td>
+      );
+      case 'category': return (
+        <td key={colId} className={cellBase}>
+          <span className="text-xs text-stone-600">{getMappedCategories(stone.category).filter(c => c !== 'Empty').join(', ') || '-'}</span>
         </td>
       );
       case 'type': return (
