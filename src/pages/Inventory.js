@@ -5413,12 +5413,38 @@ const StoneSearchPage = () => {
     return ["All categories", ...Array.from(set).sort(), "Empty"];
   }, [stones]);
 
-  const normalizeDiamondColor = (color) => {
-    if (!color) return '';
-    return color.replace(/[+-]$/, '').trim().toUpperCase();
-  };
+  const ALL_GRADES = ['D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+  const DIAMOND_COLOR_OTHER = new Set(['COL','BR','COM','CON','FNTY','TLB']);
 
-  const DIAMOND_COLOR_ORDER = ['D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+  const DIAMOND_FILTER_GROUPS = ['D','E','F','G','H','I','J','K','L','M','N','O-P','U-V','W-X','Y-Z','Other'];
+  const GRADE_TO_GROUP = {};
+  'DEFGHIJKLMN'.split('').forEach(g => { GRADE_TO_GROUP[g] = g; });
+  ['O','P'].forEach(g => { GRADE_TO_GROUP[g] = 'O-P'; });
+  ['U','V'].forEach(g => { GRADE_TO_GROUP[g] = 'U-V'; });
+  ['W','X'].forEach(g => { GRADE_TO_GROUP[g] = 'W-X'; });
+  ['Y','Z'].forEach(g => { GRADE_TO_GROUP[g] = 'Y-Z'; });
+  ['Q','R','S','T'].forEach(g => { GRADE_TO_GROUP[g] = 'Other'; });
+
+  const getDiamondColorGroups = (color) => {
+    if (!color) return [];
+    const raw = color.trim().toUpperCase();
+    if (DIAMOND_COLOR_OTHER.has(raw)) return ['Other'];
+    const mainPart = raw.split(/[\s,]+/)[0].replace(/[+-]$/, '');
+    const rangeMatch = mainPart.match(/^([A-Z])-([A-Z])$/);
+    if (rangeMatch) {
+      const start = ALL_GRADES.indexOf(rangeMatch[1]);
+      const end = ALL_GRADES.indexOf(rangeMatch[2]);
+      if (start !== -1 && end !== -1 && start <= end) {
+        const groups = new Set();
+        ALL_GRADES.slice(start, end + 1).forEach(g => groups.add(GRADE_TO_GROUP[g] || 'Other'));
+        return Array.from(groups);
+      }
+    }
+    if (mainPart.length === 1 && GRADE_TO_GROUP[mainPart]) {
+      return [GRADE_TO_GROUP[mainPart]];
+    }
+    return ['Other'];
+  };
 
   const isDiamondColorStone = (mapped) => (mapped.includes('Diamond') || mapped.includes('Emerald')) && !mapped.includes('Fancy');
 
@@ -5427,24 +5453,18 @@ const StoneSearchPage = () => {
     stones.forEach((s) => {
       const mapped = getMappedCategories(s.category);
       if (isDiamondColorStone(mapped) && s.color) {
-        set.add(normalizeDiamondColor(s.color));
+        getDiamondColorGroups(s.color).forEach(g => set.add(g));
       }
     });
-    const sorted = Array.from(set).filter(Boolean).sort((a, b) => {
-      const ia = DIAMOND_COLOR_ORDER.indexOf(a);
-      const ib = DIAMOND_COLOR_ORDER.indexOf(b);
-      if (ia !== -1 && ib !== -1) return ia - ib;
-      if (ia !== -1) return -1;
-      if (ib !== -1) return 1;
-      return a.localeCompare(b);
-    });
-    return ["All colors", ...sorted];
+    return ["All colors", ...DIAMOND_FILTER_GROUPS.filter(g => set.has(g))];
   }, [stones]);
 
   const getBaseFancyColor = (fancyColorStr) => {
     if (!fancyColorStr) return '';
     const words = fancyColorStr.trim().split(/\s+/);
-    return words[words.length - 1];
+    const base = words[words.length - 1];
+    if (base === 'Vivid') return 'Other';
+    return base;
   };
 
   const fancyColorOptions = useMemo(() => {
@@ -5457,7 +5477,12 @@ const StoneSearchPage = () => {
         if (base) set.add(base);
       }
     });
-    return ["All colors", ...Array.from(set).sort()];
+    const sorted = Array.from(set).sort((a, b) => {
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      return a.localeCompare(b);
+    });
+    return ["All colors", ...sorted];
   }, [stones]);
 
   const filteredStones = useMemo(() => {
@@ -5513,24 +5538,21 @@ const StoneSearchPage = () => {
         } else if (stone.groupingType?.toLowerCase() !== filters.groupingType.toLowerCase()) return false;
       }
 
-      // Diamond color filter
-      if (filters.diamondColor !== "All colors") {
+      // Color filters (diamond and fancy work independently)
+      const hasDiamondFilter = filters.diamondColor !== "All colors";
+      const hasFancyFilter = filters.fancyColor !== "All colors";
+      if (hasDiamondFilter || hasFancyFilter) {
         const mapped = getMappedCategories(stone.category);
-        if (isDiamondColorStone(mapped)) {
-          if (normalizeDiamondColor(stone.color) !== filters.diamondColor) return false;
+        const isDiamond = isDiamondColorStone(mapped);
+        if (isDiamond) {
+          if (hasDiamondFilter && !getDiamondColorGroups(stone.color).includes(filters.diamondColor)) return false;
+          if (!hasDiamondFilter && hasFancyFilter) return false;
         } else {
-          return false;
-        }
-      }
-
-      // Fancy color filter
-      if (filters.fancyColor !== "All colors") {
-        const mapped = getMappedCategories(stone.category);
-        if (!isDiamondColorStone(mapped)) {
-          const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
-          if (getBaseFancyColor(fc) !== filters.fancyColor) return false;
-        } else {
-          return false;
+          if (hasFancyFilter) {
+            const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
+            if (getBaseFancyColor(fc) !== filters.fancyColor) return false;
+          }
+          if (!hasFancyFilter && hasDiamondFilter) return false;
         }
       }
 
