@@ -2729,6 +2729,73 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
   );
 };
 
+/* ---------------- Multi-Select Dropdown ---------------- */
+const MultiSelect = ({ value, options, onChange, placeholder }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = (opt) => {
+    if (value.includes(opt)) {
+      onChange(value.filter(v => v !== opt));
+    } else {
+      onChange([...value, opt]);
+    }
+  };
+
+  const display = value.length === 0
+    ? placeholder
+    : value.length <= 2
+      ? value.join(', ')
+      : `${value.length} selected`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="input-modern w-full text-left flex items-center justify-between gap-1"
+      >
+        <span className={`truncate text-sm ${value.length === 0 ? 'text-stone-400' : 'text-stone-700'}`}>{display}</span>
+        <svg className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+          {value.length > 0 && (
+            <button
+              onClick={() => onChange([])}
+              className="w-full px-3 py-1.5 text-left text-xs text-red-500 hover:bg-red-50 border-b border-stone-100"
+            >
+              Clear all
+            </button>
+          )}
+          {options.map((opt) => (
+            <label
+              key={opt}
+              className="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={value.includes(opt)}
+                onChange={() => toggle(opt)}
+                className="w-3.5 h-3.5 text-primary-600 rounded border-stone-300 focus:ring-primary-500"
+              />
+              <span className="text-sm text-stone-700">{opt}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ---------------- Filters ---------------- */
 const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, tags, onManageTags }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -2751,11 +2818,13 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
       minWidth: "",
       maxWidth: "",
       shape: [],
-      treatment: "All treatments",
-      category: "All categories",
-      tag: "All tags",
-      location: "All locations",
-      groupingType: "All types",
+      treatment: [],
+      category: [],
+      tag: [],
+      location: [],
+      groupingType: [],
+      diamondColor: [],
+      fancyColor: [],
       box: "",
     });
   };
@@ -2773,13 +2842,13 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
     filters.minWidth,
     filters.maxWidth,
     filters.shape.length > 0,
-    !filters.treatment.includes("All") && filters.treatment,
-    !filters.category.includes("All") && filters.category,
-    !filters.tag.includes("All") && filters.tag,
-    !filters.location.includes("All") && filters.location,
-    !filters.groupingType.includes("All") && filters.groupingType,
-    !filters.diamondColor.includes("All") && filters.diamondColor,
-    !filters.fancyColor.includes("All") && filters.fancyColor,
+    filters.treatment.length > 0,
+    filters.category.length > 0,
+    filters.tag.length > 0,
+    filters.location.length > 0,
+    filters.groupingType.length > 0,
+    filters.diamondColor.length > 0,
+    filters.fancyColor.length > 0,
     filters.box,
   ].filter(Boolean).length;
 
@@ -2908,51 +2977,57 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Category</label>
-                  <select value={filters.category} onChange={handleChange("category")} className="input-modern">
-                    {categoriesOptions.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    value={filters.category}
+                    options={categoriesOptions.filter(c => c !== 'All categories')}
+                    onChange={(val) => onChange({ ...filters, category: val })}
+                    placeholder="All categories"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Treatment</label>
-                  <select value={filters.treatment} onChange={handleChange("treatment")} className="input-modern">
-                    {treatmentOptions.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    value={filters.treatment}
+                    options={treatmentOptions.filter(t => t !== 'All treatments')}
+                    onChange={(val) => onChange({ ...filters, treatment: val })}
+                    placeholder="All treatments"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Location</label>
-                  <select value={filters.location} onChange={handleChange("location")} className="input-modern">
-                    {locationOptions.map((loc) => (
-                      <option key={loc} value={loc}>{loc}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    value={filters.location}
+                    options={locationOptions.filter(l => l !== 'All locations')}
+                    onChange={(val) => onChange({ ...filters, location: val })}
+                    placeholder="All locations"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Grouping Type</label>
-                  <select value={filters.groupingType} onChange={handleChange("groupingType")} className="input-modern">
-                    {["All types", "Single", "Pair", "Set", "Parcel", "Side Stones", "Melee", "Empty"].map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    value={filters.groupingType}
+                    options={["Single", "Pair", "Set", "Parcel", "Side Stones", "Melee", "Empty"]}
+                    onChange={(val) => onChange({ ...filters, groupingType: val })}
+                    placeholder="All types"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Diamond Color</label>
-                  <select value={filters.diamondColor} onChange={handleChange("diamondColor")} className="input-modern">
-                    {diamondColorOptions.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    value={filters.diamondColor}
+                    options={diamondColorOptions.filter(c => c !== 'All colors')}
+                    onChange={(val) => onChange({ ...filters, diamondColor: val })}
+                    placeholder="All colors"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Fancy Color</label>
-                  <select value={filters.fancyColor} onChange={handleChange("fancyColor")} className="input-modern">
-                    {fancyColorOptions.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  <MultiSelect
+                    value={filters.fancyColor}
+                    options={fancyColorOptions.filter(c => c !== 'All colors')}
+                    onChange={(val) => onChange({ ...filters, fancyColor: val })}
+                    placeholder="All colors"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Box</label>
@@ -2961,12 +3036,12 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
                 <div className="col-span-2 sm:col-span-1 lg:col-span-2">
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Client Tag</label>
                   <div className="flex gap-2">
-                    <select value={filters.tag} onChange={handleChange("tag")} className="input-modern flex-1">
-                      <option value="All tags">All tags</option>
-                      {tags.map((tag) => (
-                        <option key={tag.id} value={tag.name}>{tag.name}</option>
-                      ))}
-                    </select>
+                    <MultiSelect
+                      value={filters.tag}
+                      options={tags.map(t => t.name)}
+                      onChange={(val) => onChange({ ...filters, tag: val })}
+                      placeholder="All tags"
+                    />
                     <button
                       onClick={onManageTags}
                       className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl transition-colors"
@@ -4097,13 +4172,13 @@ const StoneSearchPage = () => {
     minWidth: "",
     maxWidth: "",
     shape: [],
-    treatment: "All treatments",
-    category: "All categories",
-    tag: "All tags",
-    location: "All locations",
-    groupingType: "All types",
-    diamondColor: "All colors",
-    fancyColor: "All colors",
+    treatment: [],
+    category: [],
+    tag: [],
+    location: [],
+    groupingType: [],
+    diamondColor: [],
+    fancyColor: [],
     box: "",
   });
 
@@ -5421,7 +5496,8 @@ const StoneSearchPage = () => {
   }, [stones]);
 
   const ALL_GRADES = ['D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
-  const DIAMOND_COLOR_OTHER = new Set(['COL','BR','COM','CON','FNTY','TLB']);
+  const DIAMOND_COLOR_OTHER = new Set(['BR','CON','FNTY','TLB']);
+  const DIAMOND_COLOR_ALIAS = { 'COL': ['D','E','F'], 'COM': ['H','I','J'] };
 
   const DIAMOND_FILTER_GROUPS = ['D','E','F','G','H','I','J','K','L','M','N','O-P','U-V','W-X','Y-Z','Other'];
   const GRADE_TO_GROUP = {};
@@ -5436,6 +5512,8 @@ const StoneSearchPage = () => {
     if (!color) return [];
     const raw = color.trim().toUpperCase();
     if (DIAMOND_COLOR_OTHER.has(raw)) return ['Other'];
+    const alias = DIAMOND_COLOR_ALIAS[raw];
+    if (alias) return alias;
     const mainPart = raw.split(/[\s,]+/)[0].replace(/[+-]$/, '');
     const rangeMatch = mainPart.match(/^([A-Z])-([A-Z])$/);
     if (rangeMatch) {
@@ -5534,30 +5612,32 @@ const StoneSearchPage = () => {
       if (filters.maxWidth && dims.width != null && dims.width > Number(filters.maxWidth)) return false;
       
       if (filters.shape.length > 0 && !filters.shape.includes(stone.shape) && !getDnaShapes(stone.shape).some(dna => filters.shape.includes(dna))) return false;
-      if (filters.treatment !== "All treatments" && stone.treatment?.toLowerCase() !== filters.treatment.toLowerCase()) return false;
-      if (filters.category !== "All categories" && !getMappedCategories(stone.category).includes(filters.category)) return false;
-      if (filters.location !== "All locations" && stone.location !== filters.location) return false;
+      if (filters.treatment.length > 0 && !filters.treatment.some(t => stone.treatment?.toLowerCase() === t.toLowerCase())) return false;
+      if (filters.category.length > 0 && !filters.category.some(c => getMappedCategories(stone.category).includes(c))) return false;
+      if (filters.location.length > 0 && !filters.location.includes(stone.location)) return false;
       
       // Grouping type filter
-      if (filters.groupingType !== "All types") {
-        if (filters.groupingType === "Empty") {
-          if (stone.groupingType) return false;
-        } else if (stone.groupingType?.toLowerCase() !== filters.groupingType.toLowerCase()) return false;
+      if (filters.groupingType.length > 0) {
+        const matchesAny = filters.groupingType.some(gt => {
+          if (gt === "Empty") return !stone.groupingType;
+          return stone.groupingType?.toLowerCase() === gt.toLowerCase();
+        });
+        if (!matchesAny) return false;
       }
 
       // Color filters (diamond and fancy work independently)
-      const hasDiamondFilter = filters.diamondColor !== "All colors";
-      const hasFancyFilter = filters.fancyColor !== "All colors";
+      const hasDiamondFilter = filters.diamondColor.length > 0;
+      const hasFancyFilter = filters.fancyColor.length > 0;
       if (hasDiamondFilter || hasFancyFilter) {
         const mapped = getMappedCategories(stone.category);
         const isDiamond = isDiamondColorStone(mapped);
         if (isDiamond) {
-          if (hasDiamondFilter && !getDiamondColorGroups(stone.color).includes(filters.diamondColor)) return false;
+          if (hasDiamondFilter && !getDiamondColorGroups(stone.color).some(g => filters.diamondColor.includes(g))) return false;
           if (!hasDiamondFilter && hasFancyFilter) return false;
         } else {
           if (hasFancyFilter) {
             const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
-            if (getBaseFancyColor(fc) !== filters.fancyColor) return false;
+            if (!filters.fancyColor.includes(getBaseFancyColor(fc))) return false;
           }
           if (!hasFancyFilter && hasDiamondFilter) return false;
         }
@@ -5567,9 +5647,9 @@ const StoneSearchPage = () => {
       if (filters.box && !(stone.box || '').toLowerCase().includes(filters.box.toLowerCase())) return false;
 
       // Tag filter
-      if (filters.tag !== "All tags") {
+      if (filters.tag.length > 0) {
         const stoneTagList = stoneTags[stone.sku] || [];
-        if (!stoneTagList.some((t) => t.name === filters.tag)) return false;
+        if (!filters.tag.some(tagName => stoneTagList.some(t => t.name === tagName))) return false;
       }
       
       return true;
@@ -5607,7 +5687,7 @@ const StoneSearchPage = () => {
 
   // Group stones into pairs when pair filter is active
   const pairedGroups = useMemo(() => {
-    if (filters.groupingType !== "Pair") return null;
+    if (!filters.groupingType.includes("Pair") || filters.groupingType.length !== 1) return null;
     
     const allStones = sortedStones;
     const skuMap = {};
@@ -5631,7 +5711,7 @@ const StoneSearchPage = () => {
     return groups;
   }, [sortedStones, stones, filters.groupingType]);
 
-  const isPairGrouping = filters.groupingType === "Pair";
+  const isPairGrouping = filters.groupingType.length === 1 && filters.groupingType.includes("Pair");
   const isPairView = isPairGrouping && pairViewMode === "cards" && pairedGroups;
   const totalItems = isPairView ? pairedGroups.length : sortedStones.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
