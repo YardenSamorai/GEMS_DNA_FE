@@ -44,7 +44,7 @@ const CATEGORY_MAP = {
   'Spinel':                         ['Spinel'],
   'Spinel Memo':                    ['Spinel'],
   'Spinel O':                       ['Spinel'],
-  'Fancy':                           ['Diamond'],
+  'Fancy':                           ['Diamond', 'Fancy'],
   'Tanzanite':                      ['Tanzanite'],
   'Tanzanite O':                    ['Tanzanite'],
   'Tourmaline Memo':                ['Tourmaline'],

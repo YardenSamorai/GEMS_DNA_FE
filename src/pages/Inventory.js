@@ -2406,20 +2406,20 @@ const ShapeIcon = ({ shape, isActive }) => {
   if (shapeKey === 'RA' || shapeKey === 'RADIANT') {
     return (
       <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 5 L28 5 L35 12 L35 28 L28 35 L12 35 L5 28 L5 12 Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <line x1="12" y1="5" x2="16" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="28" y1="5" x2="24" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="35" y1="12" x2="26" y2="16" stroke={c} strokeWidth={fw}/>
-        <line x1="35" y1="28" x2="26" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="28" y1="35" x2="24" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="12" y1="35" x2="16" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="5" y1="28" x2="14" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="5" y1="12" x2="14" y2="16" stroke={c} strokeWidth={fw}/>
-        <polygon points="16,14 24,14 26,16 26,24 24,26 16,26 14,24 14,16" stroke={c} strokeWidth={fw} fill="none"/>
-        <line x1="20" y1="5" x2="20" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="35" x2="20" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="5" y1="20" x2="14" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="35" y1="20" x2="26" y2="20" stroke={c} strokeWidth={fw}/>
+        <path d="M13 3 L27 3 L34 10 L34 30 L27 37 L13 37 L6 30 L6 10 Z" stroke={c} strokeWidth={sw} fill="none"/>
+        <line x1="13" y1="3" x2="16" y2="12" stroke={c} strokeWidth={fw}/>
+        <line x1="27" y1="3" x2="24" y2="12" stroke={c} strokeWidth={fw}/>
+        <line x1="34" y1="10" x2="26" y2="14" stroke={c} strokeWidth={fw}/>
+        <line x1="34" y1="30" x2="26" y2="26" stroke={c} strokeWidth={fw}/>
+        <line x1="27" y1="37" x2="24" y2="28" stroke={c} strokeWidth={fw}/>
+        <line x1="13" y1="37" x2="16" y2="28" stroke={c} strokeWidth={fw}/>
+        <line x1="6" y1="30" x2="14" y2="26" stroke={c} strokeWidth={fw}/>
+        <line x1="6" y1="10" x2="14" y2="14" stroke={c} strokeWidth={fw}/>
+        <polygon points="16,12 24,12 26,14 26,26 24,28 16,28 14,26 14,14" stroke={c} strokeWidth={fw} fill="none"/>
+        <line x1="20" y1="3" x2="20" y2="12" stroke={c} strokeWidth={fw}/>
+        <line x1="20" y1="37" x2="20" y2="28" stroke={c} strokeWidth={fw}/>
+        <line x1="6" y1="20" x2="14" y2="20" stroke={c} strokeWidth={fw}/>
+        <line x1="34" y1="20" x2="26" y2="20" stroke={c} strokeWidth={fw}/>
       </svg>
     );
   }
@@ -2531,11 +2531,11 @@ const ShapeIcon = ({ shape, isActive }) => {
   if (shapeKey === 'CABUSHON' || shapeKey === 'CABOCHON' || shapeKey === 'CAB') {
     return (
       <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="20" cy="22" rx="14" ry="12" stroke={c} strokeWidth={sw}/>
-        <path d="M6 22 C6 12 12 6 20 6 C28 6 34 12 34 22" stroke={c} strokeWidth={fw}/>
-        <path d="M10 22 C10 15 14 10 20 10 C26 10 30 15 30 22" stroke={c} strokeWidth={fw}/>
-        <path d="M14 22 C14 18 16 14 20 14 C24 14 26 18 26 22" stroke={c} strokeWidth={fw}/>
-        <ellipse cx="18" cy="16" rx="2" ry="1.5" stroke={c} strokeWidth="0.4" fill="none" opacity="0.4"/>
+        <path d="M5 28 C5 14 12 4 20 4 C28 4 35 14 35 28" stroke={c} strokeWidth={sw} fill="none"/>
+        <line x1="5" y1="28" x2="35" y2="28" stroke={c} strokeWidth={sw}/>
+        <path d="M10 28 C10 17 14 9 20 9 C26 9 30 17 30 28" stroke={c} strokeWidth={fw} opacity="0.6" fill="none"/>
+        <path d="M15 28 C15 20 17 14 20 14 C23 14 25 20 25 28" stroke={c} strokeWidth={fw} opacity="0.4" fill="none"/>
+        <ellipse cx="16" cy="16" rx="3" ry="1.5" stroke={c} strokeWidth={fw} opacity="0.3" transform="rotate(-20 16 16)" fill="none"/>
       </svg>
     );
   }
@@ -2920,7 +2920,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, tag
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Grouping Type</label>
                   <select value={filters.groupingType} onChange={handleChange("groupingType")} className="input-modern">
-                    {["All types", "Single", "Pair", "Set", "Parcel", "Side Stones", "Melee"].map((opt) => (
+                    {["All types", "Single", "Pair", "Set", "Parcel", "Fancy", "Side Stones", "Melee", "Empty"].map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
@@ -2974,12 +2974,7 @@ const shortTreatment = (t) => {
 const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick }) => (
   <motion.div
     layout
-    onClick={(e) => {
-      // Don't toggle if clicking on button, checkbox, or link
-      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A' || e.target.closest('button') || e.target.closest('a')) return;
-      onToggleSelection(stone.id);
-    }}
-    className={`rounded-2xl border-2 overflow-hidden shadow-md cursor-pointer transition-all duration-200 ${
+    className={`rounded-2xl border-2 overflow-hidden shadow-md transition-all duration-200 ${
       isSelected 
         ? 'shadow-lg' 
         : 'border-stone-200 bg-white hover:border-stone-300'
@@ -3414,7 +3409,6 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
         {/* Main Card Content */}
         <div 
           className="p-4"
-          onClick={() => onToggleSelection(stone.id)}
         >
           <div className="flex gap-3">
             {/* Checkbox */}
@@ -3639,12 +3633,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="sku">SKU</SortButton>
               </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">Image</th>
-              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 uppercase tracking-wider">Pair</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider">Img</th>
+              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 tracking-wider">Type</th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="shape">Shape</SortButton>
               </th>
-              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 uppercase tracking-wider">Qty</th>
+              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 tracking-wider">Qty</th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="weightCt">Weight</SortButton>
               </th>
@@ -3688,11 +3682,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                   <motion.tr
                       initial={false}
                     animate={{ opacity: 1, y: 0 }}
-                      onClick={(e) => {
-                        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
-                        onToggleSelection(stone.id);
-                      }}
-                      className={`transition-colors cursor-pointer ${
+                      className={`transition-colors ${
                         selectedStones?.has(stone.id) 
                           ? 'border-l-4' 
                           : isExpanded 
@@ -3729,6 +3719,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           stone.groupingType === 'Pair' ? 'bg-indigo-100 text-indigo-700 font-semibold' :
                           stone.groupingType === 'Set' ? 'bg-purple-100 text-purple-700 font-semibold' :
                           stone.groupingType === 'Parcel' ? 'bg-amber-100 text-amber-700 font-semibold' :
+                          stone.groupingType === 'Fancy' ? 'bg-pink-100 text-pink-700 font-semibold' :
                           stone.groupingType === 'Side Stones' ? 'bg-teal-100 text-teal-700 font-semibold' :
                           stone.groupingType === 'Melee' ? 'bg-rose-100 text-rose-700 font-semibold' :
                           'bg-stone-100 text-stone-500'
@@ -5260,7 +5251,11 @@ const StoneSearchPage = () => {
       if (filters.location !== "All locations" && stone.location !== filters.location) return false;
       
       // Grouping type filter
-      if (filters.groupingType !== "All types" && stone.groupingType?.toLowerCase() !== filters.groupingType.toLowerCase()) return false;
+      if (filters.groupingType !== "All types") {
+        if (filters.groupingType === "Empty") {
+          if (stone.groupingType) return false;
+        } else if (stone.groupingType?.toLowerCase() !== filters.groupingType.toLowerCase()) return false;
+      }
 
       // Box filter (free text, includes match)
       if (filters.box && !(stone.box || '').toLowerCase().includes(filters.box.toLowerCase())) return false;
