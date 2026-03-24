@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -2732,13 +2733,33 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
 /* ---------------- Multi-Select Dropdown ---------------- */
 const MultiSelect = ({ value, options, onChange, placeholder }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const btnRef = useRef(null);
+  const dropRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      if (dropRef.current && dropRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const dropHeight = 240;
+      const showAbove = spaceBelow < dropHeight && rect.top > dropHeight;
+      setPos({
+        top: showAbove ? rect.top - dropHeight - 4 : rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, [open]);
 
   const toggle = (opt) => {
     if (value.includes(opt)) {
@@ -2755,8 +2776,9 @@ const MultiSelect = ({ value, options, onChange, placeholder }) => {
       : `${value.length} selected`;
 
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(!open)}
         className="input-modern w-full text-left flex items-center justify-between gap-1"
@@ -2766,12 +2788,16 @@ const MultiSelect = ({ value, options, onChange, placeholder }) => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+      {open && createPortal(
+        <div
+          ref={dropRef}
+          className="bg-white border border-stone-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+          style={{ position: 'fixed', zIndex: 9999, top: pos.top, left: pos.left, width: pos.width }}
+        >
           {value.length > 0 && (
             <button
               onClick={() => onChange([])}
-              className="w-full px-3 py-1.5 text-left text-xs text-red-500 hover:bg-red-50 border-b border-stone-100"
+              className="w-full px-3 py-1.5 text-left text-xs text-red-500 hover:bg-red-50 border-b border-stone-100 sticky top-0 bg-white"
             >
               Clear all
             </button>
@@ -2790,7 +2816,8 @@ const MultiSelect = ({ value, options, onChange, placeholder }) => {
               <span className="text-sm text-stone-700">{opt}</span>
             </label>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
