@@ -3361,8 +3361,198 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
   );
 };
 
+/* ---------------- Column Configuration ---------------- */
+const DEFAULT_COLUMNS = [
+  { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
+  { id: 'img', label: 'Img' },
+  { id: 'type', label: 'Type' },
+  { id: 'shape', label: 'Shape', sortField: 'shape' },
+  { id: 'color', label: 'Color' },
+  { id: 'qty', label: 'Qty' },
+  { id: 'weight', label: 'Weight', sortField: 'weightCt' },
+  { id: 'measurements', label: 'Measurements', sortField: 'measurements' },
+  { id: 'ratio', label: 'Ratio', sortField: 'ratio' },
+  { id: 'treatment', label: 'Treatment', sortField: 'treatment' },
+  { id: 'lab', label: 'Lab', sortField: 'lab' },
+  { id: 'ppc', label: 'PPC', sortField: 'pricePerCt' },
+  { id: 'total', label: 'Total', sortField: 'priceTotal' },
+  { id: 'location', label: 'Location', sortField: 'location' },
+];
+
+const COLUMNS_STORAGE_KEY = 'gems_dna_column_config';
+
+const getColumnConfig = (userId) => {
+  try {
+    const stored = localStorage.getItem(`${COLUMNS_STORAGE_KEY}_${userId}`);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const knownIds = new Set(DEFAULT_COLUMNS.map(c => c.id));
+      const storedIds = new Set(parsed.map(c => c.id));
+      const merged = parsed.filter(c => knownIds.has(c.id));
+      DEFAULT_COLUMNS.forEach(col => {
+        if (!storedIds.has(col.id)) {
+          merged.push({ id: col.id, visible: true });
+        }
+      });
+      return merged;
+    }
+  } catch {}
+  return DEFAULT_COLUMNS.map(c => ({ id: c.id, visible: true }));
+};
+
+const saveColumnConfig = (userId, config) => {
+  try {
+    localStorage.setItem(`${COLUMNS_STORAGE_KEY}_${userId}`, JSON.stringify(config));
+  } catch {}
+};
+
+/* ---------------- Column Settings Modal ---------------- */
+const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave }) => {
+  const [localConfig, setLocalConfig] = useState(columnConfig);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+
+  useEffect(() => {
+    setLocalConfig(columnConfig);
+  }, [columnConfig, isOpen]);
+
+  if (!isOpen) return null;
+
+  const colMeta = Object.fromEntries(DEFAULT_COLUMNS.map(c => [c.id, c]));
+
+  const handleDragStart = (idx) => (e) => {
+    setDragIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (idx) => (e) => {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  };
+
+  const handleDrop = (idx) => (e) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return; }
+    const updated = [...localConfig];
+    const [moved] = updated.splice(dragIdx, 1);
+    updated.splice(idx, 0, moved);
+    setLocalConfig(updated);
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+
+  const toggleVisibility = (id) => {
+    const meta = colMeta[id];
+    if (meta?.alwaysVisible) return;
+    setLocalConfig(prev => prev.map(c => c.id === id ? { ...c, visible: !c.visible } : c));
+  };
+
+  const handleSave = () => {
+    onSave(localConfig);
+    onClose();
+  };
+
+  const handleReset = () => {
+    const reset = DEFAULT_COLUMNS.map(c => ({ id: c.id, visible: true }));
+    setLocalConfig(reset);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={onClose}
+        >
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-stone-800">Column Settings</h3>
+                <p className="text-xs text-stone-400 mt-0.5">Drag to reorder, toggle to show/hide</p>
+              </div>
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-stone-100 transition-colors text-stone-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-1">
+              {localConfig.map((col, idx) => {
+                const meta = colMeta[col.id];
+                if (!meta) return null;
+                return (
+                  <div
+                    key={col.id}
+                    draggable
+                    onDragStart={handleDragStart(idx)}
+                    onDragOver={handleDragOver(idx)}
+                    onDrop={handleDrop(idx)}
+                    onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing select-none ${
+                      dragOverIdx === idx ? 'border-primary-400 bg-primary-50' :
+                      dragIdx === idx ? 'opacity-50 border-stone-200 bg-stone-50' :
+                      'border-stone-200 bg-white hover:border-stone-300 hover:shadow-sm'
+                    }`}
+                  >
+                    <svg className="w-4 h-4 text-stone-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
+                    </svg>
+                    <span className="flex-1 text-sm font-medium text-stone-700">{meta.label}</span>
+                    {meta.alwaysVisible ? (
+                      <span className="text-[10px] text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">Required</span>
+                    ) : (
+                      <button
+                        onClick={() => toggleVisibility(col.id)}
+                        className={`w-10 h-5 rounded-full transition-colors relative ${col.visible ? 'bg-primary-500' : 'bg-stone-300'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${col.visible ? 'left-5' : 'left-0.5'}`} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="px-5 py-4 border-t border-stone-200 flex items-center justify-between gap-3">
+              <button onClick={handleReset} className="px-4 py-2 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors">
+                Reset to Default
+              </button>
+              <div className="flex gap-2">
+                <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors">
+                  Cancel
+                </button>
+                <button onClick={handleSave} className="px-4 py-2 text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors">
+                  Save
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, columnConfig, onColumnConfigChange }) => {
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+
+  const visibleColumns = useMemo(() => {
+    if (!columnConfig) return DEFAULT_COLUMNS.map(c => c.id);
+    return columnConfig.filter(c => c.visible).map(c => c.id);
+  }, [columnConfig]);
+
+  const colMeta = useMemo(() => Object.fromEntries(DEFAULT_COLUMNS.map(c => [c.id, c])), []);
+
   if (loading) {
     return (
       <div className="glass rounded-2xl border border-white/50 p-8 sm:p-12">
@@ -3417,6 +3607,83 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       )}
     </button>
   );
+
+  const renderHeader = (colId) => {
+    const meta = colMeta[colId];
+    if (!meta) return null;
+    const base = "px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider";
+    switch (colId) {
+      case 'sku': return <th key={colId} className={`${base} uppercase`}><SortButton field="sku">SKU</SortButton></th>;
+      case 'img': return <th key={colId} className={base}>Img</th>;
+      case 'type': return <th key={colId} className={`${base} text-center`}>Type</th>;
+      case 'shape': return <th key={colId} className={`${base} uppercase`}><SortButton field="shape">Shape</SortButton></th>;
+      case 'color': return <th key={colId} className={base}>Color</th>;
+      case 'qty': return <th key={colId} className={`${base} text-center`}>Qty</th>;
+      case 'weight': return <th key={colId} className={`${base} uppercase`}><SortButton field="weightCt">Weight</SortButton></th>;
+      case 'measurements': return <th key={colId} className={`${base} uppercase`}><SortButton field="measurements">Measurements</SortButton></th>;
+      case 'ratio': return <th key={colId} className={`${base} uppercase`}><SortButton field="ratio">Ratio</SortButton></th>;
+      case 'treatment': return <th key={colId} className={`${base} uppercase`}><SortButton field="treatment">Treatment</SortButton></th>;
+      case 'lab': return <th key={colId} className={`${base} uppercase`}><SortButton field="lab">Lab</SortButton></th>;
+      case 'ppc': return <th key={colId} className={`${base} uppercase`}><SortButton field="pricePerCt">PPC</SortButton></th>;
+      case 'total': return <th key={colId} className={`${base} uppercase`}><SortButton field="priceTotal">Total</SortButton></th>;
+      case 'location': return <th key={colId} className={`${base} uppercase`}><SortButton field="location">Location</SortButton></th>;
+      default: return null;
+    }
+  };
+
+  const renderCell = (colId, stone) => {
+    const cellBase = "px-3 py-2 whitespace-nowrap";
+    switch (colId) {
+      case 'sku': return <td key={colId} className={cellBase}><span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span></td>;
+      case 'img': return (
+        <td key={colId} className="px-3 py-2">
+          <div
+            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
+            onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
+          >
+            {stone.imageUrl ? (
+              <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
+            )}
+          </div>
+        </td>
+      );
+      case 'type': return (
+        <td key={colId} className={`${cellBase} text-center`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+            stone.groupingType === 'Pair' ? 'bg-indigo-100 text-indigo-700 font-semibold' :
+            stone.groupingType === 'Set' ? 'bg-purple-100 text-purple-700 font-semibold' :
+            stone.groupingType === 'Parcel' ? 'bg-amber-100 text-amber-700 font-semibold' :
+            stone.groupingType === 'Fancy' ? 'bg-pink-100 text-pink-700 font-semibold' :
+            stone.groupingType === 'Side Stones' ? 'bg-teal-100 text-teal-700 font-semibold' :
+            stone.groupingType === 'Melee' ? 'bg-rose-100 text-rose-700 font-semibold' :
+            'bg-stone-100 text-stone-500'
+          }`}>
+            {stone.groupingType || 'Single'}
+          </span>
+        </td>
+      );
+      case 'shape': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>{stone.shape}</td>;
+      case 'color': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>{getDisplayColor(stone) || '-'}</td>;
+      case 'qty': return (
+        <td key={colId} className={`${cellBase} text-center`}>
+          <span className="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-stone-600">
+            {stone.stones ?? '-'}
+          </span>
+        </td>
+      );
+      case 'weight': return <td key={colId} className={`${cellBase} text-xs font-medium text-stone-800`}>{stone.weightCt} ct</td>;
+      case 'measurements': return <td key={colId} className={`${cellBase} text-xs text-stone-600`}>{stone.measurements}</td>;
+      case 'ratio': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span></td>;
+      case 'treatment': return <td key={colId} className={cellBase}><span className="badge badge-neutral text-xs">{shortTreatment(stone.treatment)}</span></td>;
+      case 'lab': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.lab || 'N/A'}</span></td>;
+      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(stone.pricePerCt / 2).toLocaleString() : '-'}</td>;
+      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(stone.priceTotal / 2).toLocaleString() : '-'}</td>;
+      case 'location': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.location || 'N/A'}</span></td>;
+      default: return null;
+    }
+  };
 
   // Mobile Card Component
   const MobileStoneCard = ({ stone, index }) => {
@@ -3645,6 +3912,14 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
         ))}
       </div>
 
+      {/* Column Settings Modal */}
+      <ColumnSettingsModal
+        isOpen={showColumnSettings}
+        onClose={() => setShowColumnSettings(false)}
+        columnConfig={columnConfig || DEFAULT_COLUMNS.map(c => ({ id: c.id, visible: true }))}
+        onSave={onColumnConfigChange}
+      />
+
       {/* Desktop Table View */}
       <div className="hidden md:block glass rounded-2xl border border-white/50 overflow-hidden shadow-lg">
       <div className="overflow-x-auto">
@@ -3659,43 +3934,19 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
                   />
                 </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="sku">SKU</SortButton>
+              {visibleColumns.map(colId => renderHeader(colId))}
+              <th className="px-2 py-4 text-right">
+                <button
+                  onClick={() => setShowColumnSettings(true)}
+                  className="p-1.5 rounded-lg hover:bg-stone-200 transition-colors text-stone-400 hover:text-stone-600"
+                  title="Column settings"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
               </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider">Img</th>
-              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 tracking-wider">Type</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="shape">Shape</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider">
-                Color
-              </th>
-              <th className="px-4 py-4 text-center text-xs font-semibold text-stone-600 tracking-wider">Qty</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="weightCt">Weight</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
-                <SortButton field="measurements">Measurements</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
-                <SortButton field="ratio">Ratio</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
-                <SortButton field="treatment">Treatment</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
-                <SortButton field="lab">Lab</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="pricePerCt">PPC</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                <SortButton field="priceTotal">Total</SortButton>
-              </th>
-              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
-                <SortButton field="location">Location</SortButton>
-              </th>
-              <th className="px-4 py-4 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -3723,61 +3974,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                           className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
                         />
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
-                      </td>
-                    <td className="px-3 py-2">
-                      <div 
-                        className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
-                        onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
-                      >
-                        {stone.imageUrl ? (
-                          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
-                        )}
-                      </div>
-                    </td>
-                      <td className="px-3 py-2 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          stone.groupingType === 'Pair' ? 'bg-indigo-100 text-indigo-700 font-semibold' :
-                          stone.groupingType === 'Set' ? 'bg-purple-100 text-purple-700 font-semibold' :
-                          stone.groupingType === 'Parcel' ? 'bg-amber-100 text-amber-700 font-semibold' :
-                          stone.groupingType === 'Fancy' ? 'bg-pink-100 text-pink-700 font-semibold' :
-                          stone.groupingType === 'Side Stones' ? 'bg-teal-100 text-teal-700 font-semibold' :
-                          stone.groupingType === 'Melee' ? 'bg-rose-100 text-rose-700 font-semibold' :
-                          'bg-stone-100 text-stone-500'
-                        }`}>
-                          {stone.groupingType || 'Single'}
-                        </span>
-                      </td>
-                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{stone.shape}</td>
-                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{getDisplayColor(stone) || '-'}</td>
-                    <td className="px-3 py-2 text-center whitespace-nowrap">
-                      <span className="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-stone-600">
-                        {stone.stones ?? '-'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-xs font-medium text-stone-800 whitespace-nowrap">{stone.weightCt} ct</td>
-                    <td className="px-3 py-2 text-xs text-stone-600 whitespace-nowrap hidden lg:table-cell">{stone.measurements}</td>
-                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
-                      <span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span>
-                    </td>
-                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
-                      <span className="badge badge-neutral text-xs">{shortTreatment(stone.treatment)}</span>
-                    </td>
-                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
-                      <span className="text-xs text-stone-600">{stone.lab || 'N/A'}</span>
-                    </td>
-                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">
-                      ${stone.pricePerCt ? Math.round(stone.pricePerCt / 2).toLocaleString() : '-'}
-                    </td>
-                    <td className="px-3 py-2 text-xs font-semibold text-stone-800 whitespace-nowrap">
-                      ${stone.priceTotal ? Math.round(stone.priceTotal / 2).toLocaleString() : '-'}
-                    </td>
-                    <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
-                      <span className="text-xs text-stone-600">{stone.location || 'N/A'}</span>
-                    </td>
+                    {visibleColumns.map(colId => renderCell(colId, stone))}
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -3911,7 +4108,8 @@ const StoneSearchPage = () => {
   const [drawerStone, setDrawerStone] = useState(null); // DNA Drawer
   const [showCategoryExportModal, setShowCategoryExportModal] = useState(false); // Category export choice
   const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
-  const [showPDFModal, setShowPDFModal] = useState(false); // PDF Catalog modal
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default'));
   const [pdfGenerating, setPdfGenerating] = useState(false); // PDF generation loading state
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
@@ -5084,6 +5282,11 @@ const StoneSearchPage = () => {
     }));
   };
 
+  const handleColumnConfigChange = (newConfig) => {
+    setColumnConfig(newConfig);
+    saveColumnConfig(user?.id || 'default', newConfig);
+  };
+
   // Track visibility of export button for floating button
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -5821,6 +6024,8 @@ const StoneSearchPage = () => {
               onManageTags={() => setShowTagsModal(true)}
               onViewDNA={setDrawerStone}
               onImageClick={setLightboxImage}
+              columnConfig={columnConfig}
+              onColumnConfigChange={handleColumnConfigChange}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
