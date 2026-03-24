@@ -5642,8 +5642,8 @@ const StoneSearchPage = () => {
   return (
     <>
       <LoadingBar active={initialLoading} progress={progress} />
-      <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen py-8 px-2 sm:px-4 lg:px-6">
+        <div className="max-w-[1600px] mx-auto">
           {/* Header */}
           <div className="mb-6">
             {/* Title Row */}
