@@ -32,7 +32,7 @@ const shareToWhatsApp = (stone, includePrice = false) => {
   let message = `💎 *${getDisplayShape(stone.shape) || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
   message += `📋 *Details:*\n`;
   message += `• SKU: ${stone.sku}\n`;
-  message += `• Color: ${stone.color || 'N/A'}\n`;
+  message += `• Color: ${getDisplayColor(stone) || 'N/A'}\n`;
   message += `• Clarity: ${stone.clarity || 'N/A'}\n`;
   message += `• Treatment: ${stone.treatment || 'N/A'}\n`;
   message += `• Origin: ${stone.origin || 'N/A'}\n`;
@@ -64,7 +64,7 @@ const shareMultipleToWhatsApp = (selectedStonesArray) => {
   selectedStonesArray.forEach((stone, idx) => {
     const dnaUrl = `https://gems-dna.com/${stone.sku}`;
     message += `${idx + 1}. *${getDisplayShape(stone.shape) || 'Gemstone'}* ${stone.weightCt || '?'}ct`;
-    if (stone.color) message += ` | ${stone.color}`;
+    if (getDisplayColor(stone)) message += ` | ${getDisplayColor(stone)}`;
     message += ` — SKU: ${stone.sku}\n`;
     message += `   ${dnaUrl}\n\n`;
   });
@@ -163,7 +163,7 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
       details = [
         `${stone.weightCt || '?'}`,
         lab,
-        `${stone.color || ''}   ${clarity}`.trim() || null
+        `${getDisplayColor(stone) || ''}   ${clarity}`.trim() || null
       ].filter(Boolean).join('\n');
     } else {
       details = [
@@ -467,7 +467,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
           pdf.text(`Treatment: ${stone.treatment || 'N/A'}`, textX, y + 32);
           pdf.text(`Origin: ${stone.origin || 'N/A'}`, textX, y + 37);
         } else {
-          pdf.text(`Color: ${stone.color || 'N/A'} • Clarity: ${stone.clarity || 'N/A'}`, textX, y + 32);
+          pdf.text(`Color: ${getDisplayColor(stone) || 'N/A'} • Clarity: ${stone.clarity || 'N/A'}`, textX, y + 32);
           if (stone.cut) pdf.text(`Cut: ${stone.cut}`, textX, y + 37);
         }
         pdf.text(`Lab: ${stone.lab || 'N/A'}`, textX, y + 42);
@@ -559,7 +559,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         if (mapped.includes('Emerald')) {
           pdf.text(`Treatment: ${stone.treatment || 'N/A'}  •  Origin: ${stone.origin || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
         } else {
-          pdf.text(`Color: ${stone.color || 'N/A'}  •  Clarity: ${stone.clarity || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
+          pdf.text(`Color: ${getDisplayColor(stone) || 'N/A'}  •  Clarity: ${stone.clarity || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
         }
         
         // Details row 2
@@ -2039,7 +2039,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
               <div className="bg-stone-50 rounded-xl p-4 space-y-0">
                 <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
                 <DetailRow label="Weight" value={`${stone.weightCt} ct`} />
-                <DetailRow label="Color" value={stone.color} />
+                <DetailRow label="Color" value={getDisplayColor(stone)} />
                 <DetailRow label="Clarity" value={stone.clarity} />
                 <DetailRow label="Treatment" value={stone.treatment} />
                 <DetailRow label="Origin" value={stone.origin} />
@@ -2246,6 +2246,14 @@ const DNA_TO_SHORT = {
 };
 
 const getShortShape = (dnaName) => DNA_TO_SHORT[dnaName] || dnaName;
+
+const getDisplayColor = (stone) => {
+  const mapped = getMappedCategories(stone.category);
+  if (mapped.includes('Diamond') || mapped.includes('Emerald')) {
+    return stone.color || '';
+  }
+  return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
+};
 
 /* ---------------- Shape Icons (faceted line-art) ---------------- */
 const ShapeIcon = ({ shape, isActive }) => {
@@ -3103,7 +3111,7 @@ const StoneDetails = ({ stone, onViewDNA }) => {
         <DetailItem label="Shape" value={getDisplayShape(stone.shape)} />
         <DetailItem label="Weight" value={`${stone.weightCt} ct`} />
         <DetailItem label="Measurements" value={stone.measurements} />
-        <DetailItem label="Color" value={stone.color} />
+        <DetailItem label="Color" value={getDisplayColor(stone)} />
         <DetailItem label="Clarity" value={stone.clarity} />
         <DetailItem label="Treatment" value={stone.treatment} />
         <DetailItem label="Lab" value={stone.lab} />
@@ -3642,6 +3650,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
                 <SortButton field="weightCt">Weight</SortButton>
               </th>
+              <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                Color
+              </th>
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden lg:table-cell">
                 <SortButton field="measurements">Measurements</SortButton>
               </th>
@@ -3663,15 +3674,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
               <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider hidden xl:table-cell">
                 <SortButton field="location">Location</SortButton>
               </th>
-                <th className="px-4 py-4 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider">
-                  <span className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    Tags
-                  </span>
-                </th>
-              <th className="px-4 py-4 text-right text-xs font-semibold text-stone-600 uppercase tracking-wider">Actions</th>
+              <th className="px-4 py-4 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -3734,6 +3737,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs font-medium text-stone-800 whitespace-nowrap">{stone.weightCt} ct</td>
+                    <td className="px-3 py-2 text-xs text-stone-700 whitespace-nowrap">{getDisplayColor(stone) || '-'}</td>
                     <td className="px-3 py-2 text-xs text-stone-600 whitespace-nowrap hidden lg:table-cell">{stone.measurements}</td>
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span>
@@ -3753,27 +3757,6 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     <td className="px-3 py-2 hidden xl:table-cell whitespace-nowrap">
                       <span className="text-xs text-stone-600">{stone.location || 'N/A'}</span>
                     </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1">
-                          {stoneTags?.[stone.sku]?.map((tag) => (
-                            <span
-                              key={tag.id}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                              style={{ backgroundColor: tag.color }}
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                          <TagSelector
-                            stoneSku={stone.sku}
-                            currentTags={stoneTags?.[stone.sku] || []}
-                            allTags={allTags || []}
-                            onAddTag={onAddTag}
-                            onRemoveTag={onRemoveTag}
-                            onManageTags={onManageTags}
-                          />
-                        </div>
-                      </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -4470,7 +4453,7 @@ const StoneSearchPage = () => {
           case 'lab': rowData.lab = stone.lab || ''; break;
           case 'pricePerCt': rowData.pricePerCt = stone.pricePerCt || ''; break;
           case 'priceTotal': rowData.priceTotal = stone.priceTotal || ''; break;
-          case 'color': rowData.color = stone.color || ''; break;
+          case 'color': rowData.color = getDisplayColor(stone) || ''; break;
           case 'clarity': rowData.clarity = stone.clarity || ''; break;
           case 'fluorescence': rowData.fluorescence = stone.fluorescence || ''; break;
           case 'rapPrice': rowData.rapPrice = stone.rapPrice || ''; break;
@@ -4901,7 +4884,7 @@ const StoneSearchPage = () => {
           case 'lab': rowData.lab = stone.lab || ''; break;
           case 'pricePerCt': rowData.pricePerCt = stone.pricePerCt || ''; break;
           case 'priceTotal': rowData.priceTotal = stone.priceTotal || ''; break;
-          case 'color': rowData.color = stone.color || ''; break;
+          case 'color': rowData.color = getDisplayColor(stone) || ''; break;
           case 'clarity': rowData.clarity = stone.clarity || ''; break;
           case 'fluorescence': rowData.fluorescence = stone.fluorescence || ''; break;
           case 'rapPrice': rowData.rapPrice = stone.rapPrice || ''; break;
