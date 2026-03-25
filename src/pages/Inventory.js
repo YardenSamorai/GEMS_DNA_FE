@@ -2779,23 +2779,44 @@ const SMART_SEARCH_GROUPING = new Set([
 
 const parseSmartSearch = (text) => {
   const result = {
-    shapes: [], weight: null, clarities: [], colors: [], categories: [],
+    shapes: [], weight: null, weightRange: null, clarities: [], colors: [], categories: [],
     treatments: [], locations: [], labs: [], origins: [], skus: [],
-    fancyColors: [], groupingTypes: [], unmatched: [],
+    fancyColors: [], groupingTypes: [], pricePerCt: null, unmatched: [],
   };
   if (!text || !text.trim()) return result;
 
   let remaining = text.trim();
 
-  // 1. Extract SKUs (T followed by digits)
-  remaining = remaining.replace(/\bT\d+\b/gi, (match) => {
+  // 1. Extract SKUs (T followed by digits, or TC- followed by digits)
+  remaining = remaining.replace(/\b(?:TC-?\d+|T\d+)\b/gi, (match) => {
     result.skus.push(match.toUpperCase());
     return ' ';
   });
 
-  // 2. Extract weight (number with optional ct/carat suffix)
+  // 2a. Extract price per carat range: 10000-20000pc or 10000pc-20000pc
+  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*(?:pc)?\s*-\s*(\d+(?:\.\d+)?)\s*pc\b/gi, (match, min, max) => {
+    result.pricePerCt = { min: parseFloat(min), max: parseFloat(max) };
+    return ' ';
+  });
+
+  // 2b. Extract single price per carat: 10000pc
+  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*pc\b/gi, (match, num) => {
+    if (!result.pricePerCt) {
+      const val = parseFloat(num);
+      result.pricePerCt = { min: val * 0.85, max: val * 1.15 };
+    }
+    return ' ';
+  });
+
+  // 2c. Extract weight range: 3-5ct
+  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(?:ct|carat|cts|carats)\b/gi, (match, min, max) => {
+    result.weightRange = { min: parseFloat(min), max: parseFloat(max) };
+    return ' ';
+  });
+
+  // 2d. Extract single weight: 3ct or standalone number
   remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*(?:ct|carat|cts|carats)?\b/gi, (match, num) => {
-    if (!result.weight) result.weight = parseFloat(num);
+    if (!result.weight && !result.weightRange) result.weight = parseFloat(num);
     return ' ';
   });
 
@@ -5865,10 +5886,11 @@ const StoneSearchPage = () => {
 
       // Smart search filter
       const ss = parsedSearch;
-      const hasSmartSearch = ss.shapes.length > 0 || ss.weight || ss.clarities.length > 0 ||
+      const hasSmartSearch = ss.shapes.length > 0 || ss.weight || ss.weightRange || ss.clarities.length > 0 ||
         ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
         ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
-        ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0;
+        ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0 ||
+        ss.pricePerCt;
 
       if (hasSmartSearch) {
         if (ss.skus.length > 0) {
@@ -5883,10 +5905,17 @@ const StoneSearchPage = () => {
           const mapped = getMappedCategories(stone.category);
           if (!ss.categories.some(c => mapped.some(m => m.toUpperCase() === c.toUpperCase()))) return false;
         }
-        if (ss.weight) {
+        if (ss.weightRange) {
+          const w = stone.weightCt;
+          if (w == null || w < ss.weightRange.min || w > ss.weightRange.max) return false;
+        } else if (ss.weight) {
           const tolerance = ss.weight * 0.15;
           const w = stone.weightCt;
           if (w == null || w < ss.weight - tolerance || w > ss.weight + tolerance) return false;
+        }
+        if (ss.pricePerCt) {
+          const ppc = stone.pricePerCt;
+          if (ppc == null || ppc < ss.pricePerCt.min || ppc > ss.pricePerCt.max) return false;
         }
         if (ss.clarities.length > 0) {
           const stoneClarity = (stone.clarity || '').toUpperCase().replace(/\s+/g, '');
@@ -6292,10 +6321,11 @@ const StoneSearchPage = () => {
             </div>
             {smartSearch && (() => {
               const ss = parsedSearch;
-              const hasTags = ss.shapes.length > 0 || ss.weight || ss.clarities.length > 0 ||
+              const hasTags = ss.shapes.length > 0 || ss.weight || ss.weightRange || ss.clarities.length > 0 ||
                 ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
                 ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
-                ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0;
+                ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0 ||
+                ss.pricePerCt;
               if (!hasTags) return null;
               const Badge = ({ label, type, color }) => (
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
@@ -6307,7 +6337,9 @@ const StoneSearchPage = () => {
                   {ss.skus.map(s => <Badge key={`sku-${s}`} label={s} type="SKU" color="bg-violet-100 text-violet-700" />)}
                   {ss.categories.map(c => <Badge key={`cat-${c}`} label={c} type="Category" color="bg-blue-100 text-blue-700" />)}
                   {ss.shapes.map(s => <Badge key={`shp-${s}`} label={s} type="Shape" color="bg-emerald-100 text-emerald-700" />)}
-                  {ss.weight && <Badge label={`~${ss.weight}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
+                  {ss.weightRange && <Badge label={`${ss.weightRange.min}-${ss.weightRange.max}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
+                  {!ss.weightRange && ss.weight && <Badge label={`~${ss.weight}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
+                  {ss.pricePerCt && <Badge label={`$${Math.round(ss.pricePerCt.min).toLocaleString()}-${Math.round(ss.pricePerCt.max).toLocaleString()}/ct`} type="Price" color="bg-green-100 text-green-700" />}
                   {ss.clarities.map(c => <Badge key={`cl-${c}`} label={c} type="Clarity" color="bg-sky-100 text-sky-700" />)}
                   {ss.colors.map(c => <Badge key={`col-${c}`} label={c} type="Color" color="bg-pink-100 text-pink-700" />)}
                   {ss.fancyColors.map(c => <Badge key={`fc-${c}`} label={c} type="Fancy" color="bg-rose-100 text-rose-700" />)}
