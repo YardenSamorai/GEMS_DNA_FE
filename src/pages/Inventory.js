@@ -2522,7 +2522,7 @@ const ShapeIcon = ({ shape, isActive }) => {
 
   // Old Mine (rounded square with brilliant facets)
   if (shapeKey === 'OLD MINE' || shapeKey === 'OM') {
-    return (
+  return (
       <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect x="6" y="6" width="28" height="28" rx="4" stroke={c} strokeWidth={sw}/>
         <polygon points="20,8 28,14 32,20 28,26 20,32 12,26 8,20 12,14" stroke={c} strokeWidth={fw} fill="none"/>
@@ -2886,13 +2886,17 @@ const parseSmartSearch = (text) => {
     deferredByWord[item.upper].push(item);
   }
   for (const [, items] of Object.entries(deferredByWord)) {
+    const catName = items[0].upper.charAt(0) + items[0].upper.slice(1).toLowerCase();
     if (items.length >= 2) {
       // Same word twice → first = category, second = shape
-      result.categories.push(items[0].upper.charAt(0) + items[0].upper.slice(1).toLowerCase());
+      result.categories.push(catName);
       result.shapes.push(items[1].shapeName);
+    } else if (pureCategoryCount > 0) {
+      // Another category already exists (e.g. Diamond) → this is a shape
+      result.shapes.push(items[0].shapeName);
     } else {
-      // Single occurrence → always category (default)
-      result.categories.push(items[0].upper.charAt(0) + items[0].upper.slice(1).toLowerCase());
+      // No other category → default to category
+      result.categories.push(catName);
     }
   }
 
@@ -4229,9 +4233,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
+                    </svg>
                 </button>
-              </th>
+                </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -5822,7 +5826,7 @@ const StoneSearchPage = () => {
       if (filters.treatment.length > 0 && !filters.treatment.some(t => stone.treatment?.toLowerCase() === t.toLowerCase())) return false;
       if (filters.category.length > 0 && !filters.category.some(c => getMappedCategories(stone.category).includes(c))) return false;
       if (filters.location.length > 0 && !filters.location.includes(stone.location)) return false;
-      
+
       // Grouping type filter
       if (filters.groupingType.length > 0) {
         const matchesAny = filters.groupingType.some(gt => {

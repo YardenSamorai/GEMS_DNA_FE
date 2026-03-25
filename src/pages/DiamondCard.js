@@ -104,6 +104,9 @@ const DiamondCard = () => {
 
   const halfTotalPrice = decryptPrice(details.total_price) / 2;
 
+  const certUrl = details.certificate_url
+    || (details.certificate_number ? `${barakURL}/${details.certificate_number}.pdf` : null);
+
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <motion.div 
@@ -191,16 +194,16 @@ const DiamondCard = () => {
                       </span>
                     </div>
                   )}
-                  {details.certificate_number && details.certificate_number.trim() !== '' && (
+                  {certUrl && (
                     <a
-                      href={`${barakURL}/${details.certificate_number}.pdf`}
+                      href={certUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="relative group"
                     >
                       <div className="rounded-xl overflow-hidden bg-stone-100 aspect-square shadow-md card-hover border-2 border-transparent hover:border-primary-500">
                         <embed
-                          src={`${barakURL}/${details.certificate_number}.pdf`}
+                          src={certUrl}
                           type="application/pdf"
                           className="w-full h-full pointer-events-none"
                         />
@@ -349,7 +352,7 @@ const DiamondCard = () => {
                       value={
                         details.certificate_number ? (
                           <a 
-                            href={`${barakURL}/${details.certificate_number}.pdf`} 
+                            href={certUrl || '#'} 
                             className="text-primary-600 hover:text-primary-700 underline decoration-primary-300 underline-offset-2"
                             target="_blank"
                             rel="noopener noreferrer"
