@@ -2730,6 +2730,181 @@ const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
   );
 };
 
+/* ---------------- Smart Search Parser ---------------- */
+const SMART_SEARCH_SHAPES = new Set([
+  ...Object.keys(SHAPE_TO_DNA).map(k => k.toUpperCase()),
+  ...new Set(Object.values(SHAPE_TO_DNA).flat().map(v => v.toUpperCase())),
+]);
+
+const SMART_SEARCH_CLARITIES = new Set([
+  'FL', 'IF', 'LOUPE CLEAN', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2', 'I3',
+]);
+
+const SMART_SEARCH_LABS = new Set([
+  'GIA', 'GRS', 'SSEF', 'GUBELIN', 'GÜBELIN', 'CDC', 'AIGS', 'AGL', 'GIT', 'LOTUS', 'CGL',
+]);
+
+const SMART_SEARCH_CATEGORIES = new Set([
+  'DIAMOND', 'EMERALD', 'RUBY', 'SAPPHIRE', 'SPINEL', 'TOURMALINE',
+  'ALEXANDRITE', 'AQUAMARINE', 'GARNET', 'TANZANITE', 'TSAVORITE',
+  'RUBELLITE', 'MORGANITE', 'KUNZITE', 'TOPAZ', 'OPAL', 'ONYX', 'FANCY',
+]);
+
+const SMART_SEARCH_TREATMENTS = {
+  'NO OIL': 'No Oil', 'INSIGNIFICANT': 'Insignificant',
+  'MINOR': 'Minor', 'MODERATE': 'Moderate', 'SIGNIFICANT': 'Significant',
+};
+
+const SMART_SEARCH_LOCATIONS = {
+  'NEW YORK': 'New York', 'LOS ANGELES': 'Los Angeles',
+  'HONG KONG': 'Hong Kong', 'ISRAEL': 'Israel',
+  'NY': 'New York', 'LA': 'Los Angeles', 'HK': 'Hong Kong',
+};
+
+const SMART_SEARCH_FANCY_COLORS = new Set([
+  'YELLOW', 'GREEN', 'BLUE', 'PINK', 'RED', 'ORANGE', 'PURPLE', 'BROWN',
+  'BLACK', 'GREY', 'GRAY', 'WHITE', 'VIOLET', 'TEAL', 'PADPARADSCHA',
+]);
+
+const SMART_SEARCH_ORIGINS = new Set([
+  'COLOMBIA', 'ZAMBIA', 'BRAZIL', 'ETHIOPIA', 'AFGHANISTAN', 'MADAGASCAR',
+  'MOZAMBIQUE', 'BURMA', 'MYANMAR', 'SRI LANKA', 'KASHMIR', 'TANZANIA',
+  'KENYA', 'PAKISTAN', 'RUSSIA', 'TAJIKISTAN', 'VIETNAM', 'THAILAND',
+  'CAMBODIA', 'AUSTRALIA', 'NIGERIA', 'ZIMBABWE', 'INDIA',
+]);
+
+const SMART_SEARCH_GROUPING = new Set([
+  'SINGLE', 'PAIR', 'SET', 'PARCEL', 'SIDE STONES', 'MELEE',
+]);
+
+const parseSmartSearch = (text) => {
+  const result = {
+    shapes: [], weight: null, clarities: [], colors: [], categories: [],
+    treatments: [], locations: [], labs: [], origins: [], skus: [],
+    fancyColors: [], groupingTypes: [], unmatched: [],
+  };
+  if (!text || !text.trim()) return result;
+
+  let remaining = text.trim();
+
+  // 1. Extract SKUs (T followed by digits)
+  remaining = remaining.replace(/\bT\d+\b/gi, (match) => {
+    result.skus.push(match.toUpperCase());
+    return ' ';
+  });
+
+  // 2. Extract weight (number with optional ct/carat suffix)
+  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*(?:ct|carat|cts|carats)?\b/gi, (match, num) => {
+    if (!result.weight) result.weight = parseFloat(num);
+    return ' ';
+  });
+
+  // 3. Extract multi-word phrases first (treatments, locations, origins, grouping, clarities)
+  const multiWordSets = [
+    { dict: SMART_SEARCH_TREATMENTS, target: 'treatments', isMap: true },
+    { dict: SMART_SEARCH_LOCATIONS, target: 'locations', isMap: true },
+  ];
+  for (const { dict, target, isMap } of multiWordSets) {
+    const keys = Object.keys(dict);
+    for (const key of keys) {
+      const regex = new RegExp('\\b' + key.replace(/\s+/g, '\\s+') + '\\b', 'gi');
+      remaining = remaining.replace(regex, () => {
+        result[target].push(isMap ? dict[key] : key);
+        return ' ';
+      });
+    }
+  }
+  // Multi-word origins
+  for (const origin of SMART_SEARCH_ORIGINS) {
+    if (origin.includes(' ')) {
+      const regex = new RegExp('\\b' + origin.replace(/\s+/g, '\\s+') + '\\b', 'gi');
+      remaining = remaining.replace(regex, () => {
+        result.origins.push(origin.charAt(0) + origin.slice(1).toLowerCase());
+        return ' ';
+      });
+    }
+  }
+  // Multi-word grouping
+  for (const gt of SMART_SEARCH_GROUPING) {
+    if (gt.includes(' ')) {
+      const regex = new RegExp('\\b' + gt.replace(/\s+/g, '\\s+') + '\\b', 'gi');
+      remaining = remaining.replace(regex, () => {
+        result.groupingTypes.push(gt.charAt(0) + gt.slice(1).toLowerCase());
+        return ' ';
+      });
+    }
+  }
+
+  // 4. Two-pass token processing:
+  //    Pass 1 -- classify each token; ambiguous words (shape+category) are deferred
+  //    Pass 2 -- resolve deferred words using context from pass 1
+  const tokens = remaining.split(/[\s,]+/).filter(t => t.length > 0);
+  const deferred = []; // { token, upper, shapeName }
+  let pureShapeCount = 0;
+  let pureCategoryCount = 0;
+
+  for (const token of tokens) {
+    const upper = token.toUpperCase();
+    if (['SHAPE', 'COLOR', 'CUT', 'STONE', 'GEM', 'GEMSTONE', 'THE', 'AND', 'WITH', 'CT', 'CARAT'].includes(upper)) continue;
+    if (SMART_SEARCH_CLARITIES.has(upper)) { result.clarities.push(upper); continue; }
+    if (SMART_SEARCH_LABS.has(upper)) { result.labs.push(upper); continue; }
+
+    const isShape = SMART_SEARCH_SHAPES.has(upper);
+    const isCategory = SMART_SEARCH_CATEGORIES.has(upper);
+
+    if (isShape && isCategory) {
+      const dnaNames = SHAPE_TO_DNA[upper] || SHAPE_TO_DNA[token];
+      const shapeName = dnaNames ? dnaNames[0] : (token.charAt(0).toUpperCase() + token.slice(1).toLowerCase());
+      deferred.push({ token, upper, shapeName });
+      continue;
+    }
+    if (isShape) {
+      const dnaNames = SHAPE_TO_DNA[upper] || SHAPE_TO_DNA[token];
+      if (dnaNames) { result.shapes.push(...dnaNames); } else { result.shapes.push(token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()); }
+      pureShapeCount++;
+      continue;
+    }
+    if (isCategory) {
+      result.categories.push(upper.charAt(0) + upper.slice(1).toLowerCase());
+      pureCategoryCount++;
+      continue;
+    }
+
+    if (SMART_SEARCH_TREATMENTS[upper]) { result.treatments.push(SMART_SEARCH_TREATMENTS[upper]); continue; }
+    if (SMART_SEARCH_ORIGINS.has(upper)) { result.origins.push(upper.charAt(0) + upper.slice(1).toLowerCase()); continue; }
+    if (SMART_SEARCH_GROUPING.has(upper)) { result.groupingTypes.push(upper.charAt(0) + upper.slice(1).toLowerCase()); continue; }
+    if (SMART_SEARCH_FANCY_COLORS.has(upper)) { result.fancyColors.push(upper.charAt(0) + upper.slice(1).toLowerCase()); continue; }
+    if (/^[D-Z]$/i.test(token)) { result.colors.push(upper); continue; }
+    result.unmatched.push(token);
+  }
+
+  // Pass 2: resolve ambiguous words
+  // Group deferred by word to detect duplicates (e.g. "emerald emerald")
+  const deferredByWord = {};
+  for (const item of deferred) {
+    if (!deferredByWord[item.upper]) deferredByWord[item.upper] = [];
+    deferredByWord[item.upper].push(item);
+  }
+  for (const [, items] of Object.entries(deferredByWord)) {
+    if (items.length >= 2) {
+      // Same word twice → first = category, second = shape
+      result.categories.push(items[0].upper.charAt(0) + items[0].upper.slice(1).toLowerCase());
+      result.shapes.push(items[1].shapeName);
+    } else {
+      // Single occurrence → always category (default)
+      result.categories.push(items[0].upper.charAt(0) + items[0].upper.slice(1).toLowerCase());
+    }
+  }
+
+  // Deduplicate
+  result.shapes = [...new Set(result.shapes)];
+  result.clarities = [...new Set(result.clarities)];
+  result.colors = [...new Set(result.colors)];
+  result.categories = [...new Set(result.categories)];
+  result.fancyColors = [...new Set(result.fancyColors)];
+  return result;
+};
+
 /* ---------------- Multi-Select Dropdown ---------------- */
 const MultiSelect = ({ value, options, onChange, placeholder }) => {
   const [open, setOpen] = useState(false);
@@ -3102,7 +3277,7 @@ const shortTreatment = (t) => {
   return t;
 };
 
-const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick }) => (
+const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, priceMode }) => (
   <motion.div
     layout
     className={`rounded-2xl border-2 overflow-hidden shadow-md transition-all duration-200 ${
@@ -3151,8 +3326,8 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
             </span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-stone-500">
-            <span><span className="text-stone-400">Total:</span> <span className="font-semibold text-stone-800">${stone.priceTotal?.toLocaleString() || '-'}</span></span>
-            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt?.toLocaleString() || '-'}</span>
+            <span><span className="text-stone-400">Total:</span> <span className="font-semibold text-stone-800">${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</span></span>
+            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</span>
             <span><span className="text-stone-400">Measurements:</span> {stone.measurements || 'N/A'}</span>
             <span><span className="text-stone-400">Ratio:</span> {stone.ratio || 'N/A'}</span>
             <span><span className="text-stone-400">Treatment:</span> {shortTreatment(stone.treatment)}</span>
@@ -3330,7 +3505,7 @@ const DetailItem = ({ label, value }) => (
 );
 
 /* ---------------- Pair Card (shows two stones side by side) ---------------- */
-const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSelection, onImageClick }) => {
+const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSelection, onImageClick, priceMode }) => {
   const StoneSide = ({ stone, label }) => (
     <div className="flex-1 min-w-0">
       {/* Image */}
@@ -3376,8 +3551,8 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
         </div>
         {/* Price */}
         <div className="pt-1">
-          <span className="text-base font-bold text-stone-900">${stone.priceTotal?.toLocaleString() || '-'}</span>
-          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt?.toLocaleString() || '-'}/ct)</span>
+          <span className="text-base font-bold text-stone-900">${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</span>
+          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}/ct)</span>
         </div>
       </div>
       {/* View DNA button */}
@@ -3395,7 +3570,8 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
 
   // Calculate combined weight
   const combinedWeight = ((stoneA.weightCt || 0) + (stoneB ? stoneB.weightCt || 0 : 0)).toFixed(2);
-  const combinedPrice = ((stoneA.priceTotal || 0) + (stoneB ? stoneB.priceTotal || 0 : 0));
+  const rawCombinedPrice = ((stoneA.priceTotal || 0) + (stoneB ? stoneB.priceTotal || 0 : 0));
+  const combinedPrice = priceMode === 'neto' ? Math.round(rawCombinedPrice / 2) : rawCombinedPrice;
 
   return (
     <motion.div
@@ -3646,7 +3822,7 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave }) => {
 };
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, columnConfig, onColumnConfigChange }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, columnConfig, onColumnConfigChange, priceMode }) => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
   const visibleColumns = useMemo(() => {
@@ -3787,8 +3963,8 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'ratio': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.ratio || 'N/A'}</span></td>;
       case 'treatment': return <td key={colId} className={cellBase}><span className="badge badge-neutral text-xs">{shortTreatment(stone.treatment)}</span></td>;
       case 'lab': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.lab || 'N/A'}</span></td>;
-      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(stone.pricePerCt / 2).toLocaleString() : '-'}</td>;
-      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(stone.priceTotal / 2).toLocaleString() : '-'}</td>;
+      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</td>;
+      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</td>;
       case 'location': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.location || 'N/A'}</span></td>;
       default: return null;
     }
@@ -3862,10 +4038,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-stone-900">
-                    ${stone.priceTotal?.toLocaleString() || '-'}
+                    ${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}
                   </p>
                   <p className="text-xs text-stone-500">
-                    ${stone.pricePerCt?.toLocaleString() || '-'}/ct
+                    ${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}/ct
                   </p>
                 </div>
               </div>
@@ -4234,6 +4410,8 @@ const StoneSearchPage = () => {
   const [sortConfig, setSortConfig] = useState({ field: "sku", direction: "asc" });
   const [viewMode, setViewMode] = useState("table");
   const [pairViewMode, setPairViewMode] = useState("cards");
+  const [smartSearch, setSmartSearch] = useState("");
+  const [priceMode, setPriceMode] = useState("neto"); // 'neto' = /2, 'bruto' = full DB price
 
   // Tags state
   const [tags, setTags] = useState([]);
@@ -5499,7 +5677,7 @@ const StoneSearchPage = () => {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedStone(null);
-  }, [filters]);
+  }, [filters, smartSearch]);
 
   const shapesOptions = useMemo(() => {
     const set = new Set();
@@ -5597,6 +5775,8 @@ const StoneSearchPage = () => {
     return ["All colors", ...sorted];
   }, [stones]);
 
+  const parsedSearch = useMemo(() => parseSmartSearch(smartSearch), [smartSearch]);
+
   const filteredStones = useMemo(() => {
     // Helper to parse measurements string like "11.92-7.85-5.60" into { length, width, depth }
     const parseMeasurements = (measurements) => {
@@ -5678,10 +5858,65 @@ const StoneSearchPage = () => {
         const stoneTagList = stoneTags[stone.sku] || [];
         if (!filters.tag.some(tagName => stoneTagList.some(t => t.name === tagName))) return false;
       }
+
+      // Smart search filter
+      const ss = parsedSearch;
+      const hasSmartSearch = ss.shapes.length > 0 || ss.weight || ss.clarities.length > 0 ||
+        ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
+        ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
+        ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0;
+
+      if (hasSmartSearch) {
+        if (ss.skus.length > 0) {
+          const sku = (stone.sku || '').toUpperCase();
+          if (!ss.skus.some(s => sku === s)) return false;
+        }
+        if (ss.shapes.length > 0) {
+          const stoneShapes = getDnaShapes(stone.shape).map(s => s.toUpperCase());
+          if (!ss.shapes.some(s => stoneShapes.includes(s.toUpperCase()))) return false;
+        }
+        if (ss.categories.length > 0) {
+          const mapped = getMappedCategories(stone.category);
+          if (!ss.categories.some(c => mapped.some(m => m.toUpperCase() === c.toUpperCase()))) return false;
+        }
+        if (ss.weight) {
+          const tolerance = ss.weight * 0.15;
+          const w = stone.weightCt;
+          if (w == null || w < ss.weight - tolerance || w > ss.weight + tolerance) return false;
+        }
+        if (ss.clarities.length > 0) {
+          const stoneClarity = (stone.clarity || '').toUpperCase().replace(/\s+/g, '');
+          if (!ss.clarities.some(c => stoneClarity === c || stoneClarity.startsWith(c))) return false;
+        }
+        if (ss.treatments.length > 0) {
+          if (!ss.treatments.some(t => (stone.treatment || '').toLowerCase() === t.toLowerCase())) return false;
+        }
+        if (ss.locations.length > 0) {
+          if (!ss.locations.some(l => (stone.location || '').toLowerCase() === l.toLowerCase())) return false;
+        }
+        if (ss.labs.length > 0) {
+          if (!ss.labs.some(l => (stone.lab || '').toUpperCase() === l.toUpperCase())) return false;
+        }
+        if (ss.origins.length > 0) {
+          if (!ss.origins.some(o => (stone.origin || '').toLowerCase().includes(o.toLowerCase()))) return false;
+        }
+        if (ss.groupingTypes.length > 0) {
+          if (!ss.groupingTypes.some(gt => (stone.groupingType || '').toLowerCase() === gt.toLowerCase())) return false;
+        }
+        if (ss.colors.length > 0) {
+          const groups = getDiamondColorGroups(stone.color);
+          if (!ss.colors.some(c => groups.includes(c))) return false;
+        }
+        if (ss.fancyColors.length > 0) {
+          const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
+          const base = getBaseFancyColor(fc);
+          if (!ss.fancyColors.some(c => c.toUpperCase() === (base || '').toUpperCase())) return false;
+        }
+      }
       
       return true;
     });
-  }, [filters, stones, stoneTags]);
+  }, [filters, stones, stoneTags, parsedSearch]);
 
   const sortedStones = useMemo(() => {
     const sorted = [...filteredStones];
@@ -5793,6 +6028,13 @@ const StoneSearchPage = () => {
                     </svg>
                   </button>
                 </div>
+
+                <button
+                  onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
+                >
+                  {priceMode === 'neto' ? 'Neto' : 'B'}
+                </button>
               </div>
             </div>
             
@@ -6018,6 +6260,63 @@ const StoneSearchPage = () => {
             </div>
           </div>
 
+          {/* Smart Search */}
+          <div className="glass rounded-2xl shadow-lg border border-white/50 p-4 mb-4">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg className="w-5 h-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={smartSearch}
+                onChange={(e) => setSmartSearch(e.target.value)}
+                placeholder="Smart search... e.g. Emerald 3ct VS2, Diamond J SI1 GIA, T9548"
+                className="w-full pl-12 pr-10 py-3 rounded-xl border border-stone-200 bg-white/80 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all"
+              />
+              {smartSearch && (
+                <button
+                  onClick={() => setSmartSearch("")}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-stone-400 hover:text-stone-600"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {smartSearch && (() => {
+              const ss = parsedSearch;
+              const hasTags = ss.shapes.length > 0 || ss.weight || ss.clarities.length > 0 ||
+                ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
+                ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
+                ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0;
+              if (!hasTags) return null;
+              const Badge = ({ label, type, color }) => (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+                  <span className="opacity-60">{type}:</span> {label}
+                </span>
+              );
+              return (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {ss.skus.map(s => <Badge key={`sku-${s}`} label={s} type="SKU" color="bg-violet-100 text-violet-700" />)}
+                  {ss.categories.map(c => <Badge key={`cat-${c}`} label={c} type="Category" color="bg-blue-100 text-blue-700" />)}
+                  {ss.shapes.map(s => <Badge key={`shp-${s}`} label={s} type="Shape" color="bg-emerald-100 text-emerald-700" />)}
+                  {ss.weight && <Badge label={`~${ss.weight}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
+                  {ss.clarities.map(c => <Badge key={`cl-${c}`} label={c} type="Clarity" color="bg-sky-100 text-sky-700" />)}
+                  {ss.colors.map(c => <Badge key={`col-${c}`} label={c} type="Color" color="bg-pink-100 text-pink-700" />)}
+                  {ss.fancyColors.map(c => <Badge key={`fc-${c}`} label={c} type="Fancy" color="bg-rose-100 text-rose-700" />)}
+                  {ss.treatments.map(t => <Badge key={`tr-${t}`} label={t} type="Treatment" color="bg-orange-100 text-orange-700" />)}
+                  {ss.labs.map(l => <Badge key={`lab-${l}`} label={l} type="Lab" color="bg-indigo-100 text-indigo-700" />)}
+                  {ss.locations.map(l => <Badge key={`loc-${l}`} label={l} type="Location" color="bg-teal-100 text-teal-700" />)}
+                  {ss.origins.map(o => <Badge key={`org-${o}`} label={o} type="Origin" color="bg-lime-100 text-lime-700" />)}
+                  {ss.groupingTypes.map(g => <Badge key={`gt-${g}`} label={g} type="Type" color="bg-stone-200 text-stone-700" />)}
+                </div>
+              );
+            })()}
+          </div>
+
           {/* Filters */}
           <StoneFilters
             filters={filters}
@@ -6141,6 +6440,7 @@ const StoneSearchPage = () => {
                         requestAnimationFrame(() => window.scrollTo(0, scrollY));
                       }}
                       onImageClick={setLightboxImage}
+                      priceMode={priceMode}
                     />
                   );
                 })
@@ -6169,6 +6469,7 @@ const StoneSearchPage = () => {
               onImageClick={setLightboxImage}
               columnConfig={columnConfig}
               onColumnConfigChange={handleColumnConfigChange}
+              priceMode={priceMode}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
@@ -6205,6 +6506,7 @@ const StoneSearchPage = () => {
                     onManageTags={() => setShowTagsModal(true)}
                     onViewDNA={setDrawerStone}
                     onImageClick={setLightboxImage}
+                    priceMode={priceMode}
                   />
                 ))
               )}
