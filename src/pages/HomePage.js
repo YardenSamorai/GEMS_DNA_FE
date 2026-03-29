@@ -470,6 +470,320 @@ const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
   );
 };
 
+// CSV Upload Dialog Component
+const CsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [resultMessage, setResultMessage] = useState('');
+  const [progress, setProgress] = useState({ phase: 'idle', progress: 0, detail: '' });
+  const [dragOver, setDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
+  const pollingRef = useRef(null);
+
+  useEffect(() => {
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, []);
+
+  const resetState = () => {
+    setUploading(false);
+    setResult(null);
+    setResultMessage('');
+    setProgress({ phase: 'idle', progress: 0, detail: '' });
+    setSelectedFile(null);
+    setDragOver(false);
+  };
+
+  const handleClose = () => {
+    if (!uploading) {
+      resetState();
+      onClose();
+    }
+  };
+
+  const startPolling = () => {
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/import-csv/progress`);
+        const data = await res.json();
+        setProgress(data);
+        if (!data.active && data.phase !== 'idle') {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      } catch (e) { /* ignore polling errors */ }
+    }, 800);
+  };
+
+  const handleFileSelect = (file) => {
+    if (file && file.name.toLowerCase().endsWith('.csv')) {
+      setSelectedFile(file);
+      setResult(null);
+      setResultMessage('');
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    handleFileSelect(file);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    try {
+      setUploading(true);
+      setResult(null);
+      setResultMessage('');
+      setProgress({ phase: 'reading', progress: 5, detail: 'Reading file...' });
+
+      const text = await selectedFile.text();
+      setProgress({ phase: 'uploading', progress: 15, detail: 'Uploading to server...' });
+      startPolling();
+
+      const response = await fetch(`${API_BASE}/api/import-csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvContent: text }),
+      });
+
+      const data = await response.json();
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+
+      if (data.success) {
+        setProgress({ phase: 'complete', progress: 100, detail: `Successfully imported ${data.count} stones!` });
+        setResult('success');
+        setResultMessage(`${data.count} stones imported successfully from CSV`);
+        if (onImportComplete) onImportComplete();
+      } else {
+        setProgress({ phase: 'error', progress: 0, detail: data.error });
+        setResult('error');
+        setResultMessage(data.error || 'CSV import failed');
+      }
+    } catch (error) {
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+      setProgress({ phase: 'error', progress: 0, detail: error.message });
+      setResult('error');
+      setResultMessage('Connection error. Make sure the backend server is running.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm"
+        onClick={uploading ? undefined : handleClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          onClick={e => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 sm:px-5 py-3.5 sm:py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-white font-bold text-base sm:text-lg flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  CSV Import
+                </h2>
+                <p className="text-white/80 text-xs sm:text-sm mt-0.5">Upload a CSV file to update inventory</p>
+              </div>
+              {!uploading && (
+                <button onClick={handleClose} className="text-white/80 hover:text-white transition-colors p-1">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
+            {/* Drop Zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => !uploading && fileInputRef.current?.click()}
+              className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all ${
+                dragOver
+                  ? 'border-amber-400 bg-amber-50'
+                  : selectedFile
+                  ? 'border-emerald-300 bg-emerald-50'
+                  : 'border-stone-300 bg-stone-50 hover:border-amber-400 hover:bg-amber-50/50'
+              } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => handleFileSelect(e.target.files[0])}
+              />
+              {selectedFile ? (
+                <div className="space-y-2">
+                  <div className="w-12 h-12 mx-auto bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold text-emerald-700">{selectedFile.name}</p>
+                  <p className="text-xs text-stone-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                  {!uploading && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                      className="text-xs text-stone-400 hover:text-red-500 transition-colors"
+                    >
+                      Remove & choose another
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="w-12 h-12 mx-auto bg-stone-200 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-stone-600">Drag & drop a CSV file here</p>
+                  <p className="text-xs text-stone-400">or click to browse</p>
+                </div>
+              )}
+            </div>
+
+            {/* Progress Section */}
+            {(uploading || result) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="space-y-3"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-medium text-stone-700">
+                      {progress.phase === 'reading' ? 'Reading file...' :
+                       progress.phase === 'uploading' ? 'Uploading...' :
+                       progress.phase === 'parsing' ? 'Parsing CSV...' :
+                       progress.phase === 'processing' ? 'Processing stones...' :
+                       progress.phase === 'clearing' ? 'Preparing database...' :
+                       progress.phase === 'inserting' ? 'Saving to database...' :
+                       progress.phase === 'complete' ? 'Import complete!' :
+                       progress.phase === 'error' ? 'Import failed' :
+                       progress.phase}
+                    </span>
+                    <span className="text-[11px] text-stone-400 font-mono">{Math.round(progress.progress)}%</span>
+                  </div>
+                  <div className="w-full bg-stone-200 rounded-full h-3 overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full ${
+                        result === 'error' ? 'bg-red-500' :
+                        result === 'success' ? 'bg-emerald-500' :
+                        'bg-gradient-to-r from-amber-400 to-orange-500'
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress.progress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                  {progress.detail && (
+                    <p className="text-[11px] text-stone-500">{progress.detail}</p>
+                  )}
+                </div>
+
+                {result && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`rounded-xl p-3 sm:p-4 flex items-start gap-3 ${
+                      result === 'success'
+                        ? 'bg-emerald-50 border border-emerald-200'
+                        : 'bg-red-50 border border-red-200'
+                    }`}
+                  >
+                    <span className="text-xl flex-shrink-0">{result === 'success' ? '✅' : '❌'}</span>
+                    <div className="min-w-0">
+                      <h4 className={`font-semibold text-sm ${result === 'success' ? 'text-emerald-800' : 'text-red-800'}`}>
+                        {result === 'success' ? 'Import Complete!' : 'Import Failed'}
+                      </h4>
+                      <p className={`text-xs mt-0.5 ${result === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {resultMessage}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Upload Button */}
+            <button
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading}
+              className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-semibold text-white text-sm sm:text-base transition-all ${
+                !selectedFile || uploading
+                  ? 'bg-stone-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 hover:shadow-lg active:scale-[0.98]'
+              }`}
+            >
+              {uploading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Importing...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  {result === 'success' ? 'Import Again' : result === 'error' ? 'Retry Import' : 'Start Import'}
+                </span>
+              )}
+            </button>
+
+            {/* Warning note */}
+            <div className="flex items-start gap-2 px-1 text-[11px] sm:text-xs text-amber-600 bg-amber-50 rounded-lg p-2.5">
+              <span className="flex-shrink-0 mt-0.5">⚠️</span>
+              <span>This will replace all existing inventory data. Prices will be automatically doubled as per business rules.</span>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t bg-stone-50 px-4 sm:px-5 py-3 flex justify-end flex-shrink-0">
+            <button
+              onClick={handleClose}
+              disabled={uploading}
+              className={`px-5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
+                uploading
+                  ? 'text-stone-400 bg-stone-200 cursor-not-allowed'
+                  : 'text-white bg-amber-600 hover:bg-amber-700'
+              }`}
+            >
+              {uploading ? 'Please wait...' : 'Close'}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const HomePage = () => {
   const { user } = useUser();
   const navigate = useNavigate();
@@ -480,6 +794,7 @@ const HomePage = () => {
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [showCsvDialog, setShowCsvDialog] = useState(false);
   const [stats, setStats] = useState({
     totalStones: 0,
     totalValue: 0,
@@ -681,6 +996,15 @@ const HomePage = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 Sync SOAP Data
+              </button>
+              <button
+                onClick={() => setShowCsvDialog(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.02]"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Upload CSV
               </button>
             </div>
           </div>
@@ -1148,6 +1472,13 @@ const HomePage = () => {
         onClose={() => setShowSyncDialog(false)}
         currentStats={stats}
         onSyncComplete={fetchData}
+      />
+
+      {/* CSV Upload Dialog */}
+      <CsvUploadDialog
+        isOpen={showCsvDialog}
+        onClose={() => setShowCsvDialog(false)}
+        onImportComplete={fetchData}
       />
     </div>
   );
