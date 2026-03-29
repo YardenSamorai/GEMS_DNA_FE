@@ -3968,9 +3968,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
             stone.groupingType === 'Fancy' ? 'bg-pink-100 text-pink-700 font-semibold' :
             stone.groupingType === 'Side Stones' ? 'bg-teal-100 text-teal-700 font-semibold' :
             stone.groupingType === 'Melee' ? 'bg-rose-100 text-rose-700 font-semibold' :
-            'bg-stone-100 text-stone-500'
+            stone.groupingType === 'Single' ? 'bg-stone-200 text-stone-600' :
+            'bg-stone-100 text-stone-400'
           }`}>
-            {stone.groupingType || 'Single'}
+            {stone.groupingType || '-'}
           </span>
         </td>
       );
