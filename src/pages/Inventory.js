@@ -1318,6 +1318,7 @@ const ExportModal = ({
   const [globalMarkup, setGlobalMarkup] = useState(0);
   const [priceOverrides, setPriceOverrides] = useState({});
   const [includeAppendix, setIncludeAppendix] = useState(false);
+  const [hidePrices, setHidePrices] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -1325,6 +1326,7 @@ const ExportModal = ({
       setGlobalMarkup(0);
       setPriceOverrides({});
       setIncludeAppendix(true);
+      setHidePrices(false);
     }
   }, [isOpen]);
 
@@ -1390,10 +1392,10 @@ const ExportModal = ({
   const handleExport = () => {
     const stonesWithAdjustedPrices = selectedStones.map((stone) => ({
       ...stone,
-      pricePerCt: getAdjustedPricePerCt(stone),
-      priceTotal: getAdjustedTotal(stone),
+      pricePerCt: hidePrices ? 0 : getAdjustedPricePerCt(stone),
+      priceTotal: hidePrices ? 0 : getAdjustedTotal(stone),
     }));
-    onExport(stonesWithAdjustedPrices, { includeAppendix });
+    onExport(stonesWithAdjustedPrices, { includeAppendix, hidePrices });
     onClose();
   };
 
@@ -1439,6 +1441,7 @@ const ExportModal = ({
           </div>
 
           {/* Global Markup Section */}
+          {!hidePrices && (
           <div className="px-4 sm:px-6 py-3 sm:py-4 bg-stone-50 border-b border-stone-200">
             <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 sm:gap-4">
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1476,6 +1479,7 @@ const ExportModal = ({
               </div>
             </div>
           </div>
+          )}
 
           {/* Stones List - Cards for Mobile, Table for Desktop */}
           <div className="overflow-auto max-h-[50vh] sm:max-h-[45vh]">
@@ -1502,6 +1506,7 @@ const ExportModal = ({
                     </div>
                     
                     {/* Price Row */}
+                    {!hidePrices && (
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-col">
                         <span className="text-[10px] text-stone-400 uppercase">Original $/ct</span>
@@ -1546,6 +1551,7 @@ const ExportModal = ({
                         <span className="text-sm font-bold text-stone-800">${Math.round(adjustedTotal).toLocaleString()}</span>
                       </div>
                     </div>
+                    )}
                   </div>
                 );
               })}
@@ -1558,11 +1564,13 @@ const ExportModal = ({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600 uppercase">SKU</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600 uppercase">Shape</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase">Weight</th>
+                  {!hidePrices && <>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-stone-600 uppercase">Orig $/ct</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase">New $/ct</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase">+/-</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-stone-600 uppercase">Total</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase"></th>
+                  </>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -1584,6 +1592,7 @@ const ExportModal = ({
                       </td>
                       <td className="px-4 py-3 text-sm text-stone-700">{getDisplayShape(stone.shape)}</td>
                       <td className="px-4 py-3 text-sm text-stone-700 text-center">{stone.weightCt}ct</td>
+                      {!hidePrices && <>
                       <td className="px-4 py-3 text-sm text-stone-500 text-right">
                         ${originalPricePerCt.toLocaleString()}
                       </td>
@@ -1624,6 +1633,7 @@ const ExportModal = ({
                           </button>
                         )}
                       </td>
+                      </>}
                     </tr>
                   );
                 })}
@@ -1634,7 +1644,7 @@ const ExportModal = ({
           {/* Footer */}
           <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-stone-200 bg-stone-50">
             {/* Options Row */}
-            <div className="flex items-center gap-4 mb-3 pb-3 border-b border-stone-200">
+            <div className="flex flex-wrap items-center gap-4 mb-3 pb-3 border-b border-stone-200">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -1644,17 +1654,28 @@ const ExportModal = ({
                 />
                 <span className="text-xs sm:text-sm text-stone-700 font-medium">Include GRS Appendix</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hidePrices}
+                  onChange={(e) => setHidePrices(e.target.checked)}
+                  className="w-4 h-4 rounded border-stone-300 text-red-500 focus:ring-red-500"
+                />
+                <span className="text-xs sm:text-sm text-stone-700 font-medium">Hide Prices</span>
+              </label>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="text-xs sm:text-sm text-stone-600 text-center sm:text-left space-y-1 sm:space-y-0">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1">
                   <span><span className="font-medium">{selectedStones.length}</span> stones</span>
                   <span><span className="font-medium">{totalWeight.toFixed(2)}</span> ct</span>
+                  {!hidePrices && <>
                   <span className="text-stone-400">|</span>
                   <span>Orig: <span className="font-medium text-stone-500">${totalOriginal.toLocaleString()}</span></span>
                   <span className={`font-semibold ${totalAdjusted !== totalOriginal ? 'text-emerald-600' : 'text-stone-700'}`}>
                     → Total: ${Math.round(totalAdjusted).toLocaleString()}
                   </span>
+                  </>}
                 </div>
               </div>
               <div className="flex items-center gap-2 sm:gap-3">
@@ -4424,6 +4445,7 @@ const StoneSearchPage = () => {
   const [pdfGenerating, setPdfGenerating] = useState(false); // PDF generation loading state
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
+  const [pdfHidePrices, setPdfHidePrices] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -4438,6 +4460,15 @@ const StoneSearchPage = () => {
   const [pairViewMode, setPairViewMode] = useState("cards");
   const [smartSearch, setSmartSearch] = useState("");
   const [priceMode, setPriceMode] = useState("neto"); // 'neto' = /2, 'bruto' = full DB price
+
+  const applyPriceMode = useCallback((stonesArr) => {
+    if (priceMode === 'bruto') return stonesArr;
+    return stonesArr.map(s => ({
+      ...s,
+      pricePerCt: s.pricePerCt ? s.pricePerCt / 2 : s.pricePerCt,
+      priceTotal: s.priceTotal ? s.priceTotal / 2 : s.priceTotal,
+    }));
+  }, [priceMode]);
 
   // Tags state
   const [tags, setTags] = useState([]);
@@ -4765,24 +4796,24 @@ const StoneSearchPage = () => {
       console.log('Could not load logo image:', e.message);
     }
 
-    const { includeAppendix = true } = options;
+    const { includeAppendix = true, hidePrices = false } = options;
 
     // Create sheet for Emeralds
     if (emeralds.length > 0) {
       console.log('Creating Emeralds sheet with', emeralds.length, 'stones');
-      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981", logoImageId, includeAppendix);
+      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF10B981", logoImageId, includeAppendix, hidePrices);
     }
 
     // Create sheet for Diamonds
     if (diamonds.length > 0) {
       console.log('Creating Diamonds sheet with', diamonds.length, 'stones');
-      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6", logoImageId, includeAppendix);
+      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6", logoImageId, includeAppendix, hidePrices);
     }
 
     // Create sheet for Others (use Emerald columns as default)
     if (others.length > 0) {
       console.log('Creating Other Gems sheet with', others.length, 'stones');
-      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6", logoImageId, includeAppendix);
+      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6", logoImageId, includeAppendix, hidePrices);
     }
 
     console.log('Total sheets in workbook:', workbook.worksheets.length);
@@ -4795,9 +4826,11 @@ const StoneSearchPage = () => {
   };
 
   // Helper: Create a category-specific sheet
-  const createCategorySheet = (workbook, sheetName, data, columns, accentColor, logoImageId = null, includeAppendix = true) => {
-    // Filter out appendix column if not included
-    const effectiveColumns = includeAppendix ? columns : columns.filter(c => c.key !== 'appendix');
+  const createCategorySheet = (workbook, sheetName, data, columns, accentColor, logoImageId = null, includeAppendix = true, hidePrices = false) => {
+    let effectiveColumns = includeAppendix ? columns : columns.filter(c => c.key !== 'appendix');
+    if (hidePrices) {
+      effectiveColumns = effectiveColumns.filter(c => !['pricePerCt', 'priceTotal', 'rapPrice'].includes(c.key));
+    }
     const worksheet = workbook.addWorksheet(sheetName);
     const colCount = effectiveColumns.length;
     
@@ -5189,10 +5222,12 @@ const StoneSearchPage = () => {
       accentColor = "FF8B5CF6"; // Purple for mixed
     }
 
-    // Filter out appendix column if not included
-    const { includeAppendix = true } = options;
+    const { includeAppendix = true, hidePrices = false } = options;
     if (!includeAppendix) {
       columnsToUse = columnsToUse.filter(c => c.key !== 'appendix');
+    }
+    if (hidePrices) {
+      columnsToUse = columnsToUse.filter(c => !['pricePerCt', 'priceTotal', 'rapPrice'].includes(c.key));
     }
 
     // Create workbook and worksheet
@@ -5830,10 +5865,12 @@ const StoneSearchPage = () => {
           if (!matches) return false;
         }
       }
-      if (filters.minPrice && stone.priceTotal != null && stone.priceTotal < Number(filters.minPrice)) return false;
-      if (filters.maxPrice && stone.priceTotal != null && stone.priceTotal > Number(filters.maxPrice)) return false;
-      if (filters.minPricePerCt && stone.pricePerCt != null && stone.pricePerCt < Number(filters.minPricePerCt)) return false;
-      if (filters.maxPricePerCt && stone.pricePerCt != null && stone.pricePerCt > Number(filters.maxPricePerCt)) return false;
+      const effectiveTotal = priceMode === 'neto' && stone.priceTotal != null ? stone.priceTotal / 2 : stone.priceTotal;
+      const effectivePPC = priceMode === 'neto' && stone.pricePerCt != null ? stone.pricePerCt / 2 : stone.pricePerCt;
+      if (filters.minPrice && effectiveTotal != null && effectiveTotal < Number(filters.minPrice)) return false;
+      if (filters.maxPrice && effectiveTotal != null && effectiveTotal > Number(filters.maxPrice)) return false;
+      if (filters.minPricePerCt && effectivePPC != null && effectivePPC < Number(filters.minPricePerCt)) return false;
+      if (filters.maxPricePerCt && effectivePPC != null && effectivePPC > Number(filters.maxPricePerCt)) return false;
       if (filters.minCarat && stone.weightCt != null && stone.weightCt < Number(filters.minCarat)) return false;
       if (filters.maxCarat && stone.weightCt != null && stone.weightCt > Number(filters.maxCarat)) return false;
       
@@ -5915,7 +5952,7 @@ const StoneSearchPage = () => {
           if (w == null || w < ss.weight - tolerance || w > ss.weight + tolerance) return false;
         }
         if (ss.pricePerCt) {
-          const ppc = stone.pricePerCt;
+          const ppc = priceMode === 'neto' && stone.pricePerCt != null ? stone.pricePerCt / 2 : stone.pricePerCt;
           if (ppc == null || ppc < ss.pricePerCt.min || ppc > ss.pricePerCt.max) return false;
         }
         if (ss.clarities.length > 0) {
@@ -5950,7 +5987,7 @@ const StoneSearchPage = () => {
       
       return true;
     });
-  }, [filters, stones, stoneTags, parsedSearch]);
+  }, [filters, stones, stoneTags, parsedSearch, priceMode]);
 
   const sortedStones = useMemo(() => {
     const sorted = [...filteredStones];
@@ -6169,7 +6206,7 @@ const StoneSearchPage = () => {
                           <span className="font-medium">PDF</span>
                         </button>
                         <button
-                          onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
+                          onClick={() => exportForLabels(applyPriceMode(stones.filter(s => selectedStones.has(s.id))), false)}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                         >
                           <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -6252,7 +6289,7 @@ const StoneSearchPage = () => {
                       </div>
                       
                       <button
-                        onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
+                        onClick={() => exportForLabels(applyPriceMode(stones.filter(s => selectedStones.has(s.id))), false)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                       >
                         <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -6645,7 +6682,7 @@ const StoneSearchPage = () => {
                 </div>
                 
                 <button
-                  onClick={() => exportForLabels(stones.filter(s => selectedStones.has(s.id)), false)}
+                  onClick={() => exportForLabels(applyPriceMode(stones.filter(s => selectedStones.has(s.id))), false)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -6692,7 +6729,7 @@ const StoneSearchPage = () => {
           setShowExportModal(false);
           setExportMode('combined'); // Reset to default
         }}
-        selectedStones={stones.filter((s) => selectedStones.has(s.id))}
+        selectedStones={applyPriceMode(stones.filter((s) => selectedStones.has(s.id)))}
         onExport={(modifiedStones, options = {}) => {
           if (exportMode === 'separate') {
             exportToExcelSeparate(modifiedStones, options);
@@ -6706,7 +6743,7 @@ const StoneSearchPage = () => {
       <CategoryExportModal
         isOpen={showCategoryExportModal}
         onClose={() => setShowCategoryExportModal(false)}
-        categories={getCategoryBreakdown(stones.filter((s) => selectedStones.has(s.id)))}
+        categories={getCategoryBreakdown(applyPriceMode(stones.filter((s) => selectedStones.has(s.id))))}
         onChoose={handleCategoryExportChoice}
       />
 
@@ -6731,9 +6768,10 @@ const StoneSearchPage = () => {
       <ExportModal
         isOpen={showPDFPriceModal}
         onClose={() => setShowPDFPriceModal(false)}
-        selectedStones={stones.filter((s) => selectedStones.has(s.id))}
-        onExport={(modifiedStones) => {
+        selectedStones={applyPriceMode(stones.filter((s) => selectedStones.has(s.id)))}
+        onExport={(modifiedStones, options = {}) => {
           setPdfStonesWithPrices(modifiedStones);
+          setPdfHidePrices(!!options.hidePrices);
           setShowPDFPriceModal(false);
           setShowPDFModal(true);
         }}
@@ -6757,10 +6795,13 @@ const StoneSearchPage = () => {
           try {
             const stonesToUse = pdfStonesWithPrices.length > 0 
               ? pdfStonesWithPrices 
-              : stones.filter(s => selectedStones.has(s.id));
-            await generatePDFCatalog(stonesToUse, options);
+              : applyPriceMode(stones.filter(s => selectedStones.has(s.id)));
+            const pdfOptions = { ...options };
+            if (pdfHidePrices) pdfOptions.showPrices = false;
+            await generatePDFCatalog(stonesToUse, pdfOptions);
             setShowPDFModal(false);
             setPdfStonesWithPrices([]);
+            setPdfHidePrices(false);
           } catch (err) {
             console.error('PDF generation failed:', err);
             alert('Failed to generate PDF. Please try again.');
