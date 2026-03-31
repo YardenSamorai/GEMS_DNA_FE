@@ -1313,7 +1313,8 @@ const ExportModal = ({
   title = "Export Preview",
   subtitle = null,
   buttonText = "Export",
-  buttonColor = "from-emerald-500 to-emerald-600"
+  buttonColor = "from-emerald-500 to-emerald-600",
+  showHidePricesOption = true
 }) => {
   const [globalMarkup, setGlobalMarkup] = useState(0);
   const [priceOverrides, setPriceOverrides] = useState({});
@@ -1654,6 +1655,7 @@ const ExportModal = ({
                 />
                 <span className="text-xs sm:text-sm text-stone-700 font-medium">Include GRS Appendix</span>
               </label>
+              {showHidePricesOption && (
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -1663,6 +1665,7 @@ const ExportModal = ({
                 />
                 <span className="text-xs sm:text-sm text-stone-700 font-medium">Hide Prices</span>
               </label>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="text-xs sm:text-sm text-stone-600 text-center sm:text-left space-y-1 sm:space-y-0">
@@ -4445,7 +4448,6 @@ const StoneSearchPage = () => {
   const [pdfGenerating, setPdfGenerating] = useState(false); // PDF generation loading state
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
-  const [pdfHidePrices, setPdfHidePrices] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -6769,9 +6771,8 @@ const StoneSearchPage = () => {
         isOpen={showPDFPriceModal}
         onClose={() => setShowPDFPriceModal(false)}
         selectedStones={applyPriceMode(stones.filter((s) => selectedStones.has(s.id)))}
-        onExport={(modifiedStones, options = {}) => {
+        onExport={(modifiedStones) => {
           setPdfStonesWithPrices(modifiedStones);
-          setPdfHidePrices(!!options.hidePrices);
           setShowPDFPriceModal(false);
           setShowPDFModal(true);
         }}
@@ -6779,6 +6780,7 @@ const StoneSearchPage = () => {
         subtitle="Modify prices before generating the catalog"
         buttonText="Continue to PDF Options"
         buttonColor="from-red-500 to-pink-500"
+        showHidePricesOption={false}
       />
 
       {/* PDF Options Modal (Step 2) */}
@@ -6796,12 +6798,9 @@ const StoneSearchPage = () => {
             const stonesToUse = pdfStonesWithPrices.length > 0 
               ? pdfStonesWithPrices 
               : applyPriceMode(stones.filter(s => selectedStones.has(s.id)));
-            const pdfOptions = { ...options };
-            if (pdfHidePrices) pdfOptions.showPrices = false;
-            await generatePDFCatalog(stonesToUse, pdfOptions);
+            await generatePDFCatalog(stonesToUse, options);
             setShowPDFModal(false);
             setPdfStonesWithPrices([]);
-            setPdfHidePrices(false);
           } catch (err) {
             console.error('PDF generation failed:', err);
             alert('Failed to generate PDF. Please try again.');
