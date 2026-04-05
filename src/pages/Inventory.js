@@ -4636,22 +4636,21 @@ const StoneSearchPage = () => {
     });
   };
 
-  // Select/Deselect all visible stones (preserve scroll position)
+  // Select/Deselect all filtered stones across all pages
   const toggleSelectAll = () => {
     const scrollY = window.scrollY;
-    const visibleIds = paginatedStones.map((s) => s.id);
-    const allSelected = visibleIds.every((id) => selectedStones.has(id));
+    const allIds = sortedStones.map((s) => s.id);
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedStones.has(id));
     
     setSelectedStones((prev) => {
       const newSet = new Set(prev);
       if (allSelected) {
-        visibleIds.forEach((id) => newSet.delete(id));
+        allIds.forEach((id) => newSet.delete(id));
       } else {
-        visibleIds.forEach((id) => newSet.add(id));
+        allIds.forEach((id) => newSet.add(id));
       }
       return newSet;
     });
-    // Restore scroll position after React re-renders
     requestAnimationFrame(() => {
       window.scrollTo(0, scrollY);
     });
@@ -6099,7 +6098,7 @@ const StoneSearchPage = () => {
               <button
                 onClick={() => {
                   const scrollY = window.scrollY;
-                  const allPairIds = paginatedPairs.flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]);
+                  const allPairIds = (pairedGroups || []).flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]);
                   const allSelected = allPairIds.length > 0 && allPairIds.every(id => selectedStones.has(id));
                   setSelectedStones(prev => {
                     const newSet = new Set(prev);
@@ -6117,7 +6116,7 @@ const StoneSearchPage = () => {
                 <input
                   type="checkbox"
                   readOnly
-                  checked={paginatedPairs.length > 0 && paginatedPairs.flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]).every(id => selectedStones.has(id))}
+                  checked={(pairedGroups || []).length > 0 && (pairedGroups || []).flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]).every(id => selectedStones.has(id))}
                   className="w-3.5 h-3.5 rounded border-emerald-300 text-emerald-500 pointer-events-none"
                 />
                 Select All Pairs
@@ -6194,7 +6193,7 @@ const StoneSearchPage = () => {
               selectedStones={selectedStones}
               onToggleSelection={toggleStoneSelection}
               onToggleSelectAll={toggleSelectAll}
-              allSelected={paginatedStones.length > 0 && paginatedStones.every((s) => selectedStones.has(s.id))}
+              allSelected={sortedStones.length > 0 && sortedStones.every((s) => selectedStones.has(s.id))}
               stoneTags={stoneTags}
               allTags={tags}
               onAddTag={addTagToStone}
