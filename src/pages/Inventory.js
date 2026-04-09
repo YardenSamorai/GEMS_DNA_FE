@@ -915,7 +915,7 @@ const EMERALD_COLUMNS = [
   { key: "weight", header: "Weight (ct)", width: 12 },
   { key: "measurements", header: "Measurements", width: 20 },
   { key: "ratio", header: "Ratio", width: 8 },
-  { key: "treatment", header: "Treatment", width: 18 },
+  { key: "treatment", header: "Clarity", width: 18 },
   { key: "origin", header: "Origin", width: 12 },
   { key: "lab", header: "Lab", width: 10 },
   { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
@@ -2084,7 +2084,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
                 <DetailRow label="Weight" value={`${stone.weightCt} ct`} />
                 <DetailRow label="Color" value={getDisplayColor(stone)} />
                 <DetailRow label="Clarity" value={stone.clarity} />
-                <DetailRow label="Treatment" value={stone.treatment} />
+                <DetailRow label="Clarity" value={stone.treatment} />
                 <DetailRow label="Origin" value={stone.origin} />
                 <DetailRow label="Lab" value={stone.lab} />
                 <DetailRow label="Measurements" value={stone.measurements} />
@@ -3066,7 +3066,7 @@ const MultiSelect = ({ value, options, onChange, placeholder }) => {
 };
 
 /* ---------------- Filters ---------------- */
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, tags, onManageTags }) => {
+const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, tags, onManageTags, inventoryMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   
   const handleChange = (field) => (e) => {
@@ -3244,24 +3244,28 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
 
               {/* Row 4: Dropdowns */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Category</label>
-                  <MultiSelect
-                    value={filters.category}
-                    options={categoriesOptions.filter(c => c !== 'All categories')}
-                    onChange={(val) => onChange({ ...filters, category: val })}
-                    placeholder="All categories"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Treatment</label>
-                  <MultiSelect
-                    value={filters.treatment}
-                    options={treatmentOptions.filter(t => t !== 'All treatments')}
-                    onChange={(val) => onChange({ ...filters, treatment: val })}
-                    placeholder="All treatments"
-                  />
-                </div>
+                {inventoryMode === 'gemstones' && (
+                  <div>
+                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Category</label>
+                    <MultiSelect
+                      value={filters.category}
+                      options={categoriesOptions.filter(c => c !== 'All categories')}
+                      onChange={(val) => onChange({ ...filters, category: val })}
+                      placeholder="All categories"
+                    />
+                  </div>
+                )}
+                {inventoryMode === 'gemstones' && (
+                  <div>
+                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Clarity</label>
+                    <MultiSelect
+                      value={filters.treatment}
+                      options={treatmentOptions.filter(t => t !== 'All treatments')}
+                      onChange={(val) => onChange({ ...filters, treatment: val })}
+                      placeholder="All"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Location</label>
                   <MultiSelect
@@ -3280,24 +3284,28 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
                     placeholder="All types"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Diamond Color</label>
-                  <MultiSelect
-                    value={filters.diamondColor}
-                    options={diamondColorOptions.filter(c => c !== 'All colors')}
-                    onChange={(val) => onChange({ ...filters, diamondColor: val })}
-                    placeholder="All colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Fancy Color</label>
-                  <MultiSelect
-                    value={filters.fancyColor}
-                    options={fancyColorOptions.filter(c => c !== 'All colors')}
-                    onChange={(val) => onChange({ ...filters, fancyColor: val })}
-                    placeholder="All colors"
-                  />
-                </div>
+                {inventoryMode === 'diamonds' && (
+                  <div>
+                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Diamond Color</label>
+                    <MultiSelect
+                      value={filters.diamondColor}
+                      options={diamondColorOptions.filter(c => c !== 'All colors')}
+                      onChange={(val) => onChange({ ...filters, diamondColor: val })}
+                      placeholder="All colors"
+                    />
+                  </div>
+                )}
+                {inventoryMode === 'diamonds' && (
+                  <div>
+                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Fancy Color</label>
+                    <MultiSelect
+                      value={filters.fancyColor}
+                      options={fancyColorOptions.filter(c => c !== 'All colors')}
+                      onChange={(val) => onChange({ ...filters, fancyColor: val })}
+                      placeholder="All colors"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Box</label>
                   <input type="text" value={filters.box} onChange={handleChange("box")} placeholder="Search box..." className="input-modern" />
@@ -3397,7 +3405,7 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
             <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</span>
             <span><span className="text-stone-400">Measurements:</span> {stone.measurements || 'N/A'}</span>
             <span><span className="text-stone-400">Ratio:</span> {stone.ratio || 'N/A'}</span>
-            <span><span className="text-stone-400">Treatment:</span> {shortTreatment(stone.treatment)}</span>
+            <span><span className="text-stone-400">Clarity:</span> {shortTreatment(stone.treatment)}</span>
             <span><span className="text-stone-400">Lab:</span> {stone.lab || ''}</span>
             <span><span className="text-stone-400">Location:</span> {stone.location || ''}</span>
             <span><span className="text-stone-400">Type:</span> {stone.pairSku ? 'Pair' : 'Single'}</span>
@@ -3478,7 +3486,7 @@ const StoneDetails = ({ stone, onViewDNA }) => {
         <DetailItem label="Measurements" value={stone.measurements} />
         <DetailItem label="Color" value={getDisplayColor(stone)} />
         <DetailItem label="Clarity" value={stone.clarity} />
-        <DetailItem label="Treatment" value={stone.treatment} />
+        <DetailItem label="Clarity" value={stone.treatment} />
         <DetailItem label="Lab" value={stone.lab} />
         <DetailItem label="Origin" value={stone.origin} />
         <DetailItem label="Ratio" value={stone.ratio} />
@@ -3707,35 +3715,57 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
 };
 
 /* ---------------- Column Configuration ---------------- */
-const DEFAULT_COLUMNS = [
+const DIAMOND_DEFAULT_COLUMNS = [
+  { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
+  { id: 'img', label: 'Img' },
+  { id: 'type', label: 'Type' },
+  { id: 'shape', label: 'Shape', sortField: 'shape' },
+  { id: 'color', label: 'Color' },
+  { id: 'clarity', label: 'Clarity' },
+  { id: 'qty', label: 'Qty' },
+  { id: 'weight', label: 'Weight', sortField: 'weightCt' },
+  { id: 'measurements', label: 'Measurements', sortField: 'measurements' },
+  { id: 'ratio', label: 'Ratio', sortField: 'ratio' },
+  { id: 'lab', label: 'Lab', sortField: 'lab' },
+  { id: 'fluorescence', label: 'Fluor.' },
+  { id: 'ppc', label: 'PPC', sortField: 'pricePerCt' },
+  { id: 'total', label: 'Total', sortField: 'priceTotal' },
+  { id: 'location', label: 'Location', sortField: 'location' },
+];
+
+const GEMSTONE_DEFAULT_COLUMNS = [
   { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
   { id: 'img', label: 'Img' },
   { id: 'category', label: 'Category', sortField: 'category' },
   { id: 'type', label: 'Type' },
   { id: 'shape', label: 'Shape', sortField: 'shape' },
-  { id: 'color', label: 'Color' },
+  { id: 'treatment', label: 'Clarity', sortField: 'treatment' },
+  { id: 'origin', label: 'Origin' },
   { id: 'qty', label: 'Qty' },
   { id: 'weight', label: 'Weight', sortField: 'weightCt' },
   { id: 'measurements', label: 'Measurements', sortField: 'measurements' },
   { id: 'ratio', label: 'Ratio', sortField: 'ratio' },
-  { id: 'treatment', label: 'Treatment', sortField: 'treatment' },
   { id: 'lab', label: 'Lab', sortField: 'lab' },
   { id: 'ppc', label: 'PPC', sortField: 'pricePerCt' },
   { id: 'total', label: 'Total', sortField: 'priceTotal' },
   { id: 'location', label: 'Location', sortField: 'location' },
 ];
 
+const DEFAULT_COLUMNS = DIAMOND_DEFAULT_COLUMNS;
+
 const COLUMNS_STORAGE_KEY = 'gems_dna_column_config';
 
-const getColumnConfig = (userId) => {
+const getColumnConfig = (userId, mode = 'diamonds') => {
+  const defaults = mode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : GEMSTONE_DEFAULT_COLUMNS;
+  const storageKey = `${COLUMNS_STORAGE_KEY}_${mode}_${userId}`;
   try {
-    const stored = localStorage.getItem(`${COLUMNS_STORAGE_KEY}_${userId}`);
+    const stored = localStorage.getItem(storageKey);
     if (stored) {
       const parsed = JSON.parse(stored);
-      const knownIds = new Set(DEFAULT_COLUMNS.map(c => c.id));
+      const knownIds = new Set(defaults.map(c => c.id));
       const storedIds = new Set(parsed.map(c => c.id));
       const merged = parsed.filter(c => knownIds.has(c.id));
-      DEFAULT_COLUMNS.forEach(col => {
+      defaults.forEach(col => {
         if (!storedIds.has(col.id)) {
           merged.push({ id: col.id, visible: true });
         }
@@ -3743,17 +3773,19 @@ const getColumnConfig = (userId) => {
       return merged;
     }
   } catch {}
-  return DEFAULT_COLUMNS.map(c => ({ id: c.id, visible: true }));
+  return defaults.map(c => ({ id: c.id, visible: true }));
 };
 
-const saveColumnConfig = (userId, config) => {
+const saveColumnConfig = (userId, config, mode = 'diamonds') => {
+  const storageKey = `${COLUMNS_STORAGE_KEY}_${mode}_${userId}`;
   try {
-    localStorage.setItem(`${COLUMNS_STORAGE_KEY}_${userId}`, JSON.stringify(config));
+    localStorage.setItem(storageKey, JSON.stringify(config));
   } catch {}
 };
 
 /* ---------------- Column Settings Modal ---------------- */
-const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave }) => {
+const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefaultColumns }) => {
+  const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
   const [localConfig, setLocalConfig] = useState(columnConfig);
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
@@ -3764,7 +3796,7 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave }) => {
 
   if (!isOpen) return null;
 
-  const colMeta = Object.fromEntries(DEFAULT_COLUMNS.map(c => [c.id, c]));
+  const colMeta = Object.fromEntries(defaultCols.map(c => [c.id, c]));
 
   const handleDragStart = (idx) => (e) => {
     setDragIdx(idx);
@@ -3799,7 +3831,7 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave }) => {
   };
 
   const handleReset = () => {
-    const reset = DEFAULT_COLUMNS.map(c => ({ id: c.id, visible: true }));
+    const reset = defaultCols.map(c => ({ id: c.id, visible: true }));
     setLocalConfig(reset);
   };
 
@@ -3889,15 +3921,16 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave }) => {
 };
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, columnConfig, onColumnConfigChange, priceMode }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns }) => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
 
   const visibleColumns = useMemo(() => {
-    if (!columnConfig) return DEFAULT_COLUMNS.map(c => c.id);
+    if (!columnConfig) return defaultCols.map(c => c.id);
     return columnConfig.filter(c => c.visible).map(c => c.id);
-  }, [columnConfig]);
+  }, [columnConfig, defaultCols]);
 
-  const colMeta = useMemo(() => Object.fromEntries(DEFAULT_COLUMNS.map(c => [c.id, c])), []);
+  const colMeta = useMemo(() => Object.fromEntries(defaultCols.map(c => [c.id, c])), [defaultCols]);
 
   if (loading) {
     return (
@@ -3969,7 +4002,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'weight': return <th key={colId} className={`${base} uppercase`}><SortButton field="weightCt">Weight</SortButton></th>;
       case 'measurements': return <th key={colId} className={`${base} uppercase`}><SortButton field="measurements">Measurements</SortButton></th>;
       case 'ratio': return <th key={colId} className={`${base} uppercase`}><SortButton field="ratio">Ratio</SortButton></th>;
-      case 'treatment': return <th key={colId} className={`${base} uppercase`}><SortButton field="treatment">Treatment</SortButton></th>;
+      case 'treatment': return <th key={colId} className={`${base} uppercase`}><SortButton field="treatment">Clarity</SortButton></th>;
+      case 'clarity': return <th key={colId} className={`${base} uppercase`}><SortButton field="clarity">Clarity</SortButton></th>;
+      case 'origin': return <th key={colId} className={base}>Origin</th>;
+      case 'fluorescence': return <th key={colId} className={base}>Fluor.</th>;
       case 'lab': return <th key={colId} className={`${base} uppercase`}><SortButton field="lab">Lab</SortButton></th>;
       case 'ppc': return <th key={colId} className={`${base} uppercase`}><SortButton field="pricePerCt">PPC</SortButton></th>;
       case 'total': return <th key={colId} className={`${base} uppercase`}><SortButton field="priceTotal">Total</SortButton></th>;
@@ -4030,6 +4066,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'measurements': return <td key={colId} className={`${cellBase} text-xs text-stone-600`}>{stone.measurements}</td>;
       case 'ratio': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.ratio || ''}</span></td>;
       case 'treatment': return <td key={colId} className={cellBase}><span className="badge badge-neutral text-xs">{shortTreatment(stone.treatment)}</span></td>;
+      case 'clarity': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.clarity || ''}</span></td>;
+      case 'origin': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.origin || ''}</span></td>;
+      case 'fluorescence': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.fluorescence || ''}</span></td>;
       case 'lab': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.lab || ''}</span></td>;
       case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</td>;
       case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</td>;
@@ -4269,8 +4308,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       <ColumnSettingsModal
         isOpen={showColumnSettings}
         onClose={() => setShowColumnSettings(false)}
-        columnConfig={columnConfig || DEFAULT_COLUMNS.map(c => ({ id: c.id, visible: true }))}
+        columnConfig={columnConfig || defaultCols.map(c => ({ id: c.id, visible: true }))}
         onSave={onColumnConfigChange}
+        activeDefaultColumns={defaultCols}
       />
 
       {/* Desktop Table View */}
@@ -4430,7 +4470,9 @@ const StoneSearchPage = () => {
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   
-  const [filters, setFilters] = useState({
+  const [inventoryMode, setInventoryMode] = useState('diamonds');
+
+  const defaultFilters = {
     sku: initialSearch,
     minPrice: "",
     maxPrice: "",
@@ -4451,7 +4493,9 @@ const StoneSearchPage = () => {
     diamondColor: [],
     fancyColor: [],
     box: "",
-  });
+  };
+
+  const [filters, setFilters] = useState(defaultFilters);
 
   const [stones, setStones] = useState([]);
   const [selectedStone, setSelectedStone] = useState(null);
@@ -4462,7 +4506,7 @@ const StoneSearchPage = () => {
   const [showCategoryExportModal, setShowCategoryExportModal] = useState(false); // Category export choice
   const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
   const [showPDFModal, setShowPDFModal] = useState(false);
-  const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default'));
+  const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', 'diamonds'));
   const [pdfGenerating, setPdfGenerating] = useState(false); // PDF generation loading state
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
@@ -4687,6 +4731,17 @@ const StoneSearchPage = () => {
       alert(`Stone not found: ${scannedText}\n\nTry scanning another barcode or search manually.`);
       setScanResult(null);
     }
+  };
+
+  const handleModeSwitch = (newMode) => {
+    if (newMode === inventoryMode) return;
+    setInventoryMode(newMode);
+    setFilters({ ...defaultFilters, sku: '' });
+    setSelectedStones(new Set());
+    setSelectedStone(null);
+    setCurrentPage(1);
+    setSmartSearch('');
+    setColumnConfig(getColumnConfig(user?.id || 'default', newMode));
   };
 
   // USB Barcode Scanner Listener (global keyboard listener)
@@ -5245,7 +5300,7 @@ const StoneSearchPage = () => {
         { key: "clarity", header: "Clarity", width: 10 },
         { key: "measurements", header: "Measurements", width: 20 },
         { key: "ratio", header: "Ratio", width: 8 },
-        { key: "treatment", header: "Treatment", width: 18 },
+        { key: "treatment", header: "Clarity", width: 18 },
         { key: "origin", header: "Origin", width: 12 },
         { key: "lab", header: "Lab", width: 10 },
         { key: "fluorescence", header: "Fluor.", width: 10 },
@@ -5292,7 +5347,7 @@ const StoneSearchPage = () => {
 
   const handleColumnConfigChange = (newConfig) => {
     setColumnConfig(newConfig);
-    saveColumnConfig(user?.id || 'default', newConfig);
+    saveColumnConfig(user?.id || 'default', newConfig, inventoryMode);
   };
 
   // Track visibility of export button for floating button
@@ -5400,9 +5455,22 @@ const StoneSearchPage = () => {
     setSelectedStone(null);
   }, [filters, smartSearch]);
 
+  const modeFilteredStones = useMemo(() => {
+    return stones.filter(stone => {
+      const mapped = getMappedCategories(stone.category);
+      if (inventoryMode === 'diamonds') {
+        return mapped.includes('Diamond');
+      }
+      return !mapped.includes('Diamond');
+    });
+  }, [stones, inventoryMode]);
+
+  const diamondCount = useMemo(() => stones.filter(s => getMappedCategories(s.category).includes('Diamond')).length, [stones]);
+  const gemstoneCount = useMemo(() => stones.filter(s => !getMappedCategories(s.category).includes('Diamond')).length, [stones]);
+
   const shapesOptions = useMemo(() => {
     const set = new Set();
-    stones.forEach((s) => {
+    modeFilteredStones.forEach((s) => {
       if (s.shape) {
         getDnaShapes(s.shape).forEach(dna => set.add(dna));
         if (EXTRA_BARAK_FILTERS.includes(s.shape)) set.add(s.shape);
@@ -5410,16 +5478,16 @@ const StoneSearchPage = () => {
     });
     Object.values(BARAK_DISPLAY_NAMES).forEach(dn => set.delete(dn));
     return ["All shapes", ...Array.from(set).sort()];
-  }, [stones]);
+  }, [modeFilteredStones]);
 
   const categoriesOptions = useMemo(() => {
     const set = new Set();
-    stones.forEach((s) => {
+    modeFilteredStones.forEach((s) => {
       getMappedCategories(s.category).forEach((cat) => set.add(cat));
     });
     set.delete('Empty');
     return ["All categories", ...Array.from(set).sort(), "Empty"];
-  }, [stones]);
+  }, [modeFilteredStones]);
 
   const ALL_GRADES = ['D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
   const DIAMOND_COLOR_OTHER = new Set(['BR','CON','FNTY','TLB']);
@@ -5461,14 +5529,14 @@ const StoneSearchPage = () => {
 
   const diamondColorOptions = useMemo(() => {
     const set = new Set();
-    stones.forEach((s) => {
+    modeFilteredStones.forEach((s) => {
       const mapped = getMappedCategories(s.category);
       if (isDiamondColorStone(mapped) && s.color) {
         getDiamondColorGroups(s.color).forEach(g => set.add(g));
       }
     });
     return ["All colors", ...DIAMOND_FILTER_GROUPS.filter(g => set.has(g))];
-  }, [stones]);
+  }, [modeFilteredStones]);
 
   const getBaseFancyColor = (fancyColorStr) => {
     if (!fancyColorStr) return '';
@@ -5480,7 +5548,7 @@ const StoneSearchPage = () => {
 
   const fancyColorOptions = useMemo(() => {
     const set = new Set();
-    stones.forEach((s) => {
+    modeFilteredStones.forEach((s) => {
       const mapped = getMappedCategories(s.category);
       if (!isDiamondColorStone(mapped)) {
         const fc = [s.fancyIntensity, s.fancyColor].filter(Boolean).join(' ');
@@ -5494,7 +5562,7 @@ const StoneSearchPage = () => {
       return a.localeCompare(b);
     });
     return ["All colors", ...sorted];
-  }, [stones]);
+  }, [modeFilteredStones]);
 
   const parsedSearch = useMemo(() => parseSmartSearch(smartSearch), [smartSearch]);
 
@@ -5510,8 +5578,7 @@ const StoneSearchPage = () => {
       };
     };
 
-    return stones.filter((stone) => {
-      // Bulk SKU support - check if SKU matches any in the list
+    return modeFilteredStones.filter((stone) => {
       if (filters.sku) {
         const skuList = filters.sku
           .split(/[,\n]/)
@@ -5647,29 +5714,28 @@ const StoneSearchPage = () => {
       
       return true;
     });
-  }, [filters, stones, stoneTags, parsedSearch, priceMode]);
+  }, [filters, modeFilteredStones, stoneTags, parsedSearch, priceMode]);
 
   const sortedStones = useMemo(() => {
     const sorted = [...filteredStones];
     const { field, direction } = sortConfig;
     const dir = direction === "desc" ? -1 : 1;
+    const isDefaultSort = field === 'sku' && direction === 'asc';
     sorted.sort((a, b) => {
-      // First, prioritize selected stones (always on top)
       const aIsSelected = selectedStones.has(a.id) ? 1 : 0;
       const bIsSelected = selectedStones.has(b.id) ? 1 : 0;
       if (aIsSelected !== bIsSelected) return bIsSelected - aIsSelected;
-      
-      // Second, prioritize Emerald shapes
-      const aIsEmerald = a.shape?.toUpperCase() === "EM" || a.shape?.toLowerCase().includes("emerald") ? 1 : 0;
-      const bIsEmerald = b.shape?.toUpperCase() === "EM" || b.shape?.toLowerCase().includes("emerald") ? 1 : 0;
-      if (aIsEmerald !== bIsEmerald) return bIsEmerald - aIsEmerald;
-      
-      // Third, prioritize items with images (for mobile UX)
-      const aHasImage = a.imageUrl ? 1 : 0;
-      const bHasImage = b.imageUrl ? 1 : 0;
-      if (aHasImage !== bHasImage) return bHasImage - aHasImage;
-      
-      // Then sort by the selected field
+
+      if (isDefaultSort) {
+        const aIsEmerald = a.shape?.toUpperCase() === "EM" || a.shape?.toLowerCase().includes("emerald") ? 1 : 0;
+        const bIsEmerald = b.shape?.toUpperCase() === "EM" || b.shape?.toLowerCase().includes("emerald") ? 1 : 0;
+        if (aIsEmerald !== bIsEmerald) return bIsEmerald - aIsEmerald;
+
+        const aHasImage = a.imageUrl ? 1 : 0;
+        const bHasImage = b.imageUrl ? 1 : 0;
+        if (aHasImage !== bHasImage) return bHasImage - aHasImage;
+      }
+
       const aVal = a[field];
       const bVal = b[field];
       if (typeof aVal === "number" && typeof bVal === "number") return (aVal - bVal) * dir;
@@ -5722,7 +5788,9 @@ const StoneSearchPage = () => {
             {/* Title Row */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-stone-800 mb-1">Stone Inventory</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-stone-800 mb-1">
+                  {inventoryMode === 'diamonds' ? 'Diamond Inventory' : 'Gemstone Inventory'}
+                </h1>
                 <p className="text-stone-500 text-sm sm:text-base">
                   {loading ? 'Loading...' : isPairGrouping ? `${sortedStones.length.toLocaleString()} stones (${pairedGroups?.length || 0} pairs)` : `${totalItems.toLocaleString()} stones available`}
                 </p>
@@ -5767,6 +5835,32 @@ const StoneSearchPage = () => {
                   {priceMode === 'neto' ? 'Neto' : 'B'}
                 </button>
               </div>
+            </div>
+
+            {/* Inventory Mode Tabs */}
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-stone-100/80 border border-stone-200/50 mb-4">
+              <button
+                onClick={() => handleModeSwitch('diamonds')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  inventoryMode === 'diamonds'
+                    ? 'bg-white shadow-md text-blue-700 border border-blue-100'
+                    : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
+                }`}
+              >
+                Diamonds
+                {!loading && <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'diamonds' ? 'bg-blue-100 text-blue-600' : 'bg-stone-200 text-stone-500'}`}>{diamondCount.toLocaleString()}</span>}
+              </button>
+              <button
+                onClick={() => handleModeSwitch('gemstones')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  inventoryMode === 'gemstones'
+                    ? 'bg-white shadow-md text-emerald-700 border border-emerald-100'
+                    : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
+                }`}
+              >
+                Gemstones
+                {!loading && <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'gemstones' ? 'bg-emerald-100 text-emerald-600' : 'bg-stone-200 text-stone-500'}`}>{gemstoneCount.toLocaleString()}</span>}
+              </button>
             </div>
             
             {/* Action Buttons - Shows when stones are selected */}
@@ -6061,6 +6155,7 @@ const StoneSearchPage = () => {
             fancyColorOptions={fancyColorOptions}
             tags={tags}
             onManageTags={() => setShowTagsModal(true)}
+            inventoryMode={inventoryMode}
           />
 
           {/* Pair View Mode Toggle */}
@@ -6204,6 +6299,7 @@ const StoneSearchPage = () => {
               columnConfig={columnConfig}
               onColumnConfigChange={handleColumnConfigChange}
               priceMode={priceMode}
+              activeDefaultColumns={inventoryMode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : GEMSTONE_DEFAULT_COLUMNS}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
