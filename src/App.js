@@ -6,7 +6,7 @@ import HomePage from "./pages/HomePage";
 import JewelryPage from "./pages/JewelryPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import { Toaster } from "react-hot-toast";
-import Inventory from "./pages/Inventory";
+import Inventory from "./pages/inventory";
 
 // Theme Context
 const ThemeContext = createContext();

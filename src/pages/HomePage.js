@@ -1,113 +1,117 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { getMappedCategories } from "../utils/categoryMap";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Separator } from "../components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 
-// API base URL from .env
 const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
 
-// Animated Counter Hook
-const useAnimatedCounter = (end, duration = 1500, startOnView = true) => {
+/* ─── Animated Counter Hook ───────────────────────────────── */
+const useAnimatedCounter = (end, duration = 1200) => {
   const [count, setCount] = useState(0);
-  const [hasStarted, setHasStarted] = useState(!startOnView);
-  const ref = useRef(null);
 
   useEffect(() => {
-    if (!startOnView) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasStarted) {
-          setHasStarted(true);
-        }
-      },
-      { threshold: 0.1 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [startOnView, hasStarted]);
-
-  useEffect(() => {
-    if (!hasStarted || end === 0) return;
-    
-    let startTime;
-    const animate = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(easeOut * end));
-      if (progress < 1) requestAnimationFrame(animate);
+    if (end === 0) { setCount(0); return; }
+    let start;
+    let raf;
+    const tick = (ts) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      setCount(Math.floor((1 - Math.pow(1 - p, 3)) * end));
+      if (p < 1) raf = requestAnimationFrame(tick);
     };
-    requestAnimationFrame(animate);
-  }, [end, duration, hasStarted]);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [end, duration]);
 
-  return { count, ref };
+  return count;
 };
 
-// Mini Pie Chart Component
-const MiniPieChart = ({ data, size = 120 }) => {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
-  let currentAngle = 0;
-  
-  const createArc = (startAngle, endAngle, color) => {
-    const start = polarToCartesian(size/2, size/2, size/2 - 5, endAngle);
-    const end = polarToCartesian(size/2, size/2, size/2 - 5, startAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-    return `M ${size/2} ${size/2} L ${start.x} ${start.y} A ${size/2 - 5} ${size/2 - 5} 0 ${largeArcFlag} 0 ${end.x} ${end.y} Z`;
-  };
-  
-  const polarToCartesian = (cx, cy, r, angle) => ({
-    x: cx + r * Math.cos((angle - 90) * Math.PI / 180),
-    y: cy + r * Math.sin((angle - 90) * Math.PI / 180)
-  });
+/* ─── Donut Chart ─────────────────────────────────────────── */
+const DonutChart = ({ data, size = 160, thickness = 24 }) => {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!total) return null;
+  const r = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * r;
+  let offset = 0;
 
   return (
-    <svg width={size} height={size} className="drop-shadow-lg">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="drop-shadow-sm">
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={thickness} />
       {data.map((item, i) => {
-        const angle = (item.value / total) * 360;
-        const path = createArc(currentAngle, currentAngle + angle, item.color);
-        currentAngle += angle;
+        const pct = item.value / total;
+        const dash = pct * circumference;
+        const gap = circumference - dash;
+        const o = offset;
+        offset += dash;
         return (
-          <motion.path
+          <motion.circle
             key={i}
-            d={path}
-            fill={item.color}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: i * 0.1, duration: 0.5 }}
-            className="hover:opacity-80 transition-opacity cursor-pointer"
+            cx={size/2} cy={size/2} r={r}
+            fill="none"
+            stroke={item.color}
+            strokeWidth={thickness}
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-o}
+            strokeLinecap="butt"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.12, duration: 0.5 }}
+            style={{ transformOrigin: `${size/2}px ${size/2}px`, transform: 'rotate(-90deg)' }}
           />
         );
       })}
-      <circle cx={size/2} cy={size/2} r={size/4} fill="white" />
+      <text x={size/2} y={size/2 - 6} textAnchor="middle" className="fill-foreground text-xl font-bold">{total.toLocaleString()}</text>
+      <text x={size/2} y={size/2 + 12} textAnchor="middle" className="fill-muted-foreground text-[10px]">stones</text>
     </svg>
   );
 };
 
-// Bar Chart Component
-const BarChart = ({ data, maxValue }) => {
-  return (
-    <div className="space-y-3">
-      {data.map((item, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <span className="text-xs text-stone-500 w-16 truncate">{item.label}</span>
-          <div className="flex-1 h-6 bg-stone-100 rounded-full overflow-hidden">
+/* ─── Horizontal Bar Chart ────────────────────────────────── */
+const HBarChart = ({ data, maxValue }) => (
+  <div className="space-y-2.5">
+    {data.map((item, i) => {
+      const pct = maxValue ? (item.value / maxValue) * 100 : 0;
+      return (
+        <div key={i} className="group">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground truncate max-w-[120px]">{item.label}</span>
+            <span className="text-xs font-semibold tabular-nums">{item.value.toLocaleString()}</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(item.value / maxValue) * 100}%` }}
-              transition={{ delay: i * 0.1, duration: 0.8, ease: "easeOut" }}
+              animate={{ width: `${pct}%` }}
+              transition={{ delay: i * 0.08, duration: 0.7, ease: 'easeOut' }}
               className="h-full rounded-full"
               style={{ backgroundColor: item.color }}
             />
           </div>
-          <span className="text-sm font-semibold text-stone-700 w-12 text-right">{item.value}</span>
         </div>
-      ))}
-    </div>
-  );
-};
+      );
+    })}
+  </div>
+);
 
-// Phase labels for progress display
+/* ─── Skeleton helpers ────────────────────────────────────── */
+const Skeleton = ({ className }) => <div className={`animate-pulse rounded-md bg-muted ${className}`} />;
+
+const StatCardSkeleton = () => (
+  <Card>
+    <CardContent className="p-5">
+      <Skeleton className="h-4 w-20 mb-3" />
+      <Skeleton className="h-8 w-28 mb-1" />
+      <Skeleton className="h-3 w-16" />
+    </CardContent>
+  </Card>
+);
+
+/* ─── Phase labels (sync) ─────────────────────────────────── */
 const SYNC_PHASE_LABELS = {
   idle: 'Ready to sync',
   starting: 'Starting sync...',
@@ -120,10 +124,12 @@ const SYNC_PHASE_LABELS = {
   error: 'Sync failed',
 };
 
-// Sync Info Dialog Component
+/* ═══════════════════════════════════════════════════════════════
+   Sync Info Dialog
+   ═══════════════════════════════════════════════════════════════ */
 const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState(null); // 'success' | 'error' | null
+  const [syncResult, setSyncResult] = useState(null);
   const [syncMessage, setSyncMessage] = useState('');
   const [progress, setProgress] = useState({ phase: 'idle', progress: 0, detail: '', totalStones: 0, processedStones: 0 });
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -135,7 +141,6 @@ const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
   
   const syncCommand = 'cd GEMS_DNA_BE && node api/stones/importFromSoap.js';
 
-  // Cleanup polling and timer on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
@@ -144,325 +149,185 @@ const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
   }, []);
 
   const startPolling = () => {
-    // Poll progress every 800ms
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE}/api/sync/progress`);
         const data = await res.json();
         setProgress(data);
-        
         if (!data.active && data.phase === 'complete') {
           stopPolling();
         }
-      } catch (err) {
-        // Silently continue polling
-      }
+      } catch (err) { /* continue */ }
     }, 800);
   };
 
   const stopPolling = () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   };
 
   const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    setSyncMessage('');
+    setElapsedTime(0);
+    startTimeRef.current = Date.now();
+    
+    timerRef.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+    
+    startPolling();
+    
     try {
-      setSyncing(true);
-      setSyncResult(null);
-      setSyncMessage('');
-      setElapsedTime(0);
-      setProgress({ phase: 'starting', progress: 0, detail: 'Starting sync...', totalStones: 0, processedStones: 0 });
-      startTimeRef.current = Date.now();
-      
-      // Start elapsed timer
-      timerRef.current = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
-      }, 1000);
-
-      // Start polling for progress
-      startPolling();
-      
-      const response = await fetch(`${API_BASE}/api/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      const data = await response.json();
+      const res = await fetch(`${API_BASE}/api/sync`, { method: 'POST' });
+      const data = await res.json();
       stopPolling();
       
       if (data.success) {
-        setProgress({ phase: 'complete', progress: 100, detail: `Successfully synced ${data.count || ''} stones!`, totalStones: data.count || 0, processedStones: data.count || 0 });
         setSyncResult('success');
-        setSyncMessage(`${data.count || ''} stones imported successfully`);
+        setSyncMessage(`Successfully synced ${data.count} stones`);
+        setProgress({ phase: 'complete', progress: 100, detail: '', totalStones: data.count, processedStones: data.count });
         if (onSyncComplete) onSyncComplete();
       } else {
-        setProgress(prev => ({ ...prev, phase: 'error', progress: 0 }));
         setSyncResult('error');
-        setSyncMessage(data.error || 'Sync failed. Please try again.');
+        setSyncMessage(data.error || 'Sync failed');
+        setProgress(prev => ({ ...prev, phase: 'error' }));
       }
-    } catch (error) {
-      console.error('Sync error:', error);
+    } catch (err) {
       stopPolling();
-      setProgress(prev => ({ ...prev, phase: 'error', progress: 0 }));
       setSyncResult('error');
-      setSyncMessage('Connection error. Make sure the backend server is running.');
+      setSyncMessage(`Network error: ${err.message}`);
+      setProgress(prev => ({ ...prev, phase: 'error' }));
     } finally {
       setSyncing(false);
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     }
   };
 
-  const copyCommand = () => {
-    navigator.clipboard.writeText(syncCommand);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  const handleCopyCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(syncCommand);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* fallback */ }
   };
 
   if (!isOpen) return null;
-  
+
   return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm"
-        onClick={syncing ? undefined : onClose}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          transition={{ type: "spring", duration: 0.4 }}
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+          className="bg-card rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto border"
         >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Sync Inventory
-                </h2>
-                <p className="text-white/80 text-xs sm:text-sm mt-0.5">Update from Barak SOAP API</p>
-              </div>
-              {!syncing && (
-                <button onClick={onClose} className="text-white/80 hover:text-white transition-colors p-1">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">SOAP Data Sync</h2>
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-          </div>
 
-          {/* Scrollable Content */}
-          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-            {/* Current Stats - compact */}
-            <div className="bg-stone-50 rounded-xl p-3 sm:p-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center">
-                  <p className="text-xl sm:text-2xl font-bold text-emerald-600">{currentStats?.totalStones || 0}</p>
-                  <p className="text-[11px] sm:text-xs text-stone-500">Stones in DB</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{Object.keys(currentStats?.categories || {}).length}</p>
-                  <p className="text-[11px] sm:text-xs text-stone-500">Categories</p>
-                </div>
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="rounded-lg bg-muted/50 p-3 text-center">
+                <p className="text-lg font-bold">{currentStats.totalStones.toLocaleString()}</p>
+                <p className="text-[11px] text-muted-foreground">Current Stones</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3 text-center">
+                <p className="text-lg font-bold">{Object.keys(currentStats.categories).length}</p>
+                <p className="text-[11px] text-muted-foreground">Categories</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3 text-center">
+                <p className="text-lg font-bold">{Object.keys(currentStats.locations).length}</p>
+                <p className="text-[11px] text-muted-foreground">Locations</p>
               </div>
             </div>
 
-            {/* Progress Section - shown during/after sync */}
-            {(syncing || syncResult) && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }} 
-                animate={{ opacity: 1, height: 'auto' }}
-                className="space-y-3"
-              >
-                {/* Progress Bar */}
-                <div className="bg-stone-50 rounded-xl p-3 sm:p-4 space-y-3">
-                  {/* Phase label + elapsed time */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-medium text-stone-700">
-                      {SYNC_PHASE_LABELS[progress.phase] || progress.phase}
-                    </span>
-                    {syncing && (
-                      <span className="text-[11px] sm:text-xs text-stone-400 font-mono tabular-nums">
-                        {formatTime(elapsedTime)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Bar */}
-                  <div className="w-full bg-stone-200 rounded-full h-3 sm:h-4 overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${
-                        syncResult === 'error' 
-                          ? 'bg-red-500' 
-                          : syncResult === 'success' 
-                          ? 'bg-emerald-500' 
-                          : 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                      }`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress.progress}%` }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                    />
-                  </div>
-
-                  {/* Detail line */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] sm:text-xs text-stone-500 truncate flex-1 mr-2">
-                      {progress.detail}
-                    </p>
-                    <span className="text-xs sm:text-sm font-bold text-stone-600 tabular-nums flex-shrink-0">
-                      {progress.progress}%
-                    </span>
-                  </div>
-
-                  {/* Stone counter during insert phase */}
-                  {progress.totalStones > 0 && syncing && progress.phase === 'inserting' && (
-                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-stone-500">
-                      <svg className="w-3.5 h-3.5 text-emerald-500 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
-                      </svg>
-                      <span>{progress.processedStones.toLocaleString()} / {progress.totalStones.toLocaleString()} stones</span>
-                    </div>
-                  )}
+            {syncing && (
+              <div className="mb-5 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{SYNC_PHASE_LABELS[progress.phase] || progress.phase}</span>
+                  <span className="text-muted-foreground tabular-nums">{formatTime(elapsedTime)}</span>
                 </div>
-
-                {/* Result Banner */}
-                {syncResult && (
+                <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
                   <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-xl p-3 sm:p-4 flex items-start gap-3 ${
-                      syncResult === 'success' 
-                        ? 'bg-emerald-50 border border-emerald-200' 
-                        : 'bg-red-50 border border-red-200'
-                    }`}
-                  >
-                    <span className="text-xl flex-shrink-0">{syncResult === 'success' ? '✅' : '❌'}</span>
-                    <div className="min-w-0">
-                      <h4 className={`font-semibold text-sm ${syncResult === 'success' ? 'text-emerald-800' : 'text-red-800'}`}>
-                        {syncResult === 'success' ? 'Sync Complete!' : 'Sync Failed'}
-                      </h4>
-                      <p className={`text-xs mt-0.5 ${syncResult === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {syncMessage}
-                      </p>
-                      {syncResult === 'success' && (
-                        <p className="text-[11px] text-emerald-600 mt-1">Completed in {formatTime(elapsedTime)}</p>
-                      )}
-                    </div>
-                  </motion.div>
+                    className="h-full rounded-full bg-primary"
+                    animate={{ width: `${progress.progress}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+                {progress.detail && <p className="text-xs text-muted-foreground">{progress.detail}</p>}
+                {progress.processedStones > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {progress.processedStones.toLocaleString()} / {progress.totalStones.toLocaleString()} stones processed
+                  </p>
                 )}
-              </motion.div>
+              </div>
             )}
 
-            {/* Sync Button */}
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-semibold text-white text-sm sm:text-base transition-all ${
-                syncing
-                  ? 'bg-stone-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg active:scale-[0.98]'
-              }`}
-            >
-              {syncing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Syncing in progress...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  {syncResult === 'success' ? 'Sync Again' : syncResult === 'error' ? 'Retry Sync' : 'Start Sync Now'}
-                </span>
-              )}
-            </button>
+            {syncResult === 'success' && (
+              <div className="mb-5 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+                {syncMessage}
+              </div>
+            )}
+            {syncResult === 'error' && (
+              <div className="mb-5 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                {syncMessage}
+              </div>
+            )}
 
-            {/* Collapsible Terminal Section */}
-            <div className="border border-stone-200 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-3 mb-4">
               <button
-                onClick={() => setShowTerminal(!showTerminal)}
-                className="w-full flex items-center justify-between px-3 sm:px-4 py-2.5 text-xs sm:text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex-1 h-10 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <span className="flex items-center gap-2">
-                  <span>💻</span>
-                  <span>Alternative: Run from Terminal</span>
-                </span>
-                <svg className={`w-4 h-4 transition-transform ${showTerminal ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                {syncing ? 'Syncing...' : 'Start Sync'}
               </button>
-              
-              <AnimatePresence>
-                {showTerminal && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-3 sm:px-4 pb-3 space-y-2 border-t border-stone-100">
-                      <div className="bg-stone-900 rounded-lg p-2.5 sm:p-3 mt-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <code className="text-emerald-400 text-[11px] sm:text-xs font-mono truncate">{syncCommand}</code>
-                          <button
-                            onClick={copyCommand}
-                            className="flex-shrink-0 px-2 py-1 text-[10px] sm:text-xs font-medium bg-stone-700 text-white rounded-md hover:bg-stone-600 transition-colors"
-                          >
-                            {copied ? '✅' : '📋'}
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-[11px] text-stone-500">Run this command in your project terminal. Wait ~30 seconds then refresh.</p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
 
-            {/* Auto sync info - compact */}
-            <div className="flex items-center gap-2 px-1 text-[11px] sm:text-xs text-stone-400">
-              <span>⏰</span>
-              <span>Auto-syncs every 5 hours via scheduled task</span>
-            </div>
-          </div>
+            <Separator className="my-4" />
 
-          {/* Footer */}
-          <div className="border-t bg-stone-50 px-4 sm:px-5 py-3 flex justify-end flex-shrink-0">
             <button
-              onClick={onClose}
-              disabled={syncing}
-              className={`px-5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
-                syncing
-                  ? 'text-stone-400 bg-stone-200 cursor-not-allowed'
-                  : 'text-white bg-emerald-600 hover:bg-emerald-700'
-              }`}
+              onClick={() => setShowTerminal(!showTerminal)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              {syncing ? 'Please wait...' : 'Close'}
+              <svg className={`w-3.5 h-3.5 transition-transform ${showTerminal ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Manual terminal sync
             </button>
+
+            {showTerminal && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="overflow-hidden mt-3">
+                <div className="bg-zinc-900 rounded-lg p-4 font-mono text-sm text-zinc-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-zinc-500 text-xs">Terminal command</span>
+                    <button onClick={handleCopyCommand} className="text-zinc-400 hover:text-white text-xs flex items-center gap-1">
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                  <code className="text-emerald-400 text-xs">{syncCommand}</code>
+                </div>
+              </motion.div>
+            )}
           </div>
         </motion.div>
       </motion.div>
@@ -470,36 +335,22 @@ const SyncInfoDialog = ({ isOpen, onClose, currentStats, onSyncComplete }) => {
   );
 };
 
-// CSV Upload Dialog Component
+/* ═══════════════════════════════════════════════════════════════
+   CSV Upload Dialog (Stones)
+   ═══════════════════════════════════════════════════════════════ */
 const CsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [resultMessage, setResultMessage] = useState('');
+  const [file, setFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importMessage, setImportMessage] = useState('');
   const [progress, setProgress] = useState({ phase: 'idle', progress: 0, detail: '' });
   const [dragOver, setDragOver] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const fileInputRef = useRef(null);
   const pollingRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, []);
-
-  const resetState = () => {
-    setUploading(false);
-    setResult(null);
-    setResultMessage('');
-    setProgress({ phase: 'idle', progress: 0, detail: '' });
-    setSelectedFile(null);
-    setDragOver(false);
-  };
-
-  const handleClose = () => {
-    if (!uploading) {
-      resetState();
-      onClose();
-    }
-  };
 
   const startPolling = () => {
     pollingRef.current = setInterval(async () => {
@@ -507,69 +358,54 @@ const CsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
         const res = await fetch(`${API_BASE}/api/import-csv/progress`);
         const data = await res.json();
         setProgress(data);
-        if (!data.active && data.phase !== 'idle') {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
-      } catch (e) { /* ignore polling errors */ }
+      } catch { /* continue */ }
     }, 800);
   };
 
-  const handleFileSelect = (file) => {
-    if (file && file.name.toLowerCase().endsWith('.csv')) {
-      setSelectedFile(file);
-      setResult(null);
-      setResultMessage('');
+  const stopPolling = () => {
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+  };
+
+  const handleImport = async () => {
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    setImportMessage('');
+
+    try {
+      const text = await file.text();
+      startPolling();
+      const res = await fetch(`${API_BASE}/api/import-csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvContent: text })
+      });
+      const data = await res.json();
+      stopPolling();
+
+      if (data.success) {
+        setImportResult('success');
+        setImportMessage(`Imported ${data.imported || data.count || 0} stones`);
+        setProgress({ phase: 'complete', progress: 100, detail: '' });
+        if (onImportComplete) onImportComplete();
+      } else {
+        setImportResult('error');
+        setImportMessage(data.error || 'Import failed');
+      }
+    } catch (err) {
+      stopPolling();
+      setImportResult('error');
+      setImportMessage(err.message);
+    } finally {
+      setImporting(false);
     }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    handleFileSelect(file);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-
-    try {
-      setUploading(true);
-      setResult(null);
-      setResultMessage('');
-      setProgress({ phase: 'reading', progress: 5, detail: 'Reading file...' });
-
-      const text = await selectedFile.text();
-      setProgress({ phase: 'uploading', progress: 15, detail: 'Uploading to server...' });
-      startPolling();
-
-      const response = await fetch(`${API_BASE}/api/import-csv`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvContent: text }),
-      });
-
-      const data = await response.json();
-      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-
-      if (data.success) {
-        setProgress({ phase: 'complete', progress: 100, detail: `Successfully imported ${data.count} stones!` });
-        setResult('success');
-        setResultMessage(`${data.count} stones imported successfully from CSV`);
-        if (onImportComplete) onImportComplete();
-      } else {
-        setProgress({ phase: 'error', progress: 0, detail: data.error });
-        setResult('error');
-        setResultMessage(data.error || 'CSV import failed');
-      }
-    } catch (error) {
-      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-      setProgress({ phase: 'error', progress: 0, detail: error.message });
-      setResult('error');
-      setResultMessage('Connection error. Make sure the backend server is running.');
-    } finally {
-      setUploading(false);
-    }
+    const dropped = e.dataTransfer.files[0];
+    if (dropped && (dropped.name.endsWith('.csv') || dropped.name.endsWith('.xlsx'))) setFile(dropped);
   };
 
   if (!isOpen) return null;
@@ -577,205 +413,69 @@ const CsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm"
-        onClick={uploading ? undefined : handleClose}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          onClick={e => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+          initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-card rounded-xl shadow-xl max-w-md w-full border"
         >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 sm:px-5 py-3.5 sm:py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-white font-bold text-base sm:text-lg flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  CSV Import
-                </h2>
-                <p className="text-white/80 text-xs sm:text-sm mt-0.5">Upload a CSV file to update inventory</p>
-              </div>
-              {!uploading && (
-                <button onClick={handleClose} className="text-white/80 hover:text-white transition-colors p-1">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold">Import Stones CSV</h2>
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-          </div>
 
-          {/* Body */}
-          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-            {/* Drop Zone */}
             <div
+              onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => !uploading && fileInputRef.current?.click()}
-              className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all ${
-                dragOver
-                  ? 'border-amber-400 bg-amber-50'
-                  : selectedFile
-                  ? 'border-emerald-300 bg-emerald-50'
-                  : 'border-stone-300 bg-stone-50 hover:border-amber-400 hover:bg-amber-50/50'
-              } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                dragOver ? 'border-primary bg-primary/5' : file ? 'border-emerald-300 bg-emerald-50/50' : 'border-border hover:border-primary/50'
+              }`}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={(e) => handleFileSelect(e.target.files[0])}
-              />
-              {selectedFile ? (
-                <div className="space-y-2">
-                  <div className="w-12 h-12 mx-auto bg-emerald-100 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-semibold text-emerald-700">{selectedFile.name}</p>
-                  <p className="text-xs text-stone-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
-                  {!uploading && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
-                      className="text-xs text-stone-400 hover:text-red-500 transition-colors"
-                    >
-                      Remove & choose another
-                    </button>
-                  )}
+              <input ref={fileInputRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              {file ? (
+                <div>
+                  <svg className="w-8 h-8 text-emerald-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <p className="text-sm font-medium">{file.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{(file.size / 1024).toFixed(1)} KB</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <div className="w-12 h-12 mx-auto bg-stone-200 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-stone-600">Drag & drop a CSV file here</p>
-                  <p className="text-xs text-stone-400">or click to browse</p>
+                <div>
+                  <svg className="w-8 h-8 text-muted-foreground mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                  <p className="text-sm text-muted-foreground">Drop CSV file here or click to browse</p>
                 </div>
               )}
             </div>
 
-            {/* Progress Section */}
-            {(uploading || result) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="space-y-3"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-medium text-stone-700">
-                      {progress.phase === 'reading' ? 'Reading file...' :
-                       progress.phase === 'uploading' ? 'Uploading...' :
-                       progress.phase === 'parsing' ? 'Parsing CSV...' :
-                       progress.phase === 'processing' ? 'Processing stones...' :
-                       progress.phase === 'clearing' ? 'Preparing database...' :
-                       progress.phase === 'inserting' ? 'Saving to database...' :
-                       progress.phase === 'complete' ? 'Import complete!' :
-                       progress.phase === 'error' ? 'Import failed' :
-                       progress.phase}
-                    </span>
-                    <span className="text-[11px] text-stone-400 font-mono">{Math.round(progress.progress)}%</span>
-                  </div>
-                  <div className="w-full bg-stone-200 rounded-full h-3 overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${
-                        result === 'error' ? 'bg-red-500' :
-                        result === 'success' ? 'bg-emerald-500' :
-                        'bg-gradient-to-r from-amber-400 to-orange-500'
-                      }`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress.progress}%` }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  </div>
-                  {progress.detail && (
-                    <p className="text-[11px] text-stone-500">{progress.detail}</p>
-                  )}
+            {importing && (
+              <div className="mt-4 space-y-2">
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <motion.div className="h-full rounded-full bg-primary" animate={{ width: `${progress.progress}%` }} />
                 </div>
-
-                {result && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-xl p-3 sm:p-4 flex items-start gap-3 ${
-                      result === 'success'
-                        ? 'bg-emerald-50 border border-emerald-200'
-                        : 'bg-red-50 border border-red-200'
-                    }`}
-                  >
-                    <span className="text-xl flex-shrink-0">{result === 'success' ? '✅' : '❌'}</span>
-                    <div className="min-w-0">
-                      <h4 className={`font-semibold text-sm ${result === 'success' ? 'text-emerald-800' : 'text-red-800'}`}>
-                        {result === 'success' ? 'Import Complete!' : 'Import Failed'}
-                      </h4>
-                      <p className={`text-xs mt-0.5 ${result === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {resultMessage}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
+                <p className="text-xs text-muted-foreground">{progress.detail || 'Processing...'}</p>
+              </div>
             )}
 
-            {/* Upload Button */}
-            <button
-              onClick={handleUpload}
-              disabled={!selectedFile || uploading}
-              className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-semibold text-white text-sm sm:text-base transition-all ${
-                !selectedFile || uploading
-                  ? 'bg-stone-300 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 hover:shadow-lg active:scale-[0.98]'
-              }`}
-            >
-              {uploading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Importing...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  {result === 'success' ? 'Import Again' : result === 'error' ? 'Retry Import' : 'Start Import'}
-                </span>
-              )}
-            </button>
+            {importResult === 'success' && (
+              <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{importMessage}</div>
+            )}
+            {importResult === 'error' && (
+              <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{importMessage}</div>
+            )}
 
-            {/* Warning note */}
-            <div className="flex items-start gap-2 px-1 text-[11px] sm:text-xs text-amber-600 bg-amber-50 rounded-lg p-2.5">
-              <span className="flex-shrink-0 mt-0.5">⚠️</span>
-              <span>This will replace all existing inventory data. Prices will be automatically doubled as per business rules.</span>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="border-t bg-stone-50 px-4 sm:px-5 py-3 flex justify-end flex-shrink-0">
             <button
-              onClick={handleClose}
-              disabled={uploading}
-              className={`px-5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
-                uploading
-                  ? 'text-stone-400 bg-stone-200 cursor-not-allowed'
-                  : 'text-white bg-amber-600 hover:bg-amber-700'
-              }`}
+              onClick={handleImport}
+              disabled={!file || importing}
+              className="mt-4 w-full h-10 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {uploading ? 'Please wait...' : 'Close'}
+              {importing ? 'Importing...' : 'Import'}
             </button>
           </div>
         </motion.div>
@@ -784,28 +484,22 @@ const CsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
   );
 };
 
-// Jewelry CSV Upload Dialog Component
+/* ═══════════════════════════════════════════════════════════════
+   CSV Upload Dialog (Jewelry)
+   ═══════════════════════════════════════════════════════════════ */
 const JewelryCsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [resultMessage, setResultMessage] = useState('');
+  const [file, setFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importMessage, setImportMessage] = useState('');
   const [progress, setProgress] = useState({ phase: 'idle', progress: 0, detail: '' });
   const [dragOver, setDragOver] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const fileInputRef = useRef(null);
   const pollingRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, []);
-
-  const resetState = () => {
-    setUploading(false); setResult(null); setResultMessage('');
-    setProgress({ phase: 'idle', progress: 0, detail: '' });
-    setSelectedFile(null); setDragOver(false);
-  };
-
-  const handleClose = () => { if (!uploading) { resetState(); onClose(); } };
 
   const startPolling = () => {
     pollingRef.current = setInterval(async () => {
@@ -813,195 +507,122 @@ const JewelryCsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
         const res = await fetch(`${API_BASE}/api/jewelry/import-csv/progress`);
         const data = await res.json();
         setProgress(data);
-        if (!data.active && data.phase !== 'idle') {
-          clearInterval(pollingRef.current); pollingRef.current = null;
-        }
-      } catch (e) { /* ignore */ }
+      } catch { /* continue */ }
     }, 800);
   };
 
-  const handleFileSelect = (file) => {
-    if (file && file.name.toLowerCase().endsWith('.csv')) {
-      setSelectedFile(file); setResult(null); setResultMessage('');
+  const stopPolling = () => {
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+  };
+
+  const handleImport = async () => {
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const text = await file.text();
+      startPolling();
+      const res = await fetch(`${API_BASE}/api/jewelry/import-csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvContent: text })
+      });
+      const data = await res.json();
+      stopPolling();
+
+      if (data.success) {
+        setImportResult('success');
+        setImportMessage(`Imported ${data.imported || data.count || 0} jewelry items`);
+        if (onImportComplete) onImportComplete();
+      } else {
+        setImportResult('error');
+        setImportMessage(data.error || 'Import failed');
+      }
+    } catch (err) {
+      stopPolling();
+      setImportResult('error');
+      setImportMessage(err.message);
+    } finally {
+      setImporting(false);
     }
   };
 
-  const handleDrop = (e) => { e.preventDefault(); setDragOver(false); handleFileSelect(e.dataTransfer.files[0]); };
-
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-    try {
-      setUploading(true); setResult(null); setResultMessage('');
-      setProgress({ phase: 'reading', progress: 5, detail: 'Reading file...' });
-      const text = await selectedFile.text();
-      setProgress({ phase: 'uploading', progress: 15, detail: 'Uploading to server...' });
-      startPolling();
-      const response = await fetch(`${API_BASE}/api/jewelry/import-csv`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvContent: text }),
-      });
-      const data = await response.json();
-      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-      if (data.success) {
-        setProgress({ phase: 'complete', progress: 100, detail: `Successfully imported ${data.count} jewelry items!` });
-        setResult('success');
-        setResultMessage(`${data.count} jewelry items imported successfully`);
-        if (onImportComplete) onImportComplete();
-      } else {
-        setProgress({ phase: 'error', progress: 0, detail: data.error });
-        setResult('error'); setResultMessage(data.error || 'Jewelry CSV import failed');
-      }
-    } catch (error) {
-      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-      setProgress({ phase: 'error', progress: 0, detail: error.message });
-      setResult('error'); setResultMessage('Connection error. Make sure the backend server is running.');
-    } finally { setUploading(false); }
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped && (dropped.name.endsWith('.csv') || dropped.name.endsWith('.xlsx'))) setFile(dropped);
   };
 
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm"
-        onClick={uploading ? undefined : handleClose}
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
       >
-        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          onClick={e => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-card rounded-xl shadow-xl max-w-md w-full border"
         >
-          <div className="bg-gradient-to-r from-pink-500 to-rose-600 px-4 sm:px-5 py-3.5 sm:py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-white font-bold text-base sm:text-lg flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  Jewelry CSV Import
-                </h2>
-                <p className="text-white/80 text-xs sm:text-sm mt-0.5">Upload a CSV file to update jewelry inventory</p>
-              </div>
-              {!uploading && (
-                <button onClick={handleClose} className="text-white/80 hover:text-white transition-colors p-1">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold">Import Jewelry CSV</h2>
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-          </div>
 
-          <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
             <div
+              onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => !uploading && fileInputRef.current?.click()}
-              className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all ${
-                dragOver ? 'border-pink-400 bg-pink-50'
-                : selectedFile ? 'border-emerald-300 bg-emerald-50'
-                : 'border-stone-300 bg-stone-50 hover:border-pink-400 hover:bg-pink-50/50'
-              } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
-            >
-              <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={(e) => handleFileSelect(e.target.files[0])} />
-              {selectedFile ? (
-                <div className="space-y-2">
-                  <div className="w-12 h-12 mx-auto bg-emerald-100 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-semibold text-emerald-700">{selectedFile.name}</p>
-                  <p className="text-xs text-stone-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
-                  {!uploading && (
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }} className="text-xs text-stone-400 hover:text-red-500 transition-colors">
-                      Remove & choose another
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="w-12 h-12 mx-auto bg-stone-200 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-stone-600">Drag & drop a Jewelry CSV file here</p>
-                  <p className="text-xs text-stone-400">or click to browse</p>
-                </div>
-              )}
-            </div>
-
-            {(uploading || result) && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-medium text-stone-700">
-                      {progress.phase === 'reading' ? 'Reading file...' :
-                       progress.phase === 'uploading' ? 'Uploading...' :
-                       progress.phase === 'parsing' ? 'Parsing CSV...' :
-                       progress.phase === 'processing' ? 'Processing items...' :
-                       progress.phase === 'clearing' ? 'Preparing database...' :
-                       progress.phase === 'inserting' ? 'Saving to database...' :
-                       progress.phase === 'complete' ? 'Import complete!' :
-                       progress.phase === 'error' ? 'Import failed' : progress.phase}
-                    </span>
-                    <span className="text-[11px] text-stone-400 font-mono">{Math.round(progress.progress)}%</span>
-                  </div>
-                  <div className="w-full bg-stone-200 rounded-full h-3 overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${result === 'error' ? 'bg-red-500' : result === 'success' ? 'bg-emerald-500' : 'bg-gradient-to-r from-pink-400 to-rose-500'}`}
-                      initial={{ width: 0 }} animate={{ width: `${progress.progress}%` }} transition={{ duration: 0.3 }}
-                    />
-                  </div>
-                  {progress.detail && <p className="text-[11px] text-stone-500">{progress.detail}</p>}
-                </div>
-                {result && (
-                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-xl p-3 sm:p-4 flex items-start gap-3 ${result === 'success' ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}
-                  >
-                    <span className="text-xl flex-shrink-0">{result === 'success' ? '✅' : '❌'}</span>
-                    <div className="min-w-0">
-                      <h4 className={`font-semibold text-sm ${result === 'success' ? 'text-emerald-800' : 'text-red-800'}`}>
-                        {result === 'success' ? 'Import Complete!' : 'Import Failed'}
-                      </h4>
-                      <p className={`text-xs mt-0.5 ${result === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>{resultMessage}</p>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-
-            <button onClick={handleUpload} disabled={!selectedFile || uploading}
-              className={`w-full py-2.5 sm:py-3 px-4 rounded-xl font-semibold text-white text-sm sm:text-base transition-all ${
-                !selectedFile || uploading ? 'bg-stone-300 cursor-not-allowed' : 'bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 hover:shadow-lg active:scale-[0.98]'
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                dragOver ? 'border-primary bg-primary/5' : file ? 'border-pink-300 bg-pink-50/50' : 'border-border hover:border-primary/50'
               }`}
             >
-              {uploading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  Importing...
-                </span>
+              <input ref={fileInputRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              {file ? (
+                <div>
+                  <svg className="w-8 h-8 text-pink-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <p className="text-sm font-medium">{file.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{(file.size / 1024).toFixed(1)} KB</p>
+                </div>
               ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                  {result === 'success' ? 'Import Again' : result === 'error' ? 'Retry Import' : 'Start Jewelry Import'}
-                </span>
+                <div>
+                  <svg className="w-8 h-8 text-muted-foreground mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                  <p className="text-sm text-muted-foreground">Drop jewelry CSV here or click to browse</p>
+                </div>
               )}
-            </button>
-
-            <div className="flex items-start gap-2 px-1 text-[11px] sm:text-xs text-pink-600 bg-pink-50 rounded-lg p-2.5">
-              <span className="flex-shrink-0 mt-0.5">&#x26A0;&#xFE0F;</span>
-              <span>This will replace all existing jewelry data in the database.</span>
             </div>
-          </div>
 
-          <div className="border-t bg-stone-50 px-4 sm:px-5 py-3 flex justify-end flex-shrink-0">
-            <button onClick={handleClose} disabled={uploading}
-              className={`px-5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${uploading ? 'text-stone-400 bg-stone-200 cursor-not-allowed' : 'text-white bg-pink-600 hover:bg-pink-700'}`}
+            {importing && (
+              <div className="mt-4 space-y-2">
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <motion.div className="h-full rounded-full bg-pink-500" animate={{ width: `${progress.progress}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground">{progress.detail || 'Processing...'}</p>
+              </div>
+            )}
+
+            {importResult === 'success' && (
+              <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{importMessage}</div>
+            )}
+            {importResult === 'error' && (
+              <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{importMessage}</div>
+            )}
+
+            <button
+              onClick={handleImport}
+              disabled={!file || importing}
+              className="mt-4 w-full h-10 rounded-lg bg-pink-600 text-white font-medium text-sm hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {uploading ? 'Please wait...' : 'Close'}
+              {importing ? 'Importing...' : 'Import Jewelry'}
             </button>
           </div>
         </motion.div>
@@ -1010,6 +631,9 @@ const JewelryCsvUploadDialog = ({ isOpen, onClose, onImportComplete }) => {
   );
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   MAIN DASHBOARD
+   ═══════════════════════════════════════════════════════════════ */
 const HomePage = () => {
   const { user } = useUser();
   const navigate = useNavigate();
@@ -1022,91 +646,120 @@ const HomePage = () => {
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showCsvDialog, setShowCsvDialog] = useState(false);
   const [showJewelryCsvDialog, setShowJewelryCsvDialog] = useState(false);
+  const [qaMinPpc, setQaMinPpc] = useState('');
+  const [qaPriceMode, setQaPriceMode] = useState('bruto');
+  const [copiedSku, setCopiedSku] = useState(null);
+  const [topStonesMode, setTopStonesMode] = useState('bruto');
   const [stats, setStats] = useState({
-    totalStones: 0,
-    totalValue: 0,
-    categories: {},
-    locations: {},
-    shapes: {},
-    topStones: [],
-    recentStones: []
+    totalStones: 0, totalValue: 0, categories: {}, locations: {},
+    shapes: {}, topStones: [], recentStones: [], avgPrice: 0, avgWeight: 0,
+    priceRanges: {}, weightRanges: {}, groupingTypes: {}, labs: {},
+    missingMedia: 0, missingCerts: 0,
+    missingMediaByType: { Single: [], Pair: [], Parcel: [], Set: [] },
+    missingCertByType: { Single: [], Pair: [], Parcel: [], Set: [] },
   });
 
-  const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch stones and tags in parallel
-        const [stonesRes, tagsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/soap-stones`),
-          fetch(`${API_BASE}/api/tags`).catch(() => ({ json: () => [] }))
-        ]);
-        
-        const stonesData = await stonesRes.json();
-        const tagsData = await tagsRes.json();
-        
-        const allStones = Array.isArray(stonesData.stones) ? stonesData.stones : [];
-        setStones(allStones);
-        setTags(Array.isArray(tagsData) ? tagsData : []);
-        
-        // Calculate statistics
-        const categories = {};
-        const locations = {};
-        const shapes = {};
-        let totalValue = 0;
-        
-        allStones.forEach(stone => {
-          const mapped = getMappedCategories(stone.category);
-          mapped.forEach(cat => {
-            categories[cat] = (categories[cat] || 0) + 1;
-          });
-          
-          // Locations
-          const loc = stone.location || 'Unknown';
-          locations[loc] = (locations[loc] || 0) + 1;
-          
-          // Shapes
-          const shape = stone.shape || 'Unknown';
-          shapes[shape] = (shapes[shape] || 0) + 1;
-          
-          // Total value
-          totalValue += stone.priceTotal || 0;
-        });
-        
-        // Top 5 by value
-        const topStones = [...allStones]
-          .filter(s => s.priceTotal)
-          .sort((a, b) => (b.priceTotal || 0) - (a.priceTotal || 0))
-          .slice(0, 5);
-        
-        // Recent stones (last 5 by ID or just first 5)
-        const recentStones = allStones.slice(0, 5);
-        
-        setStats({
-          totalStones: allStones.length,
-          totalValue,
-          categories,
-          locations,
-          shapes,
-          topStones,
-          recentStones
-        });
-        
-      } catch (err) {
-        console.error('Error fetching data:', err);
-      } finally {
-        setLoading(false);
-      }
-  };
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [stonesRes, tagsRes] = await Promise.all([
+        fetch(`${API_BASE}/api/soap-stones`),
+        fetch(`${API_BASE}/api/tags`).catch(() => ({ json: () => [] }))
+      ]);
+      const stonesData = await stonesRes.json();
+      const tagsData = await tagsRes.json();
+      const allStones = Array.isArray(stonesData.stones) ? stonesData.stones : [];
+      setStones(allStones);
+      setTags(Array.isArray(tagsData) ? tagsData : []);
 
-  useEffect(() => {
-    fetchData();
+      const categories = {};
+      const locations = {};
+      const shapes = {};
+      const groupingTypes = {};
+      const labs = {};
+      const priceRanges = { '$0-1K': 0, '$1K-5K': 0, '$5K-20K': 0, '$20K+': 0 };
+      const weightRanges = { '< 1ct': 0, '1-3ct': 0, '3-5ct': 0, '5ct+': 0 };
+      const missingMediaByType = { Single: [], Pair: [], Parcel: [], Set: [] };
+      const missingCertByType = { Single: [], Pair: [], Parcel: [], Set: [] };
+      let missingMediaTotal = 0;
+      let missingCertTotal = 0;
+      let totalValue = 0;
+      let totalWeight = 0;
+      let priceCount = 0;
+
+      allStones.forEach(stone => {
+        getMappedCategories(stone.category).forEach(cat => { categories[cat] = (categories[cat] || 0) + 1; });
+        const loc = stone.location || 'Unknown';
+        locations[loc] = (locations[loc] || 0) + 1;
+        shapes[stone.shape || 'Unknown'] = (shapes[stone.shape || 'Unknown'] || 0) + 1;
+        totalValue += stone.priceTotal || 0;
+        totalWeight += stone.weightCt || 0;
+        if (stone.priceTotal) priceCount++;
+
+        const gt = stone.groupingType || 'Unknown';
+        groupingTypes[gt] = (groupingTypes[gt] || 0) + 1;
+
+        if (stone.lab) labs[stone.lab] = (labs[stone.lab] || 0) + 1;
+
+        const p = stone.priceTotal || 0;
+        if (p < 1000) priceRanges['$0-1K']++;
+        else if (p < 5000) priceRanges['$1K-5K']++;
+        else if (p < 20000) priceRanges['$5K-20K']++;
+        else priceRanges['$20K+']++;
+
+        const w = stone.weightCt || 0;
+        if (w < 1) weightRanges['< 1ct']++;
+        else if (w < 3) weightRanges['1-3ct']++;
+        else if (w < 5) weightRanges['3-5ct']++;
+        else weightRanges['5ct+']++;
+
+        if (!stone.imageUrl && !stone.videoUrl) {
+          missingMediaTotal++;
+          const bucket = missingMediaByType[stone.groupingType] !== undefined ? stone.groupingType : 'Single';
+          missingMediaByType[bucket].push(stone);
+        }
+        if (!stone.certificateUrl && !stone.certificateNumber) {
+          missingCertTotal++;
+          const bucket = missingCertByType[stone.groupingType] !== undefined ? stone.groupingType : 'Single';
+          missingCertByType[bucket].push(stone);
+        }
+      });
+
+      const topStones = [...allStones].filter(s => s.priceTotal).sort((a, b) => b.priceTotal - a.priceTotal).slice(0, 6);
+      const recentStones = allStones.slice(0, 8);
+
+      setStats({
+        totalStones: allStones.length,
+        totalValue,
+        categories,
+        locations,
+        shapes,
+        topStones,
+        recentStones,
+        avgPrice: priceCount ? Math.round(totalValue / priceCount) : 0,
+        avgWeight: allStones.length ? (totalWeight / allStones.length).toFixed(2) : '0',
+        priceRanges,
+        weightRanges,
+        groupingTypes,
+        labs,
+        missingMedia: missingMediaTotal,
+        missingCerts: missingCertTotal,
+        missingMediaByType,
+        missingCertByType,
+      });
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
     return 'Good evening';
   };
 
@@ -1118,610 +771,852 @@ const HomePage = () => {
     }
   };
 
-  // Get SKU suggestions based on search query
   const skuSuggestions = useMemo(() => {
     if (!searchQuery.trim() || searchQuery.length < 2) return [];
-    const query = searchQuery.toLowerCase();
-    return stones
-      .filter(s => s.sku?.toLowerCase().includes(query))
-      .slice(0, 8) // Limit to 8 suggestions
-      .map(s => ({
-        sku: s.sku,
-        shape: s.shape,
-        category: s.category,
-        weightCt: s.weightCt,
-        imageUrl: s.imageUrl
-      }));
+    const q = searchQuery.toLowerCase();
+    return stones.filter(s => s.sku?.toLowerCase().includes(q)).slice(0, 8).map(s => ({
+      sku: s.sku, shape: s.shape, category: s.category, weightCt: s.weightCt, imageUrl: s.imageUrl
+    }));
   }, [searchQuery, stones]);
 
-  // Click outside to close suggestions
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const handler = (e) => { if (searchRef.current && !searchRef.current.contains(e.target)) setShowSuggestions(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Handle suggestion click
-  const handleSuggestionClick = (sku) => {
-    setSearchQuery(sku);
-    setShowSuggestions(false);
-    navigate(`/inventory?search=${encodeURIComponent(sku)}`);
-  };
+  /* ─── Derived data ────────────────────────────────────────── */
+  const totalStonesC = useAnimatedCounter(stats.totalStones);
+  const totalValueC = useAnimatedCounter(Math.round(stats.totalValue));
+  const avgPriceC = useAnimatedCounter(stats.avgPrice);
 
-  // Open sync info dialog
-  const handleSyncClick = () => {
-    setShowSyncDialog(true);
-  };
-
-  // Animated counter values
-  const totalStonesCounter = useAnimatedCounter(stats.totalStones);
-  const totalValueCounter = useAnimatedCounter(Math.round(stats.totalValue));
-  const categoriesCounter = useAnimatedCounter(Object.keys(stats.categories).length);
-  const locationsCounter = useAnimatedCounter(Object.keys(stats.locations).length);
-
-  // Chart data
-  const categoryColors = {
-    'Emerald': '#10b981',
-    'Diamond': '#3b82f6',
-    'Fancy Diamonds': '#f59e0b',
-    'Gemstones': '#6b7280'
-  };
-
-  const categoryChartData = Object.entries(stats.categories).map(([name, value]) => ({
-    label: name,
-    value,
-    color: categoryColors[name] || '#6b7280'
+  const categoryColors = { 'Emerald': '#10b981', 'Diamond': '#3b82f6', 'Fancy Diamonds': '#f59e0b', 'Gemstones': '#8b5cf6', 'Empty': '#94a3b8' };
+  const categoryChartData = Object.entries(stats.categories).filter(([n]) => n !== 'Empty').map(([name, value]) => ({
+    label: name, value, color: categoryColors[name] || '#6b7280'
   }));
 
-  const locationColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-  const locationChartData = Object.entries(stats.locations)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([name, value], i) => ({
-      label: name,
-      value,
-      color: locationColors[i % locationColors.length]
-    }));
-
+  const locationColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  const locationChartData = Object.entries(stats.locations).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value], i) => ({
+    label: name, value, color: locationColors[i % locationColors.length]
+  }));
   const maxLocationValue = Math.max(...locationChartData.map(d => d.value), 1);
 
+  const topShapes = Object.entries(stats.shapes).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const priceBarColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
+  const priceChartData = Object.entries(stats.priceRanges).map(([label, value], i) => ({
+    label, value, color: priceBarColors[i % priceBarColors.length]
+  }));
+  const maxPriceRange = Math.max(...priceChartData.map(d => d.value), 1);
+
+  const weightBarColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b'];
+  const weightChartData = Object.entries(stats.weightRanges).map(([label, value], i) => ({
+    label, value, color: weightBarColors[i % weightBarColors.length]
+  }));
+  const maxWeightRange = Math.max(...weightChartData.map(d => d.value), 1);
+
+  const groupingColors = { 'Single': '#3b82f6', 'Pair': '#8b5cf6', 'Set': '#ec4899', 'Parcel': '#f59e0b', 'Melee': '#ef4444', 'Side Stones': '#14b8a6', 'Fancy': '#f97316', 'Unknown': '#94a3b8' };
+  const groupingChartData = Object.entries(stats.groupingTypes).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({
+    label: name, value, color: groupingColors[name] || '#6b7280'
+  }));
+
+  const labColors = { 'GIA': '#3b82f6', 'GRS': '#10b981', 'AGL': '#f59e0b', 'Gubelin': '#8b5cf6', 'SSEF': '#ec4899', 'C.Dunaigre': '#14b8a6' };
+  const labEntries = Object.entries(stats.labs).sort((a, b) => b[1] - a[1]);
+  const topLabs = labEntries.slice(0, 5);
+  const otherLabsCount = labEntries.slice(5).reduce((s, [, v]) => s + v, 0);
+  const labChartData = [
+    ...topLabs.map(([name, value]) => ({ label: name, value, color: labColors[name] || '#6b7280' })),
+    ...(otherLabsCount > 0 ? [{ label: 'Other', value: otherLabsCount, color: '#94a3b8' }] : []),
+  ];
+
+  const isNeto = qaPriceMode === 'neto';
+  const qaMinPpcNum = qaMinPpc ? Number(qaMinPpc) : 0;
+  const getEffectivePpc = (s) => {
+    const raw = s.pricePerCt || 0;
+    return isNeto ? raw / 2 : raw;
+  };
+  const filterByPpc = (list) => {
+    if (!qaMinPpcNum) return list;
+    return list.filter(s => getEffectivePpc(s) >= qaMinPpcNum);
+  };
+  const filteredMediaByType = useMemo(() => {
+    const result = {};
+    for (const type of ['Single', 'Pair', 'Parcel', 'Set']) {
+      result[type] = filterByPpc(stats.missingMediaByType[type] || []);
+    }
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.missingMediaByType, qaMinPpcNum, isNeto]);
+  const filteredCertByType = useMemo(() => {
+    const result = {};
+    for (const type of ['Single', 'Pair', 'Parcel', 'Set']) {
+      result[type] = filterByPpc(stats.missingCertByType[type] || []);
+    }
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.missingCertByType, qaMinPpcNum, isNeto]);
+  const filteredMediaTotal = Object.values(filteredMediaByType).reduce((s, arr) => s + arr.length, 0);
+  const filteredCertTotal = Object.values(filteredCertByType).reduce((s, arr) => s + arr.length, 0);
+  const formatPpc = (stone) => {
+    const ppc = getEffectivePpc(stone);
+    return ppc ? `$${Math.round(ppc).toLocaleString()}/ct` : '';
+  };
+  const topStonesIsNeto = topStonesMode === 'neto';
+  const getTopStonePrice = (s) => {
+    const raw = s.priceTotal || 0;
+    return topStonesIsNeto ? raw / 2 : raw;
+  };
+  const sortedTopStones = useMemo(() => {
+    return [...(stats.topStones || [])].sort((a, b) => getTopStonePrice(b) - getTopStonePrice(a));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.topStones, topStonesIsNeto]);
+
+  const handleCopySku = (e, sku) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigator.clipboard.writeText(sku);
+    setCopiedSku(sku);
+    setTimeout(() => setCopiedSku(null), 1500);
+  };
+
+  const stagger = (i, base = 0.05) => ({ delay: i * base, duration: 0.4 });
+  const fadeUp = { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 } };
+
+  /* ─── Render ──────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen py-6 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-stone-50 via-white to-emerald-50/30">
-      <div className="max-w-7xl mx-auto">
-        {/* Welcome Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <TooltipProvider delayDuration={200}>
+      <div className="min-h-screen bg-background">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+          {/* ── Header ──────────────────────────────────────── */}
+          <motion.div {...fadeUp} transition={stagger(0)} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-stone-800 mb-1">
-                {getGreeting()}, {user?.firstName || 'there'} 👋
+              <h1 className="text-2xl font-bold tracking-tight">
+                {getGreeting()}, {user?.firstName || 'there'}
               </h1>
-              <p className="text-stone-500">
-                Welcome to your GEMS DNA dashboard
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Here's what's happening with your inventory
               </p>
             </div>
-            
-            {/* Sync Button */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSyncClick}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.02]"
-              >
-                <svg 
-                  className="w-4 h-4" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Sync SOAP Data
-              </button>
-              <button
-                onClick={() => setShowCsvDialog(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.02]"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Upload CSV
-              </button>
-              <button
-                onClick={() => setShowJewelryCsvDialog(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all bg-gradient-to-r from-pink-500 to-rose-600 text-white hover:shadow-lg hover:shadow-pink-500/25 hover:scale-[1.02]"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Upload Jewelry
-              </button>
-            </div>
-          </div>
-        </motion.div>
 
-        {/* Quick Search Bar with Autocomplete */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="mb-6"
-          ref={searchRef}
-        >
-          <form onSubmit={handleQuickSearch} className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              placeholder="Quick search by SKU..."
-              className="w-full px-5 py-4 pl-12 text-lg bg-white border border-stone-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-            />
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <button
-              type="submit"
-              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors"
-            >
-              Search
-            </button>
-            
-            {/* Autocomplete Suggestions */}
-            <AnimatePresence>
-              {showSuggestions && skuSuggestions.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-white border border-stone-200 rounded-xl shadow-lg z-50 overflow-hidden"
-                >
-                  {skuSuggestions.map((stone, index) => (
-                    <button
-                      key={stone.sku}
-                      type="button"
-                      onClick={() => handleSuggestionClick(stone.sku)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-emerald-50 transition-colors ${
-                        index !== skuSuggestions.length - 1 ? 'border-b border-stone-100' : ''
-                      }`}
-                    >
-                      {/* Stone Image */}
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100 flex-shrink-0">
-                        {stone.imageUrl ? (
-                          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-stone-400">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      {/* Stone Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-mono font-semibold text-stone-800">{stone.sku}</p>
-                        <p className="text-sm text-stone-500 truncate">
-                          {stone.shape} • {stone.weightCt?.toFixed(2)}ct • {getMappedCategories(stone.category).join(', ')}
-                        </p>
-                      </div>
-                      {/* Arrow */}
-                      <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </form>
-        </motion.div>
-
-        {/* Main Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <motion.div
-            ref={totalStonesCounter.ref}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-            <p className="text-xs text-stone-500 mb-1">Total Stones</p>
-            <p className="text-2xl font-bold text-stone-800">
-              {loading ? '...' : totalStonesCounter.count.toLocaleString()}
-            </p>
-          </motion.div>
-
-          <motion.div
-            ref={totalValueCounter.ref}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-xs text-stone-500 mb-1">Total Value</p>
-            <p className="text-2xl font-bold text-stone-800">
-              {loading ? '...' : `$${totalValueCounter.count.toLocaleString()}`}
-            </p>
-          </motion.div>
-
-          <motion.div
-            ref={categoriesCounter.ref}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </div>
-            <p className="text-xs text-stone-500 mb-1">Categories</p>
-            <p className="text-2xl font-bold text-stone-800">
-              {loading ? '...' : categoriesCounter.count}
-            </p>
-          </motion.div>
-
-          <motion.div
-            ref={locationsCounter.ref}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <p className="text-xs text-stone-500 mb-1">Locations</p>
-            <p className="text-2xl font-bold text-stone-800">
-              {loading ? '...' : locationsCounter.count}
-            </p>
-          </motion.div>
-        </div>
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Category Distribution */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-            className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm"
-          >
-            <h3 className="text-lg font-semibold text-stone-800 mb-4">Category Distribution</h3>
-            {loading ? (
-              <div className="flex items-center justify-center h-40">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-6">
-                <MiniPieChart data={categoryChartData} size={140} />
-                <div className="flex-1 space-y-2">
-                  {categoryChartData.map((item, i) => (
-                    <motion.div
-                      key={item.label}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.4 + i * 0.1 }}
-                      className="flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></span>
-                        <span className="text-sm text-stone-600">{item.label}</span>
-                      </div>
-                      <span className="text-sm font-semibold text-stone-800">{item.value}</span>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Location Distribution */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm"
-          >
-            <h3 className="text-lg font-semibold text-stone-800 mb-4">Location Distribution</h3>
-            {loading ? (
-              <div className="flex items-center justify-center h-40">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-              </div>
-            ) : (
-              <BarChart data={locationChartData} maxValue={maxLocationValue} />
-            )}
-          </motion.div>
-        </div>
-
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-          className="mb-6"
-        >
-          <h2 className="text-lg font-semibold text-stone-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Link
-              to="/inventory"
-              className="group bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all hover:scale-[1.02]"
-            >
-              <svg className="w-8 h-8 mb-3 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <h3 className="font-semibold mb-1">Browse Inventory</h3>
-              <p className="text-xs text-white/70">Search & filter stones</p>
-            </Link>
-
-            <Link
-              to="/inventory"
-              className="group bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all hover:scale-[1.02]"
-            >
-              <svg className="w-8 h-8 mb-3 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <h3 className="font-semibold mb-1">Export Excel</h3>
-              <p className="text-xs text-white/70">Create client reports</p>
-            </Link>
-
-            <Link
-              to="/inventory"
-              className="group bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white hover:shadow-lg hover:shadow-amber-500/25 transition-all hover:scale-[1.02]"
-            >
-              <svg className="w-8 h-8 mb-3 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-              <h3 className="font-semibold mb-1">Scan QR</h3>
-              <p className="text-xs text-white/70">Quick stone lookup</p>
-            </Link>
-
-            <Link
-              to="/inventory"
-              className="group bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-5 text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all hover:scale-[1.02]"
-            >
-              <svg className="w-8 h-8 mb-3 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-              <h3 className="font-semibold mb-1">Manage Tags</h3>
-              <p className="text-xs text-white/70">Organize by client</p>
-            </Link>
-          </div>
-        </motion.div>
-
-        {/* Bottom Row: Top Stones + Tags Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Top 5 Stones by Value */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-800">Top Stones by Value</h3>
-              <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Top 5</span>
-            </div>
-            {loading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-12 bg-stone-100 rounded-xl animate-pulse"></div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {stats.topStones.map((stone, i) => (
-                  <motion.div
-                    key={stone.sku}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.55 + i * 0.1 }}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowSyncDialog(true)}
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                   >
-                    <Link
-                      to={`/${stone.sku}`}
-                      className="flex items-center justify-between p-3 rounded-xl bg-stone-50 hover:bg-emerald-50 transition-colors group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white text-xs font-bold flex items-center justify-center">
-                          {i + 1}
-                        </span>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Sync
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Sync stone data from SOAP API</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowCsvDialog(true)}
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                    CSV
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Import stones from CSV</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowJewelryCsvDialog(true)}
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                    Jewelry
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Import jewelry from CSV</TooltipContent>
+              </Tooltip>
+            </div>
+          </motion.div>
+
+          {/* ── Search ──────────────────────────────────────── */}
+          <motion.div {...fadeUp} transition={stagger(1)} ref={searchRef}>
+            <form onSubmit={handleQuickSearch} className="relative">
+              <div className="relative">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="Search by SKU, shape, or category..."
+                  className="w-full h-11 pl-10 pr-24 rounded-lg border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-shadow"
+                />
+                <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-4 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+                  Search
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {showSuggestions && skuSuggestions.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    className="absolute top-full left-0 right-0 mt-1.5 bg-popover border rounded-lg shadow-lg z-50 overflow-hidden"
+                  >
+                    {skuSuggestions.map((stone, i) => (
+                      <button
+                        key={stone.sku}
+                        type="button"
+                        onClick={() => { setSearchQuery(stone.sku); setShowSuggestions(false); navigate(`/inventory?search=${encodeURIComponent(stone.sku)}`); }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors ${i !== skuSuggestions.length - 1 ? 'border-b border-border' : ''}`}
+                      >
+                        <div className="w-9 h-9 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                          {stone.imageUrl ? (
+                            <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono text-sm font-medium">{stone.sku}</p>
+                          <p className="text-xs text-muted-foreground truncate">{stone.shape} {stone.weightCt ? `• ${stone.weightCt}ct` : ''}</p>
+                        </div>
+                        <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </form>
+          </motion.div>
+
+          {/* ── KPI Cards ───────────────────────────────────── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {loading ? (
+              <>
+                <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
+              </>
+            ) : (
+              <>
+                {/* Total Stones */}
+                <motion.div {...fadeUp} transition={stagger(2)}>
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-mono text-sm font-semibold text-stone-800 group-hover:text-emerald-600 transition-colors">
-                            {stone.sku}
-                          </p>
-                          <p className="text-xs text-stone-500">{stone.shape} • {stone.weightCt}ct</p>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Total Stones</p>
+                          <p className="text-2xl font-bold tabular-nums">{totalStonesC.toLocaleString()}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{Object.keys(stats.categories).filter(c => c !== 'Empty').length} categories</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                         </div>
                       </div>
-                      <span className="text-sm font-bold text-emerald-600">
-                        ${(stone.priceTotal || 0).toLocaleString()}
-                      </span>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Total Value */}
+                <motion.div {...fadeUp} transition={stagger(3)}>
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Total Value</p>
+                          <p className="text-2xl font-bold tabular-nums">${totalValueC.toLocaleString()}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">Inventory B value</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Avg Price */}
+                <motion.div {...fadeUp} transition={stagger(4)}>
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Avg. Price</p>
+                          <p className="text-2xl font-bold tabular-nums">${avgPriceC.toLocaleString()}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">Per stone (B)</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Avg Weight */}
+                <motion.div {...fadeUp} transition={stagger(5)}>
+                  <Card className="relative overflow-hidden">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Avg. Weight</p>
+                          <p className="text-2xl font-bold tabular-nums">{stats.avgWeight} ct</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{Object.keys(stats.locations).length} locations</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </>
             )}
+          </div>
+
+          {/* ── Charts Row ──────────────────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Category Distribution - takes 2 cols */}
+            <motion.div {...fadeUp} transition={stagger(6)} className="lg:col-span-2">
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Category Distribution</CardTitle>
+                  <CardDescription>Stones by category type</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex items-center justify-center h-48"><Skeleton className="w-32 h-32 rounded-full" /></div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-4">
+                      <DonutChart data={categoryChartData} size={160} thickness={22} />
+                      <div className="w-full space-y-2">
+                        {categoryChartData.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                              <span className="text-sm text-muted-foreground">{item.label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold tabular-nums">{item.value.toLocaleString()}</span>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {stats.totalStones ? Math.round((item.value / stats.totalStones) * 100) : 0}%
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Location Distribution - takes 3 cols */}
+            <motion.div {...fadeUp} transition={stagger(7)} className="lg:col-span-3">
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Location Distribution</CardTitle>
+                  <CardDescription>Top {locationChartData.length} locations by stone count</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="space-y-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
+                  ) : (
+                    <HBarChart data={locationChartData} maxValue={maxLocationValue} />
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* ── Quick Actions ───────────────────────────────── */}
+          <motion.div {...fadeUp} transition={stagger(8)}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Browse Inventory', desc: 'Search & filter', to: '/inventory', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', color: 'bg-primary text-primary-foreground' },
+                { label: 'Diamonds', desc: 'Diamond inventory', to: '/inventory?mode=diamonds', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4', color: 'bg-blue-600 text-white' },
+                { label: 'Gemstones', desc: 'Emeralds & gems', to: '/inventory?mode=gemstones', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z', color: 'bg-emerald-600 text-white' },
+                { label: 'Jewelry', desc: 'Jewelry collection', to: '/inventory?mode=jewelry', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7', color: 'bg-pink-600 text-white' },
+              ].map((action, i) => (
+                <Link key={action.label} to={action.to} className={`group rounded-lg p-4 ${action.color} hover:opacity-90 transition-all hover:shadow-md`}>
+                  <svg className="w-6 h-6 mb-2 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} /></svg>
+                  <p className="font-medium text-sm">{action.label}</p>
+                  <p className="text-[11px] opacity-70">{action.desc}</p>
+                </Link>
+              ))}
+            </div>
           </motion.div>
 
-          {/* Tags Overview */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55 }}
-            className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-800">Tags Overview</h3>
-              <Link to="/inventory" className="text-xs text-emerald-600 hover:text-emerald-700">
-                Manage →
-              </Link>
-            </div>
-            {loading ? (
-              <div className="space-y-3">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-10 bg-stone-100 rounded-xl animate-pulse"></div>
-                ))}
-              </div>
-            ) : tags.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 rounded-full bg-stone-100 text-stone-400 flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-stone-500 mb-2">No tags created yet</p>
-                <Link to="/inventory" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
-                  Create your first tag →
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {tags.slice(0, 6).map((tag, i) => (
-                  <motion.div
-                    key={tag.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.6 + i * 0.1 }}
-                    className="flex items-center justify-between p-3 rounded-xl bg-stone-50 hover:bg-stone-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: tag.color || '#10b981' }}
-                      ></span>
-                      <span className="text-sm font-medium text-stone-800">{tag.name}</span>
+          {/* ── Price & Weight Distribution ─────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <motion.div {...fadeUp} transition={stagger(9)}>
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Price Distribution</CardTitle>
+                  <CardDescription>Number of stones per price range</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
+                  ) : (
+                    <HBarChart data={priceChartData} maxValue={maxPriceRange} />
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div {...fadeUp} transition={stagger(10)}>
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Weight Distribution</CardTitle>
+                  <CardDescription>Number of stones per carat range</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
+                  ) : (
+                    <HBarChart data={weightChartData} maxValue={maxWeightRange} />
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* ── Grouping Types & Lab Distribution ────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <motion.div {...fadeUp} transition={stagger(11)}>
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Inventory by Type</CardTitle>
+                  <CardDescription>Stone grouping breakdown</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex items-center justify-center h-48"><Skeleton className="w-32 h-32 rounded-full" /></div>
+                  ) : groupingChartData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No data</p>
+                  ) : (
+                    <div className="flex flex-col items-center gap-4">
+                      <DonutChart data={groupingChartData} size={150} thickness={20} />
+                      <div className="w-full space-y-2">
+                        {groupingChartData.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                              <span className="text-sm text-muted-foreground">{item.label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold tabular-nums">{item.value.toLocaleString()}</span>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {stats.totalStones ? Math.round((item.value / stats.totalStones) * 100) : 0}%
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <span className="text-xs text-stone-500 bg-stone-200 px-2 py-1 rounded-full">
-                      {tag.stone_count || 0} stones
-                    </span>
-                  </motion.div>
-                ))}
-                {tags.length > 6 && (
-                  <p className="text-xs text-stone-400 text-center pt-2">
-                    +{tags.length - 6} more tags
-                  </p>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div {...fadeUp} transition={stagger(12)}>
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Lab Distribution</CardTitle>
+                  <CardDescription>Certification laboratories</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex items-center justify-center h-48"><Skeleton className="w-32 h-32 rounded-full" /></div>
+                  ) : labChartData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No lab data</p>
+                  ) : (
+                    <div className="flex flex-col items-center gap-4">
+                      <DonutChart data={labChartData} size={150} thickness={20} />
+                      <div className="w-full space-y-2">
+                        {labChartData.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                              <span className="text-sm text-muted-foreground">{item.label}</span>
+                            </div>
+                            <span className="text-sm font-semibold tabular-nums">{item.value.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* ── Bottom Row: Top Stones + Tags + Shapes ───── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Top Stones */}
+            <motion.div {...fadeUp} transition={stagger(9)} className="lg:col-span-1">
+              <Card className="h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Top Stones</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setTopStonesMode(prev => prev === 'bruto' ? 'neto' : 'bruto')}
+                        className={`h-7 px-2.5 rounded-md text-[10px] font-semibold transition-colors border ${topStonesIsNeto ? 'bg-primary/10 text-primary border-primary/20' : 'bg-amber-50 text-amber-700 border-amber-200'}`}
+                      >
+                        {topStonesIsNeto ? 'Neto' : 'B'}
+                      </button>
+                      <Badge variant="success" className="text-[10px]">By Value</Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {loading ? (
+                    <div className="space-y-2.5">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {sortedTopStones.map((stone, i) => (
+                        <Link key={stone.sku} to={`/${stone.sku}`} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted transition-colors group">
+                          <span className="w-6 h-6 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {i + 1}
+                          </span>
+                          <div className="w-8 h-8 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                            {stone.imageUrl ? (
+                              <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-mono text-xs font-medium truncate group-hover:text-primary transition-colors">{stone.sku}</p>
+                            <p className="text-[11px] text-muted-foreground">{stone.shape} {stone.weightCt ? `• ${stone.weightCt}ct` : ''}</p>
+                          </div>
+                          <span className="text-xs font-bold text-emerald-600 tabular-nums flex-shrink-0">
+                            ${getTopStonePrice(stone).toLocaleString()}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Tags */}
+            <motion.div {...fadeUp} transition={stagger(10)} className="lg:col-span-1">
+              <Card className="h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Tags</CardTitle>
+                    <Link to="/inventory" className="text-xs text-primary hover:underline">Manage</Link>
+                  </div>
+                  <CardDescription>{tags.length} tags created</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {loading ? (
+                    <div className="space-y-2.5">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                  ) : tags.length === 0 ? (
+                    <div className="text-center py-6">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
+                        <svg className="w-5 h-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                      </div>
+                      <p className="text-sm text-muted-foreground">No tags yet</p>
+                      <Link to="/inventory" className="text-xs text-primary hover:underline">Create one</Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {tags.slice(0, 7).map((tag) => (
+                        <div key={tag.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#10b981' }} />
+                            <span className="text-sm font-medium truncate max-w-[140px]">{tag.name}</span>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px]">{tag.stone_count || 0}</Badge>
+                        </div>
+                      ))}
+                      {tags.length > 7 && (
+                        <p className="text-xs text-muted-foreground text-center pt-1">+{tags.length - 7} more</p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Top Shapes */}
+            <motion.div {...fadeUp} transition={stagger(11)} className="lg:col-span-1">
+              <Card className="h-full">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Top Shapes</CardTitle>
+                  <CardDescription>Most common stone shapes</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {loading ? (
+                    <div className="space-y-2.5">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {topShapes.map(([shape, count], i) => {
+                        const maxShape = topShapes[0]?.[1] || 1;
+                        return (
+                          <div key={shape}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium">{shape}</span>
+                              <span className="text-xs text-muted-foreground tabular-nums">{count.toLocaleString()}</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(count / maxShape) * 100}%` }}
+                                transition={{ delay: i * 0.08 + 0.3, duration: 0.6 }}
+                                className="h-full rounded-full bg-primary/60"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* ── QA Alerts ──────────────────────────────────── */}
+          <motion.div {...fadeUp} transition={stagger(15)}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">QA Alerts</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setQaPriceMode(prev => prev === 'bruto' ? 'neto' : 'bruto')}
+                  className={`h-8 px-3 rounded-md text-xs font-semibold transition-colors border ${isNeto ? 'bg-primary/10 text-primary border-primary/20' : 'bg-amber-50 text-amber-700 border-amber-200'}`}
+                >
+                  {isNeto ? 'Neto' : 'B'}
+                </button>
+                <label className="text-xs text-muted-foreground whitespace-nowrap">Min $/ct</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={qaMinPpc}
+                  onChange={(e) => setQaMinPpc(e.target.value)}
+                  placeholder="0"
+                  className="w-24 h-8 px-2.5 rounded-md border border-input bg-background text-xs tabular-nums ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                />
+                {qaMinPpcNum > 0 && (
+                  <button onClick={() => setQaMinPpc('')} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Clear</button>
                 )}
               </div>
-            )}
+            </div>
           </motion.div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Missing Images / Video */}
+            <motion.div {...fadeUp} transition={stagger(16)}>
+              <Card className="h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Missing Images / Video</CardTitle>
+                    <Badge variant={filteredMediaTotal === 0 ? 'success' : 'warning'} className="text-[10px]">
+                      {filteredMediaTotal === 0 ? 'All good' : `${filteredMediaTotal} stones`}
+                    </Badge>
+                  </div>
+                  <CardDescription>Stones without any image or video attached</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {loading ? (
+                    <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                  ) : filteredMediaTotal === 0 ? (
+                    <div className="text-center py-6">
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2">
+                        <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                      <p className="text-sm font-medium text-emerald-700">{qaMinPpcNum > 0 ? 'No matches for this filter' : 'All stones have media'}</p>
+                    </div>
+                  ) : (
+                    <Tabs defaultValue="Single">
+                      <TabsList className="w-full">
+                        {['Single', 'Pair', 'Parcel', 'Set'].map(type => (
+                          <TabsTrigger key={type} value={type} className="flex-1 text-xs gap-1.5">
+                            {type}
+                            {filteredMediaByType[type]?.length > 0 && (
+                              <Badge variant="warning" className="text-[9px] px-1 py-0 ml-0.5">{filteredMediaByType[type].length}</Badge>
+                            )}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                      {['Single', 'Pair', 'Parcel', 'Set'].map(type => (
+                        <TabsContent key={type} value={type}>
+                          {(filteredMediaByType[type]?.length || 0) === 0 ? (
+                            <div className="text-center py-4">
+                              <p className="text-xs text-muted-foreground">No missing media for {type} stones</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                              {filteredMediaByType[type].slice(0, 20).map((stone) => (
+                                <Link key={stone.sku} to={`/inventory?search=${encodeURIComponent(stone.sku)}`} className="flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors group">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    </div>
+                                    <span className="font-mono text-xs font-medium group-hover:text-primary transition-colors">{stone.sku}</span>
+                                    <button onClick={(e) => handleCopySku(e, stone.sku)} className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted-foreground/10" title="Copy SKU">
+                                      {copiedSku === stone.sku ? (
+                                        <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                      ) : (
+                                        <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                      )}
+                                    </button>
+                                  </div>
+                                  <span className="text-[11px] text-muted-foreground">{formatPpc(stone)} {stone.shape} {stone.weightCt ? `• ${stone.weightCt}ct` : ''}</span>
+                                </Link>
+                              ))}
+                              {filteredMediaByType[type].length > 20 && (
+                                <p className="text-xs text-muted-foreground text-center pt-1">+{filteredMediaByType[type].length - 20} more</p>
+                              )}
+                            </div>
+                          )}
+                        </TabsContent>
+                      ))}
+                    </Tabs>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Missing Certificates */}
+            <motion.div {...fadeUp} transition={stagger(17)}>
+              <Card className="h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Missing Certificates</CardTitle>
+                    <Badge variant={filteredCertTotal === 0 ? 'success' : 'warning'} className="text-[10px]">
+                      {filteredCertTotal === 0 ? 'All good' : `${filteredCertTotal} stones`}
+                    </Badge>
+                  </div>
+                  <CardDescription>Stones without certificate URL or number</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {loading ? (
+                    <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                  ) : filteredCertTotal === 0 ? (
+                    <div className="text-center py-6">
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2">
+                        <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                      <p className="text-sm font-medium text-emerald-700">{qaMinPpcNum > 0 ? 'No matches for this filter' : 'All stones have certificates'}</p>
+                    </div>
+                  ) : (
+                    <Tabs defaultValue="Single">
+                      <TabsList className="w-full">
+                        {['Single', 'Pair', 'Parcel', 'Set'].map(type => (
+                          <TabsTrigger key={type} value={type} className="flex-1 text-xs gap-1.5">
+                            {type}
+                            {filteredCertByType[type]?.length > 0 && (
+                              <Badge variant="warning" className="text-[9px] px-1 py-0 ml-0.5">{filteredCertByType[type].length}</Badge>
+                            )}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                      {['Single', 'Pair', 'Parcel', 'Set'].map(type => (
+                        <TabsContent key={type} value={type}>
+                          {(filteredCertByType[type]?.length || 0) === 0 ? (
+                            <div className="text-center py-4">
+                              <p className="text-xs text-muted-foreground">No missing certificates for {type} stones</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                              {filteredCertByType[type].slice(0, 20).map((stone) => (
+                                <Link key={stone.sku} to={`/inventory?search=${encodeURIComponent(stone.sku)}`} className="flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors group">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    </div>
+                                    <span className="font-mono text-xs font-medium group-hover:text-primary transition-colors">{stone.sku}</span>
+                                    <button onClick={(e) => handleCopySku(e, stone.sku)} className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted-foreground/10" title="Copy SKU">
+                                      {copiedSku === stone.sku ? (
+                                        <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                      ) : (
+                                        <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                      )}
+                                    </button>
+                                  </div>
+                                  <span className="text-[11px] text-muted-foreground">{formatPpc(stone)} {stone.shape} {stone.weightCt ? `• ${stone.weightCt}ct` : ''}</span>
+                                </Link>
+                              ))}
+                              {filteredCertByType[type].length > 20 && (
+                                <p className="text-xs text-muted-foreground text-center pt-1">+{filteredCertByType[type].length - 20} more</p>
+                              )}
+                            </div>
+                          )}
+                        </TabsContent>
+                      ))}
+                    </Tabs>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* ── Recent Stones Gallery ───────────────────────── */}
+          <motion.div {...fadeUp} transition={stagger(17)}>
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Recent Stones</CardTitle>
+                    <CardDescription>Latest additions to inventory</CardDescription>
+                  </div>
+                  <Link to="/inventory" className="text-xs text-primary hover:underline font-medium">View all</Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                    {[...Array(8)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                    {stats.recentStones.map((stone) => (
+                      <Link key={stone.sku} to={`/${stone.sku}`} className="group">
+                        <div className="aspect-square rounded-lg overflow-hidden bg-muted relative">
+                          {stone.imageUrl ? (
+                            <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1.5">
+                            <span className="text-white text-[10px] font-medium">View</span>
+                          </div>
+                        </div>
+                        <p className="font-mono text-[11px] font-medium mt-1.5 truncate group-hover:text-primary transition-colors">{stone.sku}</p>
+                        <p className="text-[10px] text-muted-foreground">{stone.weightCt ? `${stone.weightCt}ct` : ''}</p>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ── Footer ──────────────────────────────────────── */}
+          <div className="text-center pb-4">
+            <p className="text-xs text-muted-foreground">GEMS DNA &middot; Diamond Network by Gemstar</p>
+          </div>
+
         </div>
 
-        {/* Recent Stones */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm mb-6"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-stone-800">Recent Stones</h3>
-            <Link to="/inventory" className="text-xs text-emerald-600 hover:text-emerald-700">
-              View All →
-            </Link>
-          </div>
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="aspect-square bg-stone-100 rounded-xl animate-pulse"></div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-              {stats.recentStones.map((stone, i) => (
-                <motion.div
-                  key={stone.sku}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.65 + i * 0.1 }}
-                >
-                  <Link
-                    to={`/${stone.sku}`}
-                    className="block group"
-                  >
-                    <div className="aspect-square rounded-xl overflow-hidden bg-stone-100 mb-2 relative">
-                      {stone.imageUrl ? (
-                        <img
-                          src={stone.imageUrl}
-                          alt={stone.sku}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-stone-400">
-                          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                        <span className="text-white text-xs font-medium">View DNA →</span>
-                      </div>
-                    </div>
-                    <p className="font-mono text-xs font-semibold text-stone-800 truncate group-hover:text-emerald-600 transition-colors">
-                      {stone.sku}
-                    </p>
-                    <p className="text-xs text-stone-500">{stone.weightCt}ct</p>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-
-        {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="text-center"
-        >
-          <p className="text-sm text-stone-400">
-            GEMS DNA • Diamond Network by Gemstar
-          </p>
-        </motion.div>
+        {/* ── Dialogs ─────────────────────────────────────── */}
+        <SyncInfoDialog isOpen={showSyncDialog} onClose={() => setShowSyncDialog(false)} currentStats={stats} onSyncComplete={fetchData} />
+        <CsvUploadDialog isOpen={showCsvDialog} onClose={() => setShowCsvDialog(false)} onImportComplete={fetchData} />
+        <JewelryCsvUploadDialog isOpen={showJewelryCsvDialog} onClose={() => setShowJewelryCsvDialog(false)} onImportComplete={fetchData} />
       </div>
-
-      {/* Sync Info Dialog */}
-      <SyncInfoDialog
-        isOpen={showSyncDialog}
-        onClose={() => setShowSyncDialog(false)}
-        currentStats={stats}
-        onSyncComplete={fetchData}
-      />
-
-      {/* CSV Upload Dialog */}
-      <CsvUploadDialog
-        isOpen={showCsvDialog}
-        onClose={() => setShowCsvDialog(false)}
-        onImportComplete={fetchData}
-      />
-      <JewelryCsvUploadDialog
-        isOpen={showJewelryCsvDialog}
-        onClose={() => setShowJewelryCsvDialog(false)}
-        onImportComplete={fetchData}
-      />
-    </div>
+    </TooltipProvider>
   );
 };
 

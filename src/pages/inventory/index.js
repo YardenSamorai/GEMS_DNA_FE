@@ -8,7 +8,7 @@ import { saveAs } from "file-saver";
 import { Html5Qrcode } from "html5-qrcode";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
-import { getMappedCategories } from "../utils/categoryMap";
+import { getMappedCategories } from "../../utils/categoryMap";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -30,26 +30,26 @@ const TAG_COLORS = [
 const shareToWhatsApp = (stone, includePrice = false) => {
   const dnaUrl = `https://gems-dna.com/${stone.sku}`;
   
-  let message = `💎 *${getDisplayShape(stone.shape) || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
-  message += `📋 *Details:*\n`;
-  message += `• SKU: ${stone.sku}\n`;
-  message += `• Color: ${getDisplayColor(stone) || 'N/A'}\n`;
-  message += `• Clarity: ${stone.clarity || 'N/A'}\n`;
-  message += `• Treatment: ${stone.treatment || 'N/A'}\n`;
-  message += `• Origin: ${stone.origin || 'N/A'}\n`;
-  message += `• Lab: ${stone.lab || 'N/A'}\n`;
+  let message = `≡ƒעמ *${getDisplayShape(stone.shape) || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
+  message += `≡ƒףכ *Details:*\n`;
+  message += `Γאó SKU: ${stone.sku}\n`;
+  message += `Γאó Color: ${getDisplayColor(stone) || 'N/A'}\n`;
+  message += `Γאó Clarity: ${stone.clarity || 'N/A'}\n`;
+  message += `Γאó Treatment: ${stone.treatment || 'N/A'}\n`;
+  message += `Γאó Origin: ${stone.origin || 'N/A'}\n`;
+  message += `Γאó Lab: ${stone.lab || 'N/A'}\n`;
   if (stone.measurements) {
-    message += `• Size: ${stone.measurements}\n`;
+    message += `Γאó Size: ${stone.measurements}\n`;
   }
   
   if (includePrice && stone.priceTotal) {
-    message += `\n💰 *Price: $${stone.priceTotal.toLocaleString()}*\n`;
+    message += `\n≡ƒע░ *Price: $${stone.priceTotal.toLocaleString()}*\n`;
   }
   
-  message += `\n🔗 View DNA: ${dnaUrl}`;
+  message += `\n≡ƒפק View DNA: ${dnaUrl}`;
   
   if (stone.imageUrl) {
-    message += `\n\n📸 Image: ${stone.imageUrl}`;
+    message += `\n\n≡ƒף╕ Image: ${stone.imageUrl}`;
   }
   
   const encodedMessage = encodeURIComponent(message);
@@ -66,7 +66,7 @@ const shareMultipleToWhatsApp = (selectedStonesArray) => {
     const dnaUrl = `https://gems-dna.com/${stone.sku}`;
     message += `${idx + 1}. *${getDisplayShape(stone.shape) || 'Gemstone'}* ${stone.weightCt || '?'}ct`;
     if (getDisplayColor(stone)) message += ` | ${getDisplayColor(stone)}`;
-    message += ` — SKU: ${stone.sku}\n`;
+    message += ` Γאפ SKU: ${stone.sku}\n`;
     message += `   ${dnaUrl}\n\n`;
   });
 
@@ -96,7 +96,7 @@ const encodePriceBARELOVSK = (price) => {
         zeroCount++;
         i++;
       }
-      // Order: I(0) → Y(00) → Z(000)
+      // Order: I(0) Γזע Y(00) Γזע Z(000)
       const remainder = zeroCount % 3;
       const zCount = Math.floor(zeroCount / 3);
       if (remainder === 1) encoded += 'I';
@@ -145,16 +145,16 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
     
     const isDiamondOrFancy = mapped.includes('Diamond') || sku.startsWith('T');
     
-    // Clarity: "insignificant" → "Ins."
+    // Clarity: "insignificant" Γזע "Ins."
     const clarity = (stone.clarity || '').toLowerCase() === 'insignificant' 
       ? 'Ins' 
       : (stone.clarity || '');
     
-    // Treatment: "insignificant" → "Ins.", default to "Minor" if empty
+    // Treatment: "insignificant" Γזע "Ins.", default to "Minor" if empty
     const rawTreatment = stone.treatment || 'Minor';
     const treatment = rawTreatment.toLowerCase() === 'insignificant' ? 'Ins' : rawTreatment;
     
-    // Hide price if ≥50K per carat
+    // Hide price if ΓיÑ50K per carat
     const showPrice = stone.pricePerCt < 50000;
     
     const lab = (stone.lab && stone.lab.toUpperCase() !== 'N/A') ? stone.lab : null;
@@ -611,17 +611,17 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
             <div className="flex flex-wrap gap-2 mb-6">
               {emeraldCount > 0 && (
                 <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  💚 Emeralds: {emeraldCount}
+                  ≡ƒעת Emeralds: {emeraldCount}
                 </span>
               )}
               {diamondCount > 0 && (
                 <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                  💎 Diamonds: {diamondCount}
+                  ≡ƒעמ Diamonds: {diamondCount}
                 </span>
               )}
               {otherCount > 0 && (
                 <span className="px-3 py-1.5 bg-stone-100 text-stone-700 rounded-full text-sm font-medium">
-                  🔷 Other: {otherCount}
+                  ≡ƒפ╖ Other: {otherCount}
                 </span>
               )}
             </div>
@@ -1531,7 +1531,7 @@ const ExportModal = ({
                               onClick={() => resetPrice(stone.id)}
                               className="text-xs text-stone-400 hover:text-stone-600"
                             >
-                              ↺
+                              Γז║
                             </button>
                           )}
                         </div>
@@ -1616,7 +1616,7 @@ const ExportModal = ({
                             onClick={() => resetPrice(stone.id)}
                             className="text-xs text-stone-500 hover:text-stone-700 underline"
                           >
-                            ↺
+                            Γז║
                           </button>
                         )}
                       </td>
@@ -1662,7 +1662,7 @@ const ExportModal = ({
                   <span className="text-stone-400">|</span>
                   <span>Orig: <span className="font-medium text-stone-500">${totalOriginal.toLocaleString()}</span></span>
                   <span className={`font-semibold ${totalAdjusted !== totalOriginal ? 'text-emerald-600' : 'text-stone-700'}`}>
-                    → Total: ${Math.round(totalAdjusted).toLocaleString()}
+                    Γזע Total: ${Math.round(totalAdjusted).toLocaleString()}
                   </span>
                   </>}
                 </div>
@@ -1955,7 +1955,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
                 <span className="text-emerald-100 text-xs">SKU: {stone.sku}</span>
               </div>
               <h2 className="text-xl font-bold text-white">
-                {getDisplayShape(stone.shape)} • {stone.weightCt}ct
+                {getDisplayShape(stone.shape)} Γאó {stone.weightCt}ct
               </h2>
             </div>
             <button
@@ -2081,7 +2081,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
                   </div>
                 </div>
                 <p className="text-xs text-stone-400 text-center">
-                  {stone.weightCt}ct × ${stone.pricePerCt?.toLocaleString()}/ct
+                  {stone.weightCt}ct ├ק ${stone.pricePerCt?.toLocaleString()}/ct
                 </p>
               </div>
             )}
@@ -2151,7 +2151,7 @@ const LoadingBar = ({ active, progress }) => {
   );
 };
 
-/* ---------------- Shape Mapping (BARAK → DNA) ---------------- */
+/* ---------------- Shape Mapping (BARAK Γזע DNA) ---------------- */
 const SHAPE_TO_DNA = {
   'ASH': ['Emerald'],
   'BGT': ['Baguette'],
@@ -2753,7 +2753,7 @@ const SMART_SEARCH_CLARITIES = new Set([
 ]);
 
 const SMART_SEARCH_LABS = new Set([
-  'GIA', 'GRS', 'SSEF', 'GUBELIN', 'GÜBELIN', 'CDC', 'AIGS', 'AGL', 'GIT', 'LOTUS', 'CGL',
+  'GIA', 'GRS', 'SSEF', 'GUBELIN', 'G├£BELIN', 'CDC', 'AIGS', 'AGL', 'GIT', 'LOTUS', 'CGL',
 ]);
 
 const SMART_SEARCH_CATEGORIES = new Set([
@@ -2921,14 +2921,14 @@ const parseSmartSearch = (text) => {
   for (const [, items] of Object.entries(deferredByWord)) {
     const catName = items[0].upper.charAt(0) + items[0].upper.slice(1).toLowerCase();
     if (items.length >= 2) {
-      // Same word twice → first = category, second = shape
+      // Same word twice Γזע first = category, second = shape
       result.categories.push(catName);
       result.shapes.push(items[1].shapeName);
     } else if (pureCategoryCount > 0) {
-      // Another category already exists (e.g. Diamond) → this is a shape
+      // Another category already exists (e.g. Diamond) Γזע this is a shape
       result.shapes.push(items[0].shapeName);
     } else {
-      // No other category → default to category
+      // No other category Γזע default to category
       result.categories.push(catName);
     }
   }
@@ -3687,7 +3687,7 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">{stone.lab}</span>
           )}
           {stone.location && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">📍 {stone.location}</span>
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">≡ƒףם {stone.location}</span>
           )}
         </div>
         {/* Price */}
@@ -3746,8 +3746,8 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
           <span className="text-white font-semibold text-sm">Pair</span>
         </div>
         <div className="flex items-center gap-3 text-white/90 text-xs">
-          <span>⚖️ {combinedWeight} ct</span>
-          <span>💰 ${combinedPrice.toLocaleString()}</span>
+          <span>Γתצ∩╕ן {combinedWeight} ct</span>
+          <span>≡ƒע░ ${combinedPrice.toLocaleString()}</span>
         </div>
       </div>
 
@@ -3784,6 +3784,7 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
 const DIAMOND_DEFAULT_COLUMNS = [
   { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
   { id: 'img', label: 'Img' },
+  { id: 'video', label: 'Video' },
   { id: 'type', label: 'Type' },
   { id: 'shape', label: 'Shape', sortField: 'shape' },
   { id: 'color', label: 'Color' },
@@ -3802,6 +3803,7 @@ const DIAMOND_DEFAULT_COLUMNS = [
 const GEMSTONE_DEFAULT_COLUMNS = [
   { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
   { id: 'img', label: 'Img' },
+  { id: 'video', label: 'Video' },
   { id: 'category', label: 'Category', sortField: 'category' },
   { id: 'type', label: 'Type' },
   { id: 'shape', label: 'Shape', sortField: 'shape' },
@@ -3820,6 +3822,7 @@ const GEMSTONE_DEFAULT_COLUMNS = [
 const JEWELRY_DEFAULT_COLUMNS = [
   { id: 'sku', label: 'Model', sortField: 'sku', alwaysVisible: true },
   { id: 'img', label: 'Img' },
+  { id: 'video', label: 'Video' },
   { id: 'title', label: 'Title', sortField: 'title' },
   { id: 'jewelryType', label: 'Type', sortField: 'jewelryType' },
   { id: 'style', label: 'Style', sortField: 'style' },
@@ -4001,7 +4004,7 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefa
 };
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns }) => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
 
@@ -4061,7 +4064,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       {children}
       {sortConfig?.field === field && (
         <span className="text-primary-500">
-          {sortConfig.direction === "asc" ? "↑" : "↓"}
+          {sortConfig.direction === "asc" ? "Γזס" : "Γזף"}
         </span>
       )}
     </button>
@@ -4074,6 +4077,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
     switch (colId) {
       case 'sku': return <th key={colId} className={`${base} uppercase`}><SortButton field="sku">SKU</SortButton></th>;
       case 'img': return <th key={colId} className={base}>Img</th>;
+      case 'video': return <th key={colId} className={base}>Video</th>;
       case 'category': return <th key={colId} className={base}><SortButton field="category">Category</SortButton></th>;
       case 'type': return <th key={colId} className={`${base} text-center`}>Type</th>;
       case 'shape': return <th key={colId} className={`${base} uppercase`}><SortButton field="shape">Shape</SortButton></th>;
@@ -4113,6 +4117,20 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
           >
             {stone.imageUrl ? (
               <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
+            )}
+          </div>
+        </td>
+      );
+      case 'video': return (
+        <td key={colId} className="px-3 py-2">
+          <div
+            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center ${stone.videoUrl ? 'cursor-pointer hover:ring-2 hover:ring-accent-300 transition-all' : ''}`}
+            onClick={(e) => { if (stone.videoUrl && onVideoClick) { e.stopPropagation(); onVideoClick(stone.videoUrl); } }}
+          >
+            {stone.videoUrl ? (
+              <svg className="w-5 h-5 text-accent-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
             )}
@@ -4250,7 +4268,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                   </span>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm font-medium text-stone-800">{getDisplayShape(stone.shape)}</span>
-                    <span className="text-stone-300">•</span>
+                    <span className="text-stone-300">Γאó</span>
                     <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
                   </div>
                 </div>
@@ -4283,7 +4301,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 )}
                 {stone.location && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                    📍 {stone.location}
+                    ≡ƒףם {stone.location}
                   </span>
                 )}
               </div>
@@ -4624,6 +4642,7 @@ const StoneSearchPage = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [lightboxVideo, setLightboxVideo] = useState(null);
   const exportButtonRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -4907,6 +4926,7 @@ const StoneSearchPage = () => {
     setSmartSearch('');
     setSortConfig({ field: 'sku', direction: 'asc' });
     setColumnConfig(getColumnConfig(user?.id || 'default', newMode));
+    if (newMode === 'jewelry') setPriceMode('bruto');
   };
 
   // USB Barcode Scanner Listener (global keyboard listener)
@@ -4933,7 +4953,7 @@ const StoneSearchPage = () => {
         
         // Process the scanned barcode
         if (scannedBarcode) {
-          console.log("🔫 USB Scanner detected:", scannedBarcode);
+          console.log("≡ƒפ½ USB Scanner detected:", scannedBarcode);
           handleBarcodeScan(scannedBarcode);
         }
         return;
@@ -5616,6 +5636,26 @@ const StoneSearchPage = () => {
   }, []);
 
   useEffect(() => {
+    if (!initialSearch || loading || stones.length === 0) return;
+    const match = stones.find(s => s.sku?.toLowerCase() === initialSearch.toLowerCase());
+    if (!match) {
+      const inJewelry = jewelryItems.find(j => j.sku?.toLowerCase() === initialSearch.toLowerCase());
+      if (inJewelry && inventoryMode !== 'jewelry') {
+        setInventoryMode('jewelry');
+        setPriceMode('bruto');
+      }
+      return;
+    }
+    const mapped = getMappedCategories(match.category);
+    if (mapped.includes('Diamond') && inventoryMode !== 'diamonds') {
+      setInventoryMode('diamonds');
+    } else if (!mapped.includes('Diamond') && inventoryMode !== 'gemstones') {
+      setInventoryMode('gemstones');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stones, jewelryItems, loading]);
+
+  useEffect(() => {
     setCurrentPage(1);
     setSelectedStone(null);
   }, [filters, smartSearch]);
@@ -6058,12 +6098,14 @@ const StoneSearchPage = () => {
                   </button>
                 </div>
 
-                <button
-                  onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
-                >
-                  {priceMode === 'neto' ? 'Neto' : 'B'}
-                </button>
+                {inventoryMode !== 'jewelry' && (
+                  <button
+                    onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
+                  >
+                    {priceMode === 'neto' ? 'Neto' : 'B'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -6564,6 +6606,7 @@ const StoneSearchPage = () => {
               onManageTags={() => setShowTagsModal(true)}
               onViewDNA={setDrawerStone}
               onImageClick={setLightboxImage}
+              onVideoClick={setLightboxVideo}
               columnConfig={columnConfig}
               onColumnConfigChange={handleColumnConfigChange}
               priceMode={priceMode}
@@ -6615,7 +6658,7 @@ const StoneSearchPage = () => {
           {!loading && !error && totalItems > 0 && (
             <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-sm text-stone-500">
-                Showing {startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, totalItems)} of {totalItems.toLocaleString()}
+                Showing {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, totalItems)} of {totalItems.toLocaleString()}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -6881,6 +6924,44 @@ const StoneSearchPage = () => {
               />
               <button
                 onClick={() => setLightboxImage(null)}
+                className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-stone-600 hover:text-stone-900 hover:scale-110 transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Video Lightbox */}
+      <AnimatePresence>
+        {lightboxVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setLightboxVideo(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative max-w-2xl max-h-[80vh] w-full aspect-video"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <iframe
+                src={lightboxVideo}
+                title="Stone Video"
+                className="w-full h-full rounded-lg"
+                allow="autoplay; fullscreen"
+                allowFullScreen
+              />
+              <button
+                onClick={() => setLightboxVideo(null)}
                 className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-stone-600 hover:text-stone-900 hover:scale-110 transition-all"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
