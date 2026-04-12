@@ -5,6 +5,28 @@
 @tailwind utilities;
 
 :root {
+  /* shadcn CSS variables - Light Mode */
+  --background: 60 9% 98%;
+  --foreground: 24 10% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 24 10% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 24 10% 10%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 60 5% 96%;
+  --secondary-foreground: 24 10% 10%;
+  --muted: 60 5% 96%;
+  --muted-foreground: 25 6% 45%;
+  --accent: 60 5% 96%;
+  --accent-foreground: 24 10% 10%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 20 6% 90%;
+  --input: 20 6% 90%;
+  --ring: 160 84% 39%;
+  --radius: 0.5rem;
+
   /* Primary - Emerald/Jade Green */
   --color-primary-50: #ecfdf5;
   --color-primary-100: #d1fae5;
@@ -61,6 +83,27 @@
 }
 
 [data-theme="dark"] {
+  /* shadcn CSS variables - Dark Mode */
+  --background: 20 14% 4%;
+  --foreground: 60 9% 98%;
+  --card: 24 10% 10%;
+  --card-foreground: 60 9% 98%;
+  --popover: 24 10% 10%;
+  --popover-foreground: 60 9% 98%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 12 6% 15%;
+  --secondary-foreground: 60 9% 98%;
+  --muted: 12 6% 15%;
+  --muted-foreground: 24 5% 64%;
+  --accent: 12 6% 15%;
+  --accent-foreground: 60 9% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 60 9% 98%;
+  --border: 12 6% 15%;
+  --input: 12 6% 15%;
+  --ring: 160 84% 39%;
+
   /* Theme colors - Dark Mode */
   --bg-primary: #0c0a09;
   --bg-secondary: #1c1917;
