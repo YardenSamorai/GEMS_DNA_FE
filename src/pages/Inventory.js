@@ -238,367 +238,337 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     return;
   }
 
-  const { 
-    layout = 'grid', // 'grid' or 'list'
+  const {
+    layout = 'grid',
     showPrices = true,
-    itemsPerPage = layout === 'grid' ? 6 : 4
+    itemsPerPage = 4,
   } = options;
 
-  // Create PDF - A4 size
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4'
-  });
-
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 15;
-  const contentWidth = pageWidth - (margin * 2);
+  const contentWidth = pageWidth - margin * 2;
 
-  // Colors
-  const primaryColor = [16, 185, 129]; // Emerald green
-  const darkColor = [31, 41, 55];
-  const lightGray = [156, 163, 175];
+  const green = [0, 168, 107];
+  const dark = [24, 24, 24];
+  const black = [0, 0, 0];
+  const gray = [140, 140, 140];
+  const lightGray = [200, 200, 200];
 
-  // Helper: Add header to each page
-  const addHeader = (pageNum, totalPages) => {
-    // Top accent bar
-    pdf.setFillColor(...primaryColor);
-    pdf.rect(0, 0, pageWidth, 8, 'F');
-    
-    // Company name
-    pdf.setFontSize(24);
-    pdf.setTextColor(...darkColor);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('GEMSTAR', margin, 20);
-    
-    // Tagline
-    pdf.setFontSize(10);
-    pdf.setTextColor(...lightGray);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Premium Gemstones & Diamonds', margin, 26);
-    
-    // Date and page number on right
-    pdf.setFontSize(9);
-    const date = new Date().toLocaleDateString('en-GB');
-    pdf.text(date, pageWidth - margin, 20, { align: 'right' });
-    pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, 26, { align: 'right' });
-    
-    // Separator line
-    pdf.setDrawColor(...primaryColor);
-    pdf.setLineWidth(0.5);
-    pdf.line(margin, 32, pageWidth - margin, 32);
-    
-    return 38; // Return Y position after header
-  };
+  let logoBase64 = null;
+  try { logoBase64 = await imageToBase64('/gemstar-logo-footer.png'); } catch (e) { /* no logo */ }
 
-  // Helper: Add footer to each page
-  const addFooter = () => {
-    const footerY = pageHeight - 15;
-    
-    // Footer line
-    pdf.setDrawColor(...lightGray);
-    pdf.setLineWidth(0.3);
-    pdf.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
-    
-    // Contact info
-    pdf.setFontSize(8);
-    pdf.setTextColor(...lightGray);
-    pdf.text('📍 New York  •  Tel Aviv  •  Hong Kong  •  Los Angeles', pageWidth / 2, footerY, { align: 'center' });
-    pdf.text('📞 +1 (212) 869-0544  •  ✉ info@gems.net  •  🌐 www.gems.net', pageWidth / 2, footerY + 4, { align: 'center' });
-  };
-
-  // Helper: Load image as base64 using our backend proxy
   const loadImage = async (url) => {
     if (!url) return null;
-    
     try {
-      // Use our backend proxy to bypass CORS
-      const proxyUrl = `${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
-      
-      if (!response.ok) {
-        console.log('Image proxy failed:', response.status);
-        return null;
-      }
-      
-      const data = await response.json();
-      if (data.image && data.image.startsWith('data:')) {
-        return data.image;
-      }
-      return null;
-    } catch (e) {
-      console.log('Image load failed:', e.message);
-      return null;
-    }
+      const res = await fetch(`${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.image && data.image.startsWith('data:')) ? data.image : null;
+    } catch (e) { return null; }
   };
 
-  // Calculate total pages
-  const totalPages = Math.ceil(selectedStones.length / itemsPerPage) + 1; // +1 for cover
+  const getCategoryLabel = (stone) => {
+    const mapped = getMappedCategories(stone.category);
+    if (mapped.includes('Emerald')) return 'EMERALD';
+    if (mapped.includes('Diamond')) return 'DIAMOND';
+    const label = mapped.find(m => m !== 'Empty' && m !== 'Fancy');
+    return (label || 'GEMSTONE').toUpperCase();
+  };
 
-  // === COVER PAGE ===
-  let currentPage = 1;
-  
-  // Cover background
-  pdf.setFillColor(31, 41, 55);
-  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-  
-  // Accent bar
-  pdf.setFillColor(...primaryColor);
-  pdf.rect(0, pageHeight * 0.4, pageWidth, 3, 'F');
-  
-  // Company name
-  pdf.setFontSize(48);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('GEMSTAR', pageWidth / 2, pageHeight * 0.35, { align: 'center' });
-  
-  // Tagline
-  pdf.setFontSize(14);
-  pdf.setTextColor(...primaryColor);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, pageHeight * 0.35 + 12, { align: 'center' });
-  
-  // Catalog title
-  pdf.setFontSize(28);
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.55, { align: 'center' });
-  
-  // Summary info
-  pdf.setFontSize(12);
-  pdf.setTextColor(...lightGray);
+  const getStoneDetails = (stone) => {
+    const mapped = getMappedCategories(stone.category);
+    const isEmeraldType = !mapped.includes('Diamond');
+    return {
+      shape: getDisplayShape(stone.shape) || '-',
+      color: getDisplayColor(stone) || '-',
+      clarity: isEmeraldType ? (stone.treatment || '-') : (stone.clarity || '-'),
+      lab: stone.lab || '-',
+      sku: stone.sku || '-',
+    };
+  };
+
+  const addFooter = (pageNum, totalContentPages) => {
+    const footerY = pageHeight - 12;
+    pdf.setDrawColor(...lightGray);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+    pdf.setFontSize(8);
+    pdf.setTextColor(...gray);
+    pdf.setFont('helvetica', 'normal');
+    const dateStr = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+    pdf.text(dateStr, margin, footerY);
+    pdf.text(`Page ${pageNum} of ${totalContentPages}`, pageWidth - margin, footerY, { align: 'right' });
+  };
+
+  const totalContentPages = Math.ceil(selectedStones.length / itemsPerPage);
   const totalWeight = selectedStones.reduce((sum, s) => sum + (s.weightCt || 0), 0);
-  pdf.text(`${selectedStones.length} Stones  •  ${totalWeight.toFixed(2)} Total Carats`, pageWidth / 2, pageHeight * 0.55 + 12, { align: 'center' });
-  
-  // Date
-  pdf.setFontSize(11);
-  pdf.text(new Date().toLocaleDateString('en-GB', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  }), pageWidth / 2, pageHeight * 0.55 + 22, { align: 'center' });
-  
-  // Contact info at bottom
-  pdf.setFontSize(10);
-  pdf.setTextColor(...lightGray);
-  pdf.text('www.gems.net', pageWidth / 2, pageHeight - 30, { align: 'center' });
-  pdf.text('+1 (212) 869-0544  •  info@gems.net', pageWidth / 2, pageHeight - 24, { align: 'center' });
 
-  // === CONTENT PAGES ===
-  if (layout === 'grid') {
-    // Grid layout: 2 columns x 3 rows = 6 items per page
-    const cols = 2;
-    const rows = 3;
-    const cardWidth = (contentWidth - 10) / cols;
-    const cardHeight = 72;
-    
+  // ==================== COVER PAGE ====================
+  pdf.setFillColor(...dark);
+  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  if (logoBase64) {
+    try { pdf.addImage(logoBase64, 'PNG', pageWidth / 2 - 25, 45, 50, 18); } catch (e) { /* skip */ }
+  }
+
+  pdf.setDrawColor(...gray);
+  pdf.setLineWidth(0.3);
+  pdf.line(pageWidth / 2 - 40, 72, pageWidth / 2 + 40, 72);
+
+  pdf.setFontSize(12);
+  pdf.setTextColor(...green);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 80, { align: 'center' });
+
+  pdf.setFontSize(32);
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.52, { align: 'center' });
+
+  pdf.setFontSize(13);
+  pdf.setTextColor(190, 190, 190);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(`${selectedStones.length} Stones  |  ${totalWeight.toFixed(2)} Total Carats`, pageWidth / 2, pageHeight * 0.52 + 12, { align: 'center' });
+
+  pdf.setFontSize(11);
+  pdf.setTextColor(160, 160, 160);
+  const dateStr = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+  pdf.text(dateStr, pageWidth / 2, pageHeight - 35, { align: 'center' });
+
+  pdf.setDrawColor(...gray);
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, pageHeight - 22, pageWidth - margin, pageHeight - 22);
+
+  pdf.setFontSize(9);
+  pdf.setTextColor(...green);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('www.gems.net', margin + 20, pageHeight - 15, { align: 'center' });
+  pdf.setTextColor(160, 160, 160);
+  pdf.text('|', pageWidth / 2 - 30, pageHeight - 15, { align: 'center' });
+  pdf.text('+1 (212) 869-0544', pageWidth / 2, pageHeight - 15, { align: 'center' });
+  pdf.text('|', pageWidth / 2 + 30, pageHeight - 15, { align: 'center' });
+  pdf.text('info@gems.net', pageWidth - margin - 20, pageHeight - 15, { align: 'center' });
+
+  // ==================== CONTENT PAGES ====================
+  if (layout === 'list') {
+    const cardHeight = 58;
+    const imgSize = 45;
+    let pageNum = 0;
+
     for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
       pdf.addPage();
-      currentPage++;
-      let startY = addHeader(currentPage, totalPages);
-      
+      pageNum++;
+      let y = 15;
       const pageStones = selectedStones.slice(i, i + itemsPerPage);
-      
+
       for (let j = 0; j < pageStones.length; j++) {
         const stone = pageStones[j];
-        const col = j % cols;
-        const row = Math.floor(j / cols);
-        
-        const x = margin + (col * (cardWidth + 10));
-        const y = startY + (row * (cardHeight + 8));
-        
-        // Card background
-        pdf.setFillColor(249, 250, 251);
-        pdf.roundedRect(x, y, cardWidth, cardHeight, 3, 3, 'F');
-        
-        // Card border
-        pdf.setDrawColor(229, 231, 235);
+        const details = getStoneDetails(stone);
+        const catLabel = getCategoryLabel(stone);
+
+        // Image area
+        pdf.setDrawColor(220, 220, 220);
         pdf.setLineWidth(0.3);
-        pdf.roundedRect(x, y, cardWidth, cardHeight, 3, 3, 'S');
-        
-        // Image placeholder
-        const imgSize = 35;
-        pdf.setFillColor(229, 231, 235);
-        pdf.rect(x + 5, y + 5, imgSize, imgSize, 'F');
-        
-        // Load and add image if available
+        pdf.roundedRect(margin, y, imgSize, imgSize, 2, 2, 'S');
+        pdf.setFillColor(248, 248, 248);
+        pdf.roundedRect(margin + 0.15, y + 0.15, imgSize - 0.3, imgSize - 0.3, 2, 2, 'F');
+
         if (stone.imageUrl) {
           try {
             const imgData = await loadImage(stone.imageUrl);
-            if (imgData) {
-              pdf.addImage(imgData, 'JPEG', x + 5, y + 5, imgSize, imgSize);
-            }
-          } catch (e) {
-            // Image failed, keep placeholder
-          }
+            if (imgData) pdf.addImage(imgData, 'JPEG', margin + 1, y + 1, imgSize - 2, imgSize - 2);
+          } catch (e) { /* skip */ }
         }
-        
-        // Stone details
-        const textX = x + imgSize + 10;
-        const textWidth = cardWidth - imgSize - 15;
-        
-        // SKU
-        pdf.setFontSize(10);
-        pdf.setTextColor(...darkColor);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(stone.sku || 'N/A', textX, y + 12);
-        
-        // Shape & Weight
-        pdf.setFontSize(9);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(...darkColor);
-        pdf.text(`${getDisplayShape(stone.shape) || 'N/A'} • ${stone.weightCt || '?'}ct`, textX, y + 19);
-        
-        const mapped = getMappedCategories(stone.category);
-        let catColor = lightGray;
-        let catLabel = mapped[0] || 'Gem';
-        if (mapped.includes('Emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
-        else if (mapped.includes('Diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
-        
+
+        const textX = margin + imgSize + 8;
+        const rightEdge = pageWidth - margin;
+
+        // Details table header
+        const labelY = y + 5;
+        const valY = labelY + 5;
+        const cols = ['Shape', 'Color', 'Clarity', 'Lab', 'SKU'];
+        const vals = [details.shape, details.color, details.clarity, details.lab, details.sku];
+        const colWidth = (rightEdge - textX) / cols.length;
+
         pdf.setFontSize(7);
-        pdf.setTextColor(...catColor);
-        pdf.text(catLabel.toUpperCase(), textX, y + 25);
-        
-        // Details
-        pdf.setFontSize(8);
-        pdf.setTextColor(...lightGray);
-        if (mapped.includes('Emerald')) {
-          pdf.text(`Treatment: ${stone.treatment || 'N/A'}`, textX, y + 32);
-          pdf.text(`Origin: ${stone.origin || 'N/A'}`, textX, y + 37);
-        } else {
-          pdf.text(`Color: ${getDisplayColor(stone) || 'N/A'} • Clarity: ${stone.clarity || 'N/A'}`, textX, y + 32);
-          if (stone.cut) pdf.text(`Cut: ${stone.cut}`, textX, y + 37);
-        }
-        pdf.text(`Lab: ${stone.lab || 'N/A'}`, textX, y + 42);
-        
-        // Price (if enabled)
-        if (showPrices && stone.priceTotal) {
-          pdf.setFontSize(11);
-          pdf.setTextColor(...primaryColor);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(`$${stone.priceTotal.toLocaleString()}`, x + cardWidth - 5, y + cardHeight - 8, { align: 'right' });
-        }
-        
-        // DNA Link - Button style
-        const dnaLinkX = x + 5;
-        const dnaLinkY = y + cardHeight - 10;
-        pdf.setFillColor(139, 92, 246); // Purple background
-        pdf.roundedRect(dnaLinkX, dnaLinkY, 22, 7, 1.5, 1.5, 'F');
-        pdf.setFontSize(6);
-        pdf.setTextColor(255, 255, 255); // White text
+        pdf.setTextColor(...gray);
+        pdf.setFont('helvetica', 'normal');
+        cols.forEach((label, ci) => { pdf.text(label, textX + ci * colWidth, labelY); });
+
+        pdf.setFontSize(9);
+        pdf.setTextColor(...black);
         pdf.setFont('helvetica', 'bold');
-        pdf.textWithLink('View DNA', dnaLinkX + 2.5, dnaLinkY + 5, { url: `https://gems-dna.com/${stone.sku}` });
+        vals.forEach((val, ci) => { pdf.text(val, textX + ci * colWidth, valY); });
+
+        // Category name
+        pdf.setFontSize(14);
+        pdf.setTextColor(...black);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(catLabel, textX, valY + 10);
+
+        // Weight + Price + View DNA row
+        const bottomY = valY + 18;
+        pdf.setFontSize(9);
+        pdf.setTextColor(...black);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('WEIGHT:', textX, bottomY);
+        pdf.setTextColor(...green);
+        pdf.text(`${stone.weightCt || '?'}ct`, textX + 18, bottomY);
+
+        if (showPrices && stone.priceTotal) {
+          pdf.setFontSize(9);
+          pdf.setTextColor(...black);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('PRICE:', textX + 42, bottomY);
+          pdf.setFontSize(10);
+          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, textX + 56, bottomY);
+        }
+
+        // View DNA button
+        const btnW = 22; const btnH = 7;
+        const btnX = rightEdge - btnW;
+        const btnY = bottomY - 5;
+        pdf.setFillColor(...green);
+        pdf.roundedRect(btnX, btnY, btnW, btnH, 1.5, 1.5, 'F');
+        pdf.setFontSize(7);
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.textWithLink('View DNA', btnX + 3, btnY + 5, { url: `https://gems-dna.com/${stone.sku}` });
+
+        y += cardHeight;
+
+        if (j < pageStones.length - 1) {
+          pdf.setDrawColor(230, 230, 230);
+          pdf.setLineWidth(0.2);
+          pdf.line(margin, y - 3, pageWidth - margin, y - 3);
+        }
       }
-      
-      addFooter();
+
+      addFooter(pageNum, totalContentPages);
     }
   } else {
-    // List layout: Full width cards, 4 per page
-    const cardHeight = 50;
-    
+    // Grid layout: 2x2 = 4 per page
+    const cols = 2;
+    const colWidth = (contentWidth - 8) / cols;
+    const imgH = 55;
+    const cardHeight = 105;
+    let pageNum = 0;
+
     for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
       pdf.addPage();
-      currentPage++;
-      let y = addHeader(currentPage, totalPages);
-      
+      pageNum++;
+
+      // Grid header
+      let headerY = 10;
+      if (logoBase64) {
+        try { pdf.addImage(logoBase64, 'PNG', margin, headerY - 2, 35, 13); } catch (e) { /* skip */ }
+      }
+      pdf.setFontSize(7);
+      pdf.setTextColor(...green);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('Premium Gemstones & Diamonds', margin, headerY + 15);
+
+      pdf.setFontSize(7);
+      pdf.setTextColor(...black);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('N e w  Y o r k  |  T e l  A v i v  |  H o n g  K o n g  |  L o s  A n g e l e s', pageWidth - margin, headerY + 3, { align: 'right' });
+      pdf.setFontSize(7);
+      pdf.setTextColor(...gray);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('www.gems.net   |   +1 (212) 869-0544   |   info@gems.net', pageWidth - margin, headerY + 9, { align: 'right' });
+
+      const startY = headerY + 22;
       const pageStones = selectedStones.slice(i, i + itemsPerPage);
-      
+
       for (let j = 0; j < pageStones.length; j++) {
         const stone = pageStones[j];
-        
-        // Card background
-        pdf.setFillColor(249, 250, 251);
-        pdf.roundedRect(margin, y, contentWidth, cardHeight, 3, 3, 'F');
-        
-        // Card border
-        pdf.setDrawColor(229, 231, 235);
+        const details = getStoneDetails(stone);
+        const catLabel = getCategoryLabel(stone);
+        const col = j % cols;
+        const row = Math.floor(j / cols);
+        const x = margin + col * (colWidth + 8);
+        const y = startY + row * (cardHeight + 8);
+
+        // Image box
+        pdf.setDrawColor(220, 220, 220);
         pdf.setLineWidth(0.3);
-        pdf.roundedRect(margin, y, contentWidth, cardHeight, 3, 3, 'S');
-        
-        // Image placeholder
-        const imgSize = 40;
-        pdf.setFillColor(229, 231, 235);
-        pdf.rect(margin + 5, y + 5, imgSize, imgSize, 'F');
-        
-        // Load and add image
+        pdf.roundedRect(x, y, colWidth, imgH, 2, 2, 'S');
+        pdf.setFillColor(250, 250, 250);
+        pdf.roundedRect(x + 0.15, y + 0.15, colWidth - 0.3, imgH - 0.3, 2, 2, 'F');
+
         if (stone.imageUrl) {
           try {
             const imgData = await loadImage(stone.imageUrl);
             if (imgData) {
-              pdf.addImage(imgData, 'JPEG', margin + 5, y + 5, imgSize, imgSize);
+              const imgW = Math.min(colWidth - 10, imgH - 6);
+              const imgX = x + (colWidth - imgW) / 2;
+              pdf.addImage(imgData, 'JPEG', imgX, y + 3, imgW, imgH - 6);
             }
-          } catch (e) {
-            // Keep placeholder
-          }
+          } catch (e) { /* skip */ }
         }
-        
-        const textX = margin + imgSize + 15;
-        
-        // SKU & Shape
-        pdf.setFontSize(12);
-        pdf.setTextColor(...darkColor);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`${stone.sku}  •  ${getDisplayShape(stone.shape) || 'N/A'}  •  ${stone.weightCt || '?'}ct`, textX, y + 12);
-        
-        const mapped = getMappedCategories(stone.category);
-        let catColor = lightGray;
-        let catLabel = mapped[0] || 'Gemstone';
-        if (mapped.includes('Emerald')) { catColor = [16, 185, 129]; catLabel = 'Emerald'; }
-        else if (mapped.includes('Diamond')) { catColor = [59, 130, 246]; catLabel = 'Diamond'; }
-        
-        pdf.setFontSize(8);
-        pdf.setTextColor(...catColor);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(catLabel.toUpperCase(), textX, y + 19);
-        
-        // Details row 1
-        pdf.setFontSize(9);
-        pdf.setTextColor(...lightGray);
-        pdf.setFont('helvetica', 'normal');
-        if (mapped.includes('Emerald')) {
-          pdf.text(`Treatment: ${stone.treatment || 'N/A'}  •  Origin: ${stone.origin || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
-        } else {
-          pdf.text(`Color: ${getDisplayColor(stone) || 'N/A'}  •  Clarity: ${stone.clarity || 'N/A'}  •  Lab: ${stone.lab || 'N/A'}`, textX, y + 28);
-        }
-        
-        // Details row 2
-        pdf.text(`Measurements: ${stone.measurements || 'N/A'}  •  Ratio: ${stone.ratio || 'N/A'}`, textX, y + 35);
-        
-        // Price
-        if (showPrices && stone.priceTotal) {
-          pdf.setFontSize(14);
-          pdf.setTextColor(...primaryColor);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(`$${stone.priceTotal.toLocaleString()}`, pageWidth - margin - 5, y + 20, { align: 'right' });
-          
-          if (stone.pricePerCt) {
-            pdf.setFontSize(9);
-            pdf.setTextColor(...lightGray);
-            pdf.setFont('helvetica', 'normal');
-            pdf.text(`$${stone.pricePerCt.toLocaleString()}/ct`, pageWidth - margin - 5, y + 27, { align: 'right' });
-          }
-        }
-        
-        // DNA Link - Button style
-        const dnaLinkX = pageWidth - margin - 28;
-        const dnaLinkY = y + 36;
-        pdf.setFillColor(139, 92, 246); // Purple background
-        pdf.roundedRect(dnaLinkX, dnaLinkY, 25, 8, 2, 2, 'F');
+
+        // Details below image
+        const detailY = y + imgH + 5;
+        const detailCols = ['Shape', 'Color', 'Clarity', 'Lab'];
+        const detailVals = [details.shape, details.color, details.clarity, details.lab];
+        const dColW = colWidth / detailCols.length;
+
         pdf.setFontSize(7);
-        pdf.setTextColor(255, 255, 255); // White text
+        pdf.setTextColor(...gray);
+        pdf.setFont('helvetica', 'normal');
+        detailCols.forEach((label, ci) => { pdf.text(label, x + ci * dColW, detailY); });
+
+        pdf.setFontSize(8);
+        pdf.setTextColor(...black);
         pdf.setFont('helvetica', 'bold');
-        pdf.textWithLink('View DNA', dnaLinkX + 3, dnaLinkY + 5.5, { url: `https://gems-dna.com/${stone.sku}` });
-        
-        y += cardHeight + 8;
+        detailVals.forEach((val, ci) => { pdf.text(val, x + ci * dColW, detailY + 5); });
+
+        // Category
+        pdf.setFontSize(12);
+        pdf.setTextColor(...black);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(catLabel, x, detailY + 14);
+
+        // Weight + Price row
+        const bottomY = detailY + 22;
+        pdf.setFontSize(8);
+        pdf.setTextColor(...black);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('WEIGHT:', x, bottomY);
+        pdf.setTextColor(...green);
+        pdf.text(`${stone.weightCt || '?'}ct`, x + 17, bottomY);
+
+        if (showPrices && stone.priceTotal) {
+          pdf.setTextColor(...black);
+          pdf.text('PRICE:', x + 35, bottomY);
+          pdf.setFontSize(9);
+          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, x + 49, bottomY);
+        }
+
+        // SKU + View DNA row
+        const skuY = bottomY + 7;
+        pdf.setFontSize(8);
+        pdf.setTextColor(...gray);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(details.sku, x, skuY);
+
+        const btnW = 22; const btnH = 7;
+        const btnX = x + colWidth - btnW;
+        const btnY = skuY - 5;
+        pdf.setFillColor(...green);
+        pdf.roundedRect(btnX, btnY, btnW, btnH, 1.5, 1.5, 'F');
+        pdf.setFontSize(7);
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.textWithLink('View DNA', btnX + 3, btnY + 5, { url: `https://gems-dna.com/${stone.sku}` });
       }
-      
-      addFooter();
+
+      addFooter(pageNum, totalContentPages);
     }
   }
 
-  // Save PDF
   const filename = `Gemstar_Catalog_${new Date().toISOString().split('T')[0]}_${selectedStones.length}pcs.pdf`;
   pdf.save(filename);
 };
@@ -3065,6 +3035,102 @@ const MultiSelect = ({ value, options, onChange, placeholder }) => {
   );
 };
 
+/* ---------------- Jewelry Filters ---------------- */
+const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOptions, jewelryCollectionOptions, jewelryStoneTypeOptions, jewelryMetalTypeOptions }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const handleChange = (field) => (e) => { onChange({ ...filters, [field]: e.target.value }); };
+  const handleMulti = (field, value) => {
+    const current = filters[field] || [];
+    onChange({ ...filters, [field]: current.includes(value) ? current.filter(v => v !== value) : [...current, value] });
+  };
+  const activeCount = [
+    filters.minPrice, filters.maxPrice, filters.minCarat, filters.maxCarat,
+  ].filter(Boolean).length + (filters.category?.length || 0) + (filters.shape?.length || 0) + (filters.treatment?.length || 0) + (filters.diamondColor?.length || 0) + (filters.fancyColor?.length || 0);
+
+  return (
+    <div className="mb-4">
+      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-800 transition-colors mb-2">
+        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        Filters {activeCount > 0 && <span className="text-xs bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">{activeCount}</span>}
+      </button>
+      {isOpen && (
+        <div className="glass rounded-2xl border border-white/50 p-4 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Min Price</label>
+              <input type="number" value={filters.minPrice} onChange={handleChange('minPrice')} placeholder="Min $" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Max Price</label>
+              <input type="number" value={filters.maxPrice} onChange={handleChange('maxPrice')} placeholder="Max $" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Min Carats</label>
+              <input type="number" step="0.01" value={filters.minCarat} onChange={handleChange('minCarat')} placeholder="Min ct" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Max Carats</label>
+              <input type="number" step="0.01" value={filters.maxCarat} onChange={handleChange('maxCarat')} placeholder="Max ct" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {jewelryTypeOptions.length > 1 && (
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1">Type</label>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {jewelryTypeOptions.slice(1).map(opt => (
+                    <button key={opt} onClick={() => handleMulti('category', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.category || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {jewelryStyleOptions.length > 1 && (
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1">Style</label>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {jewelryStyleOptions.slice(1).map(opt => (
+                    <button key={opt} onClick={() => handleMulti('shape', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.shape || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {jewelryCollectionOptions.length > 1 && (
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1">Collection</label>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {jewelryCollectionOptions.slice(1).map(opt => (
+                    <button key={opt} onClick={() => handleMulti('treatment', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.treatment || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {jewelryStoneTypeOptions.length > 1 && (
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1">Stone Type</label>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {jewelryStoneTypeOptions.slice(1).map(opt => (
+                    <button key={opt} onClick={() => handleMulti('diamondColor', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.diamondColor || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {jewelryMetalTypeOptions.length > 1 && (
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1">Metal</label>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {jewelryMetalTypeOptions.slice(1).map(opt => (
+                    <button key={opt} onClick={() => handleMulti('fancyColor', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.fancyColor || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ---------------- Filters ---------------- */
 const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, tags, onManageTags, inventoryMode }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -3751,12 +3817,26 @@ const GEMSTONE_DEFAULT_COLUMNS = [
   { id: 'location', label: 'Location', sortField: 'location' },
 ];
 
+const JEWELRY_DEFAULT_COLUMNS = [
+  { id: 'sku', label: 'Model', sortField: 'sku', alwaysVisible: true },
+  { id: 'img', label: 'Img' },
+  { id: 'title', label: 'Title', sortField: 'title' },
+  { id: 'jewelryType', label: 'Type', sortField: 'jewelryType' },
+  { id: 'style', label: 'Style', sortField: 'style' },
+  { id: 'collection', label: 'Collection', sortField: 'collection' },
+  { id: 'stoneType', label: 'Stone', sortField: 'stoneType' },
+  { id: 'weight', label: 'Carats', sortField: 'weightCt' },
+  { id: 'metalType', label: 'Metal', sortField: 'metalType' },
+  { id: 'total', label: 'Price', sortField: 'priceTotal' },
+  { id: 'availability', label: 'Avail.', sortField: 'availability' },
+];
+
 const DEFAULT_COLUMNS = DIAMOND_DEFAULT_COLUMNS;
 
 const COLUMNS_STORAGE_KEY = 'gems_dna_column_config';
 
 const getColumnConfig = (userId, mode = 'diamonds') => {
-  const defaults = mode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : GEMSTONE_DEFAULT_COLUMNS;
+  const defaults = mode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : mode === 'gemstones' ? GEMSTONE_DEFAULT_COLUMNS : JEWELRY_DEFAULT_COLUMNS;
   const storageKey = `${COLUMNS_STORAGE_KEY}_${mode}_${userId}`;
   try {
     const stored = localStorage.getItem(storageKey);
@@ -4010,6 +4090,13 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'ppc': return <th key={colId} className={`${base} uppercase`}><SortButton field="pricePerCt">PPC</SortButton></th>;
       case 'total': return <th key={colId} className={`${base} uppercase`}><SortButton field="priceTotal">Total</SortButton></th>;
       case 'location': return <th key={colId} className={`${base} uppercase`}><SortButton field="location">Location</SortButton></th>;
+      case 'title': return <th key={colId} className={base}><SortButton field="title">Title</SortButton></th>;
+      case 'jewelryType': return <th key={colId} className={base}><SortButton field="jewelryType">Type</SortButton></th>;
+      case 'style': return <th key={colId} className={base}><SortButton field="style">Style</SortButton></th>;
+      case 'collection': return <th key={colId} className={base}><SortButton field="collection">Collection</SortButton></th>;
+      case 'stoneType': return <th key={colId} className={base}><SortButton field="stoneType">Stone</SortButton></th>;
+      case 'metalType': return <th key={colId} className={base}><SortButton field="metalType">Metal</SortButton></th>;
+      case 'availability': return <th key={colId} className={base}><SortButton field="availability">Avail.</SortButton></th>;
       default: return null;
     }
   };
@@ -4073,6 +4160,30 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</td>;
       case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</td>;
       case 'location': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.location || ''}</span></td>;
+      case 'title': return <td key={colId} className="px-3 py-2 max-w-[200px]"><span className="text-xs text-stone-700 truncate block">{stone.title || '-'}</span></td>;
+      case 'jewelryType': return (
+        <td key={colId} className={cellBase}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+            stone.jewelryType === 'Rings' ? 'bg-pink-100 text-pink-700' :
+            stone.jewelryType === 'Earrings' ? 'bg-purple-100 text-purple-700' :
+            stone.jewelryType === 'Necklaces' ? 'bg-blue-100 text-blue-700' :
+            stone.jewelryType === 'Pendants' ? 'bg-cyan-100 text-cyan-700' :
+            stone.jewelryType === 'Bracelets' ? 'bg-amber-100 text-amber-700' :
+            'bg-stone-100 text-stone-600'
+          }`}>{stone.jewelryType || '-'}</span>
+        </td>
+      );
+      case 'style': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.style || '-'}</span></td>;
+      case 'collection': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.collection || '-'}</span></td>;
+      case 'stoneType': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.stoneType || '-'}</span></td>;
+      case 'metalType': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.metalType || '-'}</span></td>;
+      case 'availability': return (
+        <td key={colId} className={cellBase}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+            stone.availability === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}>{stone.availability || '-'}</span>
+        </td>
+      );
       default: return null;
     }
   };
@@ -4525,6 +4636,59 @@ const StoneSearchPage = () => {
   const [smartSearch, setSmartSearch] = useState("");
   const [priceMode, setPriceMode] = useState("neto"); // 'neto' = /2, 'bruto' = full DB price
 
+  // Jewelry state - fetched from backend API
+  const [jewelryItems, setJewelryItems] = useState([]);
+  const [jewelryLoading, setJewelryLoading] = useState(false);
+
+  const fetchJewelry = useCallback(async () => {
+    setJewelryLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/jewelry`);
+      if (!res.ok) throw new Error('Failed to fetch jewelry');
+      const data = await res.json();
+      const items = (data.jewelry || []).map((row, idx) => {
+        const images = (row.all_pictures_link || '').split(';').map(u => u.trim()).filter(Boolean);
+        return {
+          id: `jwl_${idx}_${row.model_number || idx}`,
+          sku: row.model_number || '',
+          stockNumber: row.stock_number || '',
+          title: row.title || '',
+          jewelryType: row.jewelry_type || '',
+          style: row.style || '',
+          collection: row.collection || '',
+          priceTotal: row.price || 0,
+          imageUrl: images[0] || null,
+          allImages: images,
+          videoLink: row.video_link || '',
+          certificateLink: row.certificate_link || '',
+          certificateNumber: row.certificate_number || '',
+          description: row.description || '',
+          fullDescription: row.full_description || '',
+          jewelryWeight: row.jewelry_weight || '',
+          weightCt: row.total_carat || 0,
+          stoneType: row.stone_type || '',
+          centerStoneCarat: row.center_stone_carat || 0,
+          shape: row.center_stone_shape || '',
+          color: row.center_stone_color || '',
+          clarity: row.center_stone_clarity || '',
+          metalType: row.metal_type || '',
+          currency: row.currency || 'USD',
+          availability: row.availability || '',
+          shippingFrom: row.shipping_from || '',
+          category: 'Jewelry',
+          jewelrySize: row.jewelry_size || '',
+        };
+      });
+      setJewelryItems(items);
+    } catch (e) {
+      console.log('Failed to load jewelry:', e.message);
+    } finally {
+      setJewelryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchJewelry(); }, [fetchJewelry]);
+
   const applyPriceMode = useCallback((stonesArr) => {
     if (priceMode === 'bruto') return stonesArr;
     return stonesArr.map(s => ({
@@ -4741,6 +4905,7 @@ const StoneSearchPage = () => {
     setSelectedStone(null);
     setCurrentPage(1);
     setSmartSearch('');
+    setSortConfig({ field: 'sku', direction: 'asc' });
     setColumnConfig(getColumnConfig(user?.id || 'default', newMode));
   };
 
@@ -5456,6 +5621,7 @@ const StoneSearchPage = () => {
   }, [filters, smartSearch]);
 
   const modeFilteredStones = useMemo(() => {
+    if (inventoryMode === 'jewelry') return jewelryItems;
     return stones.filter(stone => {
       const mapped = getMappedCategories(stone.category);
       if (inventoryMode === 'diamonds') {
@@ -5463,10 +5629,11 @@ const StoneSearchPage = () => {
       }
       return !mapped.includes('Diamond');
     });
-  }, [stones, inventoryMode]);
+  }, [stones, jewelryItems, inventoryMode]);
 
   const diamondCount = useMemo(() => stones.filter(s => getMappedCategories(s.category).includes('Diamond')).length, [stones]);
   const gemstoneCount = useMemo(() => stones.filter(s => !getMappedCategories(s.category).includes('Diamond')).length, [stones]);
+  const jewelryCount = jewelryItems.length;
 
   const shapesOptions = useMemo(() => {
     const set = new Set();
@@ -5566,7 +5733,70 @@ const StoneSearchPage = () => {
 
   const parsedSearch = useMemo(() => parseSmartSearch(smartSearch), [smartSearch]);
 
+  const jewelryTypeOptions = useMemo(() => {
+    if (inventoryMode !== 'jewelry') return [];
+    const set = new Set();
+    jewelryItems.forEach(j => { if (j.jewelryType) set.add(j.jewelryType); });
+    return ['All types', ...Array.from(set).sort()];
+  }, [jewelryItems, inventoryMode]);
+
+  const jewelryStyleOptions = useMemo(() => {
+    if (inventoryMode !== 'jewelry') return [];
+    const set = new Set();
+    jewelryItems.forEach(j => { if (j.style) set.add(j.style); });
+    return ['All styles', ...Array.from(set).sort()];
+  }, [jewelryItems, inventoryMode]);
+
+  const jewelryCollectionOptions = useMemo(() => {
+    if (inventoryMode !== 'jewelry') return [];
+    const set = new Set();
+    jewelryItems.forEach(j => { if (j.collection) set.add(j.collection); });
+    return ['All collections', ...Array.from(set).sort()];
+  }, [jewelryItems, inventoryMode]);
+
+  const jewelryStoneTypeOptions = useMemo(() => {
+    if (inventoryMode !== 'jewelry') return [];
+    const set = new Set();
+    jewelryItems.forEach(j => { if (j.stoneType) set.add(j.stoneType.trim()); });
+    return ['All stones', ...Array.from(set).sort()];
+  }, [jewelryItems, inventoryMode]);
+
+  const jewelryMetalTypeOptions = useMemo(() => {
+    if (inventoryMode !== 'jewelry') return [];
+    const set = new Set();
+    jewelryItems.forEach(j => { if (j.metalType) set.add(j.metalType); });
+    return ['All metals', ...Array.from(set).sort()];
+  }, [jewelryItems, inventoryMode]);
+
   const filteredStones = useMemo(() => {
+    if (inventoryMode === 'jewelry') {
+      return modeFilteredStones.filter((item) => {
+        if (filters.sku) {
+          const skuList = filters.sku.split(/[,\n]/).map(s => s.trim().toLowerCase()).filter(Boolean);
+          if (skuList.length > 0) {
+            const itemSku = (item.sku || '').toLowerCase();
+            const itemTitle = (item.title || '').toLowerCase();
+            if (!skuList.some(q => itemSku.includes(q) || itemTitle.includes(q))) return false;
+          }
+        }
+        if (filters.minPrice && item.priceTotal < Number(filters.minPrice)) return false;
+        if (filters.maxPrice && item.priceTotal > Number(filters.maxPrice)) return false;
+        if (filters.minCarat && item.weightCt < Number(filters.minCarat)) return false;
+        if (filters.maxCarat && item.weightCt > Number(filters.maxCarat)) return false;
+        if (filters.category.length > 0 && !filters.category.includes(item.jewelryType)) return false;
+        if (filters.shape.length > 0 && !filters.shape.includes(item.style)) return false;
+        if (filters.treatment.length > 0 && !filters.treatment.includes(item.collection)) return false;
+        if (filters.diamondColor.length > 0 && !filters.diamondColor.includes(item.stoneType.trim())) return false;
+        if (filters.fancyColor.length > 0 && !filters.fancyColor.includes(item.metalType)) return false;
+        if (smartSearch) {
+          const q = smartSearch.toLowerCase();
+          const searchable = [item.sku, item.title, item.jewelryType, item.style, item.collection, item.stoneType, item.metalType, item.description].join(' ').toLowerCase();
+          if (!searchable.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
     // Helper to parse measurements string like "11.92-7.85-5.60" into { length, width, depth }
     const parseMeasurements = (measurements) => {
       if (!measurements) return { length: null, width: null, depth: null };
@@ -5714,7 +5944,7 @@ const StoneSearchPage = () => {
       
       return true;
     });
-  }, [filters, modeFilteredStones, stoneTags, parsedSearch, priceMode]);
+  }, [filters, modeFilteredStones, stoneTags, parsedSearch, priceMode, inventoryMode, smartSearch]);
 
   const sortedStones = useMemo(() => {
     const sorted = [...filteredStones];
@@ -5789,7 +6019,7 @@ const StoneSearchPage = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-stone-800 mb-1">
-                  {inventoryMode === 'diamonds' ? 'Diamond Inventory' : 'Gemstone Inventory'}
+                  {inventoryMode === 'diamonds' ? 'Diamond Inventory' : inventoryMode === 'gemstones' ? 'Gemstone Inventory' : 'Jewelry Inventory'}
                 </h1>
                 <p className="text-stone-500 text-sm sm:text-base">
                   {loading ? 'Loading...' : isPairGrouping ? `${sortedStones.length.toLocaleString()} stones (${pairedGroups?.length || 0} pairs)` : `${totalItems.toLocaleString()} stones available`}
@@ -5841,7 +6071,7 @@ const StoneSearchPage = () => {
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-stone-100/80 border border-stone-200/50 mb-4">
               <button
                 onClick={() => handleModeSwitch('diamonds')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   inventoryMode === 'diamonds'
                     ? 'bg-white shadow-md text-blue-700 border border-blue-100'
                     : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
@@ -5852,7 +6082,7 @@ const StoneSearchPage = () => {
               </button>
               <button
                 onClick={() => handleModeSwitch('gemstones')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   inventoryMode === 'gemstones'
                     ? 'bg-white shadow-md text-emerald-700 border border-emerald-100'
                     : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
@@ -5860,6 +6090,17 @@ const StoneSearchPage = () => {
               >
                 Gemstones
                 {!loading && <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'gemstones' ? 'bg-emerald-100 text-emerald-600' : 'bg-stone-200 text-stone-500'}`}>{gemstoneCount.toLocaleString()}</span>}
+              </button>
+              <button
+                onClick={() => handleModeSwitch('jewelry')}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  inventoryMode === 'jewelry'
+                    ? 'bg-white shadow-md text-pink-700 border border-pink-100'
+                    : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
+                }`}
+              >
+                Jewelry
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'jewelry' ? 'bg-pink-100 text-pink-600' : 'bg-stone-200 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>
               </button>
             </div>
             
@@ -6145,7 +6386,33 @@ const StoneSearchPage = () => {
             })()}
           </div>
 
+          {/* Jewelry info bar */}
+          {inventoryMode === 'jewelry' && jewelryLoading && (
+            <div className="mb-4 flex items-center gap-2 text-sm text-stone-500">
+              <svg className="animate-spin h-4 w-4 text-pink-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              Loading jewelry...
+            </div>
+          )}
+          {inventoryMode === 'jewelry' && !jewelryLoading && jewelryItems.length === 0 && (
+            <div className="mb-4 p-4 rounded-xl bg-pink-50 border border-pink-200 text-sm text-pink-700">
+              No jewelry items found. Upload a Jewelry CSV from the <a href="/dashboard" className="font-semibold underline">Dashboard</a>.
+            </div>
+          )}
+
           {/* Filters */}
+          {inventoryMode === 'jewelry' ? (
+            jewelryItems.length > 0 && (
+              <JewelryFilters
+                filters={filters}
+                onChange={setFilters}
+                jewelryTypeOptions={jewelryTypeOptions}
+                jewelryStyleOptions={jewelryStyleOptions}
+                jewelryCollectionOptions={jewelryCollectionOptions}
+                jewelryStoneTypeOptions={jewelryStoneTypeOptions}
+                jewelryMetalTypeOptions={jewelryMetalTypeOptions}
+              />
+            )
+          ) : (
           <StoneFilters
             filters={filters}
             onChange={setFilters}
@@ -6157,6 +6424,7 @@ const StoneSearchPage = () => {
             onManageTags={() => setShowTagsModal(true)}
             inventoryMode={inventoryMode}
           />
+          )}
 
           {/* Pair View Mode Toggle */}
           {isPairGrouping && (
@@ -6299,7 +6567,7 @@ const StoneSearchPage = () => {
               columnConfig={columnConfig}
               onColumnConfigChange={handleColumnConfigChange}
               priceMode={priceMode}
-              activeDefaultColumns={inventoryMode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : GEMSTONE_DEFAULT_COLUMNS}
+              activeDefaultColumns={inventoryMode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : inventoryMode === 'gemstones' ? GEMSTONE_DEFAULT_COLUMNS : JEWELRY_DEFAULT_COLUMNS}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
