@@ -651,7 +651,7 @@ const HomePage = () => {
   const [copiedSku, setCopiedSku] = useState(null);
   const [topStonesMode, setTopStonesMode] = useState('bruto');
   const [stats, setStats] = useState({
-    totalStones: 0, totalValue: 0, categories: {}, locations: {},
+    totalStones: 0, totalValue: 0, categories: {}, locations: {}, locationValues: {},
     shapes: {}, topStones: [], recentStones: [], avgPrice: 0, avgWeight: 0,
     priceRanges: {}, weightRanges: {}, groupingTypes: {}, labs: {},
     missingMedia: 0, missingCerts: 0,
@@ -674,6 +674,7 @@ const HomePage = () => {
 
       const categories = {};
       const locations = {};
+      const locationValues = {};
       const shapes = {};
       const groupingTypes = {};
       const labs = {};
@@ -691,6 +692,7 @@ const HomePage = () => {
         getMappedCategories(stone.category).forEach(cat => { categories[cat] = (categories[cat] || 0) + 1; });
         const loc = stone.location || 'Unknown';
         locations[loc] = (locations[loc] || 0) + 1;
+        locationValues[loc] = (locationValues[loc] || 0) + (stone.priceTotal || 0);
         shapes[stone.shape || 'Unknown'] = (shapes[stone.shape || 'Unknown'] || 0) + 1;
         totalValue += stone.priceTotal || 0;
         totalWeight += stone.weightCt || 0;
@@ -733,6 +735,7 @@ const HomePage = () => {
         totalValue,
         categories,
         locations,
+        locationValues,
         shapes,
         topStones,
         recentStones,
@@ -800,6 +803,11 @@ const HomePage = () => {
     label: name, value, color: locationColors[i % locationColors.length]
   }));
   const maxLocationValue = Math.max(...locationChartData.map(d => d.value), 1);
+
+  const locationValueData = Object.entries(stats.locationValues || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value], i) => ({
+    label: name, value: Math.round(value), color: locationColors[i % locationColors.length]
+  }));
+  const maxLocationVal = Math.max(...locationValueData.map(d => d.value), 1);
 
   const topShapes = Object.entries(stats.shapes).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
@@ -1078,7 +1086,7 @@ const HomePage = () => {
           </div>
 
           {/* ── Charts Row ──────────────────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
             {/* Category Distribution - takes 2 cols */}
             <motion.div {...fadeUp} transition={stagger(6)} className="lg:col-span-2">
               <Card className="h-full">
@@ -1114,18 +1122,56 @@ const HomePage = () => {
               </Card>
             </motion.div>
 
-            {/* Location Distribution - takes 3 cols */}
-            <motion.div {...fadeUp} transition={stagger(7)} className="lg:col-span-3">
+            {/* Location Distribution - Stone Count */}
+            <motion.div {...fadeUp} transition={stagger(7)} className="lg:col-span-2">
               <Card className="h-full">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Location Distribution</CardTitle>
-                  <CardDescription>Top {locationChartData.length} locations by stone count</CardDescription>
+                  <CardTitle className="text-base">Stones by Location</CardTitle>
+                  <CardDescription>Number of stones per location</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
                     <div className="space-y-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
                   ) : (
                     <HBarChart data={locationChartData} maxValue={maxLocationValue} />
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Location Distribution - Value */}
+            <motion.div {...fadeUp} transition={stagger(7.5)} className="lg:col-span-2">
+              <Card className="h-full">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Value by Location</CardTitle>
+                  <CardDescription>Total inventory value per location</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="space-y-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {locationValueData.map((item, i) => {
+                        const pct = maxLocationVal ? (item.value / maxLocationVal) * 100 : 0;
+                        return (
+                          <div key={i} className="group">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-muted-foreground truncate max-w-[120px]">{item.label}</span>
+                              <span className="text-xs font-semibold tabular-nums">${item.value.toLocaleString()}</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ delay: i * 0.08, duration: 0.7, ease: 'easeOut' }}
+                                className="h-full rounded-full"
+                                style={{ backgroundColor: item.color }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </CardContent>
               </Card>

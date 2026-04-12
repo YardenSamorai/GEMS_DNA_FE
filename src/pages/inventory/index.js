@@ -4593,6 +4593,115 @@ Best regards, Gemstar
 </body>
 </html>`;
 
+/* ---------------- Compare Modal ---------------- */
+const COMPARE_FIELDS = [
+  { key: 'shape', label: 'Shape', format: (v) => getDisplayShape(v) || '-' },
+  { key: 'category', label: 'Category', format: (v) => v || '-' },
+  { key: 'groupingType', label: 'Type', format: (v) => v || '-' },
+  { key: 'weightCt', label: 'Weight', format: (v) => v ? `${v} ct` : '-' },
+  { key: 'color', label: 'Color', format: (v) => v || '-' },
+  { key: 'clarity', label: 'Clarity', format: (v) => v || '-' },
+  { key: 'treatment', label: 'Treatment', format: (v) => v || '-' },
+  { key: 'measurements', label: 'Measurements', format: (v) => v || '-' },
+  { key: 'ratio', label: 'Ratio', format: (v) => v ? Number(v).toFixed(2) : '-' },
+  { key: 'lab', label: 'Lab', format: (v) => v || '-' },
+  { key: 'origin', label: 'Origin', format: (v) => v || '-' },
+  { key: 'fluorescence', label: 'Fluorescence', format: (v) => v || '-' },
+  { key: 'cut', label: 'Cut', format: (v) => v || '-' },
+  { key: 'polish', label: 'Polish', format: (v) => v || '-' },
+  { key: 'symmetry', label: 'Symmetry', format: (v) => v || '-' },
+  { key: 'pricePerCt', label: 'Price/ct', format: (v) => v ? `$${Number(v).toLocaleString()}` : '-' },
+  { key: 'priceTotal', label: 'Total Price', format: (v) => v ? `$${Number(v).toLocaleString()}` : '-' },
+  { key: 'location', label: 'Location', format: (v) => v || '-' },
+];
+
+const CompareModal = ({ isOpen, onClose, stones }) => {
+  if (!isOpen || !stones.length) return null;
+  const allSame = (key) => {
+    const vals = stones.map(s => s[key]).filter(Boolean);
+    return vals.length > 1 && new Set(vals).size === 1;
+  };
+  const allDiff = (key) => {
+    const vals = stones.map(s => s[key]).filter(Boolean);
+    return vals.length > 1 && new Set(vals).size === vals.length;
+  };
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.92, opacity: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
+              <div>
+                <h2 className="text-lg font-semibold text-stone-800">Compare Stones</h2>
+                <p className="text-xs text-stone-500">{stones.length} stones selected</p>
+              </div>
+              <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-stone-100 flex items-center justify-center transition-colors">
+                <svg className="w-5 h-5 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="overflow-auto flex-1">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="border-b border-stone-200">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-stone-500 w-[140px] min-w-[140px] bg-stone-50"></th>
+                    {stones.map(s => (
+                      <th key={s.sku} className="px-4 py-3 text-center min-w-[180px]">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-20 h-20 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                            {s.imageUrl ? (
+                              <img src={s.imageUrl} alt={s.sku} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-stone-300">
+                                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                              </div>
+                            )}
+                          </div>
+                          <span className="font-mono text-sm font-bold text-primary-700">{s.sku}</span>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {COMPARE_FIELDS.map(({ key, label, format }) => {
+                    const same = allSame(key);
+                    const diff = allDiff(key);
+                    return (
+                      <tr key={key} className={`border-b border-stone-100 ${diff ? 'bg-amber-50/50' : ''}`}>
+                        <td className="px-4 py-2.5 text-xs font-semibold text-stone-500 bg-stone-50">{label}</td>
+                        {stones.map(s => (
+                          <td key={s.sku} className="px-4 py-2.5 text-center">
+                            <span className={`text-sm ${diff ? 'font-semibold text-amber-700' : same ? 'text-emerald-600' : 'text-stone-700'}`}>
+                              {format(s[key])}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 /* ---------------- Main Page ---------------- */
 const StoneSearchPage = () => {
   const { user } = useUser();
@@ -4636,7 +4745,11 @@ const StoneSearchPage = () => {
   const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', 'diamonds'));
-  const [pdfGenerating, setPdfGenerating] = useState(false); // PDF generation loading state
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [savedFilters, setSavedFilters] = useState([]);
+  const [showSaveFilter, setShowSaveFilter] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState('');
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
   const [showScanner, setShowScanner] = useState(false);
@@ -5656,6 +5769,46 @@ const StoneSearchPage = () => {
   }, [stones, jewelryItems, loading]);
 
   useEffect(() => {
+    if (!user?.id) return;
+    fetch(`${API_BASE}/api/saved-filters?userId=${user.id}`)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setSavedFilters(data); })
+      .catch(() => {});
+  }, [user?.id]);
+
+  const handleSaveFilter = async () => {
+    if (!saveFilterName.trim() || !user?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/saved-filters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, name: saveFilterName.trim(), inventoryMode, filters }),
+      });
+      const data = await res.json();
+      setSavedFilters(prev => [data, ...prev]);
+      setSaveFilterName('');
+      setShowSaveFilter(false);
+    } catch (err) { console.error('Save filter error:', err); }
+  };
+
+  const handleDeleteFilter = async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/saved-filters/${id}`, { method: 'DELETE' });
+      setSavedFilters(prev => prev.filter(f => f.id !== id));
+    } catch (err) { console.error('Delete filter error:', err); }
+  };
+
+  const handleLoadFilter = (preset) => {
+    if (preset.inventory_mode && preset.inventory_mode !== inventoryMode) {
+      setInventoryMode(preset.inventory_mode);
+      if (preset.inventory_mode === 'jewelry') setPriceMode('bruto');
+      setColumnConfig(getColumnConfig(user?.id || 'default', preset.inventory_mode));
+    }
+    setFilters(preset.filters || defaultFilters);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
     setCurrentPage(1);
     setSelectedStone(null);
   }, [filters, smartSearch]);
@@ -6196,6 +6349,15 @@ const StoneSearchPage = () => {
                           </span>
                         )}
                       </div>
+                      {selectedStones.size >= 2 && selectedStones.size <= 3 && (
+                        <button
+                          onClick={() => setShowCompare(true)}
+                          className="px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors flex items-center gap-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                          Compare
+                        </button>
+                      )}
                       <button
                         onClick={clearSelection}
                         className="px-2 py-1 text-xs text-stone-600 hover:text-stone-800 hover:bg-white rounded-lg transition-colors"
@@ -6466,6 +6628,68 @@ const StoneSearchPage = () => {
             onManageTags={() => setShowTagsModal(true)}
             inventoryMode={inventoryMode}
           />
+          )}
+
+          {/* Saved Filters Bar */}
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            {savedFilters.map(preset => (
+              <div key={preset.id} className="group flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer">
+                <button
+                  onClick={() => handleLoadFilter(preset)}
+                  className="text-xs font-medium text-stone-700 group-hover:text-primary-700 transition-colors"
+                >
+                  {preset.name}
+                </button>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                  preset.inventory_mode === 'diamonds' ? 'bg-blue-100 text-blue-600' :
+                  preset.inventory_mode === 'gemstones' ? 'bg-emerald-100 text-emerald-600' :
+                  'bg-pink-100 text-pink-600'
+                }`}>
+                  {preset.inventory_mode === 'diamonds' ? 'D' : preset.inventory_mode === 'gemstones' ? 'G' : 'J'}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteFilter(preset.id); }}
+                  className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded-full hover:bg-red-100 text-stone-400 hover:text-red-500 transition-all"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => { setSaveFilterName(''); setShowSaveFilter(true); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-stone-300 text-xs font-medium text-stone-500 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50/50 transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Save current filters
+            </button>
+          </div>
+
+          {/* Save Filter Dialog */}
+          {showSaveFilter && (
+            <div className="mb-3 flex items-center gap-2 p-3 rounded-xl border border-primary-200 bg-primary-50/30">
+              <input
+                type="text"
+                value={saveFilterName}
+                onChange={(e) => setSaveFilterName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFilter(); }}
+                placeholder="Filter name (e.g. Emeralds > 5ct)"
+                className="flex-1 h-8 px-3 text-sm rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
+                autoFocus
+              />
+              <button
+                onClick={handleSaveFilter}
+                disabled={!saveFilterName.trim()}
+                className="h-8 px-4 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 rounded-lg transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setShowSaveFilter(false)}
+                className="h-8 px-3 text-xs font-medium text-stone-500 hover:text-stone-700 rounded-lg hover:bg-white transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           )}
 
           {/* Pair View Mode Toggle */}
@@ -6972,6 +7196,12 @@ const StoneSearchPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CompareModal
+        isOpen={showCompare}
+        onClose={() => setShowCompare(false)}
+        stones={stones.filter(s => selectedStones.has(s.id))}
+      />
     </>
   );
 };
