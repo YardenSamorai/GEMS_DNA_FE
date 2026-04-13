@@ -1892,16 +1892,25 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
 /* ---------------- DNA Drawer (Stone Preview) ---------------- */
 const DNADrawer = ({ isOpen, onClose, stone }) => {
   const [activeTab, setActiveTab] = useState('details');
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
 
   if (!isOpen || !stone) return null;
 
+  const isJewelry = stone.category === 'Jewelry';
+  const shareUrl = isJewelry
+    ? `https://gems-dna.com/jewelry/${stone.sku}`
+    : `https://gems-dna.com/${stone.sku}`;
+
+  const images = isJewelry ? (stone.allImages || (stone.imageUrl ? [stone.imageUrl] : [])) : [];
+  const videoUrl = isJewelry ? stone.videoLink : stone.videoUrl;
+  const certUrl = isJewelry ? stone.certificateLink : stone.certificateUrl;
+
   const handleShare = async () => {
-    const url = `https://gems-dna.com/${stone.sku}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Check out this gem!', text: 'View the full DNA of this gemstone:', url });
+        await navigator.share({ title: isJewelry ? 'Check out this jewelry!' : 'Check out this gem!', text: `View the full DNA:`, url: shareUrl });
       } else {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(shareUrl);
         alert('Link copied to clipboard!');
       }
     } catch (error) {
@@ -1927,7 +1936,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
         onClick={onClose}
       />
 
-      {/* Drawer - Bottom sheet on mobile, side panel on desktop */}
+      {/* Drawer */}
       <motion.div
         initial={{ y: "100%", x: 0 }}
         animate={{ y: 0, x: 0 }}
@@ -1943,19 +1952,26 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
         </div>
 
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-4 sm:px-6">
+        <div className={`sticky top-0 z-10 px-4 py-4 sm:px-6 ${isJewelry ? 'bg-gradient-to-r from-pink-500 to-pink-600' : 'bg-gradient-to-r from-emerald-500 to-emerald-600'}`}>
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                {stone.lab && (
-                <span className="text-xs font-medium text-emerald-100 bg-white/20 px-2 py-0.5 rounded-full">
-                  {stone.lab}
-                </span>
-                )}
-                <span className="text-emerald-100 text-xs">SKU: {stone.sku}</span>
+                {isJewelry ? (
+                  <span className="text-xs font-medium text-pink-100 bg-white/20 px-2 py-0.5 rounded-full">
+                    {stone.jewelryType || 'Jewelry'}
+                  </span>
+                ) : stone.lab ? (
+                  <span className="text-xs font-medium text-emerald-100 bg-white/20 px-2 py-0.5 rounded-full">
+                    {stone.lab}
+                  </span>
+                ) : null}
+                <span className={`text-xs ${isJewelry ? 'text-pink-100' : 'text-emerald-100'}`}>SKU: {stone.sku}</span>
               </div>
               <h2 className="text-xl font-bold text-white">
-                {getDisplayShape(stone.shape)} Γאó {stone.weightCt}ct
+                {isJewelry
+                  ? (stone.title || `${stone.jewelryType || 'Jewelry'}`)
+                  : `${getDisplayShape(stone.shape)} \u00b7 ${stone.weightCt}ct`
+                }
               </h2>
             </div>
             <button
@@ -1971,61 +1987,103 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
         {/* Scrollable Content */}
         <div className="overflow-y-auto" style={{ maxHeight: 'calc(92vh - 140px)' }}>
-          {/* Media Section */}
           <div className="p-4 sm:p-6">
-            {/* Main Video/Image */}
-            <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg mb-4">
-              {stone.videoUrl ? (
-                <iframe
-                  className="w-full h-full absolute inset-0"
-                  src={stone.videoUrl}
-                  title="Video Preview"
-                  allowFullScreen
-                />
-              ) : stone.imageUrl ? (
-                <img
-                  src={stone.imageUrl}
-                  alt={stone.sku}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-stone-400">
-                  <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+            {/* Media Section */}
+            {isJewelry ? (
+              <>
+                {/* Jewelry Video */}
+                {videoUrl && (
+                  <div className="relative rounded-2xl overflow-hidden bg-stone-900 aspect-video shadow-lg mb-4">
+                    <iframe
+                      className="w-full h-full absolute inset-0"
+                      src={videoUrl}
+                      title="Video Preview"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+                {/* Jewelry Image Gallery */}
+                {images.length > 0 && (
+                  <div className="mb-4">
+                    <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg mb-3">
+                      <img
+                        src={images[activeImgIdx] || images[0]}
+                        alt={stone.title || stone.sku}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {images.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {images.map((img, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setActiveImgIdx(i)}
+                            className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-pink-500 ring-1 ring-pink-300' : 'border-stone-200 hover:border-stone-400'}`}
+                          >
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Certificate thumbnail */}
+                {certUrl && (
+                  <div className="mb-6">
+                    <a href={certUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      View Certificate
+                    </a>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Stone Video/Image */}
+                <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg mb-4">
+                  {stone.videoUrl ? (
+                    <iframe className="w-full h-full absolute inset-0" src={stone.videoUrl} title="Video Preview" allowFullScreen />
+                  ) : stone.imageUrl ? (
+                    <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-stone-400">
+                      <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-
-            {/* Thumbnails */}
-            <div className="grid grid-cols-3 gap-2 mb-6">
-              {stone.imageUrl && (
-                <a href={stone.imageUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
-                  <img src={stone.imageUrl} alt="Photo" className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Photo</span>
-                </a>
-              )}
-              {stone.videoUrl && (
-                <a href={stone.videoUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
-                  <div className="w-full h-full flex items-center justify-center bg-stone-800">
-                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                  <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Video</span>
-                </a>
-              )}
-              {stone.certificateUrl && (
-                <a href={stone.certificateUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
-                  <div className="w-full h-full flex items-center justify-center bg-amber-50">
-                    <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Cert</span>
-                </a>
-              )}
-            </div>
+                {/* Stone Thumbnails */}
+                <div className="grid grid-cols-3 gap-2 mb-6">
+                  {stone.imageUrl && (
+                    <a href={stone.imageUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
+                      <img src={stone.imageUrl} alt="Photo" className="w-full h-full object-cover" />
+                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Photo</span>
+                    </a>
+                  )}
+                  {stone.videoUrl && (
+                    <a href={stone.videoUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
+                      <div className="w-full h-full flex items-center justify-center bg-stone-800">
+                        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                      </div>
+                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Video</span>
+                    </a>
+                  )}
+                  {stone.certificateUrl && (
+                    <a href={stone.certificateUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
+                      <div className="w-full h-full flex items-center justify-center bg-amber-50">
+                        <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Cert</span>
+                    </a>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Tabs */}
             <div className="flex gap-1 p-1 bg-stone-100 rounded-xl mb-4">
@@ -2048,13 +2106,60 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'details' && (
+            {activeTab === 'details' && isJewelry && (
+              <div className="space-y-4">
+                {/* Center Stone */}
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-pink-600 mb-2 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+                    </svg>
+                    Center Stone
+                  </h4>
+                  <div className="bg-stone-50 rounded-xl p-4 space-y-0">
+                    <DetailRow label="Stone Type" value={stone.stoneType} />
+                    <DetailRow label="Carat" value={stone.centerStoneCarat ? `${stone.centerStoneCarat} ct` : null} />
+                    <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
+                    <DetailRow label="Color" value={stone.color} />
+                    <DetailRow label="Clarity" value={stone.clarity} />
+                  </div>
+                </div>
+                {/* General Details */}
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    General Details
+                  </h4>
+                  <div className="bg-stone-50 rounded-xl p-4 space-y-0">
+                    <DetailRow label="Type" value={stone.jewelryType} />
+                    <DetailRow label="Collection" value={stone.collection} />
+                    <DetailRow label="Total Carat" value={stone.weightCt ? `${stone.weightCt} ct` : null} />
+                    <DetailRow label="Jewelry Weight" value={stone.jewelryWeight} />
+                    <DetailRow label="Size" value={stone.jewelrySize} />
+                    <DetailRow label="Metal" value={stone.metalType} />
+                    <DetailRow label="Style" value={stone.style} />
+                    <DetailRow label="Certificate #" value={stone.certificateNumber} />
+                  </div>
+                </div>
+                {/* Description */}
+                {stone.fullDescription && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Description</h4>
+                    <p className="text-sm text-stone-600 leading-relaxed bg-stone-50 rounded-xl p-4 whitespace-pre-line">{stone.fullDescription}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'details' && !isJewelry && (
               <div className="bg-stone-50 rounded-xl p-4 space-y-0">
                 <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
                 <DetailRow label="Weight" value={`${stone.weightCt} ct`} />
                 <DetailRow label="Color" value={getDisplayColor(stone)} />
                 <DetailRow label="Clarity" value={stone.clarity} />
-                <DetailRow label="Clarity" value={stone.treatment} />
+                <DetailRow label="Treatment" value={stone.treatment} />
                 <DetailRow label="Origin" value={stone.origin} />
                 <DetailRow label="Lab" value={stone.lab} />
                 <DetailRow label="Measurements" value={stone.measurements} />
@@ -2066,23 +2171,27 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
             {activeTab === 'pricing' && (
               <div className="space-y-3">
-                <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-stone-600">Price per Carat</span>
-                    <span className="text-xl font-bold text-emerald-700">
-                      ${stone.pricePerCt?.toLocaleString() || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-emerald-200">
+                <div className={`bg-gradient-to-r rounded-xl p-4 ${isJewelry ? 'from-pink-50 to-pink-100' : 'from-emerald-50 to-emerald-100'}`}>
+                  {!isJewelry && (
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-stone-600">Price per Carat</span>
+                      <span className={`text-xl font-bold ${isJewelry ? 'text-pink-700' : 'text-emerald-700'}`}>
+                        ${stone.pricePerCt?.toLocaleString() || 'N/A'}
+                      </span>
+                    </div>
+                  )}
+                  <div className={`flex justify-between items-center ${!isJewelry ? 'pt-3 border-t border-emerald-200' : ''}`}>
                     <span className="text-stone-600">Total Price</span>
-                    <span className="text-2xl font-bold text-emerald-800">
-                      ${stone.priceTotal?.toLocaleString() || 'N/A'}
+                    <span className={`text-2xl font-bold ${isJewelry ? 'text-pink-800' : 'text-emerald-800'}`}>
+                      {stone.currency && stone.currency !== 'USD' ? stone.currency : '$'}{stone.priceTotal?.toLocaleString() || 'N/A'}
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-stone-400 text-center">
-                  {stone.weightCt}ct ├ק ${stone.pricePerCt?.toLocaleString()}/ct
-                </p>
+                {!isJewelry && (
+                  <p className="text-xs text-stone-400 text-center">
+                    {stone.weightCt}ct \u00d7 ${stone.pricePerCt?.toLocaleString()}/ct
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -2101,7 +2210,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
               Share
             </button>
             <a
-              href={`https://gems-dna.com/${stone.sku}`}
+              href={shareUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="py-2.5 px-4 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-stone-200 transition-colors"
@@ -3523,8 +3632,116 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
   </motion.div>
 );
 
+/* ---------------- Jewelry Details Panel ---------------- */
+const JewelryDetails = ({ stone }) => {
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
+  const images = stone.allImages || (stone.imageUrl ? [stone.imageUrl] : []);
+
+  return (
+    <div className="p-5">
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+        {/* Image Gallery */}
+        {images.length > 0 && (
+          <div className="space-y-2">
+            <div className="aspect-square rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+              <img
+                src={images[activeImgIdx] || images[0]}
+                alt={stone.title || stone.sku}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            {images.length > 1 && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImgIdx(i)}
+                    className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-pink-500 ring-1 ring-pink-300' : 'border-stone-200 hover:border-stone-400'}`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Details Sections */}
+        <div className="space-y-5">
+          {/* Center Stone Section */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-pink-600 mb-2 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+              </svg>
+              Center Stone
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <DetailItem label="Stone Type" value={stone.stoneType} />
+              <DetailItem label="Carat" value={stone.centerStoneCarat ? `${stone.centerStoneCarat} ct` : null} />
+              <DetailItem label="Shape" value={getDisplayShape(stone.shape)} />
+              <DetailItem label="Color" value={stone.color} />
+              <DetailItem label="Clarity" value={stone.clarity} />
+            </div>
+          </div>
+
+          {/* General Details Section */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              General Details
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <DetailItem label="SKU" value={stone.sku} />
+              <DetailItem label="Type" value={stone.jewelryType} />
+              <DetailItem label="Collection" value={stone.collection} />
+              <DetailItem label="Total Carat" value={stone.weightCt ? `${stone.weightCt} ct` : null} />
+              <DetailItem label="Jewelry Weight" value={stone.jewelryWeight} />
+              <DetailItem label="Size" value={stone.jewelrySize} />
+            </div>
+          </div>
+
+          {/* Links & Actions */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <a
+              href={`/jewelry/${stone.sku}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-500 text-white text-xs font-medium hover:bg-pink-600 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              View DNA
+            </a>
+            {stone.certificateLink && (
+              <a href={stone.certificateLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 text-xs font-medium hover:bg-stone-200 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Certificate
+              </a>
+            )}
+            {stone.videoLink && (
+              <a href={stone.videoLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-100 text-accent-700 text-xs font-medium hover:bg-accent-200 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Video
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ---------------- Stone Details Panel ---------------- */
 const StoneDetails = ({ stone, onViewDNA }) => {
+  const isJewelry = stone.category === 'Jewelry';
   const [copied, setCopied] = useState(false);
 
   const handleCopyEmail = async () => {
@@ -3543,6 +3760,8 @@ const StoneDetails = ({ stone, onViewDNA }) => {
     }
   };
 
+  if (isJewelry) return <JewelryDetails stone={stone} />;
+
   return (
     <div className="p-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
@@ -3552,7 +3771,7 @@ const StoneDetails = ({ stone, onViewDNA }) => {
         <DetailItem label="Measurements" value={stone.measurements} />
         <DetailItem label="Color" value={getDisplayColor(stone)} />
         <DetailItem label="Clarity" value={stone.clarity} />
-        <DetailItem label="Clarity" value={stone.treatment} />
+        <DetailItem label="Treatment" value={stone.treatment} />
         <DetailItem label="Lab" value={stone.lab} />
         <DetailItem label="Origin" value={stone.origin} />
         <DetailItem label="Ratio" value={stone.ratio} />
@@ -4123,20 +4342,23 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
           </div>
         </td>
       );
-      case 'video': return (
+      case 'video': {
+        const vid = stone.videoUrl || stone.videoLink;
+        return (
         <td key={colId} className="px-3 py-2">
           <div
-            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center ${stone.videoUrl ? 'cursor-pointer hover:ring-2 hover:ring-accent-300 transition-all' : ''}`}
-            onClick={(e) => { if (stone.videoUrl && onVideoClick) { e.stopPropagation(); onVideoClick(stone.videoUrl); } }}
+            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center ${vid ? 'cursor-pointer hover:ring-2 hover:ring-accent-300 transition-all' : ''}`}
+            onClick={(e) => { if (vid && onVideoClick) { e.stopPropagation(); onVideoClick(vid); } }}
           >
-            {stone.videoUrl ? (
+            {vid ? (
               <svg className="w-5 h-5 text-accent-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
             )}
           </div>
         </td>
-      );
+        );
+      }
       case 'category': return (
         <td key={colId} className={cellBase}>
           <span className="text-xs text-stone-600">{getMappedCategories(stone.category).filter(c => c !== 'Empty').join(', ') || '-'}</span>
@@ -4593,6 +4815,115 @@ Best regards, Gemstar
 </body>
 </html>`;
 
+/* ---------------- Compare Modal ---------------- */
+const COMPARE_FIELDS = [
+  { key: 'shape', label: 'Shape', format: (v) => getDisplayShape(v) || '-' },
+  { key: 'category', label: 'Category', format: (v) => v || '-' },
+  { key: 'groupingType', label: 'Type', format: (v) => v || '-' },
+  { key: 'weightCt', label: 'Weight', format: (v) => v ? `${v} ct` : '-' },
+  { key: 'color', label: 'Color', format: (v) => v || '-' },
+  { key: 'clarity', label: 'Clarity', format: (v) => v || '-' },
+  { key: 'treatment', label: 'Treatment', format: (v) => v || '-' },
+  { key: 'measurements', label: 'Measurements', format: (v) => v || '-' },
+  { key: 'ratio', label: 'Ratio', format: (v) => v ? Number(v).toFixed(2) : '-' },
+  { key: 'lab', label: 'Lab', format: (v) => v || '-' },
+  { key: 'origin', label: 'Origin', format: (v) => v || '-' },
+  { key: 'fluorescence', label: 'Fluorescence', format: (v) => v || '-' },
+  { key: 'cut', label: 'Cut', format: (v) => v || '-' },
+  { key: 'polish', label: 'Polish', format: (v) => v || '-' },
+  { key: 'symmetry', label: 'Symmetry', format: (v) => v || '-' },
+  { key: 'pricePerCt', label: 'Price/ct', format: (v) => v ? `$${Number(v).toLocaleString()}` : '-' },
+  { key: 'priceTotal', label: 'Total Price', format: (v) => v ? `$${Number(v).toLocaleString()}` : '-' },
+  { key: 'location', label: 'Location', format: (v) => v || '-' },
+];
+
+const CompareModal = ({ isOpen, onClose, stones }) => {
+  if (!isOpen || !stones.length) return null;
+  const allSame = (key) => {
+    const vals = stones.map(s => s[key]).filter(Boolean);
+    return vals.length > 1 && new Set(vals).size === 1;
+  };
+  const allDiff = (key) => {
+    const vals = stones.map(s => s[key]).filter(Boolean);
+    return vals.length > 1 && new Set(vals).size === vals.length;
+  };
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.92, opacity: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
+              <div>
+                <h2 className="text-lg font-semibold text-stone-800">Compare Stones</h2>
+                <p className="text-xs text-stone-500">{stones.length} stones selected</p>
+              </div>
+              <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-stone-100 flex items-center justify-center transition-colors">
+                <svg className="w-5 h-5 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="overflow-auto flex-1">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="border-b border-stone-200">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-stone-500 w-[140px] min-w-[140px] bg-stone-50"></th>
+                    {stones.map(s => (
+                      <th key={s.sku} className="px-4 py-3 text-center min-w-[180px]">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-20 h-20 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                            {s.imageUrl ? (
+                              <img src={s.imageUrl} alt={s.sku} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-stone-300">
+                                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                              </div>
+                            )}
+                          </div>
+                          <span className="font-mono text-sm font-bold text-primary-700">{s.sku}</span>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {COMPARE_FIELDS.map(({ key, label, format }) => {
+                    const same = allSame(key);
+                    const diff = allDiff(key);
+                    return (
+                      <tr key={key} className={`border-b border-stone-100 ${diff ? 'bg-amber-50/50' : ''}`}>
+                        <td className="px-4 py-2.5 text-xs font-semibold text-stone-500 bg-stone-50">{label}</td>
+                        {stones.map(s => (
+                          <td key={s.sku} className="px-4 py-2.5 text-center">
+                            <span className={`text-sm ${diff ? 'font-semibold text-amber-700' : same ? 'text-emerald-600' : 'text-stone-700'}`}>
+                              {format(s[key])}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 /* ---------------- Main Page ---------------- */
 const StoneSearchPage = () => {
   const { user } = useUser();
@@ -4636,7 +4967,11 @@ const StoneSearchPage = () => {
   const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', 'diamonds'));
-  const [pdfGenerating, setPdfGenerating] = useState(false); // PDF generation loading state
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [savedFilters, setSavedFilters] = useState([]);
+  const [showSaveFilter, setShowSaveFilter] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState('');
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
   const [showScanner, setShowScanner] = useState(false);
@@ -5206,7 +5541,7 @@ const StoneSearchPage = () => {
           case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
           case 'appendix': rowData.appendix = ''; break;
           case 'image': rowData.image = stone.imageUrl || ''; break;
-          case 'video': rowData.video = stone.videoUrl || ''; break;
+          case 'video': rowData.video = stone.videoUrl || stone.videoLink || ''; break;
           default: rowData[col.key] = '';
         }
       });
@@ -5270,8 +5605,8 @@ const StoneSearchPage = () => {
         row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
         row.getCell(imgCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
       }
-      if (vidCol >= 0 && stone.videoUrl) {
-        row.getCell(vidCol + 1).value = { text: "Video", hyperlink: stone.videoUrl };
+      if (vidCol >= 0 && (stone.videoUrl || stone.videoLink)) {
+        row.getCell(vidCol + 1).value = { text: "Video", hyperlink: stone.videoUrl || stone.videoLink };
         row.getCell(vidCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
       }
     });
@@ -5654,6 +5989,46 @@ const StoneSearchPage = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stones, jewelryItems, loading]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch(`${API_BASE}/api/saved-filters?userId=${user.id}`)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setSavedFilters(data); })
+      .catch(() => {});
+  }, [user?.id]);
+
+  const handleSaveFilter = async () => {
+    if (!saveFilterName.trim() || !user?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/saved-filters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, name: saveFilterName.trim(), inventoryMode, filters }),
+      });
+      const data = await res.json();
+      setSavedFilters(prev => [data, ...prev]);
+      setSaveFilterName('');
+      setShowSaveFilter(false);
+    } catch (err) { console.error('Save filter error:', err); }
+  };
+
+  const handleDeleteFilter = async (id) => {
+    try {
+      await fetch(`${API_BASE}/api/saved-filters/${id}`, { method: 'DELETE' });
+      setSavedFilters(prev => prev.filter(f => f.id !== id));
+    } catch (err) { console.error('Delete filter error:', err); }
+  };
+
+  const handleLoadFilter = (preset) => {
+    if (preset.inventory_mode && preset.inventory_mode !== inventoryMode) {
+      setInventoryMode(preset.inventory_mode);
+      if (preset.inventory_mode === 'jewelry') setPriceMode('bruto');
+      setColumnConfig(getColumnConfig(user?.id || 'default', preset.inventory_mode));
+    }
+    setFilters(preset.filters || defaultFilters);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -6099,12 +6474,12 @@ const StoneSearchPage = () => {
                 </div>
 
                 {inventoryMode !== 'jewelry' && (
-                  <button
-                    onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
+                <button
+                  onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
                     className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
-                  >
-                    {priceMode === 'neto' ? 'Neto' : 'B'}
-                  </button>
+                >
+                  {priceMode === 'neto' ? 'Neto' : 'B'}
+                </button>
                 )}
               </div>
             </div>
@@ -6196,6 +6571,15 @@ const StoneSearchPage = () => {
                           </span>
                         )}
                       </div>
+                      {selectedStones.size >= 2 && selectedStones.size <= 3 && (
+                        <button
+                          onClick={() => setShowCompare(true)}
+                          className="px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors flex items-center gap-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                          Compare
+                        </button>
+                      )}
                       <button
                         onClick={clearSelection}
                         className="px-2 py-1 text-xs text-stone-600 hover:text-stone-800 hover:bg-white rounded-lg transition-colors"
@@ -6466,6 +6850,68 @@ const StoneSearchPage = () => {
             onManageTags={() => setShowTagsModal(true)}
             inventoryMode={inventoryMode}
           />
+          )}
+
+          {/* Saved Filters Bar */}
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            {savedFilters.map(preset => (
+              <div key={preset.id} className="group flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer">
+                <button
+                  onClick={() => handleLoadFilter(preset)}
+                  className="text-xs font-medium text-stone-700 group-hover:text-primary-700 transition-colors"
+                >
+                  {preset.name}
+                </button>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                  preset.inventory_mode === 'diamonds' ? 'bg-blue-100 text-blue-600' :
+                  preset.inventory_mode === 'gemstones' ? 'bg-emerald-100 text-emerald-600' :
+                  'bg-pink-100 text-pink-600'
+                }`}>
+                  {preset.inventory_mode === 'diamonds' ? 'D' : preset.inventory_mode === 'gemstones' ? 'G' : 'J'}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteFilter(preset.id); }}
+                  className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded-full hover:bg-red-100 text-stone-400 hover:text-red-500 transition-all"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => { setSaveFilterName(''); setShowSaveFilter(true); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-stone-300 text-xs font-medium text-stone-500 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50/50 transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Save current filters
+            </button>
+          </div>
+
+          {/* Save Filter Dialog */}
+          {showSaveFilter && (
+            <div className="mb-3 flex items-center gap-2 p-3 rounded-xl border border-primary-200 bg-primary-50/30">
+              <input
+                type="text"
+                value={saveFilterName}
+                onChange={(e) => setSaveFilterName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFilter(); }}
+                placeholder="Filter name (e.g. Emeralds > 5ct)"
+                className="flex-1 h-8 px-3 text-sm rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
+                autoFocus
+              />
+              <button
+                onClick={handleSaveFilter}
+                disabled={!saveFilterName.trim()}
+                className="h-8 px-4 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 rounded-lg transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setShowSaveFilter(false)}
+                className="h-8 px-3 text-xs font-medium text-stone-500 hover:text-stone-700 rounded-lg hover:bg-white transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           )}
 
           {/* Pair View Mode Toggle */}
@@ -6972,6 +7418,12 @@ const StoneSearchPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CompareModal
+        isOpen={showCompare}
+        onClose={() => setShowCompare(false)}
+        stones={stones.filter(s => selectedStones.has(s.id))}
+      />
     </>
   );
 };
