@@ -3159,28 +3159,28 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
 
   return (
     <div className="mb-4">
-      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-800 transition-colors mb-2">
-        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        Filters {activeCount > 0 && <span className="text-xs bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">{activeCount}</span>}
+      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm font-medium text-stone-600 hover:text-stone-800 transition-colors mb-2">
+        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        Filters {activeCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-800 text-white">{activeCount}</span>}
       </button>
       {isOpen && (
-        <div className="glass rounded-2xl border border-white/50 p-4 space-y-3">
+        <div className="rounded-lg border border-stone-200 bg-white p-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1">Min Price</label>
-              <input type="number" value={filters.minPrice} onChange={handleChange('minPrice')} placeholder="Min $" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+              <input type="number" value={filters.minPrice} onChange={handleChange('minPrice')} placeholder="Min $" className="input-modern" />
             </div>
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1">Max Price</label>
-              <input type="number" value={filters.maxPrice} onChange={handleChange('maxPrice')} placeholder="Max $" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+              <input type="number" value={filters.maxPrice} onChange={handleChange('maxPrice')} placeholder="Max $" className="input-modern" />
             </div>
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1">Min Carats</label>
-              <input type="number" step="0.01" value={filters.minCarat} onChange={handleChange('minCarat')} placeholder="Min ct" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+              <input type="number" step="0.01" value={filters.minCarat} onChange={handleChange('minCarat')} placeholder="Min ct" className="input-modern" />
             </div>
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1">Max Carats</label>
-              <input type="number" step="0.01" value={filters.maxCarat} onChange={handleChange('maxCarat')} placeholder="Max ct" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:ring-2 focus:ring-pink-300 focus:border-pink-400 outline-none" />
+              <input type="number" step="0.01" value={filters.maxCarat} onChange={handleChange('maxCarat')} placeholder="Max ct" className="input-modern" />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -3189,7 +3189,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
                 <label className="block text-xs font-medium text-stone-500 mb-1">Type</label>
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {jewelryTypeOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('category', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.category || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                    <button key={opt} onClick={() => handleMulti('category', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.category || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
                   ))}
                 </div>
               </div>
@@ -3199,7 +3199,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
                 <label className="block text-xs font-medium text-stone-500 mb-1">Style</label>
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {jewelryStyleOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('shape', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.shape || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                    <button key={opt} onClick={() => handleMulti('shape', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.shape || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
                   ))}
                 </div>
               </div>
@@ -3209,7 +3209,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
                 <label className="block text-xs font-medium text-stone-500 mb-1">Collection</label>
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {jewelryCollectionOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('treatment', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.treatment || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                    <button key={opt} onClick={() => handleMulti('treatment', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.treatment || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
                   ))}
                 </div>
               </div>
@@ -3219,7 +3219,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
                 <label className="block text-xs font-medium text-stone-500 mb-1">Stone Type</label>
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {jewelryStoneTypeOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('diamondColor', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.diamondColor || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                    <button key={opt} onClick={() => handleMulti('diamondColor', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.diamondColor || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
                   ))}
                 </div>
               </div>
@@ -3229,7 +3229,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
                 <label className="block text-xs font-medium text-stone-500 mb-1">Metal</label>
                 <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                   {jewelryMetalTypeOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('fancyColor', opt)} className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${(filters.fancyColor || []).includes(opt) ? 'bg-pink-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
+                    <button key={opt} onClick={() => handleMulti('fancyColor', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.fancyColor || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
                   ))}
                 </div>
               </div>
@@ -3298,39 +3298,33 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
   ].filter(Boolean).length;
 
   return (
-    <div className="glass rounded-2xl shadow-lg border border-white/50 p-5 mb-6">
+    <div className="rounded-lg border border-stone-200 bg-white p-4 mb-4">
       {/* Clickable Header */}
       <div 
         className="flex items-center justify-between cursor-pointer select-none"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-stone-800">Filters</h2>
-            {activeFiltersCount > 0 && (
-              <p className="text-xs text-stone-500">{activeFiltersCount} active filter{activeFiltersCount > 1 ? 's' : ''}</p>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+          <h2 className="text-sm font-medium text-stone-700">Filters</h2>
+          {activeFiltersCount > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-800 text-white">{activeFiltersCount}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {isOpen && activeFiltersCount > 0 && (
             <button
               onClick={(e) => { e.stopPropagation(); handleClear(); }}
-              className="text-sm font-medium text-primary-600 hover:text-primary-700 px-3 py-1.5 rounded-lg hover:bg-primary-50 transition-colors"
+              className="text-xs font-medium text-stone-500 hover:text-stone-700 px-2 py-1 rounded hover:bg-stone-50 transition-colors"
             >
               Clear all
             </button>
           )}
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isOpen ? 'bg-primary-100 rotate-180' : 'bg-stone-100'}`}>
-            <svg className="w-4 h-4 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <svg className={`w-4 h-4 text-stone-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </div>
       
@@ -3344,7 +3338,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pt-5 space-y-5">
+            <div className="pt-4 space-y-4">
 
               {/* Row 1: SKU + Price */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -4066,10 +4060,17 @@ const getColumnConfig = (userId, mode = 'diamonds') => {
     if (stored) {
       const parsed = JSON.parse(stored);
       const knownIds = new Set(defaults.map(c => c.id));
-      const storedIds = new Set(parsed.map(c => c.id));
-      const merged = parsed.filter(c => knownIds.has(c.id));
+      const seen = new Set();
+      const merged = [];
+      parsed.forEach(c => {
+        if (knownIds.has(c.id) && !seen.has(c.id)) {
+          seen.add(c.id);
+          merged.push(c);
+        }
+      });
       defaults.forEach(col => {
-        if (!storedIds.has(col.id)) {
+        if (!seen.has(col.id)) {
+          seen.add(col.id);
           merged.push({ id: col.id, visible: true });
         }
       });
@@ -4228,12 +4229,20 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
 
-  const visibleColumns = useMemo(() => {
-    if (!columnConfig) return defaultCols.map(c => c.id);
-    return columnConfig.filter(c => c.visible).map(c => c.id);
-  }, [columnConfig, defaultCols]);
-
   const colMeta = useMemo(() => Object.fromEntries(defaultCols.map(c => [c.id, c])), [defaultCols]);
+
+  const visibleColumns = useMemo(() => {
+    const knownIds = new Set(defaultCols.map(c => c.id));
+    const raw = columnConfig
+      ? columnConfig.filter(c => c.visible).map(c => c.id)
+      : defaultCols.map(c => c.id);
+    const seen = new Set();
+    return raw.filter(id => {
+      if (!knownIds.has(id) || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [columnConfig, defaultCols]);
 
   if (loading) {
     return (
@@ -4326,6 +4335,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
   };
 
   const renderCell = (colId, stone) => {
+    if (!colMeta[colId]) return null;
     const cellBase = "px-3 py-2 whitespace-nowrap";
     switch (colId) {
       case 'sku': return <td key={colId} className={cellBase}><span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span></td>;
@@ -4751,7 +4761,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                          <td colSpan={15} className="bg-stone-50 border-t border-stone-200">
+                          <td colSpan={visibleColumns.length + 2} className="bg-stone-50 border-t border-stone-200">
                           <StoneDetails stone={stone} onViewDNA={onViewDNA} />
                         </td>
                       </motion.tr>
@@ -5448,38 +5458,49 @@ const StoneSearchPage = () => {
     const grayFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
     const darkFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
 
+    // Helper: style a full-width row without merge (uses centerContinuous)
+    const fillRow = (rowNum, value, font, fill, border, height) => {
+      const row = worksheet.getRow(rowNum);
+      row.height = height;
+      for (let c = 1; c <= colCount; c++) {
+        const cell = row.getCell(c);
+        if (c === 1 && value !== undefined) cell.value = value;
+        if (font) cell.font = font;
+        if (fill) cell.fill = fill;
+        cell.alignment = { horizontal: "centerContinuous", vertical: "middle" };
+        if (border) cell.border = border;
+      }
+    };
+
     // === ROW 1: Title ===
-    worksheet.mergeCells(`A1:${lastCol}1`);
-    const titleCell = worksheet.getCell("A1");
-    titleCell.value = `SELECTED STONES  \u00B7  ${data.length} stones  \u00B7  ${totalWeight.toFixed(2)} cts  \u00B7  ${date}`;
-    titleCell.font = { bold: true, size: 16, color: { argb: "FF000000" }, name: "Lato" };
-    titleCell.fill = whiteFill;
-    titleCell.alignment = { horizontal: "center", vertical: "middle" };
-    titleCell.border = { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom };
-    worksheet.getRow(1).height = 26;
+    fillRow(1,
+      `SELECTED STONES  \u00B7  ${data.length} stones  \u00B7  ${totalWeight.toFixed(2)} cts  \u00B7  ${date}`,
+      { bold: true, size: 16, color: { argb: "FF000000" }, name: "Lato" },
+      whiteFill,
+      { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom },
+      26
+    );
 
     // === ROW 2: Subtitle ===
-    worksheet.mergeCells(`A2:${lastCol}2`);
-    const subtitleCell = worksheet.getCell("A2");
-    subtitleCell.value = "STONE CATALOG";
-    subtitleCell.font = { italic: true, size: 12, color: { argb: "FF000000" }, name: "Lato" };
-    subtitleCell.fill = whiteFill;
-    subtitleCell.alignment = { horizontal: "center", vertical: "middle" };
-    subtitleCell.border = { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom };
-    worksheet.getRow(2).height = 20;
+    fillRow(2,
+      "STONE CATALOG",
+      { italic: true, size: 12, color: { argb: "FF000000" }, name: "Lato" },
+      whiteFill,
+      { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom },
+      20
+    );
 
     // === ROW 3: Spacer ===
-    worksheet.mergeCells(`A3:${lastCol}3`);
-    worksheet.getRow(3).height = 6;
+    fillRow(3, undefined, null, whiteFill, null, 6);
 
     // === ROW 4: Category label ===
-    worksheet.mergeCells(`A4:${lastCol}4`);
-    const catLabel = worksheet.getCell("A4");
-    catLabel.value = sheetName.toUpperCase();
-    catLabel.font = { size: 11, color: { argb: "FF000000" }, name: "Lato", bold: true };
-    catLabel.fill = whiteFill;
-    catLabel.alignment = { horizontal: "center", vertical: "middle" };
-    worksheet.getRow(4).height = 18;
+    fillRow(4,
+      sheetName.toUpperCase(),
+      { size: 11, color: { argb: "FF000000" }, name: "Lato", bold: true },
+      whiteFill,
+      null,
+      18
+    );
 
     // === ROW 5: Column headers ===
     const headerRow = worksheet.getRow(5);
@@ -5491,6 +5512,10 @@ const StoneSearchPage = () => {
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.border = { left: darkBorder, right: darkBorder, top: darkBorder, bottom: greenBorderBottom };
     });
+
+    // === AUTO FILTER on header + data range ===
+    const lastDataRow = 5 + data.length;
+    worksheet.autoFilter = { from: { row: 5, column: 1 }, to: { row: lastDataRow, column: colCount } };
 
     // === DATA ROWS (starting from row 6) ===
     const dataStartRow = 6;
@@ -5616,31 +5641,32 @@ const StoneSearchPage = () => {
     // === FOOTER SECTION ===
     const footerStartRow = dataStartRow + data.length;
 
-    // Footer message row
-    worksheet.mergeCells(`A${footerStartRow}:${lastCol}${footerStartRow}`);
-    const footerMsg = worksheet.getCell(`A${footerStartRow}`);
-    footerMsg.value = `${sheetName} \u2014 ${data.length} stones exported on ${date}`;
-    footerMsg.font = { italic: true, size: 10, color: { argb: "FF333333" }, name: "Lato" };
-    footerMsg.fill = whiteFill;
-    footerMsg.alignment = { horizontal: "center", vertical: "middle" };
-    footerMsg.border = { top: { style: "thin", color: { argb: greenAccent } }, bottom: darkBorder };
-    worksheet.getRow(footerStartRow).height = 22;
+    // Footer message row (no merge)
+    fillRow(footerStartRow,
+      `${sheetName} \u2014 ${data.length} stones exported on ${date}`,
+      { italic: true, size: 10, color: { argb: "FF333333" }, name: "Lato" },
+      whiteFill,
+      { top: { style: "thin", color: { argb: greenAccent } }, bottom: darkBorder },
+      22
+    );
 
     // Spacer
     const r1 = footerStartRow + 1;
-    worksheet.mergeCells(`A${r1}:${lastCol}${r1}`);
-    worksheet.getRow(r1).height = 8;
+    fillRow(r1, undefined, null, whiteFill, null, 8);
 
-    // Summary section
+    // Summary section (no merged cells to allow Excel Sort & Filter)
     const sumRow = footerStartRow + 2;
     const sumBorder = { left: darkBorder, right: darkBorder, top: darkBorder, bottom: darkBorder };
 
-    worksheet.mergeCells(`A${sumRow}:C${sumRow}`);
+    // "Total Records" label spans A-C visually but without merge
+    ['A','B','C'].forEach(col => {
+      const cell = worksheet.getCell(`${col}${sumRow}`);
+      cell.fill = grayFill;
+      cell.border = sumBorder;
+    });
     worksheet.getCell(`A${sumRow}`).value = "Total Records";
     worksheet.getCell(`A${sumRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`A${sumRow}`).fill = grayFill;
     worksheet.getCell(`A${sumRow}`).alignment = { horizontal: "left", vertical: "middle" };
-    worksheet.getCell(`A${sumRow}`).border = sumBorder;
 
     worksheet.getCell(`D${sumRow}`).value = "CTS";
     worksheet.getCell(`D${sumRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
@@ -5655,14 +5681,14 @@ const StoneSearchPage = () => {
     worksheet.getCell(`E${sumRow}`).border = sumBorder;
 
     if (!hidePrices) {
-      worksheet.getCell(`F${sumRow}`).value = "PRICE";
+      worksheet.getCell(`F${sumRow}`).value = "TOTAL PRICE";
       worksheet.getCell(`F${sumRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
       worksheet.getCell(`F${sumRow}`).fill = grayFill;
       worksheet.getCell(`F${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
       worksheet.getCell(`F${sumRow}`).border = sumBorder;
     }
 
-    // Date/Time info on right side
+    // Date/Time info on right side (no merge)
     if (colCount >= 10) {
       const dtCol1 = getColLetter(colCount - 2);
       const dtCol2 = getColLetter(colCount - 1);
@@ -5671,22 +5697,24 @@ const StoneSearchPage = () => {
       worksheet.getCell(`${dtCol1}${sumRow}`).font = { bold: true, size: 9, color: { argb: "FF000000" }, name: "Lato" };
       worksheet.getCell(`${dtCol1}${sumRow}`).fill = grayFill;
       worksheet.getCell(`${dtCol1}${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.mergeCells(`${dtCol2}${sumRow}:${dtCol3}${sumRow}`);
       worksheet.getCell(`${dtCol2}${sumRow}`).value = date;
       worksheet.getCell(`${dtCol2}${sumRow}`).font = { size: 9, color: { argb: "FF000000" }, name: "Lato" };
       worksheet.getCell(`${dtCol2}${sumRow}`).fill = grayFill;
       worksheet.getCell(`${dtCol2}${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
+      worksheet.getCell(`${dtCol3}${sumRow}`).fill = grayFill;
     }
     worksheet.getRow(sumRow).height = 21;
 
-    // Summary values row
+    // Summary values row (no merged cells)
     const valRow = sumRow + 1;
-    worksheet.mergeCells(`A${valRow}:C${valRow}`);
+    ['A','B','C'].forEach(col => {
+      const cell = worksheet.getCell(`${col}${valRow}`);
+      cell.fill = whiteFill;
+      cell.border = sumBorder;
+    });
     worksheet.getCell(`A${valRow}`).value = "Total";
     worksheet.getCell(`A${valRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`A${valRow}`).fill = whiteFill;
     worksheet.getCell(`A${valRow}`).alignment = { horizontal: "left", vertical: "middle" };
-    worksheet.getCell(`A${valRow}`).border = sumBorder;
 
     worksheet.getCell(`D${valRow}`).value = totalWeight.toFixed(2);
     worksheet.getCell(`D${valRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
@@ -5702,11 +5730,13 @@ const StoneSearchPage = () => {
 
     if (!hidePrices && totalPrice > 0) {
       worksheet.getCell(`F${valRow}`).value = totalPrice;
-      worksheet.getCell(`F${valRow}`).numFmt = '"$"#,##0';
+      worksheet.getCell(`F${valRow}`).numFmt = '$#,##0';
       worksheet.getCell(`F${valRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
       worksheet.getCell(`F${valRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: greenAccent } };
       worksheet.getCell(`F${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
       worksheet.getCell(`F${valRow}`).border = sumBorder;
+      const colF = worksheet.getColumn('F');
+      if (colF.width < 16) colF.width = 16;
     }
 
     if (colCount >= 10) {
@@ -5717,25 +5747,21 @@ const StoneSearchPage = () => {
       worksheet.getCell(`${dtCol1}${valRow}`).font = { bold: true, size: 9, color: { argb: "FF000000" }, name: "Lato" };
       worksheet.getCell(`${dtCol1}${valRow}`).fill = grayFill;
       worksheet.getCell(`${dtCol1}${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.mergeCells(`${dtCol2}${valRow}:${dtCol3}${valRow}`);
       worksheet.getCell(`${dtCol2}${valRow}`).value = time;
       worksheet.getCell(`${dtCol2}${valRow}`).font = { size: 9, color: { argb: "FF000000" }, name: "Lato" };
       worksheet.getCell(`${dtCol2}${valRow}`).fill = grayFill;
       worksheet.getCell(`${dtCol2}${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
+      worksheet.getCell(`${dtCol3}${valRow}`).fill = grayFill;
     }
     worksheet.getRow(valRow).height = 21;
 
     // Spacer
     const r2 = valRow + 1;
-    worksheet.mergeCells(`A${r2}:${lastCol}${r2}`);
-    worksheet.getRow(r2).height = 10;
+    fillRow(r2, undefined, null, whiteFill, null, 10);
 
-    // Logo row
+    // Logo row (no merge)
     const logoRowNum = r2 + 1;
-    worksheet.mergeCells(`A${logoRowNum}:${lastCol}${logoRowNum}`);
-    worksheet.getCell(`A${logoRowNum}`).fill = whiteFill;
-    worksheet.getCell(`A${logoRowNum}`).alignment = { horizontal: "center", vertical: "middle" };
-    worksheet.getRow(logoRowNum).height = 60;
+    fillRow(logoRowNum, undefined, null, whiteFill, null, 60);
     if (logoImageId !== null) {
       const centerCol = Math.max(0, Math.floor(colCount / 2) - 2);
       worksheet.addImage(logoImageId, {
@@ -5744,29 +5770,28 @@ const StoneSearchPage = () => {
       });
     }
 
-    // Contact bar (dark background)
+    // Contact bar (dark background, no merge)
     const contactRow = logoRowNum + 1;
     const israelEmails = ["yarden@eshed.com", "eyal@eshed.com", "meirav@eshed.com", "le@gems.net"];
     const userEmail = user?.primaryEmailAddress?.emailAddress || "";
     const phone = israelEmails.includes(userEmail.toLowerCase()) ? "+972.3.575.1137" : "+1 (212) 869-0544";
-    worksheet.mergeCells(`A${contactRow}:${lastCol}${contactRow}`);
-    const contactCell = worksheet.getCell(`A${contactRow}`);
-    contactCell.value = `www.gems.net     \u2502     ${phone}     \u2502     info@gems.net`;
-    contactCell.font = { size: 14, color: { argb: "FFFFFFFF" }, name: "Lato", bold: true };
-    contactCell.fill = darkFill;
-    contactCell.alignment = { horizontal: "center", vertical: "middle" };
-    worksheet.getRow(contactRow).height = 36;
+    fillRow(contactRow,
+      `www.gems.net     \u2502     ${phone}     \u2502     info@gems.net`,
+      { size: 14, color: { argb: "FFFFFFFF" }, name: "Lato", bold: true },
+      darkFill,
+      null,
+      36
+    );
 
-    // Disclaimer row
+    // Disclaimer row (no merge)
     const disclaimerRow = contactRow + 1;
-    worksheet.mergeCells(`A${disclaimerRow}:${lastCol}${disclaimerRow}`);
-    const disclaimerCell = worksheet.getCell(`A${disclaimerRow}`);
-    disclaimerCell.value = "All prices are subject to change. Stones are certified and guaranteed authentic.";
-    disclaimerCell.font = { italic: true, size: 10, color: { argb: "FF333333" }, name: "Lato" };
-    disclaimerCell.fill = grayFill;
-    disclaimerCell.alignment = { horizontal: "center", vertical: "middle" };
-    disclaimerCell.border = { top: { style: "thin", color: { argb: greenAccent } }, bottom: blackBorderMedium };
-    worksheet.getRow(disclaimerRow).height = 24;
+    fillRow(disclaimerRow,
+      "All prices are subject to change. Stones are certified and guaranteed authentic.",
+      { italic: true, size: 10, color: { argb: "FF333333" }, name: "Lato" },
+      grayFill,
+      { top: { style: "thin", color: { argb: greenAccent } }, bottom: blackBorderMedium },
+      24
+    );
   };
 
   // Export selected stones to Excel with styling (combined - all columns)
@@ -6487,39 +6512,39 @@ const StoneSearchPage = () => {
             </div>
 
             {/* Inventory Mode Tabs */}
-            <div className="flex items-center gap-1 p-1 rounded-2xl bg-stone-100/80 border border-stone-200/50 mb-4">
+            <div className="flex items-center gap-4 border-b border-stone-200 mb-4">
               <button
                 onClick={() => handleModeSwitch('diamonds')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5 border-b-2 -mb-px ${
                   inventoryMode === 'diamonds'
-                    ? 'bg-white shadow-md text-blue-700 border border-blue-100'
-                    : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-stone-400 hover:text-stone-600'
                 }`}
               >
                 Diamonds
-                {!loading && <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'diamonds' ? 'bg-blue-100 text-blue-600' : 'bg-stone-200 text-stone-500'}`}>{diamondCount.toLocaleString()}</span>}
+                {!loading && <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${inventoryMode === 'diamonds' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-400'}`}>{diamondCount.toLocaleString()}</span>}
               </button>
               <button
                 onClick={() => handleModeSwitch('gemstones')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5 border-b-2 -mb-px ${
                   inventoryMode === 'gemstones'
-                    ? 'bg-white shadow-md text-emerald-700 border border-emerald-100'
-                    : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
+                    ? 'border-emerald-600 text-emerald-700'
+                    : 'border-transparent text-stone-400 hover:text-stone-600'
                 }`}
               >
                 Gemstones
-                {!loading && <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'gemstones' ? 'bg-emerald-100 text-emerald-600' : 'bg-stone-200 text-stone-500'}`}>{gemstoneCount.toLocaleString()}</span>}
+                {!loading && <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${inventoryMode === 'gemstones' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-400'}`}>{gemstoneCount.toLocaleString()}</span>}
               </button>
               <button
                 onClick={() => handleModeSwitch('jewelry')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5 border-b-2 -mb-px ${
                   inventoryMode === 'jewelry'
-                    ? 'bg-white shadow-md text-slate-700 border border-slate-200'
-                    : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
+                    ? 'border-slate-700 text-slate-800'
+                    : 'border-transparent text-stone-400 hover:text-stone-600'
                 }`}
               >
                 Jewelry
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'jewelry' ? 'bg-slate-100 text-slate-600' : 'bg-stone-200 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>
+                <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${inventoryMode === 'jewelry' ? 'bg-slate-700 text-white' : 'bg-stone-100 text-stone-400'}`}>{jewelryCount.toLocaleString()}</span>
               </button>
             </div>
             
@@ -6755,10 +6780,10 @@ const StoneSearchPage = () => {
           </div>
 
           {/* Smart Search */}
-          <div className="glass rounded-2xl shadow-lg border border-white/50 p-4 mb-4">
+          <div className="mb-4">
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <svg className="w-5 h-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -6767,14 +6792,14 @@ const StoneSearchPage = () => {
                 value={smartSearch}
                 onChange={(e) => setSmartSearch(e.target.value)}
                 placeholder="Smart search... e.g. Emerald 3ct VS2, Diamond J SI1 GIA, T9548"
-                className="w-full pl-12 pr-10 py-3 rounded-xl border border-stone-200 bg-white/80 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all"
+                className="w-full pl-9 pr-9 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-all"
               />
               {smartSearch && (
                 <button
                   onClick={() => setSmartSearch("")}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-stone-400 hover:text-stone-600"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -6817,12 +6842,12 @@ const StoneSearchPage = () => {
           {/* Jewelry info bar */}
           {inventoryMode === 'jewelry' && jewelryLoading && (
             <div className="mb-4 flex items-center gap-2 text-sm text-stone-500">
-              <svg className="animate-spin h-4 w-4 text-pink-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              <svg className="animate-spin h-4 w-4 text-stone-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               Loading jewelry...
             </div>
           )}
           {inventoryMode === 'jewelry' && !jewelryLoading && jewelryItems.length === 0 && (
-            <div className="mb-4 p-4 rounded-xl bg-pink-50 border border-pink-200 text-sm text-pink-700">
+            <div className="mb-4 p-4 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-600">
               No jewelry items found. Upload a Jewelry CSV from the <a href="/dashboard" className="font-semibold underline">Dashboard</a>.
             </div>
           )}

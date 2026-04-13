@@ -370,8 +370,8 @@ body[data-theme="dark"] {
 /* Input styles */
 .input-modern {
   width: 100%;
-  padding: 0.75rem 1rem;
-  border: 2px solid var(--border-primary);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   font-size: 0.875rem;
   transition: all 0.2s ease;
@@ -382,7 +382,7 @@ body[data-theme="dark"] {
 .input-modern:focus {
   outline: none;
   border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.1);
+  box-shadow: 0 0 0 2px rgb(16 185 129 / 0.08);
 }
 
 .input-modern::placeholder {
