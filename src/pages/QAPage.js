@@ -30,12 +30,21 @@ const cleanStr = (val) => {
   return val;
 };
 
+const ZERO_MEASUREMENT = /^[0.\-xX×*,\s]+$/;
+const cleanMeasurement = (val) => {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!s || JUNK_VALUES.has(s.toLowerCase())) return null;
+  if (ZERO_MEASUREMENT.test(s)) return null;
+  return s;
+};
+
 const normalizeStone = (row) => ({
   id: row.id || row.sku,
   sku: row.sku || '',
   shape: cleanStr(row.shape),
   weightCt: row.weightCt != null ? Number(row.weightCt) : 0,
-  measurements: cleanStr(row.measurements),
+  measurements: cleanMeasurement(row.measurements),
   priceTotal: row.priceTotal != null ? Number(row.priceTotal) : 0,
   pricePerCt: row.pricePerCt != null ? Number(row.pricePerCt) : 0,
   imageUrl: cleanStr(row.imageUrl),
@@ -190,10 +199,19 @@ const QAPage = () => {
   const [stones, setStones] = useState([]);
   const [jewelryItems, setJewelryItems] = useState([]);
   const [activeTab, setActiveTab] = useState('diamonds');
+  const [groupingFilter, setGroupingFilter] = useState('all');
   const [issueFilter, setIssueFilter] = useState(new Set());
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('issues');
   const [sortDir, setSortDir] = useState('desc');
+  const [priceMode, setPriceMode] = useState('neto');
+
+  const displayPrice = (val) => {
+    if (!val) return null;
+    const n = Number(val);
+    if (!n) return null;
+    return priceMode === 'neto' ? Math.round(n / 2) : Math.round(n);
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -242,10 +260,20 @@ const QAPage = () => {
   const gemstones = useMemo(() => stones.filter((s) => classifyStone(s) === 'gemstone'), [stones]);
 
   const currentItems = useMemo(() => {
-    if (activeTab === 'diamonds') return diamonds;
-    if (activeTab === 'gemstones') return gemstones;
-    return jewelryItems;
-  }, [activeTab, diamonds, gemstones, jewelryItems]);
+    let items;
+    if (activeTab === 'diamonds') items = diamonds;
+    else if (activeTab === 'gemstones') items = gemstones;
+    else items = jewelryItems;
+
+    if (activeTab !== 'jewelry' && groupingFilter !== 'all') {
+      items = items.filter((s) => {
+        const gt = (s.groupingType || '').toLowerCase();
+        if (groupingFilter === 'single') return gt === 'single' || gt === '' || !gt;
+        return gt === groupingFilter;
+      });
+    }
+    return items;
+  }, [activeTab, diamonds, gemstones, jewelryItems, groupingFilter]);
 
   const currentRules = activeTab === 'jewelry' ? JEWELRY_RULES : STONE_RULES;
 
@@ -333,7 +361,7 @@ const QAPage = () => {
       activeTab,
       e.issues.map((i) => i.label).join('; '),
       e.item.weightCt || '',
-      e.item.priceTotal || '',
+      displayPrice(e.item.priceTotal) || '',
     ]);
     const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -381,7 +409,7 @@ const QAPage = () => {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => { setActiveTab(tab.id); setIssueFilter(new Set()); setSearch(''); }}
+            onClick={() => { setActiveTab(tab.id); setGroupingFilter('all'); setIssueFilter(new Set()); setSearch(''); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
               activeTab === tab.id
                 ? 'bg-white text-stone-900 shadow-md'
@@ -395,6 +423,32 @@ const QAPage = () => {
           </button>
         ))}
       </div>
+
+      {/* Grouping Type Filter (stones only) */}
+      {activeTab !== 'jewelry' && (
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-xs font-medium text-stone-400 uppercase tracking-wider mr-1">Grouping:</span>
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'single', label: 'Single' },
+            { id: 'pair', label: 'Pair' },
+            { id: 'parcel', label: 'Parcel' },
+            { id: 'set', label: 'Set' },
+          ].map((g) => (
+            <button
+              key={g.id}
+              onClick={() => setGroupingFilter(g.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                groupingFilter === g.id
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700'
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -505,6 +559,17 @@ const QAPage = () => {
             </h2>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPriceMode(priceMode === 'neto' ? 'bruto' : 'neto')}
+              className={`px-2.5 py-2 text-xs font-bold rounded-lg border transition-colors ${
+                priceMode === 'bruto'
+                  ? 'bg-amber-100 border-amber-300 text-amber-700'
+                  : 'bg-emerald-100 border-emerald-300 text-emerald-700'
+              }`}
+              title={priceMode === 'neto' ? 'Showing Neto prices (click for Bruto)' : 'Showing Bruto prices (click for Neto)'}
+            >
+              {priceMode === 'neto' ? 'N' : 'B'}
+            </button>
             <div className="relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -581,7 +646,7 @@ const QAPage = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-stone-600">{item.weightCt ? `${item.weightCt} ct` : '-'}</td>
-                    <td className="px-4 py-3 text-sm text-stone-600">{item.priceTotal ? `$${Number(item.priceTotal).toLocaleString()}` : '-'}</td>
+                    <td className="px-4 py-3 text-sm text-stone-600">{displayPrice(item.priceTotal) ? `$${displayPrice(item.priceTotal).toLocaleString()}` : '-'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
                         issues.length >= 3 ? 'bg-red-100 text-red-700' : issues.length === 2 ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
