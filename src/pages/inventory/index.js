@@ -9,6 +9,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getMappedCategories } from "../../utils/categoryMap";
+import { sanitizeText } from "../../utils/helper";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -1952,7 +1953,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
         </div>
 
         {/* Header */}
-        <div className={`sticky top-0 z-10 px-4 py-4 sm:px-6 ${isJewelry ? 'bg-gradient-to-r from-pink-500 to-pink-600' : 'bg-gradient-to-r from-emerald-500 to-emerald-600'}`}>
+        <div className={`sticky top-0 z-10 px-4 py-4 sm:px-6 ${isJewelry ? 'bg-gradient-to-r from-slate-800 to-slate-900' : 'bg-gradient-to-r from-emerald-500 to-emerald-600'}`}>
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -1965,11 +1966,11 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
                     {stone.lab}
                   </span>
                 ) : null}
-                <span className={`text-xs ${isJewelry ? 'text-pink-100' : 'text-emerald-100'}`}>SKU: {stone.sku}</span>
+                <span className={`text-xs ${isJewelry ? 'text-slate-300' : 'text-emerald-100'}`}>SKU: {stone.sku}</span>
               </div>
               <h2 className="text-xl font-bold text-white">
                 {isJewelry
-                  ? (stone.title || `${stone.jewelryType || 'Jewelry'}`)
+                  ? (sanitizeText(stone.title) || `${stone.jewelryType || 'Jewelry'}`)
                   : `${getDisplayShape(stone.shape)} \u00b7 ${stone.weightCt}ct`
                 }
               </h2>
@@ -2018,7 +2019,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
                           <button
                             key={i}
                             onClick={() => setActiveImgIdx(i)}
-                            className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-pink-500 ring-1 ring-pink-300' : 'border-stone-200 hover:border-stone-400'}`}
+                            className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-slate-600 ring-1 ring-slate-400' : 'border-stone-200 hover:border-stone-400'}`}
                           >
                             <img src={img} alt="" className="w-full h-full object-cover" />
                           </button>
@@ -2110,7 +2111,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
               <div className="space-y-4">
                 {/* Center Stone */}
                 <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-pink-600 mb-2 flex items-center gap-1.5">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
                     </svg>
@@ -2147,7 +2148,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
                 {stone.fullDescription && (
                   <div>
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Description</h4>
-                    <p className="text-sm text-stone-600 leading-relaxed bg-stone-50 rounded-xl p-4 whitespace-pre-line">{stone.fullDescription}</p>
+                    <p className="text-sm text-stone-600 leading-relaxed bg-stone-50 rounded-xl p-4 whitespace-pre-line">{sanitizeText(stone.fullDescription)}</p>
                   </div>
                 )}
               </div>
@@ -2171,18 +2172,18 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
             {activeTab === 'pricing' && (
               <div className="space-y-3">
-                <div className={`bg-gradient-to-r rounded-xl p-4 ${isJewelry ? 'from-pink-50 to-pink-100' : 'from-emerald-50 to-emerald-100'}`}>
+                <div className={`bg-gradient-to-r rounded-xl p-4 ${isJewelry ? 'from-slate-50 to-slate-100' : 'from-emerald-50 to-emerald-100'}`}>
                   {!isJewelry && (
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-stone-600">Price per Carat</span>
-                      <span className={`text-xl font-bold ${isJewelry ? 'text-pink-700' : 'text-emerald-700'}`}>
+                      <span className={`text-xl font-bold ${isJewelry ? 'text-slate-700' : 'text-emerald-700'}`}>
                         ${stone.pricePerCt?.toLocaleString() || 'N/A'}
                       </span>
                     </div>
                   )}
                   <div className={`flex justify-between items-center ${!isJewelry ? 'pt-3 border-t border-emerald-200' : ''}`}>
                     <span className="text-stone-600">Total Price</span>
-                    <span className={`text-2xl font-bold ${isJewelry ? 'text-pink-800' : 'text-emerald-800'}`}>
+                    <span className={`text-2xl font-bold ${isJewelry ? 'text-slate-800' : 'text-emerald-800'}`}>
                       {stone.currency && stone.currency !== 'USD' ? stone.currency : '$'}{stone.priceTotal?.toLocaleString() || 'N/A'}
                     </span>
                   </div>
@@ -3656,7 +3657,7 @@ const JewelryDetails = ({ stone }) => {
                   <button
                     key={i}
                     onClick={() => setActiveImgIdx(i)}
-                    className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-pink-500 ring-1 ring-pink-300' : 'border-stone-200 hover:border-stone-400'}`}
+                    className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-slate-600 ring-1 ring-slate-400' : 'border-stone-200 hover:border-stone-400'}`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
@@ -3670,7 +3671,7 @@ const JewelryDetails = ({ stone }) => {
         <div className="space-y-5">
           {/* Center Stone Section */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-pink-600 mb-2 flex items-center gap-1.5">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
               </svg>
@@ -3709,7 +3710,7 @@ const JewelryDetails = ({ stone }) => {
               href={`/jewelry/${stone.sku}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-500 text-white text-xs font-medium hover:bg-pink-600 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-medium hover:bg-slate-900 transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -4400,7 +4401,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</td>;
       case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</td>;
       case 'location': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.location || ''}</span></td>;
-      case 'title': return <td key={colId} className="px-3 py-2 max-w-[200px]"><span className="text-xs text-stone-700 truncate block">{stone.title || '-'}</span></td>;
+      case 'title': return <td key={colId} className="px-3 py-2 max-w-[200px]"><span className="text-xs text-stone-700 truncate block">{sanitizeText(stone.title) || '-'}</span></td>;
       case 'jewelryType': return (
         <td key={colId} className={cellBase}>
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -5007,7 +5008,7 @@ const StoneSearchPage = () => {
           id: `jwl_${idx}_${row.model_number || idx}`,
           sku: row.model_number || '',
           stockNumber: row.stock_number || '',
-          title: row.title || '',
+          title: sanitizeText(row.title) || '',
           jewelryType: row.jewelry_type || '',
           style: row.style || '',
           collection: row.collection || '',
@@ -5017,8 +5018,8 @@ const StoneSearchPage = () => {
           videoLink: row.video_link || '',
           certificateLink: row.certificate_link || '',
           certificateNumber: row.certificate_number || '',
-          description: row.description || '',
-          fullDescription: row.full_description || '',
+          description: sanitizeText(row.description) || '',
+          fullDescription: sanitizeText(row.full_description) || '',
           jewelryWeight: row.jewelry_weight || '',
           weightCt: row.total_carat || 0,
           stoneType: row.stone_type || '',
@@ -6513,12 +6514,12 @@ const StoneSearchPage = () => {
                 onClick={() => handleModeSwitch('jewelry')}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   inventoryMode === 'jewelry'
-                    ? 'bg-white shadow-md text-pink-700 border border-pink-100'
+                    ? 'bg-white shadow-md text-slate-700 border border-slate-200'
                     : 'text-stone-500 hover:text-stone-700 hover:bg-white/50'
                 }`}
               >
                 Jewelry
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'jewelry' ? 'bg-pink-100 text-pink-600' : 'bg-stone-200 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${inventoryMode === 'jewelry' ? 'bg-slate-100 text-slate-600' : 'bg-stone-200 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>
               </button>
             </div>
             

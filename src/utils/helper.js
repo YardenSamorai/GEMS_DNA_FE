@@ -66,7 +66,18 @@ export const encryptPrice = (price) => {
 
 
 export const changeMeasurementsFormat = (measurements) => {
-  if (measurements === null || measurements === undefined) return "N/A"; // ✅ בדיקה למקרה שאין מידות
+  if (measurements === null || measurements === undefined) return "N/A";
 
   return measurements.replace(/-/g, " x ");
 }
+
+export const sanitizeText = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  return text
+    .replace(/\uFFFD/g, '')
+    .replace(/[\u0080-\u009F]/g, '')
+    .replace(/\u00EF\u00BF\u00BD/g, '')
+    .replace(/[^\x20-\x7E\u00A0-\u024F\u0590-\u05FF\u0600-\u06FF\n\r\t.,;:!?'"()\-–—…$€£¥%@#&*+=/\\[\]{}|<>°×÷]/g, '')
+    .replace(/\s{3,}/g, ' ')
+    .trim();
+};

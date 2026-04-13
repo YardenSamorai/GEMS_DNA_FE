@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { decryptPrice } from '../utils/decrypt';
+import { sanitizeText } from '../utils/helper';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SignedIn } from "@clerk/clerk-react";
 import toast from 'react-hot-toast';
@@ -55,11 +56,11 @@ const GemstoneDetails = ({ data }) => {
         transition={{ duration: 0.5 }}
       >
         {/* Header Bar */}
-        <div className="bg-gradient-to-r from-pink-500 to-pink-600 rounded-t-3xl px-6 py-5 sm:px-8">
+        <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-t-3xl px-6 py-5 sm:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-xs font-medium text-pink-100 bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                <span className="text-xs font-medium text-slate-200 bg-white/15 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                   {jewelry_type || 'Jewelry'}
                 </span>
                 <button
@@ -67,7 +68,7 @@ const GemstoneDetails = ({ data }) => {
                     navigator.clipboard.writeText(model_number);
                     toast.success('SKU copied!', { duration: 1500, style: { fontSize: '14px' } });
                   }}
-                  className="flex items-center gap-1.5 text-pink-200 text-sm hover:text-white transition-colors group cursor-pointer"
+                  className="flex items-center gap-1.5 text-slate-300 text-sm hover:text-white transition-colors group cursor-pointer"
                   title="Click to copy SKU"
                 >
                   <span>{model_number}</span>
@@ -76,11 +77,11 @@ const GemstoneDetails = ({ data }) => {
                   </svg>
                 </button>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">{title}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">{sanitizeText(title)}</h1>
             </div>
             <SignedIn>
               <div className="flex flex-col items-start sm:items-end">
-                <span className="text-pink-200 text-sm mb-1">Price</span>
+                <span className="text-slate-400 text-sm mb-1">Price</span>
                 <span className="text-3xl font-bold text-white">
                   {currency || '$'}{price ? decryptPrice(price).toLocaleString() : 'N/A'}
                 </span>
@@ -129,7 +130,7 @@ const GemstoneDetails = ({ data }) => {
                     whileTap={{ scale: 0.95 }}
                     className={`relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                       mainImage === img 
-                        ? 'border-pink-500 shadow-md shadow-pink-500/25' 
+                        ? 'border-slate-700 shadow-md shadow-slate-700/25' 
                         : 'border-transparent hover:border-stone-300'
                     }`}
                   >
@@ -188,20 +189,20 @@ const GemstoneDetails = ({ data }) => {
               {/* Collection */}
               {collection && (
                 <div className="mb-4">
-                  <span className="text-xs font-semibold text-pink-600 uppercase tracking-wider">{collection}</span>
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{collection}</span>
                 </div>
               )}
 
               {/* Description */}
               {full_description && (
                 <div className="mb-6">
-                  <p className="text-stone-600 leading-relaxed whitespace-pre-line">{full_description}</p>
+                  <p className="text-stone-600 leading-relaxed whitespace-pre-line">{sanitizeText(full_description)}</p>
                 </div>
               )}
 
               {/* Center Stone Section */}
               <div className="mb-6">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-pink-600 mb-3 flex items-center gap-1.5">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-3 flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
                   </svg>
@@ -243,7 +244,7 @@ const GemstoneDetails = ({ data }) => {
                     href={certificate_link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block rounded-xl overflow-hidden border border-stone-200 hover:border-pink-300 transition-colors card-hover"
+                    className="block rounded-xl overflow-hidden border border-stone-200 hover:border-slate-400 transition-colors card-hover"
                   >
                     <iframe
                       src={certificate_link}
