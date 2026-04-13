@@ -4993,6 +4993,7 @@ const StoneSearchPage = () => {
   // Jewelry state - fetched from backend API
   const [jewelryItems, setJewelryItems] = useState([]);
   const [jewelryLoading, setJewelryLoading] = useState(false);
+  const allItems = useMemo(() => [...stones, ...jewelryItems], [stones, jewelryItems]);
 
   const fetchJewelry = useCallback(async () => {
     setJewelryLoading(true);
@@ -5327,7 +5328,7 @@ const StoneSearchPage = () => {
 
   // Handle export button click - check categories first
   const handleExportClick = () => {
-    const selectedData = stones.filter((s) => selectedStones.has(s.id));
+    const selectedData = allItems.filter((s) => selectedStones.has(s.id));
     if (selectedData.length === 0) {
       alert("Please select at least one stone to export.");
       return;
@@ -5355,7 +5356,7 @@ const StoneSearchPage = () => {
 
   // Export to Excel with separate sheets per category
   const exportToExcelSeparate = async (customStones = null, options = {}) => {
-    const selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
+    const selectedData = customStones || allItems.filter((s) => selectedStones.has(s.id));
     
     // Separate by mapped category
     const emeralds = selectedData.filter(s => getMappedCategories(s.category).includes('Emerald'));
@@ -5769,7 +5770,7 @@ const StoneSearchPage = () => {
 
   // Export selected stones to Excel with styling (combined - all columns)
   const exportToExcel = async (customStones = null, options = {}) => {
-    let selectedData = customStones || stones.filter((s) => selectedStones.has(s.id));
+    let selectedData = customStones || allItems.filter((s) => selectedStones.has(s.id));
     
     if (selectedData.length === 0) {
       alert("Please select at least one stone to export.");
@@ -6525,7 +6526,7 @@ const StoneSearchPage = () => {
             <div ref={exportButtonRef}>
               {selectedStones.size > 0 && (() => {
                 // Calculate category breakdown
-                const selectedStonesArray = stones.filter(s => selectedStones.has(s.id));
+                const selectedStonesArray = allItems.filter(s => selectedStones.has(s.id));
                 const categoryBreakdown = selectedStonesArray.reduce((acc, stone) => {
                   const cats = getMappedCategories(stone.category);
                   cats.forEach((cat) => { acc[cat] = (acc[cat] || 0) + 1; });
@@ -6627,7 +6628,7 @@ const StoneSearchPage = () => {
                           <span className="font-medium">PDF</span>
                         </button>
                         <button
-                          onClick={() => exportForLabels(applyPriceMode(stones.filter(s => selectedStones.has(s.id))), false)}
+                          onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                         >
                           <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -6638,7 +6639,7 @@ const StoneSearchPage = () => {
                           <span className="font-medium">Labels</span>
                         </button>
                         <button
-                          onClick={() => shareMultipleToWhatsApp(stones.filter(s => selectedStones.has(s.id)))}
+                          onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors border-t border-stone-100"
                         >
                           <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
@@ -6710,7 +6711,7 @@ const StoneSearchPage = () => {
                       </div>
                       
                       <button
-                        onClick={() => exportForLabels(applyPriceMode(stones.filter(s => selectedStones.has(s.id))), false)}
+                        onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                       >
                         <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -6730,7 +6731,7 @@ const StoneSearchPage = () => {
                       </div>
                       
                       <button
-                        onClick={() => shareMultipleToWhatsApp(stones.filter(s => selectedStones.has(s.id)))}
+                        onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors"
                       >
                         <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
@@ -7195,7 +7196,7 @@ const StoneSearchPage = () => {
                 </div>
                 
                 <button
-                  onClick={() => exportForLabels(applyPriceMode(stones.filter(s => selectedStones.has(s.id))), false)}
+                  onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -7215,7 +7216,7 @@ const StoneSearchPage = () => {
                 </div>
                 
                 <button
-                  onClick={() => shareMultipleToWhatsApp(stones.filter(s => selectedStones.has(s.id)))}
+                  onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
@@ -7242,7 +7243,7 @@ const StoneSearchPage = () => {
           setShowExportModal(false);
           setExportMode('combined'); // Reset to default
         }}
-        selectedStones={applyPriceMode(stones.filter((s) => selectedStones.has(s.id)))}
+        selectedStones={applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))}
         onExport={(modifiedStones, options = {}) => {
           if (exportMode === 'separate') {
             exportToExcelSeparate(modifiedStones, options);
@@ -7256,7 +7257,7 @@ const StoneSearchPage = () => {
       <CategoryExportModal
         isOpen={showCategoryExportModal}
         onClose={() => setShowCategoryExportModal(false)}
-        categories={getCategoryBreakdown(applyPriceMode(stones.filter((s) => selectedStones.has(s.id))))}
+        categories={getCategoryBreakdown(applyPriceMode(allItems.filter((s) => selectedStones.has(s.id))))}
         onChoose={handleCategoryExportChoice}
       />
 
@@ -7281,7 +7282,7 @@ const StoneSearchPage = () => {
       <ExportModal
         isOpen={showPDFPriceModal}
         onClose={() => setShowPDFPriceModal(false)}
-        selectedStones={applyPriceMode(stones.filter((s) => selectedStones.has(s.id)))}
+        selectedStones={applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))}
         onExport={(modifiedStones) => {
           setPdfStonesWithPrices(modifiedStones);
           setShowPDFPriceModal(false);
@@ -7308,7 +7309,7 @@ const StoneSearchPage = () => {
           try {
             const stonesToUse = pdfStonesWithPrices.length > 0 
               ? pdfStonesWithPrices 
-              : applyPriceMode(stones.filter(s => selectedStones.has(s.id)));
+              : applyPriceMode(allItems.filter(s => selectedStones.has(s.id)));
             await generatePDFCatalog(stonesToUse, options);
             setShowPDFModal(false);
             setPdfStonesWithPrices([]);
@@ -7422,7 +7423,7 @@ const StoneSearchPage = () => {
       <CompareModal
         isOpen={showCompare}
         onClose={() => setShowCompare(false)}
-        stones={stones.filter(s => selectedStones.has(s.id))}
+        stones={allItems.filter(s => selectedStones.has(s.id))}
       />
     </>
   );
