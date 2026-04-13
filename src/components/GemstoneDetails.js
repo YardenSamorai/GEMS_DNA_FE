@@ -209,7 +209,7 @@ const GemstoneDetails = ({ data }) => {
                   Center Stone
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
-                  <SpecCard label="Stone Type" value={stone_type} />
+                  <SpecCard label="Stone Type" value={stone_type?.replace(/\s+O$/i, '').trim()} />
                   <SpecCard label="Carat" value={center_stone_carat ? `${center_stone_carat} ct` : null} />
                   <SpecCard label="Shape" value={center_stone_shape} />
                   <SpecCard label="Color" value={center_stone_color} />

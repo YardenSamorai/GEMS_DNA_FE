@@ -5022,7 +5022,7 @@ const StoneSearchPage = () => {
           fullDescription: sanitizeText(row.full_description) || '',
           jewelryWeight: row.jewelry_weight || '',
           weightCt: row.total_carat || 0,
-          stoneType: row.stone_type || '',
+          stoneType: (row.stone_type || '').replace(/\s+O$/i, '').trim(),
           centerStoneCarat: row.center_stone_carat || 0,
           shape: row.center_stone_shape || '',
           color: row.center_stone_color || '',
