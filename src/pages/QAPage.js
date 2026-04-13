@@ -86,7 +86,7 @@ const STONE_RULES = [
   { id: 'missingCert',     label: 'Missing Certificate',  severity: 'critical', test: (s) => isEmpty(s.certificateUrl) && isEmpty(s.certificateNumber) },
   { id: 'missingPrice',    label: 'Missing Price',        severity: 'critical', test: (s) => isEmpty(s.priceTotal) && isEmpty(s.pricePerCt) },
   { id: 'missingWeight',   label: 'Missing Weight',       severity: 'critical', test: (s) => isEmpty(s.weightCt) },
-  { id: 'missingLab',      label: 'Missing Lab',          severity: 'warning',  test: (s) => isEmpty(s.lab) },
+  { id: 'missingLab',      label: 'Missing Lab',          severity: 'warning',  test: (s) => isEmpty(s.lab) && (s.priceTotal || 0) >= 3000 },
   { id: 'missingOrigin',   label: 'Missing Origin',       severity: 'warning',  test: (s) => isEmpty(s.origin) },
   { id: 'missingMeasure',  label: 'Missing Measurements', severity: 'warning',  test: (s) => isEmpty(s.measurements) },
   { id: 'missingColor',    label: 'Missing Color',        severity: 'warning',  test: (s) => isEmpty(s.color) },
@@ -401,7 +401,7 @@ const QAPage = () => {
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-1 p-1 bg-stone-100 rounded-xl mb-6 w-fit">
+      <div className="flex items-center gap-4 border-b border-stone-200 mb-6">
         {[
           { id: 'diamonds', label: 'Diamonds', count: diamonds.length },
           { id: 'gemstones', label: 'Gemstones', count: gemstones.length },
@@ -410,16 +410,16 @@ const QAPage = () => {
           <button
             key={tab.id}
             onClick={() => { setActiveTab(tab.id); setGroupingFilter('all'); setIssueFilter(new Set()); setSearch(''); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+            className={`pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5 border-b-2 -mb-px ${
               activeTab === tab.id
-                ? 'bg-white text-stone-900 shadow-md'
-                : 'text-stone-500 hover:text-stone-700'
+                ? 'border-stone-800 text-stone-900'
+                : 'border-transparent text-stone-400 hover:text-stone-600'
             }`}
           >
             {tab.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              activeTab === tab.id ? 'bg-stone-200 text-stone-600' : 'bg-stone-200/50 text-stone-400'
-            }`}>{tab.count}</span>
+            <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${
+              activeTab === tab.id ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-400'
+            }`}>{tab.count.toLocaleString()}</span>
           </button>
         ))}
       </div>
