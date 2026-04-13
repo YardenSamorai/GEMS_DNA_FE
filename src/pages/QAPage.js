@@ -240,7 +240,7 @@ const QAPage = () => {
           certificateNumber: cleanStr(row.certificate_number),
           jewelryWeight: cleanStr(row.jewelry_weight),
           weightCt: row.total_carat || 0,
-          stoneType: cleanStr(row.stone_type),
+          stoneType: cleanStr(row.stone_type)?.replace(/\s+O$/i, '').trim() || null,
           centerStoneCarat: row.center_stone_carat || 0,
           metalType: cleanStr(row.metal_type),
           category: 'Jewelry',
