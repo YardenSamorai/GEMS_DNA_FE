@@ -1892,16 +1892,25 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
 /* ---------------- DNA Drawer (Stone Preview) ---------------- */
 const DNADrawer = ({ isOpen, onClose, stone }) => {
   const [activeTab, setActiveTab] = useState('details');
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
 
   if (!isOpen || !stone) return null;
 
+  const isJewelry = stone.category === 'Jewelry';
+  const shareUrl = isJewelry
+    ? `https://gems-dna.com/jewelry/${stone.sku}`
+    : `https://gems-dna.com/${stone.sku}`;
+
+  const images = isJewelry ? (stone.allImages || (stone.imageUrl ? [stone.imageUrl] : [])) : [];
+  const videoUrl = isJewelry ? stone.videoLink : stone.videoUrl;
+  const certUrl = isJewelry ? stone.certificateLink : stone.certificateUrl;
+
   const handleShare = async () => {
-    const url = `https://gems-dna.com/${stone.sku}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Check out this gem!', text: 'View the full DNA of this gemstone:', url });
+        await navigator.share({ title: isJewelry ? 'Check out this jewelry!' : 'Check out this gem!', text: `View the full DNA:`, url: shareUrl });
       } else {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(shareUrl);
         alert('Link copied to clipboard!');
       }
     } catch (error) {
@@ -1927,7 +1936,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
         onClick={onClose}
       />
 
-      {/* Drawer - Bottom sheet on mobile, side panel on desktop */}
+      {/* Drawer */}
       <motion.div
         initial={{ y: "100%", x: 0 }}
         animate={{ y: 0, x: 0 }}
@@ -1943,19 +1952,26 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
         </div>
 
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-4 sm:px-6">
+        <div className={`sticky top-0 z-10 px-4 py-4 sm:px-6 ${isJewelry ? 'bg-gradient-to-r from-pink-500 to-pink-600' : 'bg-gradient-to-r from-emerald-500 to-emerald-600'}`}>
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                {stone.lab && (
-                <span className="text-xs font-medium text-emerald-100 bg-white/20 px-2 py-0.5 rounded-full">
-                  {stone.lab}
-                </span>
-                )}
-                <span className="text-emerald-100 text-xs">SKU: {stone.sku}</span>
+                {isJewelry ? (
+                  <span className="text-xs font-medium text-pink-100 bg-white/20 px-2 py-0.5 rounded-full">
+                    {stone.jewelryType || 'Jewelry'}
+                  </span>
+                ) : stone.lab ? (
+                  <span className="text-xs font-medium text-emerald-100 bg-white/20 px-2 py-0.5 rounded-full">
+                    {stone.lab}
+                  </span>
+                ) : null}
+                <span className={`text-xs ${isJewelry ? 'text-pink-100' : 'text-emerald-100'}`}>SKU: {stone.sku}</span>
               </div>
               <h2 className="text-xl font-bold text-white">
-                {getDisplayShape(stone.shape)} Γאó {stone.weightCt}ct
+                {isJewelry
+                  ? (stone.title || `${stone.jewelryType || 'Jewelry'}`)
+                  : `${getDisplayShape(stone.shape)} \u00b7 ${stone.weightCt}ct`
+                }
               </h2>
             </div>
             <button
@@ -1971,61 +1987,103 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
         {/* Scrollable Content */}
         <div className="overflow-y-auto" style={{ maxHeight: 'calc(92vh - 140px)' }}>
-          {/* Media Section */}
           <div className="p-4 sm:p-6">
-            {/* Main Video/Image */}
-            <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg mb-4">
-              {stone.videoUrl ? (
-                <iframe
-                  className="w-full h-full absolute inset-0"
-                  src={stone.videoUrl}
-                  title="Video Preview"
-                  allowFullScreen
-                />
-              ) : stone.imageUrl ? (
-                <img
-                  src={stone.imageUrl}
-                  alt={stone.sku}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-stone-400">
-                  <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+            {/* Media Section */}
+            {isJewelry ? (
+              <>
+                {/* Jewelry Video */}
+                {videoUrl && (
+                  <div className="relative rounded-2xl overflow-hidden bg-stone-900 aspect-video shadow-lg mb-4">
+                    <iframe
+                      className="w-full h-full absolute inset-0"
+                      src={videoUrl}
+                      title="Video Preview"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+                {/* Jewelry Image Gallery */}
+                {images.length > 0 && (
+                  <div className="mb-4">
+                    <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg mb-3">
+                      <img
+                        src={images[activeImgIdx] || images[0]}
+                        alt={stone.title || stone.sku}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {images.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {images.map((img, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setActiveImgIdx(i)}
+                            className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-pink-500 ring-1 ring-pink-300' : 'border-stone-200 hover:border-stone-400'}`}
+                          >
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Certificate thumbnail */}
+                {certUrl && (
+                  <div className="mb-6">
+                    <a href={certUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      View Certificate
+                    </a>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Stone Video/Image */}
+                <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg mb-4">
+                  {stone.videoUrl ? (
+                    <iframe className="w-full h-full absolute inset-0" src={stone.videoUrl} title="Video Preview" allowFullScreen />
+                  ) : stone.imageUrl ? (
+                    <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-stone-400">
+                      <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-
-            {/* Thumbnails */}
-            <div className="grid grid-cols-3 gap-2 mb-6">
-              {stone.imageUrl && (
-                <a href={stone.imageUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
-                  <img src={stone.imageUrl} alt="Photo" className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Photo</span>
-                </a>
-              )}
-              {stone.videoUrl && (
-                <a href={stone.videoUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
-                  <div className="w-full h-full flex items-center justify-center bg-stone-800">
-                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                  <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Video</span>
-                </a>
-              )}
-              {stone.certificateUrl && (
-                <a href={stone.certificateUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
-                  <div className="w-full h-full flex items-center justify-center bg-amber-50">
-                    <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Cert</span>
-                </a>
-              )}
-            </div>
+                {/* Stone Thumbnails */}
+                <div className="grid grid-cols-3 gap-2 mb-6">
+                  {stone.imageUrl && (
+                    <a href={stone.imageUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
+                      <img src={stone.imageUrl} alt="Photo" className="w-full h-full object-cover" />
+                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Photo</span>
+                    </a>
+                  )}
+                  {stone.videoUrl && (
+                    <a href={stone.videoUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
+                      <div className="w-full h-full flex items-center justify-center bg-stone-800">
+                        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                      </div>
+                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Video</span>
+                    </a>
+                  )}
+                  {stone.certificateUrl && (
+                    <a href={stone.certificateUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-stone-100 aspect-square shadow group">
+                      <div className="w-full h-full flex items-center justify-center bg-amber-50">
+                        <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">Cert</span>
+                    </a>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Tabs */}
             <div className="flex gap-1 p-1 bg-stone-100 rounded-xl mb-4">
@@ -2048,13 +2106,60 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'details' && (
+            {activeTab === 'details' && isJewelry && (
+              <div className="space-y-4">
+                {/* Center Stone */}
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-pink-600 mb-2 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+                    </svg>
+                    Center Stone
+                  </h4>
+                  <div className="bg-stone-50 rounded-xl p-4 space-y-0">
+                    <DetailRow label="Stone Type" value={stone.stoneType} />
+                    <DetailRow label="Carat" value={stone.centerStoneCarat ? `${stone.centerStoneCarat} ct` : null} />
+                    <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
+                    <DetailRow label="Color" value={stone.color} />
+                    <DetailRow label="Clarity" value={stone.clarity} />
+                  </div>
+                </div>
+                {/* General Details */}
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    General Details
+                  </h4>
+                  <div className="bg-stone-50 rounded-xl p-4 space-y-0">
+                    <DetailRow label="Type" value={stone.jewelryType} />
+                    <DetailRow label="Collection" value={stone.collection} />
+                    <DetailRow label="Total Carat" value={stone.weightCt ? `${stone.weightCt} ct` : null} />
+                    <DetailRow label="Jewelry Weight" value={stone.jewelryWeight} />
+                    <DetailRow label="Size" value={stone.jewelrySize} />
+                    <DetailRow label="Metal" value={stone.metalType} />
+                    <DetailRow label="Style" value={stone.style} />
+                    <DetailRow label="Certificate #" value={stone.certificateNumber} />
+                  </div>
+                </div>
+                {/* Description */}
+                {stone.fullDescription && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Description</h4>
+                    <p className="text-sm text-stone-600 leading-relaxed bg-stone-50 rounded-xl p-4 whitespace-pre-line">{stone.fullDescription}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'details' && !isJewelry && (
               <div className="bg-stone-50 rounded-xl p-4 space-y-0">
                 <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
                 <DetailRow label="Weight" value={`${stone.weightCt} ct`} />
                 <DetailRow label="Color" value={getDisplayColor(stone)} />
                 <DetailRow label="Clarity" value={stone.clarity} />
-                <DetailRow label="Clarity" value={stone.treatment} />
+                <DetailRow label="Treatment" value={stone.treatment} />
                 <DetailRow label="Origin" value={stone.origin} />
                 <DetailRow label="Lab" value={stone.lab} />
                 <DetailRow label="Measurements" value={stone.measurements} />
@@ -2066,23 +2171,27 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
             {activeTab === 'pricing' && (
               <div className="space-y-3">
-                <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-xl p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-stone-600">Price per Carat</span>
-                    <span className="text-xl font-bold text-emerald-700">
-                      ${stone.pricePerCt?.toLocaleString() || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-emerald-200">
+                <div className={`bg-gradient-to-r rounded-xl p-4 ${isJewelry ? 'from-pink-50 to-pink-100' : 'from-emerald-50 to-emerald-100'}`}>
+                  {!isJewelry && (
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-stone-600">Price per Carat</span>
+                      <span className={`text-xl font-bold ${isJewelry ? 'text-pink-700' : 'text-emerald-700'}`}>
+                        ${stone.pricePerCt?.toLocaleString() || 'N/A'}
+                      </span>
+                    </div>
+                  )}
+                  <div className={`flex justify-between items-center ${!isJewelry ? 'pt-3 border-t border-emerald-200' : ''}`}>
                     <span className="text-stone-600">Total Price</span>
-                    <span className="text-2xl font-bold text-emerald-800">
-                      ${stone.priceTotal?.toLocaleString() || 'N/A'}
+                    <span className={`text-2xl font-bold ${isJewelry ? 'text-pink-800' : 'text-emerald-800'}`}>
+                      {stone.currency && stone.currency !== 'USD' ? stone.currency : '$'}{stone.priceTotal?.toLocaleString() || 'N/A'}
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-stone-400 text-center">
-                  {stone.weightCt}ct ├ק ${stone.pricePerCt?.toLocaleString()}/ct
-                </p>
+                {!isJewelry && (
+                  <p className="text-xs text-stone-400 text-center">
+                    {stone.weightCt}ct \u00d7 ${stone.pricePerCt?.toLocaleString()}/ct
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -2101,7 +2210,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
               Share
             </button>
             <a
-              href={`https://gems-dna.com/${stone.sku}`}
+              href={shareUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="py-2.5 px-4 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-stone-200 transition-colors"
@@ -3523,8 +3632,116 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
   </motion.div>
 );
 
+/* ---------------- Jewelry Details Panel ---------------- */
+const JewelryDetails = ({ stone }) => {
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
+  const images = stone.allImages || (stone.imageUrl ? [stone.imageUrl] : []);
+
+  return (
+    <div className="p-5">
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+        {/* Image Gallery */}
+        {images.length > 0 && (
+          <div className="space-y-2">
+            <div className="aspect-square rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+              <img
+                src={images[activeImgIdx] || images[0]}
+                alt={stone.title || stone.sku}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            {images.length > 1 && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImgIdx(i)}
+                    className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-pink-500 ring-1 ring-pink-300' : 'border-stone-200 hover:border-stone-400'}`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Details Sections */}
+        <div className="space-y-5">
+          {/* Center Stone Section */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-pink-600 mb-2 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+              </svg>
+              Center Stone
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <DetailItem label="Stone Type" value={stone.stoneType} />
+              <DetailItem label="Carat" value={stone.centerStoneCarat ? `${stone.centerStoneCarat} ct` : null} />
+              <DetailItem label="Shape" value={getDisplayShape(stone.shape)} />
+              <DetailItem label="Color" value={stone.color} />
+              <DetailItem label="Clarity" value={stone.clarity} />
+            </div>
+          </div>
+
+          {/* General Details Section */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              General Details
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <DetailItem label="SKU" value={stone.sku} />
+              <DetailItem label="Type" value={stone.jewelryType} />
+              <DetailItem label="Collection" value={stone.collection} />
+              <DetailItem label="Total Carat" value={stone.weightCt ? `${stone.weightCt} ct` : null} />
+              <DetailItem label="Jewelry Weight" value={stone.jewelryWeight} />
+              <DetailItem label="Size" value={stone.jewelrySize} />
+            </div>
+          </div>
+
+          {/* Links & Actions */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <a
+              href={`/jewelry/${stone.sku}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-500 text-white text-xs font-medium hover:bg-pink-600 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              View DNA
+            </a>
+            {stone.certificateLink && (
+              <a href={stone.certificateLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 text-xs font-medium hover:bg-stone-200 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Certificate
+              </a>
+            )}
+            {stone.videoLink && (
+              <a href={stone.videoLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-100 text-accent-700 text-xs font-medium hover:bg-accent-200 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Video
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ---------------- Stone Details Panel ---------------- */
 const StoneDetails = ({ stone, onViewDNA }) => {
+  const isJewelry = stone.category === 'Jewelry';
   const [copied, setCopied] = useState(false);
 
   const handleCopyEmail = async () => {
@@ -3543,6 +3760,8 @@ const StoneDetails = ({ stone, onViewDNA }) => {
     }
   };
 
+  if (isJewelry) return <JewelryDetails stone={stone} />;
+
   return (
     <div className="p-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
@@ -3552,7 +3771,7 @@ const StoneDetails = ({ stone, onViewDNA }) => {
         <DetailItem label="Measurements" value={stone.measurements} />
         <DetailItem label="Color" value={getDisplayColor(stone)} />
         <DetailItem label="Clarity" value={stone.clarity} />
-        <DetailItem label="Clarity" value={stone.treatment} />
+        <DetailItem label="Treatment" value={stone.treatment} />
         <DetailItem label="Lab" value={stone.lab} />
         <DetailItem label="Origin" value={stone.origin} />
         <DetailItem label="Ratio" value={stone.ratio} />
@@ -4123,20 +4342,23 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
           </div>
         </td>
       );
-      case 'video': return (
+      case 'video': {
+        const vid = stone.videoUrl || stone.videoLink;
+        return (
         <td key={colId} className="px-3 py-2">
           <div
-            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center ${stone.videoUrl ? 'cursor-pointer hover:ring-2 hover:ring-accent-300 transition-all' : ''}`}
-            onClick={(e) => { if (stone.videoUrl && onVideoClick) { e.stopPropagation(); onVideoClick(stone.videoUrl); } }}
+            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center ${vid ? 'cursor-pointer hover:ring-2 hover:ring-accent-300 transition-all' : ''}`}
+            onClick={(e) => { if (vid && onVideoClick) { e.stopPropagation(); onVideoClick(vid); } }}
           >
-            {stone.videoUrl ? (
+            {vid ? (
               <svg className="w-5 h-5 text-accent-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
             )}
           </div>
         </td>
-      );
+        );
+      }
       case 'category': return (
         <td key={colId} className={cellBase}>
           <span className="text-xs text-stone-600">{getMappedCategories(stone.category).filter(c => c !== 'Empty').join(', ') || '-'}</span>
@@ -5319,7 +5541,7 @@ const StoneSearchPage = () => {
           case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
           case 'appendix': rowData.appendix = ''; break;
           case 'image': rowData.image = stone.imageUrl || ''; break;
-          case 'video': rowData.video = stone.videoUrl || ''; break;
+          case 'video': rowData.video = stone.videoUrl || stone.videoLink || ''; break;
           default: rowData[col.key] = '';
         }
       });
@@ -5383,8 +5605,8 @@ const StoneSearchPage = () => {
         row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
         row.getCell(imgCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
       }
-      if (vidCol >= 0 && stone.videoUrl) {
-        row.getCell(vidCol + 1).value = { text: "Video", hyperlink: stone.videoUrl };
+      if (vidCol >= 0 && (stone.videoUrl || stone.videoLink)) {
+        row.getCell(vidCol + 1).value = { text: "Video", hyperlink: stone.videoUrl || stone.videoLink };
         row.getCell(vidCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
       }
     });
@@ -6252,12 +6474,12 @@ const StoneSearchPage = () => {
                 </div>
 
                 {inventoryMode !== 'jewelry' && (
-                  <button
-                    onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
+                <button
+                  onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
                     className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
-                  >
-                    {priceMode === 'neto' ? 'Neto' : 'B'}
-                  </button>
+                >
+                  {priceMode === 'neto' ? 'Neto' : 'B'}
+                </button>
                 )}
               </div>
             </div>
