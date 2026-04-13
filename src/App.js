@@ -7,6 +7,7 @@ import JewelryPage from "./pages/JewelryPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import { Toaster } from "react-hot-toast";
 import Inventory from "./pages/inventory";
+import QAPage from "./pages/QAPage";
 
 // Theme Context
 const ThemeContext = createContext();
@@ -113,6 +114,12 @@ const Header = () => {
                 </svg>
                 Inventory
               </NavLink>
+              <NavLink to="/qa" active={isActive('/qa')}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                QA
+              </NavLink>
             </SignedIn>
           </nav>
 
@@ -143,6 +150,11 @@ const Header = () => {
                   <Link to="/inventory" className={`p-2 rounded-lg transition-colors ${isActive('/inventory') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </Link>
+                  <Link to="/qa" className={`p-2 rounded-lg transition-colors ${isActive('/qa') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </Link>
                 </div>
@@ -244,6 +256,20 @@ function AppContent() {
                     </SignedIn>
                     <SignedOut>
                       <AuthPrompt message="Please sign in to access the inventory" />
+                    </SignedOut>
+                  </>
+                }
+              />
+
+              <Route
+                path="/qa"
+                element={
+                  <>
+                    <SignedIn>
+                      <QAPage />
+                    </SignedIn>
+                    <SignedOut>
+                      <AuthPrompt message="Please sign in to access QA" />
                     </SignedOut>
                   </>
                 }
