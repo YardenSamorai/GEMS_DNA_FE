@@ -283,6 +283,7 @@ const drawTextWithSpacing = (ctx, text, x, y, letterSpacing, maxWidth) => {
 };
 
 export const renderLabel = async (stone, options = {}) => {
+  await document.fonts.ready;
   const { template, labelSize } = options;
   const elements = template || loadTemplate();
   const lw = labelSize?.w || LABEL_W;
