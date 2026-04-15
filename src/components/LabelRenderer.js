@@ -251,7 +251,7 @@ const getTextForElement = (id, stone) => {
     case "weight":    return stone.weightCt ? `${stone.weightCt}` : "";
     case "shape":     return stone.shape || "";
     case "lab":       return stone.lab || "";
-    case "clarity":   return shortenClarity(stone.clarity || stone.treatment || "");
+    case "clarity":   return shortenClarity(stone.clarity || stone.treatment || "Minor");
     case "price":     return stone.priceTotal ? `$${Math.round(stone.priceTotal).toLocaleString()}` : "";
     case "priceCode": return encodePriceB(stone.pricePerCt);
     case "origin":    return stone.origin || "";
