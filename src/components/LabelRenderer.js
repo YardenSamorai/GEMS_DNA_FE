@@ -248,7 +248,7 @@ const shortenClarity = (val) => {
 const getTextForElement = (id, stone) => {
   switch (id) {
     case "sku":       return stone.sku || "";
-    case "weight":    return stone.weightCt ? `${stone.weightCt}` : "";
+    case "weight":    return stone.weightCt ? parseFloat(stone.weightCt).toFixed(2) : "";
     case "shape":     return stone.shape || "";
     case "lab":       return stone.lab || "";
     case "clarity":   return shortenClarity(stone.clarity || stone.treatment || "Minor");
