@@ -419,10 +419,11 @@ const LabelDesigner = ({ template, onChange, sampleStone, labelSize }) => {
 };
 
 /* ─── Template Manager (picker + rename + delete) ─── */
-const TemplateManager = ({ templates, activeId, onSelect, onAdd, onDuplicate, onDelete, onRename }) => {
+const TemplateManager = ({ templates, activeId, onSelect, onAdd, onDuplicate, onDelete, onRename, onImport }) => {
   const [renaming, setRenaming] = useState(null);
   const [renameVal, setRenameVal] = useState("");
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => { if (renaming && inputRef.current) inputRef.current.focus(); }, [renaming]);
 
@@ -432,11 +433,45 @@ const TemplateManager = ({ templates, activeId, onSelect, onAdd, onDuplicate, on
     setRenaming(null);
   };
 
+  const handleExport = () => {
+    const data = JSON.stringify({ templates, activeId }, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `label-templates-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        if (parsed.templates && Array.isArray(parsed.templates)) {
+          onImport(parsed.templates, parsed.activeId);
+        }
+      } catch { /* ignore bad files */ }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   return (
     <div className="space-y-2">
+      <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-stone-600">My Templates</span>
         <div className="flex items-center gap-1">
+          <button onClick={handleExport} className="p-1 rounded hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors" title="Export all templates">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+          </button>
+          <button onClick={() => fileInputRef.current?.click()} className="p-1 rounded hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors" title="Import templates">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 6l-4-4-4 4M12 3v12" /></svg>
+          </button>
           <button onClick={onAdd} className="p-1 rounded hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors" title="New blank template">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           </button>
@@ -579,6 +614,22 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
   const handleRenameTemplate = useCallback((id, newName) => {
     const updated = allTemplates.map(t => t.id === id ? { ...t, name: newName } : t);
     persistAll(updated);
+  }, [allTemplates, persistAll]);
+
+  const handleImportTemplates = useCallback((imported, importedActiveId) => {
+    const merged = [...allTemplates];
+    for (const tpl of imported) {
+      if (!merged.find(t => t.id === tpl.id)) {
+        merged.push(tpl);
+      } else {
+        const idx = merged.findIndex(t => t.id === tpl.id);
+        merged[idx] = tpl;
+      }
+    }
+    const newActive = importedActiveId && merged.find(t => t.id === importedActiveId)
+      ? importedActiveId : merged[merged.length - 1].id;
+    persistAll(merged, newActive);
+    toast.success(`Imported ${imported.length} template(s)!`);
   }, [allTemplates, persistAll]);
 
   const handleElementsChange = useCallback((newElements) => {
@@ -726,6 +777,7 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
                 onDuplicate={handleDuplicateTemplate}
                 onDelete={handleDeleteTemplate}
                 onRename={handleRenameTemplate}
+                onImport={handleImportTemplates}
               />
 
               {/* Stone navigation */}
