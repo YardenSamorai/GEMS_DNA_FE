@@ -72,10 +72,13 @@ const encodePriceB = (price) => {
 };
 
 export const FONT_FAMILIES = [
-  { id: "markazi",    label: "Markazi Text",   css: "'Markazi Text', serif" },
-  { id: "arial",      label: "Arial",          css: "Arial, sans-serif" },
-  { id: "helvetica",  label: "Helvetica",      css: "Helvetica, Arial, sans-serif" },
-  { id: "verdana",    label: "Verdana",        css: "Verdana, sans-serif" },
+  { id: "markazi",    label: "Markazi Text",   css: "'Markazi Text', serif",    minWeight: 400 },
+  { id: "cormorant",  label: "Cormorant",      css: "'Cormorant', serif",       minWeight: 300 },
+  { id: "inter",      label: "Inter",          css: "'Inter', sans-serif",      minWeight: 100 },
+  { id: "lora",       label: "Lora",           css: "'Lora', serif",            minWeight: 400 },
+  { id: "arial",      label: "Arial",          css: "Arial, sans-serif",        minWeight: 400 },
+  { id: "helvetica",  label: "Helvetica",      css: "Helvetica, Arial, sans-serif", minWeight: 400 },
+  { id: "verdana",    label: "Verdana",        css: "Verdana, sans-serif",      minWeight: 400 },
   { id: "tahoma",     label: "Tahoma",         css: "Tahoma, sans-serif" },
   { id: "trebuchet",  label: "Trebuchet MS",   css: "'Trebuchet MS', sans-serif" },
   { id: "georgia",    label: "Georgia",        css: "Georgia, serif" },
