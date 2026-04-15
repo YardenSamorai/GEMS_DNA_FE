@@ -333,16 +333,25 @@ const LabelDesigner = ({ template, onChange, sampleStone, labelSize }) => {
                   </div>
                 </div>
 
-                {/* Bold + Horizontal Align + Vertical Align */}
+                {/* Font Weight + Horizontal Align + Vertical Align */}
                 <div className="flex items-center gap-3">
-                  {/* Bold */}
-                  <button
-                    onClick={() => updateEl(selectedId, { bold: !selectedEl.bold })}
-                    className={`w-7 h-7 rounded-lg text-xs font-bold border transition-colors flex items-center justify-center ${
-                      selectedEl.bold ? "bg-stone-800 text-white border-stone-800" : "bg-white text-stone-400 border-stone-200 hover:border-stone-300"
-                    }`}
-                    title="Bold"
-                  >B</button>
+                  {/* Font Weight */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-stone-400 mr-0.5">W</span>
+                    {[300, 400, 500, 600, 700].map(w => (
+                      <button
+                        key={w}
+                        onClick={() => updateEl(selectedId, { fontWeight: w, bold: w >= 600 })}
+                        className={`w-6 h-6 rounded text-[9px] border transition-colors flex items-center justify-center ${
+                          (selectedEl.fontWeight || (selectedEl.bold ? 700 : 400)) === w
+                            ? "bg-stone-800 text-white border-stone-800"
+                            : "bg-white text-stone-400 border-stone-200 hover:border-stone-300"
+                        }`}
+                        title={`Weight ${w}`}
+                        style={{ fontWeight: w }}
+                      >{w}</button>
+                    ))}
+                  </div>
 
                   <div className="w-px h-5 bg-stone-200" />
 
