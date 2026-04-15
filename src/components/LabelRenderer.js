@@ -130,6 +130,7 @@ export const sanitizeElements = (elements) => {
         fontFamily: e.fontFamily || def.fontFamily,
         letterSpacing: e.letterSpacing ?? def.letterSpacing,
         bold: e.bold ?? def.bold,
+        fontWeight: e.fontWeight ?? (e.bold ? 700 : 400),
         textAlign: e.textAlign || def.textAlign,
         verticalAlign: e.verticalAlign || def.verticalAlign,
       });
@@ -331,10 +332,10 @@ export const renderLabel = async (stone, options = {}) => {
       const text = getTextForElement(el.id, stone);
       if (!text) continue;
       ctx.fillStyle = "#000000";
-      const boldStr = el.bold ? "bold " : "";
+      const weight = el.fontWeight || (el.bold ? 700 : 400);
       const fontCSS = getFontCSS(el.fontFamily);
       const fs = Math.round((el.fontSize || 10) * Math.min(scaleX, scaleY));
-      ctx.font = `${boldStr}${fs}px ${fontCSS}`;
+      ctx.font = `${weight} ${fs}px ${fontCSS}`;
 
       const spacing = (el.letterSpacing || 0) * scaleX;
       const textW = measureTextWithSpacing(ctx, text, spacing);
