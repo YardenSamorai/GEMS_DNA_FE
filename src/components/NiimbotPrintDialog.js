@@ -338,19 +338,24 @@ const LabelDesigner = ({ template, onChange, sampleStone, labelSize }) => {
                   {/* Font Weight */}
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] text-stone-400 mr-0.5">W</span>
-                    {[300, 400, 500, 600, 700].map(w => (
-                      <button
-                        key={w}
-                        onClick={() => updateEl(selectedId, { fontWeight: w, bold: w >= 600 })}
-                        className={`w-6 h-6 rounded text-[9px] border transition-colors flex items-center justify-center ${
-                          (selectedEl.fontWeight || (selectedEl.bold ? 700 : 400)) === w
-                            ? "bg-stone-800 text-white border-stone-800"
-                            : "bg-white text-stone-400 border-stone-200 hover:border-stone-300"
-                        }`}
-                        title={`Weight ${w}`}
-                        style={{ fontWeight: w }}
-                      >{w}</button>
-                    ))}
+                    {(() => {
+                      const fontDef = FONT_FAMILIES.find(f => f.id === selectedEl.fontFamily);
+                      const minW = fontDef?.minWeight || 400;
+                      const weights = [100, 200, 300, 400, 500, 600, 700].filter(w => w >= minW);
+                      return weights.map(w => (
+                        <button
+                          key={w}
+                          onClick={() => updateEl(selectedId, { fontWeight: w, bold: w >= 600 })}
+                          className={`w-6 h-6 rounded text-[9px] border transition-colors flex items-center justify-center ${
+                            (selectedEl.fontWeight || (selectedEl.bold ? 700 : 400)) === w
+                              ? "bg-stone-800 text-white border-stone-800"
+                              : "bg-white text-stone-400 border-stone-200 hover:border-stone-300"
+                          }`}
+                          title={`Weight ${w}`}
+                          style={{ fontWeight: w }}
+                        >{w}</button>
+                      ));
+                    })()}
                   </div>
 
                   <div className="w-px h-5 bg-stone-200" />
