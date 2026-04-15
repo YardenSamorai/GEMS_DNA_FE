@@ -24,6 +24,9 @@ export const isBluetoothAvailable = () =>
   typeof navigator !== "undefined" && !!navigator.bluetooth;
 
 export const connect = async () => {
+  if (!isBluetoothAvailable()) {
+    throw new Error("Web Bluetooth is not supported on this device. Please use Chrome or Edge on a desktop/Android.");
+  }
   if (client?.isConnected()) return getStatus();
 
   client = new NiimbotBluetoothClient();

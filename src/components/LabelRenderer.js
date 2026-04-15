@@ -116,7 +116,7 @@ const ACTIVE_KEY = "gems_label_active_template";
 
 const defaultId = () => `tpl_${Date.now()}`;
 
-const sanitizeElements = (elements) => {
+export const sanitizeElements = (elements) => {
   const knownIds = new Set(DEFAULT_ELEMENTS.map(e => e.id));
   const seen = new Set();
   const result = [];

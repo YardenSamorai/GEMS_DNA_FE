@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
@@ -16,6 +17,7 @@ import {
   setActiveTemplateId,
   createNewTemplate,
   duplicateTemplate,
+  sanitizeElements,
   loadLabelSize,
   saveLabelSize,
 } from "./LabelRenderer";
@@ -549,8 +551,13 @@ const PreviewOnly = ({ stone, template, labelSize }) => {
   return <div ref={ref} className="flex items-center justify-center bg-stone-50 rounded-xl p-4 min-h-[100px]" />;
 };
 
+const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
+
 /* ─── Main Dialog ─── */
 const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
+  const { user } = useUser();
+  const userId = user?.id;
+
   const [printerStatus, setPrinterStatus] = useState(getStatus());
   const [connecting, setConnecting] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -558,6 +565,7 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
   const [quantity, setQuantity] = useState(1);
   const [previewIdx, setPreviewIdx] = useState(0);
   const [showDesigner, setShowDesigner] = useState(false);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
 
   const [labelSize, setLabelSize] = useState(() => loadLabelSize());
   const [allTemplates, setAllTemplates] = useState(() => loadAllTemplates());
@@ -567,11 +575,78 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
     return active.id;
   });
 
+  const saveTimerRef = useRef(null);
+
   const activeTemplate = allTemplates.find(t => t.id === activeTemplateId) || allTemplates[0];
   const currentElements = activeTemplate?.elements || DEFAULT_ELEMENTS;
 
   useEffect(() => subscribe(setPrinterStatus), []);
   useEffect(() => { if (isOpen) setPreviewIdx(0); }, [isOpen]);
+
+  useEffect(() => {
+    if (!userId || !isOpen) return;
+    setLoadingTemplates(true);
+    fetch(`${API_BASE}/api/label-templates?userId=${userId}`)
+      .then(r => r.json())
+      .then(rows => {
+        if (Array.isArray(rows) && rows.length > 0) {
+          const templates = rows.map(r => ({
+            id: String(r.id),
+            dbId: r.id,
+            name: r.name,
+            elements: sanitizeElements(r.elements),
+            isActive: r.is_active,
+          }));
+          setAllTemplates(templates);
+          saveAllTemplates(templates);
+          const active = templates.find(t => t.isActive) || templates[0];
+          setActiveTemplateIdState(active.id);
+          setActiveTemplateId(active.id);
+        } else {
+          const local = loadAllTemplates();
+          setAllTemplates(local);
+          const active = getActiveTemplate(local);
+          setActiveTemplateIdState(active.id);
+          migrateLocalToServer(local, active.id);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTemplates(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, isOpen]);
+
+  const migrateLocalToServer = async (templates, activeId) => {
+    if (!userId) return;
+    for (const tpl of templates) {
+      try {
+        const res = await fetch(`${API_BASE}/api/label-templates`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, name: tpl.name, elements: tpl.elements, isActive: tpl.id === activeId }),
+        });
+        const created = await res.json();
+        tpl.dbId = created.id;
+        tpl.id = String(created.id);
+      } catch {}
+    }
+    setAllTemplates([...templates]);
+    const active = templates.find(t => t.isActive) || templates[0];
+    setActiveTemplateIdState(active.id);
+  };
+
+  const saveToServer = useCallback((tpl) => {
+    if (!userId || !tpl.dbId) return;
+    fetch(`${API_BASE}/api/label-templates/${tpl.dbId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: tpl.name, elements: tpl.elements }),
+    }).catch(() => {});
+  }, [userId]);
+
+  const debouncedSaveToServer = useCallback((tpl) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => saveToServer(tpl), 800);
+  }, [saveToServer]);
 
   const persistAll = useCallback((templates, newActiveId) => {
     setAllTemplates(templates);
@@ -579,68 +654,144 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
     if (newActiveId) {
       setActiveTemplateIdState(newActiveId);
       setActiveTemplateId(newActiveId);
+      if (userId) {
+        const tpl = templates.find(t => t.id === newActiveId);
+        if (tpl?.dbId) {
+          fetch(`${API_BASE}/api/label-templates/set-active/${tpl.dbId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }),
+          }).catch(() => {});
+        }
+      }
     }
-  }, []);
+  }, [userId]);
 
   const handleSelectTemplate = useCallback((id) => {
     setActiveTemplateIdState(id);
     setActiveTemplateId(id);
-  }, []);
+    if (userId) {
+      const tpl = allTemplates.find(t => t.id === id);
+      if (tpl?.dbId) {
+        fetch(`${API_BASE}/api/label-templates/set-active/${tpl.dbId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        }).catch(() => {});
+      }
+    }
+  }, [userId, allTemplates]);
 
-  const handleAddTemplate = useCallback(() => {
-    const newTpl = createNewTemplate(`Template ${allTemplates.length + 1}`);
-    const updated = [...allTemplates, newTpl];
-    persistAll(updated, newTpl.id);
-    toast.success("New template created!");
-  }, [allTemplates, persistAll]);
+  const handleAddTemplate = useCallback(async () => {
+    const name = `Template ${allTemplates.length + 1}`;
+    if (userId) {
+      try {
+        const res = await fetch(`${API_BASE}/api/label-templates`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, name, elements: DEFAULT_ELEMENTS, isActive: true }),
+        });
+        const created = await res.json();
+        const newTpl = { id: String(created.id), dbId: created.id, name: created.name, elements: sanitizeElements(created.elements) };
+        const updated = [...allTemplates, newTpl];
+        persistAll(updated, newTpl.id);
+        toast.success("New template created!");
+      } catch { toast.error("Failed to create template"); }
+    } else {
+      const newTpl = createNewTemplate(name);
+      persistAll([...allTemplates, newTpl], newTpl.id);
+      toast.success("New template created!");
+    }
+  }, [allTemplates, persistAll, userId]);
 
-  const handleDuplicateTemplate = useCallback((id) => {
+  const handleDuplicateTemplate = useCallback(async (id) => {
     const source = allTemplates.find(t => t.id === id);
     if (!source) return;
-    const dup = duplicateTemplate(source);
-    const updated = [...allTemplates, dup];
-    persistAll(updated, dup.id);
-    toast.success("Template duplicated!");
-  }, [allTemplates, persistAll]);
+    if (userId) {
+      try {
+        const res = await fetch(`${API_BASE}/api/label-templates`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, name: `${source.name} (copy)`, elements: source.elements, isActive: true }),
+        });
+        const created = await res.json();
+        const dup = { id: String(created.id), dbId: created.id, name: created.name, elements: sanitizeElements(created.elements) };
+        persistAll([...allTemplates, dup], dup.id);
+        toast.success("Template duplicated!");
+      } catch { toast.error("Failed to duplicate template"); }
+    } else {
+      const dup = duplicateTemplate(source);
+      persistAll([...allTemplates, dup], dup.id);
+      toast.success("Template duplicated!");
+    }
+  }, [allTemplates, persistAll, userId]);
 
-  const handleDeleteTemplate = useCallback((id) => {
+  const handleDeleteTemplate = useCallback(async (id) => {
     if (allTemplates.length <= 1) return;
+    const tpl = allTemplates.find(t => t.id === id);
+    if (tpl?.dbId && userId) {
+      try {
+        await fetch(`${API_BASE}/api/label-templates/${tpl.dbId}`, { method: "DELETE" });
+      } catch {}
+    }
     const filtered = allTemplates.filter(t => t.id !== id);
     const newActiveId = id === activeTemplateId ? filtered[0].id : activeTemplateId;
     persistAll(filtered, newActiveId);
     toast("Template deleted");
-  }, [allTemplates, activeTemplateId, persistAll]);
+  }, [allTemplates, activeTemplateId, persistAll, userId]);
 
   const handleRenameTemplate = useCallback((id, newName) => {
     const updated = allTemplates.map(t => t.id === id ? { ...t, name: newName } : t);
     persistAll(updated);
-  }, [allTemplates, persistAll]);
+    const tpl = updated.find(t => t.id === id);
+    if (tpl) saveToServer(tpl);
+  }, [allTemplates, persistAll, saveToServer]);
 
-  const handleImportTemplates = useCallback((imported, importedActiveId) => {
-    const merged = [...allTemplates];
-    for (const tpl of imported) {
-      if (!merged.find(t => t.id === tpl.id)) {
-        merged.push(tpl);
-      } else {
-        const idx = merged.findIndex(t => t.id === tpl.id);
-        merged[idx] = tpl;
+  const handleImportTemplates = useCallback(async (imported, importedActiveId) => {
+    if (userId) {
+      const created = [];
+      for (const tpl of imported) {
+        try {
+          const res = await fetch(`${API_BASE}/api/label-templates`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, name: tpl.name, elements: tpl.elements, isActive: false }),
+          });
+          const row = await res.json();
+          created.push({ id: String(row.id), dbId: row.id, name: row.name, elements: sanitizeElements(row.elements) });
+        } catch {}
       }
+      if (created.length > 0) {
+        const merged = [...allTemplates, ...created];
+        persistAll(merged, created[created.length - 1].id);
+        toast.success(`Imported ${created.length} template(s)!`);
+      }
+    } else {
+      const merged = [...allTemplates];
+      for (const tpl of imported) {
+        const existing = merged.findIndex(t => t.id === tpl.id);
+        if (existing >= 0) merged[existing] = tpl; else merged.push(tpl);
+      }
+      const newActive = importedActiveId && merged.find(t => t.id === importedActiveId)
+        ? importedActiveId : merged[merged.length - 1].id;
+      persistAll(merged, newActive);
+      toast.success(`Imported ${imported.length} template(s)!`);
     }
-    const newActive = importedActiveId && merged.find(t => t.id === importedActiveId)
-      ? importedActiveId : merged[merged.length - 1].id;
-    persistAll(merged, newActive);
-    toast.success(`Imported ${imported.length} template(s)!`);
-  }, [allTemplates, persistAll]);
+  }, [allTemplates, persistAll, userId]);
 
   const handleElementsChange = useCallback((newElements) => {
     const updated = allTemplates.map(t =>
       t.id === activeTemplateId ? { ...t, elements: newElements } : t
     );
     setAllTemplates(updated);
-  }, [allTemplates, activeTemplateId]);
+    const tpl = updated.find(t => t.id === activeTemplateId);
+    if (tpl) debouncedSaveToServer(tpl);
+  }, [allTemplates, activeTemplateId, debouncedSaveToServer]);
 
   const handleSave = () => {
     saveAllTemplates(allTemplates);
+    const tpl = allTemplates.find(t => t.id === activeTemplateId);
+    if (tpl) saveToServer(tpl);
     toast.success("All templates saved!");
   };
 
@@ -649,6 +800,8 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
       t.id === activeTemplateId ? { ...t, elements: DEFAULT_ELEMENTS.map(e => ({ ...e })) } : t
     );
     persistAll(updated);
+    const tpl = updated.find(t => t.id === activeTemplateId);
+    if (tpl) saveToServer(tpl);
     toast("Template reset to default");
   };
 
@@ -700,6 +853,46 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
     finally { setPrinting(false); }
   };
 
+  const handleDownloadLabel = async () => {
+    try {
+      const canvas = await renderLabel(currentStone, { template: currentElements, labelSize });
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `label-${currentStone.sku || "unknown"}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Label image downloaded!");
+      }, "image/png");
+    } catch (err) { toast.error(err.message || "Download failed"); }
+  };
+
+  const handleDownloadAll = async () => {
+    setPrinting(true);
+    try {
+      for (const stone of stones) {
+        const canvas = await renderLabel(stone, { template: currentElements, labelSize });
+        await new Promise((resolve) => {
+          canvas.toBlob((blob) => {
+            if (!blob) { resolve(); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `label-${stone.sku || "unknown"}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            setTimeout(resolve, 300);
+          }, "image/png");
+        });
+      }
+      toast.success(`Downloaded ${stones.length} label image(s)!`);
+    } catch (err) { toast.error(err.message || "Download failed"); }
+    finally { setPrinting(false); }
+  };
+
+  const btAvailable = isBluetoothAvailable();
   const totalLabels = stones.length * quantity;
 
   return (
@@ -751,22 +944,34 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
 
             {/* Body */}
             <div className="overflow-y-auto p-6 space-y-4">
-              {/* Printer Connection */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-200">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${printerStatus.connected ? "bg-green-500 animate-pulse" : "bg-stone-300"}`} />
-                  <span className="text-sm font-medium text-stone-700">
-                    {printerStatus.connected ? "Printer connected" : "No printer connected"}
-                  </span>
+              {/* Printer Connection / Download Mode */}
+              {btAvailable ? (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-200">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${printerStatus.connected ? "bg-green-500 animate-pulse" : "bg-stone-300"}`} />
+                    <span className="text-sm font-medium text-stone-700">
+                      {printerStatus.connected ? "Printer connected" : "No printer connected"}
+                    </span>
+                  </div>
+                  {printerStatus.connected ? (
+                    <button onClick={handleDisconnect} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-stone-200 text-stone-600 hover:bg-stone-300 transition-colors">Disconnect</button>
+                  ) : (
+                    <button onClick={handleConnect} disabled={connecting} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-50">
+                      {connecting ? "Connecting..." : "Connect"}
+                    </button>
+                  )}
                 </div>
-                {printerStatus.connected ? (
-                  <button onClick={handleDisconnect} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-stone-200 text-stone-600 hover:bg-stone-300 transition-colors">Disconnect</button>
-                ) : (
-                  <button onClick={handleConnect} disabled={connecting} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-50">
-                    {connecting ? "Connecting..." : "Connect"}
-                  </button>
-                )}
-              </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span className="text-xs font-medium text-amber-700">Download Mode</span>
+                  </div>
+                  <p className="text-[11px] text-amber-600 leading-relaxed">
+                    Bluetooth is not available on this device. Download the label as an image and print it via the NIIMBOT app.
+                  </p>
+                </div>
+              )}
 
               {/* Template Picker */}
               <TemplateManager
@@ -857,22 +1062,41 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-stone-200 space-y-2">
-              {stones.length > 1 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={handlePrintSingle} disabled={printing || !printerStatus.connected} className="py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors disabled:opacity-40">Print Current</button>
-                  <button onClick={handlePrint} disabled={printing || !printerStatus.connected} className="py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-40">
-                    {printing ? "Printing..." : `Print All (${totalLabels})`}
-                  </button>
-                </div>
+              {btAvailable ? (
+                <>
+                  {stones.length > 1 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={handlePrintSingle} disabled={printing || !printerStatus.connected} className="py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors disabled:opacity-40">Print Current</button>
+                      <button onClick={handlePrint} disabled={printing || !printerStatus.connected} className="py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-40">
+                        {printing ? "Printing..." : `Print All (${totalLabels})`}
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={handlePrintSingle} disabled={printing || !printerStatus.connected} className="w-full py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-40">
+                      {printing ? "Printing..." : `Print Label${quantity > 1 ? ` (\u00D7${quantity})` : ""}`}
+                    </button>
+                  )}
+                </>
               ) : (
-                <button onClick={handlePrintSingle} disabled={printing || !printerStatus.connected} className="w-full py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-40">
-                  {printing ? "Printing..." : `Print Label${quantity > 1 ? ` (\u00D7${quantity})` : ""}`}
-                </button>
-              )}
-              {!isBluetoothAvailable() && (
-                <p className="text-xs text-amber-600 text-center">
-                  Web Bluetooth is not supported in this browser. Please use Chrome or Edge.
-                </p>
+                <>
+                  {stones.length > 1 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={handleDownloadLabel} disabled={printing} className="py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+                        Current
+                      </button>
+                      <button onClick={handleDownloadAll} disabled={printing} className="py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+                        {printing ? "Downloading..." : `All (${stones.length})`}
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={handleDownloadLabel} disabled={printing} className="w-full py-2.5 px-4 rounded-xl text-sm font-medium bg-stone-800 text-white hover:bg-stone-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+                      Download Label Image
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </motion.div>
