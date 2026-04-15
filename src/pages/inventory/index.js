@@ -10,6 +10,8 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getMappedCategories } from "../../utils/categoryMap";
 import { sanitizeText } from "../../utils/helper";
+import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
+import { isBluetoothAvailable } from "../../services/niimbotPrint";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -1891,7 +1893,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
 };
 
 /* ---------------- DNA Drawer (Stone Preview) ---------------- */
-const DNADrawer = ({ isOpen, onClose, stone }) => {
+const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel }) => {
   const [activeTab, setActiveTab] = useState('details');
   const [activeImgIdx, setActiveImgIdx] = useState(0);
 
@@ -2200,26 +2202,37 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
         {/* Fixed Footer Actions */}
         <div className="sticky bottom-0 bg-white border-t border-stone-200 p-4 sm:p-6 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={handleShare}
-              className="py-2.5 px-4 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-stone-200 transition-colors"
+              className="py-2.5 px-3 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-1.5 hover:bg-stone-200 transition-colors text-sm"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
               Share
             </button>
+            {onPrintLabel && (
+              <button
+                onClick={() => onPrintLabel(stone)}
+                className="py-2.5 px-3 bg-purple-50 text-purple-700 font-medium rounded-xl flex items-center justify-center gap-1.5 hover:bg-purple-100 transition-colors text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print
+              </button>
+            )}
             <a
               href={shareUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="py-2.5 px-4 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-stone-200 transition-colors"
+              className="py-2.5 px-3 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-1.5 hover:bg-stone-200 transition-colors text-sm"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-              Full Page
+              DNA
             </a>
           </div>
         </div>
@@ -4984,6 +4997,8 @@ const StoneSearchPage = () => {
   const [showSaveFilter, setShowSaveFilter] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState('');
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
+  const [showNiimbotPrint, setShowNiimbotPrint] = useState(false);
+  const [niimbotPrintStones, setNiimbotPrintStones] = useState([]);
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -6654,15 +6669,15 @@ const StoneSearchPage = () => {
                           <span className="font-medium">PDF</span>
                         </button>
                         <button
-                          onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
+                          onClick={() => { setNiimbotPrintStones([]); setShowNiimbotPrint(true); }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                         >
                           <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
                             <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
                           </div>
-                          <span className="font-medium">Labels</span>
+                          <span className="font-medium">Print Labels</span>
                         </button>
                         <button
                           onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
@@ -6737,17 +6752,17 @@ const StoneSearchPage = () => {
                       </div>
                       
                       <button
-                        onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
+                        onClick={() => { setNiimbotPrintStones([]); setShowNiimbotPrint(true); }}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                       >
                         <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
                           <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                           </svg>
                         </div>
                         <div>
-                          <span className="font-medium">Niimbot Labels</span>
-                          <p className="text-xs text-stone-500">Download label Excel</p>
+                          <span className="font-medium">Print Labels</span>
+                          <p className="text-xs text-stone-500">Print via Bluetooth (NIIMBOT)</p>
                         </div>
                       </button>
                       
@@ -7222,17 +7237,17 @@ const StoneSearchPage = () => {
                 </div>
                 
                 <button
-                  onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
+                  onClick={() => { setNiimbotPrintStones([]); setShowNiimbotPrint(true); }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
                     <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                     </svg>
                   </div>
                   <div>
-                    <span className="font-medium">Niimbot Labels</span>
-                    <p className="text-xs text-stone-500">Download label Excel</p>
+                    <span className="font-medium">Print Labels</span>
+                    <p className="text-xs text-stone-500">Print via Bluetooth (NIIMBOT)</p>
                   </div>
                 </button>
                 
@@ -7353,6 +7368,17 @@ const StoneSearchPage = () => {
         isOpen={!!drawerStone}
         onClose={() => setDrawerStone(null)}
         stone={drawerStone}
+        onPrintLabel={(stone) => {
+          setNiimbotPrintStones([stone]);
+          setShowNiimbotPrint(true);
+        }}
+      />
+
+      {/* NIIMBOT Print Dialog */}
+      <NiimbotPrintDialog
+        isOpen={showNiimbotPrint}
+        onClose={() => { setShowNiimbotPrint(false); setNiimbotPrintStones([]); }}
+        stones={niimbotPrintStones.length > 0 ? niimbotPrintStones : allItems.filter(s => selectedStones.has(s.id))}
       />
 
       {/* Scan Success Toast */}
