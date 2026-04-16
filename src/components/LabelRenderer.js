@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { getMappedCategories } from "../utils/categoryMap";
 
 export const LABEL_W = 176;
 export const LABEL_H = 96;
@@ -93,6 +94,7 @@ export const ELEMENT_TYPES = [
   { id: "weight",    label: "Weight",     icon: "text"  },
   { id: "lab",       label: "Lab",        icon: "text"  },
   { id: "clarity",   label: "Clarity",    icon: "text"  },
+  { id: "color",     label: "Color",      icon: "text"  },
   { id: "priceCode", label: "Price Code", icon: "text"  },
   { id: "sku",       label: "SKU",        icon: "text"  },
   { id: "shape",     label: "Shape",      icon: "text"  },
@@ -105,6 +107,7 @@ export const DEFAULT_ELEMENTS = [
   { id: "weight",    visible: true,  x: 6,   y: 6,   w: 55,  h: 18, fontSize: 14, fontFamily: "markazi", letterSpacing: 0, bold: false, textAlign: "left", verticalAlign: "top" },
   { id: "lab",       visible: true,  x: 6,   y: 26,  w: 55,  h: 16, fontSize: 12, fontFamily: "markazi", letterSpacing: 0, bold: false, textAlign: "left", verticalAlign: "top" },
   { id: "clarity",   visible: true,  x: 6,   y: 44,  w: 55,  h: 16, fontSize: 12, fontFamily: "markazi", letterSpacing: 0, bold: false, textAlign: "left", verticalAlign: "top" },
+  { id: "color",     visible: false, x: 6,   y: 62,  w: 55,  h: 16, fontSize: 12, fontFamily: "markazi", letterSpacing: 0, bold: false, textAlign: "left", verticalAlign: "top" },
   { id: "priceCode", visible: true,  x: 6,   y: 64,  w: 70,  h: 18, fontSize: 13, fontFamily: "markazi", letterSpacing: 0, bold: true,  textAlign: "left", verticalAlign: "top" },
   { id: "qr",        visible: true,  x: 96,  y: 8,   w: 72,  h: 72, fontSize: 12, fontFamily: "markazi", letterSpacing: 0, bold: false, textAlign: "left", verticalAlign: "top" },
   { id: "sku",       visible: false, x: 6,   y: 82,  w: 80,  h: 12, fontSize: 9,  fontFamily: "markazi", letterSpacing: 0, bold: true,  textAlign: "left", verticalAlign: "top" },
@@ -256,8 +259,19 @@ const getTextForElement = (id, stone) => {
     case "shape":     return stone.shape || "";
     case "lab":       return stone.lab || "";
     case "clarity":   return shortenClarity(stone.clarity || stone.treatment || "Minor");
+    case "color": {
+      const mapped = getMappedCategories(stone.category);
+      if (mapped.includes('Fancy')) return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ') || stone.color || "";
+      return stone.color || "";
+    }
     case "price":     return stone.priceTotal ? `$${Math.round(stone.priceTotal).toLocaleString()}` : "";
-    case "priceCode": return (stone.priceTotal && stone.priceTotal > 50000) ? "" : encodePriceB(stone.pricePerCt);
+    case "priceCode": {
+      if (stone.pricePerCt && stone.pricePerCt > 50000) return "";
+      const mapped = getMappedCategories(stone.category);
+      const isDiamond = mapped.includes('Diamond') || mapped.includes('Fancy');
+      const price = isDiamond ? (stone.pricePerCt / 2) : stone.pricePerCt;
+      return encodePriceB(price);
+    }
     case "origin":    return stone.origin || "";
     default: return "";
   }
