@@ -33,26 +33,26 @@ const TAG_COLORS = [
 const shareToWhatsApp = (stone, includePrice = false) => {
   const dnaUrl = `https://gems-dna.com/${stone.sku}`;
   
-  let message = `≡ƒעמ *${getDisplayShape(stone.shape) || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
-  message += `≡ƒףכ *Details:*\n`;
-  message += `Γאó SKU: ${stone.sku}\n`;
-  message += `Γאó Color: ${getDisplayColor(stone) || 'N/A'}\n`;
-  message += `Γאó Clarity: ${stone.clarity || 'N/A'}\n`;
-  message += `Γאó Treatment: ${stone.treatment || 'N/A'}\n`;
-  message += `Γאó Origin: ${stone.origin || 'N/A'}\n`;
-  message += `Γאó Lab: ${stone.lab || 'N/A'}\n`;
+  let message = `*${getDisplayShape(stone.shape) || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
+  message += `*Details:*\n`;
+  message += `SKU: ${stone.sku}\n`;
+  message += `Color: ${getDisplayColor(stone) || 'N/A'}\n`;
+  message += `Clarity: ${stone.clarity || 'N/A'}\n`;
+  message += `Treatment: ${stone.treatment || 'N/A'}\n`;
+  message += `Origin: ${stone.origin || 'N/A'}\n`;
+  message += `Lab: ${stone.lab || 'N/A'}\n`;
   if (stone.measurements) {
-    message += `Γאó Size: ${stone.measurements}\n`;
+    message += `Size: ${stone.measurements}\n`;
   }
   
   if (includePrice && stone.priceTotal) {
-    message += `\n≡ƒע░ *Price: $${stone.priceTotal.toLocaleString()}*\n`;
+    message += `\n*Price: $${stone.priceTotal.toLocaleString()}*\n`;
   }
   
-  message += `\n≡ƒפק View DNA: ${dnaUrl}`;
+  message += `\nView DNA: ${dnaUrl}`;
   
   if (stone.imageUrl) {
-    message += `\n\n≡ƒף╕ Image: ${stone.imageUrl}`;
+    message += `\n\nImage: ${stone.imageUrl}`;
   }
   
   const encodedMessage = encodeURIComponent(message);
@@ -69,7 +69,7 @@ const shareMultipleToWhatsApp = (selectedStonesArray) => {
     const dnaUrl = `https://gems-dna.com/${stone.sku}`;
     message += `${idx + 1}. *${getDisplayShape(stone.shape) || 'Gemstone'}* ${stone.weightCt || '?'}ct`;
     if (getDisplayColor(stone)) message += ` | ${getDisplayColor(stone)}`;
-    message += ` Γאפ SKU: ${stone.sku}\n`;
+    message += ` | SKU: ${stone.sku}\n`;
     message += `   ${dnaUrl}\n\n`;
   });
 
@@ -614,17 +614,17 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
             <div className="flex flex-wrap gap-2 mb-6">
               {emeraldCount > 0 && (
                 <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  ≡ƒעת Emeralds: {emeraldCount}
+                  Emeralds: {emeraldCount}
                 </span>
               )}
               {diamondCount > 0 && (
                 <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                  ≡ƒעמ Diamonds: {diamondCount}
+                  Diamonds: {diamondCount}
                 </span>
               )}
               {otherCount > 0 && (
                 <span className="px-3 py-1.5 bg-stone-100 text-stone-700 rounded-full text-sm font-medium">
-                  ≡ƒפ╖ Other: {otherCount}
+                  Other: {otherCount}
                 </span>
               )}
             </div>
@@ -3914,7 +3914,7 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">{stone.lab}</span>
           )}
           {stone.location && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">≡ƒףם {stone.location}</span>
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{stone.location}</span>
           )}
         </div>
         {/* Price */}
@@ -3973,8 +3973,8 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
           <span className="text-white font-semibold text-sm">Pair</span>
         </div>
         <div className="flex items-center gap-3 text-white/90 text-xs">
-          <span>Γתצ∩╕ן {combinedWeight} ct</span>
-          <span>≡ƒע░ ${combinedPrice.toLocaleString()}</span>
+          <span>{combinedWeight} ct</span>
+          <span>${combinedPrice.toLocaleString()}</span>
         </div>
       </div>
 
@@ -4514,7 +4514,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                   </span>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm font-medium text-stone-800">{getDisplayShape(stone.shape)}</span>
-                    <span className="text-stone-300">Γאó</span>
+                    <span className="text-stone-300">|</span>
                     <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
                   </div>
                 </div>
@@ -4547,7 +4547,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 )}
                 {stone.location && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                    ≡ƒףם {stone.location}
+                    {stone.location}
                   </span>
                 )}
               </div>
@@ -5315,7 +5315,7 @@ const StoneSearchPage = () => {
         
         // Process the scanned barcode
         if (scannedBarcode) {
-          console.log("≡ƒפ½ USB Scanner detected:", scannedBarcode);
+          console.log("USB Scanner detected:", scannedBarcode);
           handleBarcodeScan(scannedBarcode);
         }
         return;
