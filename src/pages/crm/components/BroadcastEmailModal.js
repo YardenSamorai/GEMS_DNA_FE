@@ -16,6 +16,7 @@ import {
   PERSONALISATION_TAGS,
   htmlToPlainText,
 } from "./emailTemplates";
+import { importFromFolder, importFromZip } from "./templateImporter";
 
 /**
  * Professional email broadcast composer with:
@@ -48,8 +49,11 @@ export default function BroadcastEmailModal({ recipients = [], onClose, onSent }
   // Saved templates
   const [savedTemplates, setSavedTemplates] = useState([]);
   const [savingTpl, setSavingTpl] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const htmlRef = useRef(null); // textarea ref for cursor-based insertion
+  const folderInputRef = useRef(null);
+  const zipInputRef = useRef(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -141,6 +145,80 @@ export default function BroadcastEmailModal({ recipients = [], onClose, onSent }
     } catch (e) { toast.error(e.message); }
   };
 
+  /* ---------- folder / zip import ---------- */
+  const persistImported = async (parsed, askName = true) => {
+    const name = askName
+      ? (prompt("Save imported template as:", parsed.name) || "").trim()
+      : parsed.name;
+    if (!name) return null;
+    if (parsed.sizeKb > 1024) {
+      const proceed = window.confirm(
+        `This template is ${parsed.sizeKb} KB after inlining ${parsed.assetCount} asset(s). ` +
+        `Most email clients reject messages above ~1 MB. Save anyway?`
+      );
+      if (!proceed) return null;
+    }
+    try {
+      const created = await createEmailTemplate({
+        userId: user.id,
+        name,
+        subject,
+        html: parsed.html,
+      });
+      setSavedTemplates((arr) => [created, ...arr]);
+      return created;
+    } catch (e) {
+      toast.error(e.message);
+      return null;
+    }
+  };
+
+  const handleFolderPicked = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setImporting(true);
+    const t = toast.loading(`Importing ${files.length} files…`);
+    try {
+      const parsed = await importFromFolder(files);
+      toast.dismiss(t);
+      const saved = await persistImported(parsed);
+      if (saved) {
+        toast.success(`Imported "${saved.name}" · ${parsed.assetCount} assets · ${parsed.sizeKb} KB`);
+        setHtml(parsed.html);
+        setActiveTab("design");
+      }
+    } catch (err) {
+      toast.dismiss(t);
+      toast.error(err.message || "Import failed");
+    } finally {
+      setImporting(false);
+      if (folderInputRef.current) folderInputRef.current.value = "";
+    }
+  };
+
+  const handleZipPicked = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    const t = toast.loading(`Reading ${file.name}…`);
+    try {
+      const parsed = await importFromZip(file);
+      toast.dismiss(t);
+      const saved = await persistImported(parsed);
+      if (saved) {
+        toast.success(`Imported "${saved.name}" · ${parsed.assetCount} assets · ${parsed.sizeKb} KB`);
+        setHtml(parsed.html);
+        setActiveTab("design");
+      }
+    } catch (err) {
+      toast.dismiss(t);
+      toast.error(err.message || "Import failed");
+    } finally {
+      setImporting(false);
+      if (zipInputRef.current) zipInputRef.current.value = "";
+    }
+  };
+
   /* ---------- send ---------- */
   const handleSend = async () => {
     if (!subject.trim() || !html.trim()) {
@@ -217,6 +295,23 @@ export default function BroadcastEmailModal({ recipients = [], onClose, onSent }
   /* ---------- main composer ---------- */
   return (
     <ModalShell onClose={onClose} wide>
+      {/* Hidden inputs for folder / ZIP import */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        webkitdirectory=""
+        directory=""
+        multiple
+        onChange={handleFolderPicked}
+        className="hidden"
+      />
+      <input
+        ref={zipInputRef}
+        type="file"
+        accept=".zip,application/zip,application/x-zip-compressed"
+        onChange={handleZipPicked}
+        className="hidden"
+      />
       <Header onClose={onClose} count={eligible.length} skipped={skipped} />
 
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
@@ -270,6 +365,9 @@ export default function BroadcastEmailModal({ recipients = [], onClose, onSent }
                 onDelete={handleDeleteTemplate}
                 personalize={personalize}
                 previewContact={previewContact}
+                importing={importing}
+                onImportFolder={() => folderInputRef.current?.click()}
+                onImportZip={() => zipInputRef.current?.click()}
               />
             )}
             {activeTab === "design" && (
@@ -488,40 +586,84 @@ const TemplateCard = ({ tpl, onPick, personalize, previewContact }) => (
 );
 
 /* ----- Saved templates ----- */
-function SavedTemplates({ templates, onLoad, onUpdate, onDelete, personalize, previewContact }) {
-  if (templates.length === 0) {
-    return (
-      <div className="text-center py-12 text-stone-500">
-        <div className="mx-auto w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
-          <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
-        </div>
-        <div className="text-sm font-medium text-stone-700">No saved templates yet</div>
-        <div className="text-xs mt-1">Design a message and click "Save as template" to keep it.</div>
-      </div>
-    );
-  }
+function SavedTemplates({ templates, onLoad, onUpdate, onDelete, personalize, previewContact, importing, onImportFolder, onImportZip }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {templates.map((tpl) => (
-        <div key={tpl.id} className="group rounded-xl border border-stone-200 bg-white overflow-hidden hover:border-stone-900 transition-all">
-          <button type="button" onClick={() => onLoad(tpl)} className="block w-full text-left">
-            <div className="aspect-[4/3] bg-stone-50 overflow-hidden border-b border-stone-200">
-              <div
-                style={{ width: "600px", transform: "scale(0.40)", transformOrigin: "top left", pointerEvents: "none" }}
-                dangerouslySetInnerHTML={{ __html: personalize(tpl.html, previewContact) }}
-              />
+    <div className="space-y-4">
+      <ImportRow importing={importing} onImportFolder={onImportFolder} onImportZip={onImportZip} />
+
+      {templates.length === 0 ? (
+        <div className="text-center py-10 text-stone-500 border border-dashed border-stone-200 rounded-xl">
+          <div className="mx-auto w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+            <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
+          </div>
+          <div className="text-sm font-medium text-stone-700">No saved templates yet</div>
+          <div className="text-xs mt-1">Design a message and click "Save as template" — or import a folder above.</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {templates.map((tpl) => (
+            <div key={tpl.id} className="group rounded-xl border border-stone-200 bg-white overflow-hidden hover:border-stone-900 transition-all">
+              <button type="button" onClick={() => onLoad(tpl)} className="block w-full text-left">
+                <div className="aspect-[4/3] bg-stone-50 overflow-hidden border-b border-stone-200">
+                  <div
+                    style={{ width: "600px", transform: "scale(0.40)", transformOrigin: "top left", pointerEvents: "none" }}
+                    dangerouslySetInnerHTML={{ __html: personalize(tpl.html, previewContact) }}
+                  />
+                </div>
+                <div className="p-3">
+                  <div className="font-semibold text-sm text-stone-900 truncate">{tpl.name}</div>
+                  <div className="text-xs text-stone-500 truncate mt-0.5">{tpl.subject || <em>No subject</em>}</div>
+                </div>
+              </button>
+              <div className="px-3 pb-3 flex items-center gap-2">
+                <button onClick={() => onUpdate(tpl)} className="text-[11px] px-2 py-1 rounded border border-stone-200 hover:bg-stone-100 text-stone-700">Update</button>
+                <button onClick={() => onDelete(tpl)} className="text-[11px] px-2 py-1 rounded border border-rose-200 text-rose-700 hover:bg-rose-50 ml-auto">Delete</button>
+              </div>
             </div>
-            <div className="p-3">
-              <div className="font-semibold text-sm text-stone-900 truncate">{tpl.name}</div>
-              <div className="text-xs text-stone-500 truncate mt-0.5">{tpl.subject || <em>No subject</em>}</div>
-            </div>
-          </button>
-          <div className="px-3 pb-3 flex items-center gap-2">
-            <button onClick={() => onUpdate(tpl)} className="text-[11px] px-2 py-1 rounded border border-stone-200 hover:bg-stone-100 text-stone-700">Update</button>
-            <button onClick={() => onDelete(tpl)} className="text-[11px] px-2 py-1 rounded border border-rose-200 text-rose-700 hover:bg-rose-50 ml-auto">Delete</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ----- Import row (folder + zip) ----- */
+function ImportRow({ importing, onImportFolder, onImportZip }) {
+  return (
+    <div className="rounded-xl border border-dashed border-stone-300 bg-gradient-to-br from-stone-50 to-white p-4">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="shrink-0 w-9 h-9 rounded-lg bg-stone-900 text-white flex items-center justify-center">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-stone-900">Import a complete template</div>
+          <div className="text-[11px] text-stone-500 mt-0.5">
+            Pick a folder or ZIP containing <code className="px-1 bg-stone-100 rounded">index.html</code>, CSS files, and images.
+            CSS is inlined and images are converted to base64 automatically — perfect for Outlook / Word HTML exports.
           </div>
         </div>
-      ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={onImportFolder}
+          disabled={importing}
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-50"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+          {importing ? "Working…" : "Choose folder"}
+        </button>
+        <button
+          onClick={onImportZip}
+          disabled={importing}
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-stone-300 bg-white text-stone-700 hover:border-stone-900 disabled:opacity-50"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m0 4v1m0 4v1m0 4v1M5 8h14M5 16h14" /></svg>
+          Upload .zip
+        </button>
+        <span className="text-[10px] text-stone-400 self-center ml-auto">
+          Folder picker works in Chrome / Edge. Use ZIP for Safari / iPhone.
+        </span>
+      </div>
     </div>
   );
 }
