@@ -178,6 +178,7 @@ export default function CrmContacts() {
         <div className="bg-white rounded-xl border border-stone-200 p-3">
           <FolderTree
             folders={folders}
+            contacts={contacts}
             selectedFolderId={selectedFolderId}
             onSelect={(id) => setSelectedFolderId(id)}
             userId={user?.id}
@@ -587,6 +588,7 @@ export default function CrmContacts() {
       {showFoldersMobile && (
         <MobileFoldersDrawer
           folders={folders}
+          contacts={contacts}
           selectedFolderId={selectedFolderId}
           onSelect={(id) => { setSelectedFolderId(id); setShowFoldersMobile(false); }}
           userId={user?.id}
@@ -775,13 +777,14 @@ function MoveToFolderModal({ folders, count, onClose, onApply }) {
   );
 }
 
-function MobileFoldersDrawer({ folders, selectedFolderId, onSelect, userId, onChange, onClose }) {
+function MobileFoldersDrawer({ folders, contacts, selectedFolderId, onSelect, userId, onChange, onClose }) {
   return (
     <div className="fixed inset-0 z-[55] flex" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white w-72 max-w-[85vw] h-full overflow-y-auto p-3 shadow-2xl">
         <div className="text-sm font-semibold text-stone-800 px-2 py-2 mb-2">Folders</div>
         <FolderTree
           folders={folders}
+          contacts={contacts}
           selectedFolderId={selectedFolderId}
           onSelect={onSelect}
           userId={userId}
