@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { CONTACT_TYPES, fetchFolders } from "../../../services/crmApi";
+import { polishContact } from "../utils/smartCase";
 
 export default function ContactFormModal({ initial, onClose, onSubmit, title = "New contact" }) {
   const { user } = useUser();
@@ -36,9 +37,8 @@ export default function ContactFormModal({ initial, onClose, onSubmit, title = "
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const payload = { ...form };
-      // Normalise website (strip leading scheme spacing)
-      if (payload.website) payload.website = payload.website.trim();
+      // Apply smart-case to name/title/company/etc. Leave email/phone/website to their own normalization.
+      const payload = polishContact({ ...form });
       await onSubmit(payload);
     } finally {
       setSaving(false);
