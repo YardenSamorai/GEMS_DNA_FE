@@ -10,6 +10,7 @@ import {
   DEAL_STAGES,
 } from "../../../services/crmApi";
 import StonePicker from "./StonePicker";
+import ItemDetailModal from "./ItemDetailModal";
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 const timeAgo = (d) => {
@@ -25,6 +26,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
   const [deal, setDeal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);
 
   const reload = async () => {
     setLoading(true);
@@ -222,6 +224,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
                         item={it}
                         onPriceChange={(p) => handleItemPrice(it.id, p)}
                         onRemove={() => handleRemoveItem(it.id)}
+                        onOpen={() => setDetailItem(it)}
                       />
                     ))}
                   </div>
@@ -254,33 +257,48 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
       {showPicker && (
         <StonePicker onClose={() => setShowPicker(false)} onSelect={handleAddItems} />
       )}
+      {detailItem && (
+        <ItemDetailModal item={detailItem} onClose={() => setDetailItem(null)} />
+      )}
     </div>
   );
 }
 
-function DealItemRow({ item, onPriceChange, onRemove }) {
+function DealItemRow({ item, onPriceChange, onRemove, onOpen }) {
   const snap = item.snapshot || {};
   const [price, setPrice] = useState(item.custom_price || 0);
   const bruto = snap.priceTotal || 0;
   const neto = bruto / 2;
 
   return (
-    <div className="flex items-center gap-3 bg-white border border-stone-200 rounded-lg p-3">
-      {snap.imageUrl ? (
-        <img src={snap.imageUrl} alt={item.sku} className="w-12 h-12 rounded-md object-cover bg-stone-100 shrink-0" />
-      ) : (
-        <div className="w-12 h-12 rounded-md bg-stone-100 shrink-0" />
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm text-stone-900 truncate">{item.sku || "—"}</div>
-        <div className="text-xs text-stone-500 truncate">
-          {[snap.shape, snap.weightCt && `${snap.weightCt}ct`, snap.color, snap.clarity, snap.lab].filter(Boolean).join(" · ")}
-        </div>
-        {bruto > 0 && (
-          <div className="text-[10px] text-stone-400 mt-0.5">List: {fmt(bruto)} bruto · {fmt(neto)} neto</div>
+    <div className="group flex items-center gap-3 bg-white border border-stone-200 rounded-lg p-3 hover:border-stone-400 hover:shadow-sm transition">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex items-center gap-3 flex-1 min-w-0 text-left -m-1 p-1 rounded-md hover:bg-stone-50 cursor-pointer"
+        title="View details"
+      >
+        {snap.imageUrl ? (
+          <img src={snap.imageUrl} alt={item.sku} className="w-12 h-12 rounded-md object-cover bg-stone-100 shrink-0" />
+        ) : (
+          <div className="w-12 h-12 rounded-md bg-stone-100 shrink-0 flex items-center justify-center">
+            <svg className="w-5 h-5 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </div>
         )}
-      </div>
-      <div className="text-right shrink-0">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm text-stone-900 truncate group-hover:text-stone-950 inline-flex items-center gap-1">
+            {item.sku || "—"}
+            <svg className="w-3 h-3 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+          </div>
+          <div className="text-xs text-stone-500 truncate">
+            {[snap.shape, snap.weightCt && `${snap.weightCt}ct`, snap.color, snap.clarity, snap.lab].filter(Boolean).join(" · ")}
+          </div>
+          {bruto > 0 && (
+            <div className="text-[10px] text-stone-400 mt-0.5">List: {fmt(bruto)} bruto · {fmt(neto)} neto</div>
+          )}
+        </div>
+      </button>
+      <div className="text-right shrink-0" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1">
           <span className="text-xs text-stone-500">$</span>
           <input
