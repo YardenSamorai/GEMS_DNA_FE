@@ -14,6 +14,7 @@ import {
   DEAL_STAGES,
 } from "../../../services/crmApi";
 import ContactFormModal from "./ContactFormModal";
+import CardImageLightbox from "./CardImageLightbox";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 const timeAgo = (d) => {
@@ -29,9 +30,10 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
   const { user } = useUser();
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("activity");
+  const [tab, setTab] = useState("info");
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showCardLightbox, setShowCardLightbox] = useState(false);
 
   const reload = async () => {
     if (!user?.id || !contactId) return;
@@ -190,10 +192,10 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
             {/* Tabs */}
             <div className="border-b border-stone-200 px-2 sm:px-3 sticky top-0 bg-white z-[5]">
               <nav className="flex gap-1 overflow-x-auto scrollbar-hide">
+                <Tab active={tab === "info"} onClick={() => setTab("info")}>Info</Tab>
                 <Tab active={tab === "activity"} onClick={() => setTab("activity")}>Activity</Tab>
                 <Tab active={tab === "deals"} onClick={() => setTab("deals")}>Deals ({contact.deals?.length || 0})</Tab>
                 <Tab active={tab === "tasks"} onClick={() => setTab("tasks")}>Tasks ({contact.tasks?.filter(t => t.status === "pending").length || 0})</Tab>
-                <Tab active={tab === "info"} onClick={() => setTab("info")}>Info</Tab>
                 <Tab active={tab === "verify"} onClick={() => setTab("verify")}>
                   <span className="inline-flex items-center gap-1">
                     Verify
@@ -207,7 +209,7 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
               {tab === "activity" && <ActivityTab contact={contact} onChanged={reload} userId={user?.id} />}
               {tab === "deals" && <DealsTab contact={contact} />}
               {tab === "tasks" && <TasksTab contact={contact} userId={user?.id} onChanged={reload} />}
-              {tab === "info" && <InfoTab contact={contact} />}
+              {tab === "info" && <InfoTab contact={contact} onOpenCard={() => setShowCardLightbox(true)} />}
               {tab === "verify" && <VerifyTab contact={contact} onUpdate={(patch) => { updateContact(contactId, patch).then(() => { toast.success("Updated"); reload(); onChanged?.(); }).catch(e => toast.error(e.message)); }} />}
             </div>
           </>
@@ -231,6 +233,17 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
           danger
           onConfirm={() => { setConfirmDelete(false); handleDelete(); }}
           onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+
+      {showCardLightbox && contact && (
+        <CardImageLightbox
+          contactId={contact.id}
+          contactName={contact.name}
+          front={contact.card_image_front}
+          back={contact.card_image_back}
+          hasBack={!!contact.card_image_back}
+          onClose={() => setShowCardLightbox(false)}
         />
       )}
     </div>
@@ -478,10 +491,33 @@ function TasksTab({ contact, userId, onChanged }) {
 }
 
 /* ---------- Info tab ---------- */
-function InfoTab({ contact }) {
+function InfoTab({ contact, onOpenCard }) {
   const websiteHref = normaliseWebsite(contact.website);
+  const cardPreview = contact.card_image_front || contact.card_image_thumb;
   return (
     <div className="p-4 space-y-3 text-sm">
+      {cardPreview && (
+        <div className="pb-3 border-b border-stone-200">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-medium text-stone-500 uppercase tracking-wider">Business card</div>
+            {contact.card_image_back && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600">2 sides</span>
+            )}
+          </div>
+          <button
+            onClick={onOpenCard}
+            className="group relative block w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50 hover:ring-2 hover:ring-stone-400 transition"
+          >
+            <img src={cardPreview} alt="Business card" className="w-full max-h-48 object-contain" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition">
+              <div className="opacity-0 group-hover:opacity-100 transition px-3 py-1.5 rounded-full bg-white/95 text-stone-900 text-xs font-medium inline-flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+                View {contact.card_image_back ? "& flip" : ""}
+              </div>
+            </div>
+          </button>
+        </div>
+      )}
       <Row label="Title" value={contact.title} />
       <Row label="Company" value={contact.company} />
       <Row label="Phone" value={contact.phone} />

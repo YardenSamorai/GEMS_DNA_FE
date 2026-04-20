@@ -28,6 +28,23 @@ const downscaleImage = (file, maxSide = 1600, quality = 0.85) =>
     reader.readAsDataURL(file);
   });
 
+// Generate a tiny thumbnail (~6KB) suitable for inline display in lists.
+const makeThumbnail = (dataUrl, maxSide = 240, quality = 0.7) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.round(img.width * ratio);
+      const h = Math.round(img.height * ratio);
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+
 const fillIfEmpty = (existing, incoming) => {
   if (!incoming) return existing;
   if (existing == null || existing === "") return incoming;
@@ -197,9 +214,29 @@ export default function ScanCardModal({ onClose, onSaved }) {
     }
     setSaving(true);
     try {
+      // Build the card image payload. If splitting two people, give each their respective side.
+      const buildImagePayload = async (idx) => {
+        let front = imageFront;
+        let back = imageBack;
+        if (formsToSave.length === 2) {
+          // form 0 = front of card, form 1 = back of card
+          front = idx === 0 ? imageFront : imageBack;
+          back = null;
+        }
+        const thumbSource = front || back;
+        const thumb = thumbSource ? await makeThumbnail(thumbSource) : null;
+        return {
+          cardImageFront: front,
+          cardImageBack: back,
+          cardImageThumb: thumb,
+        };
+      };
+
       const created = [];
-      for (const f of formsToSave) {
-        const res = await createContact({ userId: user.id, ...f });
+      for (let i = 0; i < formsToSave.length; i++) {
+        const f = formsToSave[i];
+        const imgPayload = await buildImagePayload(i);
+        const res = await createContact({ userId: user.id, ...f, ...imgPayload });
         created.push(res);
       }
       // If two people saved, link them via linked_contact_ids
@@ -240,6 +277,16 @@ export default function ScanCardModal({ onClose, onSaved }) {
           ? `${existing.notes}\n\n--- From scan ${new Date().toLocaleDateString()} ---\n${f.notes || ""}`.trim()
           : f.notes,
       };
+      // Attach scanned card images (don't overwrite existing ones unless missing)
+      if (imageFront && !existing.has_card_front && !existing.card_image_front) {
+        merged.cardImageFront = imageFront;
+      }
+      if (imageBack && !existing.has_card_back && !existing.card_image_back) {
+        merged.cardImageBack = imageBack;
+      }
+      if ((imageFront || imageBack) && !existing.card_image_thumb) {
+        try { merged.cardImageThumb = await makeThumbnail(imageFront || imageBack); } catch (_) {}
+      }
       const updated = await updateContact(existing.id, merged);
       toast.success(`Merged into ${existing.name}`);
       onSaved?.(updated);

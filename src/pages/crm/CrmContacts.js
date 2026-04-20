@@ -19,6 +19,7 @@ import FolderTree from "./components/FolderTree";
 import AdvancedFiltersDrawer, { EMPTY_FILTERS, countActiveFilters } from "./components/AdvancedFiltersDrawer";
 import ImportContactsModal from "./components/ImportContactsModal";
 import BroadcastEmailModal from "./components/BroadcastEmailModal";
+import CardImageLightbox from "./components/CardImageLightbox";
 
 const typeStyle = (type) => {
   const t = CONTACT_TYPES.find((x) => x.value === type);
@@ -50,6 +51,7 @@ export default function CrmContacts() {
   const [drawerId, setDrawerId] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [showTagModal, setShowTagModal] = useState(false);
+  const [cardLightbox, setCardLightbox] = useState(null); // { contactId, name, hasBack }
 
   useEffect(() => {
     if (routeId) setDrawerId(routeId);
@@ -378,6 +380,7 @@ export default function CrmContacts() {
                         className="w-4 h-4 rounded border-stone-300 text-stone-900 focus:ring-stone-500"
                       />
                     </th>
+                    <th className="py-3 px-2 font-medium w-14">Card</th>
                     <th className="py-3 px-4 font-medium">Name</th>
                     <th className="py-3 px-4 font-medium">Title</th>
                     <th className="py-3 px-4 font-medium">Type</th>
@@ -403,6 +406,18 @@ export default function CrmContacts() {
                           onChange={() => toggleSelect(c.id)}
                           onClick={(e) => e.stopPropagation()}
                           className="w-4 h-4 rounded border-stone-300 text-stone-900 focus:ring-stone-500"
+                        />
+                      </td>
+                      <td className="py-3 px-2">
+                        <CardThumb
+                          contact={c}
+                          onOpen={() =>
+                            setCardLightbox({
+                              contactId: c.id,
+                              name: c.name,
+                              hasBack: !!c.has_card_back,
+                            })
+                          }
                         />
                       </td>
                       <td className="py-3 px-4">
@@ -458,6 +473,24 @@ export default function CrmContacts() {
                             (c.name || "?").charAt(0).toUpperCase()
                           )}
                         </button>
+                        {(c.card_image_thumb || c.has_card_front) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCardLightbox({ contactId: c.id, name: c.name, hasBack: !!c.has_card_back });
+                            }}
+                            className="shrink-0 w-12 h-9 rounded-md overflow-hidden border border-stone-200 bg-stone-100"
+                            aria-label="View card image"
+                          >
+                            {c.card_image_thumb ? (
+                              <img src={c.card_image_thumb} alt="Card" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-stone-400">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 8a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" /></svg>
+                              </div>
+                            )}
+                          </button>
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="font-semibold text-stone-900 truncate">{c.name}</div>
@@ -533,6 +566,14 @@ export default function CrmContacts() {
           recipients={broadcastRecipients}
           onClose={() => setShowBroadcast(false)}
           onSent={() => reload()}
+        />
+      )}
+      {cardLightbox && (
+        <CardImageLightbox
+          contactId={cardLightbox.contactId}
+          contactName={cardLightbox.name}
+          hasBack={cardLightbox.hasBack}
+          onClose={() => setCardLightbox(null)}
         />
       )}
       {showMoveFolder && (
@@ -612,6 +653,33 @@ const EmptyState = ({ onCreate, hasFilter }) => (
     )}
   </div>
 );
+
+function CardThumb({ contact, onOpen }) {
+  const hasFront = contact.has_card_front || !!contact.card_image_thumb;
+  if (!hasFront) {
+    return <div className="w-12 h-9 rounded-md border border-dashed border-stone-200 bg-stone-50" />;
+  }
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onOpen(); }}
+      className="group relative w-12 h-9 rounded-md overflow-hidden border border-stone-200 bg-stone-100 hover:ring-2 hover:ring-stone-400"
+      title="View business card"
+    >
+      {contact.card_image_thumb ? (
+        <img src={contact.card_image_thumb} alt="Card" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-stone-400">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 8a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" /></svg>
+        </div>
+      )}
+      {contact.has_card_back && (
+        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-stone-900 text-white text-[8px] font-bold flex items-center justify-center ring-2 ring-white" title="Has back side">
+          2
+        </span>
+      )}
+    </button>
+  );
+}
 
 function BulkTagModal({ existingTags, onClose, onApply, count }) {
   const [tag, setTag] = useState("");
