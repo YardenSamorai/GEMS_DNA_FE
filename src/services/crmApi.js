@@ -132,6 +132,14 @@ export const fetchWhatsappLog = (userId, filters = {}) =>
 export const fetchCrmStats = (userId) =>
   fetch(`${API_BASE}/api/crm/stats${qs({ userId })}`).then(json);
 
+/* ---------- Business card scanner ---------- */
+export const scanBusinessCard = (userId, imageBase64) =>
+  fetch(`${API_BASE}/api/crm/scan-card`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, imageBase64 }),
+  }).then(json);
+
 /* ---------- Constants ---------- */
 export const CONTACT_TYPES = [
   { value: "lead", label: "Lead", color: "bg-amber-100 text-amber-700 border-amber-200" },
