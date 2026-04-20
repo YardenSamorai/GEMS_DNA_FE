@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { API_BASE } from "../../inventory/helpers/constants";
-import { getMappedCategories } from "../../utils/categoryMap";
+import { getMappedCategories } from "../../../utils/categoryMap";
 
 /**
  * Three-tab inventory picker (Diamonds / Gemstones / Jewelry) with smart search,
