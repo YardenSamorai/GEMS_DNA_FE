@@ -5289,6 +5289,7 @@ const StoneSearchPage = () => {
     setCurrentPage(1);
     setSmartSearch('');
     setSortConfig({ field: 'sku', direction: 'asc' });
+    if (newMode !== 'gemstones') setPriceMode('neto');
     setColumnConfig(getColumnConfig(user?.id || 'default', newMode));
     if (newMode === 'jewelry') setPriceMode('bruto');
   };
@@ -6517,7 +6518,7 @@ const StoneSearchPage = () => {
                   </button>
                 </div>
 
-                {inventoryMode !== 'jewelry' && (
+                {inventoryMode === 'gemstones' && (
                 <button
                   onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
                     className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
