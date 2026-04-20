@@ -101,14 +101,24 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
 
   return (
     <div className="fixed inset-0 z-40 flex">
-      <div className="flex-1 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="hidden sm:block flex-1 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
       <div className="w-full sm:w-[640px] bg-white shadow-2xl flex flex-col h-full overflow-hidden">
         {loading || !deal ? (
           <div className="flex-1 flex items-center justify-center text-sm text-stone-500">Loading…</div>
         ) : (
           <>
+            {/* Mobile header bar */}
+            <div className="sm:hidden flex items-center gap-2 px-3 py-2 border-b border-stone-200 bg-white">
+              <button onClick={onClose} className="p-1.5 -ml-1 rounded-lg hover:bg-stone-100">
+                <svg className="w-5 h-5 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <div className="flex-1 text-sm font-semibold text-stone-700 truncate">Deal</div>
+              <button onClick={handleDelete} className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
+              </button>
+            </div>
             {/* Header */}
-            <div className="px-5 py-4 border-b border-stone-200">
+            <div className="px-4 sm:px-5 py-4 border-b border-stone-200">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <input
@@ -119,7 +129,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
                   />
                   <div className="text-sm text-stone-500 mt-1">{deal.contact_name}{deal.contact_company ? ` · ${deal.contact_company}` : ""}</div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="hidden sm:flex items-center gap-1">
                   <button onClick={handleDelete} className="p-2 rounded-lg text-rose-600 hover:bg-rose-50">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
                   </button>
@@ -143,7 +153,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5 pb-8">
               {/* Numbers */}
               <div className="grid grid-cols-2 gap-3">
                 <Card label="Deal value">

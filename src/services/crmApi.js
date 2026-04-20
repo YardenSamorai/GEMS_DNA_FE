@@ -44,6 +44,23 @@ export const updateContact = (id, payload) =>
 export const deleteContact = (id) =>
   fetch(`${API_BASE}/api/crm/contacts/${id}`, { method: "DELETE" }).then(json);
 
+export const bulkDeleteContacts = (userId, ids) =>
+  fetch(`${API_BASE}/api/crm/contacts/bulk-delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, ids }),
+  }).then(json);
+
+export const bulkTagContacts = (userId, ids, tag, action) =>
+  fetch(`${API_BASE}/api/crm/contacts/bulk-tag`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, ids, tag, action }),
+  }).then(json);
+
+export const fetchTags = (userId) =>
+  fetch(`${API_BASE}/api/crm/tags${qs({ userId })}`).then(json);
+
 /* ---------- Interactions ---------- */
 export const createInteraction = (payload) =>
   fetch(`${API_BASE}/api/crm/interactions`, {
@@ -138,6 +155,14 @@ export const scanBusinessCard = (userId, imageBase64) =>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, imageBase64 }),
+  }).then(json);
+
+/* ---------- Verify business online ---------- */
+export const verifyBusiness = (contact) =>
+  fetch(`${API_BASE}/api/crm/verify-business`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contact }),
   }).then(json);
 
 /* ---------- Constants ---------- */

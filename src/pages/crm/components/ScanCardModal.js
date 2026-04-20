@@ -5,6 +5,7 @@ import {
   scanBusinessCard,
   createContact,
   updateContact,
+  verifyBusiness,
   CONTACT_TYPES,
 } from "../../../services/crmApi";
 
@@ -46,6 +47,8 @@ export default function ScanCardModal({ onClose, onSaved }) {
   const [form, setForm] = useState(null);
   const [mergeMode, setMergeMode] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verification, setVerification] = useState(null);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -99,7 +102,47 @@ export default function ScanCardModal({ onClose, onSaved }) {
     setMatches([]);
     setForm(null);
     setMergeMode(null);
+    setVerification(null);
     setStep("capture");
+  };
+
+  const handleVerifyOnline = async () => {
+    if (!form) return;
+    setVerifying(true);
+    setVerification(null);
+    try {
+      const r = await verifyBusiness({
+        name: form.name,
+        company: form.company,
+        email: form.email,
+        phone: form.phone,
+        country: form.country,
+        city: form.city,
+      });
+      setVerification(r);
+
+      // Auto-fill empty fields from the discovered data
+      const df = r?.discoveredFields || {};
+      const patch = {};
+      ["company", "phone", "email", "country", "city", "address"].forEach((k) => {
+        if (df[k] && !form[k]) patch[k] = df[k];
+      });
+      const extras = ["website", "linkedin", "instagram", "industry", "yearsActive"]
+        .filter((k) => df[k])
+        .map((k) => `${k}: ${df[k]}`);
+      if (extras.length || df.notes) {
+        const verifiedNote = `\n\n--- Verified online ${new Date().toLocaleDateString()} ---\n${extras.join("\n")}${df.notes ? "\n" + df.notes : ""}`.trim();
+        patch.notes = (form.notes ? form.notes + "\n\n" : "") + verifiedNote;
+      }
+      if (Object.keys(patch).length > 0) {
+        setForm((f) => ({ ...f, ...patch }));
+        toast.success("Filled in missing details from web");
+      }
+    } catch (e) {
+      toast.error(e.message || "Verification failed");
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const handleSaveNew = async () => {
@@ -148,8 +191,8 @@ export default function ScanCardModal({ onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white sm:rounded-2xl rounded-t-2xl w-full sm:max-w-lg shadow-2xl max-h-[95vh] sm:max-h-[92vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
           <div>
@@ -315,6 +358,56 @@ export default function ScanCardModal({ onClose, onSaved }) {
                   <img src={imageData} alt="Card" className="mt-2 max-h-40 rounded-lg border border-stone-200" />
                 </details>
               )}
+
+              {/* Verify online */}
+              <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-3">
+                <div className="flex items-start gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-stone-900">Verify business online</div>
+                    <div className="text-[11px] text-stone-600 mt-0.5">
+                      Cross-check the card against the public web (LinkedIn, official site, trade directories) and auto-fill anything that's missing.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleVerifyOnline}
+                  disabled={verifying || !form.name?.trim()}
+                  className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {verifying ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                      Searching the web…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                      {verification ? "Verify again" : "Verify online"}
+                    </>
+                  )}
+                </button>
+                {verification && (
+                  <div className={`mt-3 rounded-lg p-2.5 text-xs ${verification.verified ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
+                    <div className="font-semibold">
+                      {verification.verified ? "Verified" : "Could not fully verify"}
+                      {verification.confidence && <span className="ml-1 opacity-70">· {verification.confidence}</span>}
+                    </div>
+                    {verification.summary && <div className="mt-0.5 opacity-90">{verification.summary}</div>}
+                    {verification.sources && verification.sources.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
+                        {verification.sources.map((s, i) => (
+                          <a key={i} href={s.url} target="_blank" rel="noreferrer" className="underline opacity-80 hover:opacity-100">
+                            {s.label || "source"}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Editable form */}
               <div className="space-y-3">

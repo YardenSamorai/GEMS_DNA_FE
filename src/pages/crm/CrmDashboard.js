@@ -4,15 +4,15 @@ import { useUser } from "@clerk/clerk-react";
 import { fetchCrmStats, CONTACT_TYPES } from "../../services/crmApi";
 
 const StatCard = ({ label, value, sub, accent = "stone", icon }) => (
-  <div className="bg-white rounded-xl border border-stone-200 p-4 hover:shadow-md transition-shadow">
-    <div className="flex items-start justify-between">
-      <div>
-        <div className="text-xs uppercase tracking-wider text-stone-500 font-medium">{label}</div>
-        <div className="mt-1 text-2xl font-bold text-stone-900">{value}</div>
-        {sub && <div className="text-xs text-stone-500 mt-1">{sub}</div>}
+  <div className="bg-white rounded-xl border border-stone-200 p-3 sm:p-4 hover:shadow-md transition-shadow">
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] sm:text-xs uppercase tracking-wider text-stone-500 font-medium truncate">{label}</div>
+        <div className="mt-0.5 sm:mt-1 text-lg sm:text-2xl font-bold text-stone-900 truncate">{value}</div>
+        {sub && <div className="text-[10px] sm:text-xs text-stone-500 mt-0.5 sm:mt-1 truncate">{sub}</div>}
       </div>
       {icon && (
-        <div className={`p-2 rounded-lg bg-${accent}-100 text-${accent}-600`}>{icon}</div>
+        <div className={`p-1.5 sm:p-2 rounded-lg bg-${accent}-100 text-${accent}-600 shrink-0`}>{icon}</div>
       )}
     </div>
   </div>
@@ -66,9 +66,9 @@ export default function CrmDashboard() {
   const maxMonthly = Math.max(1, ...monthly.map((m) => Number(m.value || 0)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Top stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         <StatCard
           label="Contacts"
           value={c.total || 0}
@@ -100,8 +100,8 @@ export default function CrmDashboard() {
       </div>
 
       {/* Tasks bar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-stone-200 p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-stone-900">Tasks</h3>
             <Link to="/crm/tasks" className="text-xs text-stone-500 hover:text-stone-800">View all →</Link>
@@ -114,16 +114,16 @@ export default function CrmDashboard() {
         </div>
 
         {/* Contact mix */}
-        <div className="bg-white rounded-xl border border-stone-200 p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5 lg:col-span-2">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h3 className="font-semibold text-stone-900">Contact mix</h3>
             <Link to="/crm/contacts" className="text-xs text-stone-500 hover:text-stone-800">Manage →</Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
             {CONTACT_TYPES.map((t) => (
-              <div key={t.value} className={`rounded-lg border ${t.color} px-3 py-2.5`}>
-                <div className="text-[10px] uppercase tracking-wider opacity-70">{t.label}</div>
-                <div className="text-xl font-bold mt-0.5">{c[t.value === "lead" ? "leads" : `${t.value}s`] || 0}</div>
+              <div key={t.value} className={`rounded-lg border ${t.color} px-2 sm:px-3 py-2 sm:py-2.5`}>
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-70">{t.label}</div>
+                <div className="text-lg sm:text-xl font-bold mt-0.5">{c[t.value === "lead" ? "leads" : `${t.value}s`] || 0}</div>
               </div>
             ))}
           </div>
@@ -131,8 +131,8 @@ export default function CrmDashboard() {
       </div>
 
       {/* Monthly won + Recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-stone-200 p-5 lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5 lg:col-span-2">
           <h3 className="font-semibold text-stone-900 mb-4">Won deals — last 12 months</h3>
           {monthly.length === 0 ? (
             <div className="text-sm text-stone-500 py-8 text-center">No closed deals yet</div>
@@ -152,8 +152,8 @@ export default function CrmDashboard() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-stone-200 p-5">
-          <h3 className="font-semibold text-stone-900 mb-4">Recent activity</h3>
+        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5">
+          <h3 className="font-semibold text-stone-900 mb-3 sm:mb-4">Recent activity</h3>
           {(stats?.recentInteractions || []).length === 0 ? (
             <div className="text-sm text-stone-500 py-8 text-center">No activity yet</div>
           ) : (
@@ -176,8 +176,8 @@ export default function CrmDashboard() {
       </div>
 
       {/* Top contacts */}
-      <div className="bg-white rounded-xl border border-stone-200 p-5">
-        <h3 className="font-semibold text-stone-900 mb-4">Top contacts by revenue</h3>
+      <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5">
+        <h3 className="font-semibold text-stone-900 mb-3 sm:mb-4">Top contacts by revenue</h3>
         {(stats?.topContacts || []).length === 0 ? (
           <div className="text-sm text-stone-500 py-8 text-center">No closed deals to rank yet</div>
         ) : (
