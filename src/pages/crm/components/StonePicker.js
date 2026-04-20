@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { API_BASE } from "../../inventory/helpers/constants";
+import { API_BASE, getDisplayShape, LEVEL_1_SHAPES } from "../../inventory/helpers/constants";
 import { getMappedCategories } from "../../../utils/categoryMap";
 
 /**
@@ -72,12 +72,26 @@ export default function StonePicker({ onClose, onSelect }) {
     });
   }, [stones, jewelry, tab]);
 
-  // Available shapes for the current tab (sorted, unique)
+  // Available shapes for the current tab — grouped by DNA name (Cushion, Round, …)
+  // with a count per group. Same mapping used on the Inventory page.
   const availableShapes = useMemo(() => {
     if (tab === "jewelry") return [];
-    const set = new Set();
-    baseList.forEach((s) => { if (s.shape) set.add(s.shape); });
-    return Array.from(set).sort();
+    const counts = new Map(); // dnaName -> count
+    baseList.forEach((s) => {
+      const dna = s.shape ? getDisplayShape(s.shape) : null;
+      if (!dna) return;
+      counts.set(dna, (counts.get(dna) || 0) + 1);
+    });
+    const arr = Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
+    // Sort: LEVEL_1 shapes first (in their canonical order), then the rest alphabetically
+    const lvl1 = new Map(LEVEL_1_SHAPES.map((n, i) => [n, i]));
+    arr.sort((a, b) => {
+      const ai = lvl1.has(a.name) ? lvl1.get(a.name) : 1000;
+      const bi = lvl1.has(b.name) ? lvl1.get(b.name) : 1000;
+      if (ai !== bi) return ai - bi;
+      return a.name.localeCompare(b.name);
+    });
+    return arr;
   }, [baseList, tab]);
 
   // Reset shape filter when switching tabs to avoid stale selections
@@ -115,7 +129,10 @@ export default function StonePicker({ onClose, onSelect }) {
     let list = baseList.filter((s) => matchesSearch(s, tokens));
 
     if (tab !== "jewelry") {
-      if (shapes.length > 0) list = list.filter((s) => shapes.includes(s.shape));
+      if (shapes.length > 0) {
+        const wanted = new Set(shapes);
+        list = list.filter((s) => wanted.has(getDisplayShape(s.shape)));
+      }
       const lo = minCt !== "" ? Number(minCt) : null;
       const hi = maxCt !== "" ? Number(maxCt) : null;
       if (lo != null && !isNaN(lo)) list = list.filter((s) => (s.weightCt ?? 0) >= lo);
@@ -225,17 +242,20 @@ export default function StonePicker({ onClose, onSelect }) {
                 {availableShapes.length === 0 ? (
                   <div className="text-xs text-stone-400 italic">No shapes available</div>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-                    {availableShapes.map((sh) => {
-                      const on = shapes.includes(sh);
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {availableShapes.map(({ name, count }) => {
+                      const on = shapes.includes(name);
                       return (
                         <button
-                          key={sh}
-                          onClick={() => toggleShape(sh)}
-                          className={`text-[11px] px-2.5 py-1 rounded-full border ${
+                          key={name}
+                          onClick={() => toggleShape(name)}
+                          className={`text-[11px] px-2.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${
                             on ? "bg-stone-900 text-white border-stone-900" : "bg-white text-stone-700 border-stone-200 hover:border-stone-400"
                           }`}
-                        >{sh}</button>
+                        >
+                          {name}
+                          <span className={`text-[10px] ${on ? "text-white/70" : "text-stone-400"}`}>{count}</span>
+                        </button>
                       );
                     })}
                   </div>
@@ -321,7 +341,7 @@ export default function StonePicker({ onClose, onSelect }) {
                         <div className="text-xs text-stone-500 truncate">
                           {tab === "jewelry"
                             ? [item.jewelryType, item.style, item.metalType, item.stoneType].filter(Boolean).join(" · ")
-                            : [item.shape, item.weightCt && `${item.weightCt}ct`, item.color, item.clarity, item.lab].filter(Boolean).join(" · ")
+                            : [item.shape ? getDisplayShape(item.shape) : null, item.weightCt && `${item.weightCt}ct`, item.color, item.clarity, item.lab].filter(Boolean).join(" · ")
                           }
                         </div>
                       </div>
