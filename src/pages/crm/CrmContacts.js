@@ -9,6 +9,7 @@ import {
 } from "../../services/crmApi";
 import ContactDrawer from "./components/ContactDrawer";
 import ContactFormModal from "./components/ContactFormModal";
+import ScanCardModal from "./components/ScanCardModal";
 
 const typeStyle = (type) => {
   const t = CONTACT_TYPES.find((x) => x.value === type);
@@ -24,6 +25,7 @@ export default function CrmContacts() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
+  const [showScan, setShowScan] = useState(false);
   const [drawerId, setDrawerId] = useState(null);
 
   useEffect(() => {
@@ -87,13 +89,27 @@ export default function CrmContacts() {
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-stone-200 bg-white focus:outline-none focus:border-stone-400"
           />
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          New contact
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowScan(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-stone-300 text-stone-800 text-sm font-medium hover:border-stone-500 transition-colors"
+            title="Scan business card"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="hidden sm:inline">Scan card</span>
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            <span className="hidden sm:inline">New contact</span>
+            <span className="sm:hidden">New</span>
+          </button>
+        </div>
       </div>
 
       {/* Type chips */}
@@ -194,6 +210,16 @@ export default function CrmContacts() {
         <ContactFormModal
           onClose={() => setShowForm(false)}
           onSubmit={handleCreate}
+        />
+      )}
+
+      {showScan && (
+        <ScanCardModal
+          onClose={() => setShowScan(false)}
+          onSaved={(c) => {
+            reload();
+            if (c?.id) setDrawerId(String(c.id));
+          }}
         />
       )}
 
