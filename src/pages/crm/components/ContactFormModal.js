@@ -1,21 +1,33 @@
-import React, { useState } from "react";
-import { CONTACT_TYPES } from "../../../services/crmApi";
+import React, { useState, useEffect } from "react";
+import { useUser } from "@clerk/clerk-react";
+import { CONTACT_TYPES, fetchFolders } from "../../../services/crmApi";
 
 export default function ContactFormModal({ initial, onClose, onSubmit, title = "New contact" }) {
+  const { user } = useUser();
   const [form, setForm] = useState({
     name: "",
     type: "lead",
+    title: "",
     company: "",
     phone: "",
+    phoneAlt: "",
     email: "",
+    website: "",
     country: "",
     city: "",
     address: "",
     source: "",
     notes: "",
-    ...(initial || {}),
+    folderId: null,
+    ...(initial ? snakeToCamel(initial) : {}),
   });
   const [saving, setSaving] = useState(false);
+  const [folders, setFolders] = useState([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchFolders(user.id).then(setFolders).catch(() => {});
+  }, [user?.id]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -24,18 +36,21 @@ export default function ContactFormModal({ initial, onClose, onSubmit, title = "
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      await onSubmit(form);
+      const payload = { ...form };
+      // Normalise website (strip leading scheme spacing)
+      if (payload.website) payload.website = payload.website.trim();
+      await onSubmit(payload);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
-        className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg shadow-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
       >
         <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
           <h3 className="font-semibold text-stone-900">{title}</h3>
@@ -48,40 +63,69 @@ export default function ContactFormModal({ initial, onClose, onSubmit, title = "
           <Field label="Name *" required>
             <input value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} required autoFocus />
           </Field>
+
           <div className="grid grid-cols-2 gap-3">
+            <Field label="Title">
+              <input value={form.title || ""} onChange={(e) => set("title", e.target.value)} className={inputCls} placeholder="CEO, Designer..." />
+            </Field>
             <Field label="Type">
               <select value={form.type} onChange={(e) => set("type", e.target.value)} className={inputCls}>
                 {CONTACT_TYPES.map((t) => (<option key={t.value} value={t.value}>{t.label}</option>))}
               </select>
             </Field>
-            <Field label="Company">
-              <input value={form.company} onChange={(e) => set("company", e.target.value)} className={inputCls} />
-            </Field>
           </div>
+
+          <Field label="Company">
+            <input value={form.company || ""} onChange={(e) => set("company", e.target.value)} className={inputCls} />
+          </Field>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Phone">
-              <input value={form.phone} onChange={(e) => set("phone", e.target.value)} className={inputCls} placeholder="+972…" />
+              <input value={form.phone || ""} onChange={(e) => set("phone", e.target.value)} className={inputCls} placeholder="+972..." />
             </Field>
-            <Field label="Email">
-              <input value={form.email} onChange={(e) => set("email", e.target.value)} className={inputCls} type="email" />
+            <Field label="Alt phone">
+              <input value={form.phoneAlt || ""} onChange={(e) => set("phoneAlt", e.target.value)} className={inputCls} placeholder="Office..." />
             </Field>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Email">
+              <input value={form.email || ""} onChange={(e) => set("email", e.target.value)} className={inputCls} type="email" />
+            </Field>
+            <Field label="Website">
+              <input value={form.website || ""} onChange={(e) => set("website", e.target.value)} className={inputCls} placeholder="example.com" />
+            </Field>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Country">
-              <input value={form.country} onChange={(e) => set("country", e.target.value)} className={inputCls} />
+              <input value={form.country || ""} onChange={(e) => set("country", e.target.value)} className={inputCls} />
             </Field>
             <Field label="City">
-              <input value={form.city} onChange={(e) => set("city", e.target.value)} className={inputCls} />
+              <input value={form.city || ""} onChange={(e) => set("city", e.target.value)} className={inputCls} />
             </Field>
           </div>
+
           <Field label="Address">
-            <input value={form.address} onChange={(e) => set("address", e.target.value)} className={inputCls} />
+            <input value={form.address || ""} onChange={(e) => set("address", e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Source">
-            <input value={form.source} onChange={(e) => set("source", e.target.value)} className={inputCls} placeholder="Referral, Instagram, Show…" />
-          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Source">
+              <input value={form.source || ""} onChange={(e) => set("source", e.target.value)} className={inputCls} placeholder="Referral, Show..." />
+            </Field>
+            <Field label="Folder">
+              <select value={form.folderId || ""} onChange={(e) => set("folderId", e.target.value ? Number(e.target.value) : null)} className={inputCls}>
+                <option value="">— None —</option>
+                {buildFolderOptions(folders).map((opt) => (
+                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
           <Field label="Notes">
-            <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} className={`${inputCls} min-h-[80px]`} />
+            <textarea value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} className={`${inputCls} min-h-[80px]`} />
           </Field>
         </div>
 
@@ -104,3 +148,33 @@ const Field = ({ label, children }) => (
     {children}
   </label>
 );
+
+// Convert snake_case fields from API to camelCase for the form
+function snakeToCamel(obj) {
+  const out = {};
+  for (const k of Object.keys(obj || {})) {
+    const ck = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[ck] = obj[k];
+  }
+  return out;
+}
+
+// Build hierarchical folder options with indentation
+function buildFolderOptions(folders) {
+  const byParent = new Map();
+  for (const f of folders) {
+    const key = f.parent_id || 0;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(f);
+  }
+  const out = [];
+  const walk = (parentId, depth) => {
+    const list = byParent.get(parentId) || [];
+    for (const f of list) {
+      out.push({ id: f.id, label: `${"\u00a0\u00a0".repeat(depth)}${f.name}` });
+      walk(f.id, depth + 1);
+    }
+  };
+  walk(0, 0);
+  return out;
+}
