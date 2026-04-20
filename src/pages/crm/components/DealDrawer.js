@@ -100,7 +100,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
   const itemsTotal = deal?.items?.reduce((a, i) => a + Number(i.custom_price || 0) * Number(i.quantity || 1), 0) || 0;
 
   return (
-    <div className="fixed inset-0 z-40 flex">
+    <div className="fixed inset-0 z-[60] flex">
       <div className="hidden sm:block flex-1 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
       <div className="w-full sm:w-[640px] bg-white shadow-2xl flex flex-col h-full overflow-hidden">
         {loading || !deal ? (
@@ -108,7 +108,10 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
         ) : (
           <>
             {/* Mobile header bar */}
-            <div className="sm:hidden flex items-center gap-2 px-3 py-2 border-b border-stone-200 bg-white">
+            <div
+              className="sm:hidden flex items-center gap-2 px-3 py-2 border-b border-stone-200 bg-white"
+              style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 8px)" }}
+            >
               <button onClick={onClose} className="p-1.5 -ml-1 rounded-lg hover:bg-stone-100">
                 <svg className="w-5 h-5 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>

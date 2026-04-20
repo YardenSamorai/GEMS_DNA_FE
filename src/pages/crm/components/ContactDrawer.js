@@ -87,7 +87,7 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex">
+    <div className="fixed inset-0 z-[60] flex">
       <div className="hidden sm:block flex-1 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
       <div className="w-full sm:w-[560px] bg-white shadow-2xl flex flex-col h-full overflow-hidden">
         {loading || !contact ? (
@@ -95,7 +95,10 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
         ) : (
           <>
             {/* Header */}
-            <div className="px-4 sm:px-5 pt-3 pb-4 border-b border-stone-200 bg-white sticky top-0 z-10">
+            <div
+              className="px-4 sm:px-5 pt-3 pb-4 border-b border-stone-200 bg-white sticky top-0 z-10"
+              style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 12px)" }}
+            >
               <div className="flex items-center gap-2 mb-3 sm:hidden">
                 <button onClick={onClose} className="p-1.5 -ml-1.5 rounded-lg hover:bg-stone-100">
                   <svg className="w-5 h-5 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
