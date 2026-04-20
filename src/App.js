@@ -123,33 +123,15 @@ const NAV_ITEMS = [
   },
 ];
 
-const Header = () => {
+const Header = ({ onOpenMobileMenu }) => {
   const location = useLocation();
   const currentPath = location.pathname;
   const { theme } = useTheme();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActive = (path) => currentPath === path;
 
-  // Close mobile menu when route changes
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [currentPath]);
-
-  // Lock body scroll while menu open
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [mobileMenuOpen]);
-
   return (
-    <header className="sticky top-0 z-50 glass border-b border-stone-200/50">
+    <header className="sticky top-0 z-40 glass border-b border-stone-200/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -215,7 +197,7 @@ const Header = () => {
               <div className="flex items-center gap-3">
                 {/* Hamburger - mobile only */}
                 <button
-                  onClick={() => setMobileMenuOpen(true)}
+                  onClick={onOpenMobileMenu}
                   aria-label="Open menu"
                   className={`md:hidden p-2 rounded-lg transition-colors ${theme === 'dark' ? 'text-stone-300 hover:bg-stone-800' : 'text-stone-700 hover:bg-stone-100'}`}
                 >
@@ -238,89 +220,122 @@ const Header = () => {
         </div>
       </div>
 
-      {/* Mobile drawer */}
-      <SignedIn>
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              key="mobile-menu"
-              className="md:hidden fixed inset-0 z-50"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Backdrop */}
-              <div
-                className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-                onClick={() => setMobileMenuOpen(false)}
-              />
-              {/* Drawer */}
-              <motion.aside
-                role="dialog"
-                aria-modal="true"
-                className={`absolute right-0 top-0 bottom-0 w-72 max-w-[85%] shadow-2xl flex flex-col ${theme === 'dark' ? 'bg-stone-900' : 'bg-white'}`}
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              >
-                {/* Drawer header */}
-                <div className={`flex items-center justify-between px-4 h-16 border-b ${theme === 'dark' ? 'border-stone-800' : 'border-stone-200'}`}>
-                  <div className="flex items-center gap-2.5">
-                    <DiamondIcon />
-                    <div className="flex flex-col leading-tight">
-                      <span className="text-base font-bold text-gradient">GEMS DNA</span>
-                      <span className={`text-[10px] font-medium tracking-widest uppercase ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>Menu</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-label="Close menu"
-                    className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Nav items */}
-                <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-                  {NAV_ITEMS.map((item) => {
-                    const active = item.matches(currentPath);
-                    return (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] font-medium transition-all ${
-                          active
-                            ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
-                            : theme === 'dark'
-                              ? 'text-stone-200 hover:bg-stone-800'
-                              : 'text-stone-700 hover:bg-stone-100'
-                        }`}
-                      >
-                        {item.icon("w-5 h-5")}
-                        <span>{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </nav>
-
-                {/* Footer */}
-                <div className={`p-4 border-t flex items-center justify-between ${theme === 'dark' ? 'border-stone-800' : 'border-stone-200'}`}>
-                  <span className={`text-xs ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>Theme</span>
-                  <ThemeToggle />
-                </div>
-              </motion.aside>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </SignedIn>
     </header>
   );
+};
+
+const MobileMenuDrawer = ({ open, onClose }) => {
+  const location = useLocation();
+  const currentPath = location.pathname;
+  const { theme } = useTheme();
+
+  // Lock body scroll while menu open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="mobile-menu"
+          className="md:hidden fixed inset-0 z-[100]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ height: "100dvh" }}
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          {/* Drawer */}
+          <motion.aside
+            role="dialog"
+            aria-modal="true"
+            className={`absolute right-0 top-0 bottom-0 w-72 max-w-[85%] shadow-2xl flex flex-col ${theme === 'dark' ? 'bg-stone-900' : 'bg-white'}`}
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            style={{ height: "100dvh" }}
+          >
+            {/* Drawer header */}
+            <div
+              className={`flex items-center justify-between px-4 h-16 border-b shrink-0 ${theme === 'dark' ? 'border-stone-800' : 'border-stone-200'}`}
+              style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+            >
+              <div className="flex items-center gap-2.5">
+                <DiamondIcon />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-base font-bold text-gradient">GEMS DNA</span>
+                  <span className={`text-[10px] font-medium tracking-widest uppercase ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>Menu</span>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                aria-label="Close menu"
+                className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Nav items */}
+            <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1">
+              {NAV_ITEMS.map((item) => {
+                const active = item.matches(currentPath);
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    className={`flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] font-medium transition-all ${
+                      active
+                        ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
+                        : theme === 'dark'
+                          ? 'text-stone-200 hover:bg-stone-800'
+                          : 'text-stone-700 hover:bg-stone-100'
+                    }`}
+                  >
+                    {item.icon("w-5 h-5")}
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Footer */}
+            <div
+              className={`p-4 border-t flex items-center justify-between shrink-0 ${theme === 'dark' ? 'border-stone-800' : 'border-stone-200'}`}
+              style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)" }}
+            >
+              <span className={`text-xs ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>Theme</span>
+              <ThemeToggle />
+            </div>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const RouteChangeListener = ({ onChange }) => {
+  const location = useLocation();
+  useEffect(() => {
+    onChange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+  return null;
 };
 
 const NavLink = ({ to, active, children }) => {
@@ -352,7 +367,8 @@ function App() {
 
 function AppContent() {
   const { theme } = useTheme();
-  
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <>
       <Toaster 
@@ -374,7 +390,11 @@ function AppContent() {
       />
       <Router>
         <div className="min-h-screen flex flex-col">
-          <Header />
+          <Header onOpenMobileMenu={() => setMobileMenuOpen(true)} />
+          <SignedIn>
+            <MobileMenuDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+            <RouteChangeListener onChange={() => setMobileMenuOpen(false)} />
+          </SignedIn>
           <main className="flex-1">
             <Routes>
               {/* Landing/Onboarding Page */}
