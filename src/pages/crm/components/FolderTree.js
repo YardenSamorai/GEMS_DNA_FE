@@ -11,11 +11,17 @@ import { createFolder, updateFolder, deleteFolder } from "../../../services/crmA
  *   userId
  *   onChange: () => void  (called after create/rename/delete to refresh)
  */
-export default function FolderTree({ folders, selectedFolderId, onSelect, userId, onChange }) {
+export default function FolderTree({ folders, contacts = [], selectedFolderId, onSelect, userId, onChange }) {
   const tree = useMemo(() => buildTree(folders), [folders]);
-  const totalContacts = useMemo(
-    () => folders.reduce((s, f) => s + (f.direct_count || 0), 0),
-    [folders]
+  // Total = real contacts list length (preferred). Falls back to summing folder counts
+  // if for some reason contacts weren't passed.
+  const totalContacts = useMemo(() => {
+    if (Array.isArray(contacts) && contacts.length > 0) return contacts.length;
+    return folders.reduce((s, f) => s + (f.direct_count || 0), 0);
+  }, [contacts, folders]);
+  const unfiledCount = useMemo(
+    () => contacts.filter((c) => !c.folder_id).length,
+    [contacts]
   );
 
   const handleCreate = async (parentId) => {
@@ -63,6 +69,7 @@ export default function FolderTree({ folders, selectedFolderId, onSelect, userId
         active={selectedFolderId === "unfiled"}
         onClick={() => onSelect("unfiled")}
         label="Unfiled"
+        count={unfiledCount}
         muted
         icon={(
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z" /></svg>
