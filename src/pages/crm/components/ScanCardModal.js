@@ -8,6 +8,7 @@ import {
   verifyBusiness,
   CONTACT_TYPES,
 } from "../../../services/crmApi";
+import { smartCase, polishContact } from "../utils/smartCase";
 
 const downscaleImage = (file, maxSide = 1600, quality = 0.85) =>
   new Promise((resolve, reject) => {
@@ -52,17 +53,17 @@ const fillIfEmpty = (existing, incoming) => {
 };
 
 const initialFormFromExtracted = (data) => ({
-  name: data?.name || "",
+  name: smartCase(data?.name || ""),
   type: data?.type || "lead",
-  title: data?.title || data?.jobTitle || "",
-  company: data?.company || "",
+  title: smartCase(data?.title || data?.jobTitle || ""),
+  company: smartCase(data?.company || ""),
   phone: data?.phone || "",
   phoneAlt: data?.phoneAlt || "",
-  email: data?.email || "",
-  website: data?.website || "",
-  country: data?.country || "",
-  city: data?.city || "",
-  address: data?.address || "",
+  email: (data?.email || "").trim().toLowerCase(),
+  website: (data?.website || "").trim(),
+  country: smartCase(data?.country || ""),
+  city: smartCase(data?.city || ""),
+  address: smartCase(data?.address || ""),
   notes: data?.notes || "",
   source: "Business card",
 });
@@ -204,8 +205,11 @@ export default function ScanCardModal({ onClose, onSaved }) {
   };
 
   /* ---------------- Save ---------------- */
+  // Apply smart casing to user-entered fields one final time (covers manual edits).
   const handleSaveAll = async () => {
-    const formsToSave = isTwoPeople && twoPeopleDecision !== "merge" ? forms : [forms[0]];
+    const formsToSave = isTwoPeople && twoPeopleDecision !== "merge"
+      ? forms.map(polishContact)
+      : [polishContact(forms[0])];
     for (const f of formsToSave) {
       if (!f.name?.trim()) {
         toast.error("Each contact needs a name");
@@ -236,6 +240,9 @@ export default function ScanCardModal({ onClose, onSaved }) {
       for (let i = 0; i < formsToSave.length; i++) {
         const f = formsToSave[i];
         const imgPayload = await buildImagePayload(i);
+        if (!imgPayload.cardImageFront && !imgPayload.cardImageBack) {
+          console.warn("[ScanCardModal] No card image attached for contact", f.name);
+        }
         const res = await createContact({ userId: user.id, ...f, ...imgPayload });
         created.push(res);
       }
@@ -257,8 +264,9 @@ export default function ScanCardModal({ onClose, onSaved }) {
   };
 
   const handleMergeIntoExisting = async (existing) => {
-    const f = forms[activeFormIdx];
-    if (!f) return;
+    const fRaw = forms[activeFormIdx];
+    if (!fRaw) return;
+    const f = polishContact(fRaw);
     setSaving(true);
     try {
       const merged = {
