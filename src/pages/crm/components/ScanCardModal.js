@@ -210,15 +210,32 @@ export default function ScanCardModal({ onClose, onSaved }) {
 
           {step === "preview" && imageData && (
             <div className="p-5 space-y-4">
-              <div className="rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
+              <div className="relative rounded-xl overflow-hidden border border-stone-200 bg-stone-50">
                 <img src={imageData} alt="Card" className="w-full max-h-80 object-contain" />
+                {scanning && (
+                  <>
+                    {/* Subtle dark overlay */}
+                    <div className="absolute inset-0 bg-stone-900/20 pointer-events-none" />
+                    {/* Corner brackets */}
+                    <div className="absolute inset-3 pointer-events-none">
+                      <span className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-emerald-400 rounded-tl" />
+                      <span className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-emerald-400 rounded-tr" />
+                      <span className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-emerald-400 rounded-bl" />
+                      <span className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-emerald-400 rounded-br" />
+                    </div>
+                    {/* Scan line + glow that sweeps left to right */}
+                    <div className="scan-sweep absolute top-0 bottom-0 pointer-events-none" />
+                    {/* Status pill */}
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-stone-900/85 text-white text-xs font-medium shadow-lg backdrop-blur-sm pointer-events-none">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      Reading card…
+                    </div>
+                  </>
+                )}
               </div>
-              {scanning && (
-                <div className="flex items-center gap-2 text-sm text-stone-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                  Reading card with AI…
-                </div>
-              )}
               <div className="flex gap-2">
                 <button onClick={handleRescan} disabled={scanning} className="flex-1 px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg disabled:opacity-50">
                   Retake
@@ -227,6 +244,29 @@ export default function ScanCardModal({ onClose, onSaved }) {
                   {scanning ? "Scanning…" : "Scan card"}
                 </button>
               </div>
+              <style>{`
+                @keyframes scanSweep {
+                  0%   { transform: translateX(-20%); opacity: 0; }
+                  10%  { opacity: 1; }
+                  90%  { opacity: 1; }
+                  100% { transform: translateX(420%); opacity: 0; }
+                }
+                .scan-sweep {
+                  width: 18%;
+                  left: 0;
+                  background: linear-gradient(
+                    to right,
+                    rgba(16, 185, 129, 0)    0%,
+                    rgba(16, 185, 129, 0.15) 35%,
+                    rgba(16, 185, 129, 0.95) 50%,
+                    rgba(16, 185, 129, 0.15) 65%,
+                    rgba(16, 185, 129, 0)    100%
+                  );
+                  box-shadow: 0 0 24px 6px rgba(16, 185, 129, 0.55);
+                  animation: scanSweep 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+                  mix-blend-mode: screen;
+                }
+              `}</style>
             </div>
           )}
 
