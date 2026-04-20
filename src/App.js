@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
+import { AnimatePresence, motion } from "framer-motion";
 import DiamondCard from "./pages/DiamondCard";
 import HomePage from "./pages/HomePage";
 import JewelryPage from "./pages/JewelryPage";
@@ -79,12 +80,73 @@ const ThemeToggle = () => {
   );
 };
 
+const NAV_ITEMS = [
+  {
+    to: "/dashboard",
+    label: "Dashboard",
+    matches: (path) => path === "/dashboard",
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+      </svg>
+    ),
+  },
+  {
+    to: "/inventory",
+    label: "Inventory",
+    matches: (path) => path === "/inventory",
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+  },
+  {
+    to: "/qa",
+    label: "QA",
+    matches: (path) => path === "/qa",
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    to: "/crm",
+    label: "CRM",
+    matches: (path) => path.startsWith("/crm"),
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+];
+
 const Header = () => {
   const location = useLocation();
   const currentPath = location.pathname;
   const { theme } = useTheme();
-  
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const isActive = (path) => currentPath === path;
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [currentPath]);
+
+  // Lock body scroll while menu open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-stone-200/50">
@@ -151,31 +213,18 @@ const Header = () => {
             </SignedOut>
             <SignedIn>
               <div className="flex items-center gap-3">
-                {/* Mobile Menu */}
-                <div className="md:hidden flex items-center gap-2">
-                  <Link to="/dashboard" className={`p-2 rounded-lg transition-colors ${isActive('/dashboard') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                    </svg>
-                  </Link>
-                  <Link to="/inventory" className={`p-2 rounded-lg transition-colors ${isActive('/inventory') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                  </Link>
-                  <Link to="/qa" className={`p-2 rounded-lg transition-colors ${isActive('/qa') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </Link>
-                  <Link to="/crm" className={`p-2 rounded-lg transition-colors ${currentPath.startsWith('/crm') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </Link>
-                </div>
+                {/* Hamburger - mobile only */}
+                <button
+                  onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Open menu"
+                  className={`md:hidden p-2 rounded-lg transition-colors ${theme === 'dark' ? 'text-stone-300 hover:bg-stone-800' : 'text-stone-700 hover:bg-stone-100'}`}
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
                 <div className={`h-8 w-px hidden sm:block ${theme === 'dark' ? 'bg-stone-700' : 'bg-stone-200'}`}></div>
-                <UserButton 
+                <UserButton
                   afterSignOutUrl={currentPath}
                   appearance={{
                     elements: {
@@ -188,6 +237,88 @@ const Header = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile drawer */}
+      <SignedIn>
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              key="mobile-menu"
+              className="md:hidden fixed inset-0 z-50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Backdrop */}
+              <div
+                className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              {/* Drawer */}
+              <motion.aside
+                role="dialog"
+                aria-modal="true"
+                className={`absolute right-0 top-0 bottom-0 w-72 max-w-[85%] shadow-2xl flex flex-col ${theme === 'dark' ? 'bg-stone-900' : 'bg-white'}`}
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 280 }}
+              >
+                {/* Drawer header */}
+                <div className={`flex items-center justify-between px-4 h-16 border-b ${theme === 'dark' ? 'border-stone-800' : 'border-stone-200'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <DiamondIcon />
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-base font-bold text-gradient">GEMS DNA</span>
+                      <span className={`text-[10px] font-medium tracking-widest uppercase ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>Menu</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setMobileMenuOpen(false)}
+                    aria-label="Close menu"
+                    className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Nav items */}
+                <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+                  {NAV_ITEMS.map((item) => {
+                    const active = item.matches(currentPath);
+                    return (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-3 rounded-xl text-[15px] font-medium transition-all ${
+                          active
+                            ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
+                            : theme === 'dark'
+                              ? 'text-stone-200 hover:bg-stone-800'
+                              : 'text-stone-700 hover:bg-stone-100'
+                        }`}
+                      >
+                        {item.icon("w-5 h-5")}
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </nav>
+
+                {/* Footer */}
+                <div className={`p-4 border-t flex items-center justify-between ${theme === 'dark' ? 'border-stone-800' : 'border-stone-200'}`}>
+                  <span className={`text-xs ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>Theme</span>
+                  <ThemeToggle />
+                </div>
+              </motion.aside>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </SignedIn>
     </header>
   );
 };

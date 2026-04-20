@@ -72,8 +72,8 @@ export default function CrmTasks() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="flex items-center gap-2 sm:gap-3">
         <div className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5 text-xs">
           {[
             { v: "all", l: "All" },
@@ -83,9 +83,10 @@ export default function CrmTasks() {
             <button key={f.v} onClick={() => setFilter(f.v)} className={`px-3 py-1.5 rounded-md font-medium ${filter === f.v ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"}`}>{f.l}</button>
           ))}
         </div>
-        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800">
+        <div className="flex-1" />
+        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          New task
+          <span>New task</span>
         </button>
       </div>
 
@@ -185,8 +186,8 @@ function NewTaskModal({ contacts, onClose, onSubmit }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
-      <form onSubmit={handle} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
+      <form onSubmit={handle} onClick={(e) => e.stopPropagation()} className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl">
         <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
           <h3 className="font-semibold text-stone-900">New task</h3>
           <button type="button" onClick={onClose} className="p-1 rounded hover:bg-stone-100">
