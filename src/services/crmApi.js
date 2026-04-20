@@ -227,6 +227,27 @@ export const sendEmailBroadcast = (payload) =>
 export const fetchBroadcastHistory = (userId) =>
   fetch(`${API_BASE}/api/crm/email/broadcasts${qs({ userId })}`).then(json);
 
+/* ---------- Email templates ---------- */
+export const fetchEmailTemplates = (userId) =>
+  fetch(`${API_BASE}/api/crm/email/templates${qs({ userId })}`).then(json);
+
+export const createEmailTemplate = (payload) =>
+  fetch(`${API_BASE}/api/crm/email/templates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const updateEmailTemplate = (id, payload) =>
+  fetch(`${API_BASE}/api/crm/email/templates/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const deleteEmailTemplate = (id) =>
+  fetch(`${API_BASE}/api/crm/email/templates/${id}`, { method: "DELETE" }).then(json);
+
 /* ---------- Outlook integration ---------- */
 export const fetchOutlookStatus = (userId) =>
   fetch(`${API_BASE}/api/crm/outlook/status${qs({ userId })}`).then(json);
