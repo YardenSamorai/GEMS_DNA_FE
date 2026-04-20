@@ -8,6 +8,11 @@ import OnboardingPage from "./pages/OnboardingPage";
 import { Toaster } from "react-hot-toast";
 import Inventory from "./pages/inventory";
 import QAPage from "./pages/QAPage";
+import CrmLayout from "./pages/crm/CrmLayout";
+import CrmDashboard from "./pages/crm/CrmDashboard";
+import CrmContacts from "./pages/crm/CrmContacts";
+import CrmDeals from "./pages/crm/CrmDeals";
+import CrmTasks from "./pages/crm/CrmTasks";
 
 // Theme Context
 const ThemeContext = createContext();
@@ -120,6 +125,12 @@ const Header = () => {
                 </svg>
                 QA
               </NavLink>
+              <NavLink to="/crm" active={currentPath.startsWith('/crm')}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                CRM
+              </NavLink>
             </SignedIn>
           </nav>
 
@@ -155,6 +166,11 @@ const Header = () => {
                   <Link to="/qa" className={`p-2 rounded-lg transition-colors ${isActive('/qa') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </Link>
+                  <Link to="/crm" className={`p-2 rounded-lg transition-colors ${currentPath.startsWith('/crm') ? 'bg-primary-100 text-primary-600' : theme === 'dark' ? 'text-stone-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-100'}`}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </Link>
                 </div>
@@ -274,6 +290,26 @@ function AppContent() {
                   </>
                 }
               />
+
+              <Route
+                path="/crm"
+                element={
+                  <>
+                    <SignedIn>
+                      <CrmLayout />
+                    </SignedIn>
+                    <SignedOut>
+                      <AuthPrompt message="Please sign in to access CRM" />
+                    </SignedOut>
+                  </>
+                }
+              >
+                <Route index element={<CrmDashboard />} />
+                <Route path="contacts" element={<CrmContacts />} />
+                <Route path="contacts/:id" element={<CrmContacts />} />
+                <Route path="deals" element={<CrmDeals />} />
+                <Route path="tasks" element={<CrmTasks />} />
+              </Route>
 
               {/* Public pages */}
               <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />

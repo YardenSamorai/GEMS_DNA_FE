@@ -12,6 +12,7 @@ import { getMappedCategories } from "../../utils/categoryMap";
 import { sanitizeText } from "../../utils/helper";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
+import SendToCrmModal from "../crm/components/SendToCrmModal";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -4999,6 +5000,7 @@ const StoneSearchPage = () => {
   const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
   const [showNiimbotPrint, setShowNiimbotPrint] = useState(false);
   const [niimbotPrintStones, setNiimbotPrintStones] = useState([]);
+  const [showSendToCrm, setShowSendToCrm] = useState(false);
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -6680,6 +6682,17 @@ const StoneSearchPage = () => {
                           <span className="font-medium">Print Labels</span>
                         </button>
                         <button
+                          onClick={() => setShowSendToCrm(true)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-amber-50 transition-colors border-t border-stone-100"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          </div>
+                          <span className="font-medium">Send to CRM</span>
+                        </button>
+                        <button
                           onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors border-t border-stone-100"
                         >
@@ -6765,7 +6778,27 @@ const StoneSearchPage = () => {
                           <p className="text-xs text-stone-500">Print via Bluetooth (NIIMBOT)</p>
                         </div>
                       </button>
-                      
+
+                      {/* CRM Section */}
+                      <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
+                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">CRM</span>
+                      </div>
+
+                      <button
+                        onClick={() => setShowSendToCrm(true)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-amber-50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium">Send to CRM</span>
+                          <p className="text-xs text-stone-500">Add to a deal or contact</p>
+                        </div>
+                      </button>
+
                       {/* Share Section */}
                       <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
                         <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Share</span>
@@ -7380,6 +7413,14 @@ const StoneSearchPage = () => {
         onClose={() => { setShowNiimbotPrint(false); setNiimbotPrintStones([]); }}
         stones={niimbotPrintStones.length > 0 ? niimbotPrintStones : allItems.filter(s => selectedStones.has(s.id))}
       />
+
+      {/* Send to CRM */}
+      {showSendToCrm && (
+        <SendToCrmModal
+          stones={allItems.filter(s => selectedStones.has(s.id))}
+          onClose={() => setShowSendToCrm(false)}
+        />
+      )}
 
       {/* Scan Success Toast */}
       <AnimatePresence>
