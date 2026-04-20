@@ -12,11 +12,47 @@ export default function StonePicker({ onClose, onSelect }) {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch(`${API_BASE}/api/soap-stones`).then((r) => r.json()).catch(() => []),
-      fetch(`${API_BASE}/api/jewelry`).then((r) => r.json()).catch(() => []),
+      fetch(`${API_BASE}/api/soap-stones`).then((r) => r.json()).catch(() => ({})),
+      fetch(`${API_BASE}/api/jewelry`).then((r) => r.json()).catch(() => ({})),
     ]).then(([s, j]) => {
-      setStones(Array.isArray(s) ? s : []);
-      setJewelry(Array.isArray(j) ? j : []);
+      // Both endpoints return wrapped responses ({stones: [...]} / {jewelry: [...]})
+      const stoneRows = Array.isArray(s?.stones) ? s.stones : Array.isArray(s) ? s : [];
+      const jewelryRows = Array.isArray(j?.jewelry) ? j.jewelry : Array.isArray(j) ? j : [];
+
+      // Stones already arrive in camelCase from the API
+      setStones(stoneRows.map((row, idx) => ({
+        id: row.id ?? `stn_${idx}_${row.sku || idx}`,
+        sku: row.sku || "",
+        category: row.category || "",
+        shape: row.shape || "",
+        weightCt: row.weightCt ?? null,
+        color: row.color || "",
+        clarity: row.clarity || "",
+        lab: row.lab || "",
+        certificateNumber: row.certificateNumber || "",
+        priceTotal: row.priceTotal ?? null,
+        pricePerCt: row.pricePerCt ?? null,
+        imageUrl: row.imageUrl || null,
+      })));
+
+      // Jewelry comes in snake_case from the database
+      setJewelry(jewelryRows.map((row, idx) => {
+        const images = String(row.all_pictures_link || "").split(";").map((u) => u.trim()).filter(Boolean);
+        return {
+          id: `jwl_${idx}_${row.model_number || idx}`,
+          sku: row.model_number || row.sku || "",
+          category: "Jewelry",
+          title: row.title || "",
+          jewelryType: row.jewelry_type || "",
+          style: row.style || "",
+          collection: row.collection || "",
+          metalType: row.metal_type || "",
+          stoneType: row.stone_type || "",
+          priceTotal: row.price ?? null,
+          imageUrl: images[0] || null,
+          certificateNumber: row.certificate_number || "",
+        };
+      }));
     }).finally(() => setLoading(false));
   }, []);
 
@@ -53,8 +89,12 @@ export default function StonePicker({ onClose, onSelect }) {
         </div>
 
         <div className="px-5 pt-3 flex items-center gap-3 border-b border-stone-200">
-          <button onClick={() => setTab("stones")} className={`pb-2 px-1 text-sm font-medium border-b-2 ${tab === "stones" ? "border-stone-900 text-stone-900" : "border-transparent text-stone-500"}`}>Stones</button>
-          <button onClick={() => setTab("jewelry")} className={`pb-2 px-1 text-sm font-medium border-b-2 ${tab === "jewelry" ? "border-stone-900 text-stone-900" : "border-transparent text-stone-500"}`}>Jewelry</button>
+          <button onClick={() => setTab("stones")} className={`pb-2 px-1 text-sm font-medium border-b-2 ${tab === "stones" ? "border-stone-900 text-stone-900" : "border-transparent text-stone-500"}`}>
+            Stones {!loading && <span className="ml-1 text-[10px] text-stone-400">({stones.length})</span>}
+          </button>
+          <button onClick={() => setTab("jewelry")} className={`pb-2 px-1 text-sm font-medium border-b-2 ${tab === "jewelry" ? "border-stone-900 text-stone-900" : "border-transparent text-stone-500"}`}>
+            Jewelry {!loading && <span className="ml-1 text-[10px] text-stone-400">({jewelry.length})</span>}
+          </button>
         </div>
 
         <div className="px-5 py-3 border-b border-stone-200">
@@ -69,7 +109,11 @@ export default function StonePicker({ onClose, onSelect }) {
           {loading ? (
             <div className="p-12 text-center text-sm text-stone-500">Loading inventory…</div>
           ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-sm text-stone-500">No matches</div>
+            <div className="p-12 text-center text-sm text-stone-500">
+              {(tab === "stones" ? stones.length : jewelry.length) === 0
+                ? `No ${tab} in inventory yet`
+                : "No matches for your search"}
+            </div>
           ) : (
             <ul className="divide-y divide-stone-100">
               {filtered.map((item) => {
