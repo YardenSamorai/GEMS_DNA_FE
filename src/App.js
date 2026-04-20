@@ -14,6 +14,7 @@ import CrmDashboard from "./pages/crm/CrmDashboard";
 import CrmContacts from "./pages/crm/CrmContacts";
 import CrmDeals from "./pages/crm/CrmDeals";
 import CrmTasks from "./pages/crm/CrmTasks";
+import CrmSettings from "./pages/crm/CrmSettings";
 
 // Theme Context
 const ThemeContext = createContext();
@@ -460,6 +461,7 @@ function AppContent() {
                 <Route path="contacts/:id" element={<CrmContacts />} />
                 <Route path="deals" element={<CrmDeals />} />
                 <Route path="tasks" element={<CrmTasks />} />
+                <Route path="settings" element={<CrmSettings />} />
               </Route>
 
               {/* Public pages */}

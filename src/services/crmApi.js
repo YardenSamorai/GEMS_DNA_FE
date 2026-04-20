@@ -227,6 +227,41 @@ export const sendEmailBroadcast = (payload) =>
 export const fetchBroadcastHistory = (userId) =>
   fetch(`${API_BASE}/api/crm/email/broadcasts${qs({ userId })}`).then(json);
 
+/* ---------- Outlook integration ---------- */
+export const fetchOutlookStatus = (userId) =>
+  fetch(`${API_BASE}/api/crm/outlook/status${qs({ userId })}`).then(json);
+
+export const getOutlookAuthUrl = (userId) =>
+  fetch(`${API_BASE}/api/crm/outlook/auth-url${qs({ userId })}`).then(json);
+
+export const disconnectOutlook = (userId) =>
+  fetch(`${API_BASE}/api/crm/outlook/disconnect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  }).then(json);
+
+export const syncOutlookContacts = (userId, direction = "two-way") =>
+  fetch(`${API_BASE}/api/crm/outlook/sync-contacts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, direction }),
+  }).then(json);
+
+export const importOutlookEmails = (userId, days = 7) =>
+  fetch(`${API_BASE}/api/crm/outlook/import-emails`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, days }),
+  }).then(json);
+
+export const sendOutlookEmail = (payload) =>
+  fetch(`${API_BASE}/api/crm/outlook/send-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
 /* ---------- Constants ---------- */
 export const CONTACT_TYPES = [
   { value: "lead", label: "Lead", color: "bg-amber-100 text-amber-700 border-amber-200" },

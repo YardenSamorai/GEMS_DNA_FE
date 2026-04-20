@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { sendEmailBroadcast } from "../../../services/crmApi";
+import { sendEmailBroadcast, fetchOutlookStatus } from "../../../services/crmApi";
 
 /**
  * Broadcast email to selected contacts.
@@ -19,6 +20,18 @@ export default function BroadcastEmailModal({ recipients = [], onClose, onSent }
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
   const [previewIdx, setPreviewIdx] = useState(0);
+  const [provider, setProvider] = useState("resend"); // 'resend' | 'outlook'
+  const [outlookStatus, setOutlookStatus] = useState(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchOutlookStatus(user.id)
+      .then((s) => {
+        setOutlookStatus(s);
+        if (s?.connected) setProvider("outlook"); // default to Outlook if available
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   const eligible = useMemo(() => recipients.filter((r) => r.email), [recipients]);
   const skipped = recipients.length - eligible.length;
@@ -54,6 +67,7 @@ export default function BroadcastEmailModal({ recipients = [], onClose, onSent }
         html: body.replace(/\n/g, "<br>"),
         fromName,
         replyTo: replyTo || undefined,
+        provider,
       });
       setResult(r);
       toast.success(`Sent ${r.sent} of ${r.total}`);
@@ -111,12 +125,63 @@ export default function BroadcastEmailModal({ recipients = [], onClose, onSent }
             </div>
           ) : (
             <>
+              {/* Sender selector */}
+              <Field label="Send via">
+                <div className="grid grid-cols-2 gap-2">
+                  <SenderOption
+                    active={provider === "resend"}
+                    onClick={() => setProvider("resend")}
+                    title="Resend"
+                    subtitle="Marketing-style email service"
+                    icon={
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    }
+                  />
+                  <SenderOption
+                    active={provider === "outlook"}
+                    onClick={() => {
+                      if (!outlookStatus?.connected) {
+                        toast.error("Outlook is not connected. Connect it in CRM Settings.");
+                        return;
+                      }
+                      setProvider("outlook");
+                    }}
+                    disabled={!outlookStatus?.connected}
+                    title="Outlook"
+                    subtitle={outlookStatus?.connected ? outlookStatus.accountEmail : "Not connected"}
+                    icon={
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 6.5l9-1.5v13l-9-1.5V6.5zm10-1.5h7a1 1 0 011 1v12a1 1 0 01-1 1h-7V5z" />
+                      </svg>
+                    }
+                  />
+                </div>
+                {!outlookStatus?.connected && (
+                  <div className="text-[11px] text-stone-500 mt-1.5">
+                    Want to send from your Outlook? <Link to="/crm/settings" className="text-stone-900 underline">Connect Outlook</Link>
+                  </div>
+                )}
+              </Field>
+
               <div className="grid grid-cols-2 gap-3">
                 <Field label="From name">
-                  <input value={fromName} onChange={(e) => setFromName(e.target.value)} className={inputCls} />
+                  <input
+                    value={provider === "outlook" && outlookStatus?.accountName ? outlookStatus.accountName : fromName}
+                    onChange={(e) => setFromName(e.target.value)}
+                    className={inputCls}
+                    disabled={provider === "outlook"}
+                  />
                 </Field>
-                <Field label="Reply-to email">
-                  <input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} className={inputCls} placeholder="you@yourcompany.com" />
+                <Field label={provider === "outlook" ? "Sender" : "Reply-to email"}>
+                  <input
+                    value={provider === "outlook" ? (outlookStatus?.accountEmail || "") : replyTo}
+                    onChange={(e) => setReplyTo(e.target.value)}
+                    className={inputCls}
+                    placeholder="you@yourcompany.com"
+                    disabled={provider === "outlook"}
+                  />
                 </Field>
               </div>
 
@@ -205,4 +270,29 @@ const Field = ({ label, children }) => (
 
 const Tag = ({ children }) => (
   <code className="px-1.5 py-0.5 rounded bg-white text-blue-700 text-[11px] border border-blue-200">{children}</code>
+);
+
+const SenderOption = ({ active, disabled, onClick, title, subtitle, icon }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition ${
+      active
+        ? "border-stone-900 bg-stone-50 ring-1 ring-stone-900"
+        : "border-stone-200 hover:border-stone-400 bg-white"
+    } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+  >
+    <div
+      className={`shrink-0 w-9 h-9 rounded-md flex items-center justify-center ${
+        active ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-700"
+      }`}
+    >
+      {icon}
+    </div>
+    <div className="min-w-0">
+      <div className="text-sm font-medium text-stone-900">{title}</div>
+      <div className="text-[11px] text-stone-500 truncate">{subtitle}</div>
+    </div>
+  </button>
 );
