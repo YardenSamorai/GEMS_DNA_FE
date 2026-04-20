@@ -149,12 +149,12 @@ export const fetchWhatsappLog = (userId, filters = {}) =>
 export const fetchCrmStats = (userId) =>
   fetch(`${API_BASE}/api/crm/stats${qs({ userId })}`).then(json);
 
-/* ---------- Business card scanner ---------- */
-export const scanBusinessCard = (userId, imageBase64) =>
+/* ---------- Business card scanner (one or two sides) ---------- */
+export const scanBusinessCard = (userId, imageBase64Front, imageBase64Back = null) =>
   fetch(`${API_BASE}/api/crm/scan-card`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, imageBase64 }),
+    body: JSON.stringify({ userId, imageBase64Front, imageBase64Back }),
   }).then(json);
 
 /* ---------- Verify business online ---------- */
@@ -164,6 +164,68 @@ export const verifyBusiness = (contact) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contact }),
   }).then(json);
+
+/* ---------- Folders (hierarchical) ---------- */
+export const fetchFolders = (userId) =>
+  fetch(`${API_BASE}/api/crm/folders${qs({ userId })}`).then(json);
+
+export const createFolder = (payload) =>
+  fetch(`${API_BASE}/api/crm/folders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const updateFolder = (id, payload) =>
+  fetch(`${API_BASE}/api/crm/folders/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const deleteFolder = (id) =>
+  fetch(`${API_BASE}/api/crm/folders/${id}`, { method: "DELETE" }).then(json);
+
+export const moveContactsToFolder = (userId, contactIds, folderId) =>
+  fetch(`${API_BASE}/api/crm/contacts/move-to-folder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, contactIds, folderId }),
+  }).then(json);
+
+/* ---------- Title migration (one-time) ---------- */
+export const migrateTitlesFromNotes = (userId, dryRun = false) =>
+  fetch(`${API_BASE}/api/crm/contacts/migrate-titles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, dryRun }),
+  }).then(json);
+
+/* ---------- Import (CSV/Excel/JSON) ---------- */
+export const importContactsPreview = (userId, rows) =>
+  fetch(`${API_BASE}/api/crm/contacts/import-preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, rows }),
+  }).then(json);
+
+export const importContactsExecute = (userId, rows, defaultFolderId = null) =>
+  fetch(`${API_BASE}/api/crm/contacts/import-execute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, rows, defaultFolderId }),
+  }).then(json);
+
+/* ---------- Email broadcast ---------- */
+export const sendEmailBroadcast = (payload) =>
+  fetch(`${API_BASE}/api/crm/email/send-broadcast`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const fetchBroadcastHistory = (userId) =>
+  fetch(`${API_BASE}/api/crm/email/broadcasts${qs({ userId })}`).then(json);
 
 /* ---------- Constants ---------- */
 export const CONTACT_TYPES = [

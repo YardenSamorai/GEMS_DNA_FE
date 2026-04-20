@@ -119,6 +119,7 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className="text-lg sm:text-xl font-bold text-stone-900 truncate">{contact.name}</h2>
+                    {contact.title && <div className="text-xs text-stone-600 font-medium truncate">{contact.title}</div>}
                     {contact.company && <div className="text-sm text-stone-500 truncate">{contact.company}</div>}
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
                       <Badge type={contact.type} />
@@ -127,6 +128,18 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                           {[contact.city, contact.country].filter(Boolean).join(", ")}
                         </span>
+                      )}
+                      {contact.folder_name && (
+                        <span className="text-xs text-stone-500 inline-flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                          {contact.folder_name}
+                        </span>
+                      )}
+                      {normaliseWebsite(contact.website) && (
+                        <a href={normaliseWebsite(contact.website)} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 truncate max-w-[200px]">
+                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                          <span className="truncate">{contact.website}</span>
+                        </a>
                       )}
                     </div>
                   </div>
@@ -466,13 +479,24 @@ function TasksTab({ contact, userId, onChanged }) {
 
 /* ---------- Info tab ---------- */
 function InfoTab({ contact }) {
+  const websiteHref = normaliseWebsite(contact.website);
   return (
     <div className="p-4 space-y-3 text-sm">
+      <Row label="Title" value={contact.title} />
+      <Row label="Company" value={contact.company} />
       <Row label="Phone" value={contact.phone} />
-      <Row label="Email" value={contact.email} />
+      {contact.phone_alt && <Row label="Alt phone" value={contact.phone_alt} />}
+      <Row label="Email" value={contact.email ? <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">{contact.email}</a> : null} />
+      <Row label="Website" value={websiteHref ? (
+        <a href={websiteHref} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 break-all">
+          {contact.website}
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+        </a>
+      ) : null} />
       <Row label="Country" value={contact.country} />
       <Row label="City" value={contact.city} />
       <Row label="Address" value={contact.address} />
+      <Row label="Folder" value={contact.folder_name} />
       <Row label="Source" value={contact.source} />
       <Row label="Status" value={contact.status} />
       <Row label="Created" value={fmtDate(contact.created_at)} />
@@ -481,6 +505,12 @@ function InfoTab({ contact }) {
         <div className="pt-3 border-t border-stone-200">
           <div className="text-xs font-medium text-stone-500 mb-1">Notes</div>
           <div className="text-sm text-stone-700 whitespace-pre-line bg-stone-50 rounded-lg p-3">{contact.notes}</div>
+        </div>
+      )}
+      {contact.card_back_notes && (
+        <div className="pt-3 border-t border-stone-200">
+          <div className="text-xs font-medium text-stone-500 mb-1">Back of card</div>
+          <div className="text-sm text-stone-700 whitespace-pre-line bg-stone-50 rounded-lg p-3">{contact.card_back_notes}</div>
         </div>
       )}
     </div>
@@ -493,6 +523,14 @@ const Row = ({ label, value }) => (
     <div className="flex-1 text-stone-800 break-words min-w-0">{value || <span className="text-stone-400">—</span>}</div>
   </div>
 );
+
+function normaliseWebsite(url) {
+  if (!url) return null;
+  const trimmed = String(url).trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 /* ---------- Verify tab ---------- */
 function VerifyTab({ contact, onUpdate }) {
