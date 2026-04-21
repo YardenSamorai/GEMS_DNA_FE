@@ -4,6 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import {
   fetchContacts,
+  fetchContactThumbs,
   createContact,
   bulkDeleteContacts,
   bulkTagContacts,
@@ -24,6 +25,30 @@ import CardImageLightbox from "./components/CardImageLightbox";
 const typeStyle = (type) => {
   const t = CONTACT_TYPES.find((x) => x.value === type);
   return t?.color || "bg-stone-100 text-stone-700 border-stone-200";
+};
+
+// ---- Contacts list cache (stale-while-revalidate) -------------------------
+// We persist the last successful response per (user × filter combo) in
+// localStorage so re-opening the Contacts tab is instantaneous, even before
+// the network roundtrip finishes. The cached data is then quietly refreshed
+// in the background; the UI swaps in the fresh data when it arrives.
+const CONTACTS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+const cacheKey = (userId, filterPayload) =>
+  `crm.contactsCache.${userId || "anon"}.${JSON.stringify(filterPayload)}`;
+const thumbsCacheKey = (userId) => `crm.thumbsCache.${userId || "anon"}`;
+
+const loadCache = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || (parsed.savedAt && Date.now() - parsed.savedAt > CONTACTS_CACHE_TTL)) return null;
+    return parsed.data;
+  } catch (_) { return null; }
+};
+const saveCache = (key, data) => {
+  try { localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), data })); }
+  catch (_) { /* quota exceeded etc. — ignore */ }
 };
 
 const DnaBadge = () => (
@@ -69,20 +94,66 @@ export default function CrmContacts() {
     if (routeId) setDrawerId(routeId);
   }, [routeId]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Hydrate thumbnails from a per-user localStorage cache the moment the page mounts.
+  const [thumbCache, setThumbCache] = useState(() =>
+    user?.id ? (loadCache(thumbsCacheKey(user.id)) || {}) : {}
+  );
+
   const reload = useCallback(() => {
     if (!user?.id) return;
-    setLoading(true);
     const filterPayload = {
       search,
       type: typeFilter,
       folderId: selectedFolderId,
       ...stripTypeFromFilters(advancedFilters),
     };
+    const key = cacheKey(user.id, filterPayload);
+
+    // ---- Stale-while-revalidate ----
+    // Render cached data INSTANTLY (if any), then fetch fresh in background.
+    const cached = loadCache(key);
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      setContacts(cached);
+      setLoading(false);
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     fetchContacts(user.id, filterPayload)
-      .then(setContacts)
-      .catch((e) => toast.error(e.message))
-      .finally(() => setLoading(false));
-  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters]);
+      .then((fresh) => {
+        setContacts(fresh);
+        saveCache(key, fresh);
+
+        // Lazy-load thumbnails for any contact that has one but isn't in our local cache.
+        const missingIds = fresh
+          .filter((c) => c.has_card_thumb && !thumbCache[c.id])
+          .map((c) => c.id);
+        if (missingIds.length > 0) {
+          fetchContactThumbs(missingIds)
+            .then((rows) => {
+              if (!rows.length) return;
+              setThumbCache((prev) => {
+                const next = { ...prev };
+                rows.forEach((r) => { if (r.thumb) next[r.id] = r.thumb; });
+                if (user?.id) saveCache(thumbsCacheKey(user.id), next);
+                return next;
+              });
+            })
+            .catch(() => {});
+        }
+      })
+      .catch((e) => {
+        // Don't toast if we have cached data — silent retry on next interaction
+        if (!cached) toast.error(e.message);
+      })
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, thumbCache]);
 
   // Load tags + folders ONCE per page (not on every keystroke / filter change)
   const reloadSidebars = useCallback(() => {
@@ -382,6 +453,18 @@ export default function CrmContacts() {
           </div>
         )}
 
+        {/* Quiet "refreshing" indicator — visible when we already painted cached rows
+            but a background fetch is still in flight. */}
+        {refreshing && !loading && (
+          <div className="flex items-center gap-2 text-[11px] text-stone-500 mb-2">
+            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="4" />
+              <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+            </svg>
+            Refreshing…
+          </div>
+        )}
+
         {/* List */}
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           {loading ? (
@@ -433,6 +516,7 @@ export default function CrmContacts() {
                       <td className="py-3 px-2">
                         <CardThumb
                           contact={c}
+                          thumb={thumbCache[c.id]}
                           onOpen={() =>
                             setCardLightbox({
                               contactId: c.id,
@@ -501,7 +585,7 @@ export default function CrmContacts() {
                             (c.name || "?").charAt(0).toUpperCase()
                           )}
                         </button>
-                        {(c.card_image_thumb || c.has_card_front) && (
+                        {(thumbCache[c.id] || c.has_card_front || c.has_card_thumb) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -510,8 +594,8 @@ export default function CrmContacts() {
                             className="shrink-0 w-12 h-9 rounded-md overflow-hidden border border-stone-200 bg-stone-100"
                             aria-label="View card image"
                           >
-                            {c.card_image_thumb ? (
-                              <img src={c.card_image_thumb} alt="Card" className="w-full h-full object-cover" />
+                            {thumbCache[c.id] ? (
+                              <img src={thumbCache[c.id]} alt="Card" className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-stone-400">
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 8a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" /></svg>
@@ -686,8 +770,8 @@ const EmptyState = ({ onCreate, hasFilter }) => (
   </div>
 );
 
-function CardThumb({ contact, onOpen }) {
-  const hasFront = contact.has_card_front || !!contact.card_image_thumb;
+function CardThumb({ contact, thumb, onOpen }) {
+  const hasFront = contact.has_card_front || contact.has_card_thumb || !!thumb;
   if (!hasFront) {
     return <div className="w-12 h-9 rounded-md border border-dashed border-stone-200 bg-stone-50" />;
   }
@@ -697,8 +781,8 @@ function CardThumb({ contact, onOpen }) {
       className="group relative w-12 h-9 rounded-md overflow-hidden border border-stone-200 bg-stone-100 hover:ring-2 hover:ring-stone-400"
       title="View business card"
     >
-      {contact.card_image_thumb ? (
-        <img src={contact.card_image_thumb} alt="Card" className="w-full h-full object-cover" />
+      {thumb ? (
+        <img src={thumb} alt="Card" className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-stone-400">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 8a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" /></svg>

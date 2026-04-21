@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useUser } from "@clerk/clerk-react";
-import { fetchDnaLeadsUnreadCount } from "../../services/crmApi";
+import { fetchDnaLeadsUnreadCount, pingApi } from "../../services/crmApi";
 
 const POLL_MS = 30_000;
 const SEEN_KEY = (uid) => `crm.dnaLeadsSeenAt.${uid || "anon"}`;
@@ -63,6 +63,11 @@ export default function CrmLayout() {
   const { user } = useUser();
   const [unread, setUnread] = useState(0);
   const seenInitial = useRef(false);
+
+  // Wake the BE up the moment the user enters /crm — this masks Render cold-start delay
+  useEffect(() => {
+    pingApi();
+  }, []);
 
   // Poll for new DNA leads
   useEffect(() => {

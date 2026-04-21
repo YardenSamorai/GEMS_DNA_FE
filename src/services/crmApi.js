@@ -24,6 +24,24 @@ const qs = (params) => {
 export const fetchContacts = (userId, filters = {}) =>
   fetch(`${API_BASE}/api/crm/contacts${qs({ userId, ...filters })}`).then(json);
 
+// Lazy batched thumbnail loader. Returns [{ id, thumb }] only for ids that have one.
+export const fetchContactThumbs = (ids) => {
+  if (!Array.isArray(ids) || ids.length === 0) return Promise.resolve([]);
+  // Split into chunks of 100 to keep URLs short
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+  return Promise.all(
+    chunks.map((c) =>
+      fetch(`${API_BASE}/api/crm/contacts/thumbs?ids=${c.join(",")}`).then(json)
+    )
+  ).then((arrs) => arrs.flat());
+};
+
+// Lightweight ping just to wake up Render before the user navigates to a heavy page.
+export const pingApi = () =>
+  fetch(`${API_BASE}/api/health`, { method: "GET", cache: "no-store" })
+    .catch(() => null);
+
 export const fetchContact = (userId, id) =>
   fetch(`${API_BASE}/api/crm/contacts/${id}${qs({ userId })}`).then(json);
 
