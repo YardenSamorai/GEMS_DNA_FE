@@ -7,6 +7,7 @@ import { barakURL } from "../utils/const";
 import { getMappedCategories } from "../utils/categoryMap";
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import InterestedModal from '../components/InterestedModal';
 
 // API base URL from .env
 const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
@@ -16,6 +17,7 @@ const DiamondCard = () => {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
+  const [interestedOpen, setInterestedOpen] = useState(false);
   const { isSignedIn } = useUser();
 
   const isEmerald = () => {
@@ -397,6 +399,17 @@ const DiamondCard = () => {
 
                 {/* Action Buttons */}
                 <div className="pt-6 border-t border-stone-200 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setInterestedOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                    </svg>
+                    I'm interested
+                  </button>
                   <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={handleShare}
@@ -418,6 +431,23 @@ const DiamondCard = () => {
                     </button>
                   </div>
                 </div>
+
+                <InterestedModal
+                  open={interestedOpen}
+                  onClose={() => setInterestedOpen(false)}
+                  sku={details.stone_id}
+                  snapshot={{
+                    sku: details.stone_id,
+                    category: details.category,
+                    shape: details.shape,
+                    weightCt: details.weight,
+                    color: details.color,
+                    clarity: details.clarity,
+                    lab: details.lab,
+                    certificateNumber: details.certificate_number,
+                    image: details.image_url,
+                  }}
+                />
               </div>
             </div>
           </div>

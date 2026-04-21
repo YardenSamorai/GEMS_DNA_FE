@@ -4,6 +4,7 @@ import { sanitizeText } from '../utils/helper';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SignedIn } from "@clerk/clerk-react";
 import toast from 'react-hot-toast';
+import InterestedModal from './InterestedModal';
 
 const GemstoneDetails = ({ data }) => {
   const {
@@ -17,6 +18,7 @@ const GemstoneDetails = ({ data }) => {
   const images = all_pictures_link?.split(';').map((img) => img.trim()).filter(Boolean);
   const [mainImage, setMainImage] = useState(images?.[0]);
   const [zoom, setZoom] = useState(false);
+  const [interestedOpen, setInterestedOpen] = useState(false);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -276,6 +278,33 @@ const GemstoneDetails = ({ data }) => {
                   Share Video
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => setInterestedOpen(true)}
+                className="w-full mt-3 flex items-center justify-center gap-2 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                </svg>
+                I'm interested
+              </button>
+              <InterestedModal
+                open={interestedOpen}
+                onClose={() => setInterestedOpen(false)}
+                sku={model_number}
+                snapshot={{
+                  sku: model_number,
+                  category: 'Jewelry',
+                  jewelryType: jewelry_type,
+                  style,
+                  collection,
+                  metalType: metal_type,
+                  totalCarat: total_carat,
+                  stoneType: stone_type,
+                  image: images?.[0] || null,
+                }}
+              />
             </div>
           </div>
         </div>

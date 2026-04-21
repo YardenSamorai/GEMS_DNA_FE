@@ -248,6 +248,17 @@ export const updateEmailTemplate = (id, payload) =>
 export const deleteEmailTemplate = (id) =>
   fetch(`${API_BASE}/api/crm/email/templates/${id}`, { method: "DELETE" }).then(json);
 
+/* ---------- DNA → CRM bridge (public endpoints, no userId) ---------- */
+export const submitDnaLead = (payload) =>
+  fetch(`${API_BASE}/api/crm/dna-lead`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const fetchDnaLeadsUnreadCount = (since) =>
+  fetch(`${API_BASE}/api/crm/dna-leads/unread-count${qs({ since })}`).then(json);
+
 /* ---------- Outlook integration ---------- */
 export const fetchOutlookStatus = (userId) =>
   fetch(`${API_BASE}/api/crm/outlook/status${qs({ userId })}`).then(json);
@@ -314,4 +325,5 @@ export const INTERACTION_TYPES = [
   { value: "whatsapp", label: "WhatsApp", icon: "chat" },
   { value: "email", label: "Email", icon: "mail" },
   { value: "note", label: "Note", icon: "document" },
+  { value: "dna_inquiry", label: "DNA inquiry", icon: "sparkles" },
 ];

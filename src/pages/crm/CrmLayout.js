@@ -1,5 +1,12 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
+import { useUser } from "@clerk/clerk-react";
+import { fetchDnaLeadsUnreadCount } from "../../services/crmApi";
+
+const POLL_MS = 30_000;
+const SEEN_KEY = (uid) => `crm.dnaLeadsSeenAt.${uid || "anon"}`;
+const TOAST_KEY = (uid) => `crm.dnaLeadsLastToastedLatest.${uid || "anon"}`;
 
 const NAV = [
   {
@@ -53,6 +60,66 @@ const NAV = [
 
 export default function CrmLayout() {
   const location = useLocation();
+  const { user } = useUser();
+  const [unread, setUnread] = useState(0);
+  const seenInitial = useRef(false);
+
+  // Poll for new DNA leads
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+
+    const since = (() => {
+      try {
+        return localStorage.getItem(SEEN_KEY(user.id))
+          || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      } catch (_) {
+        return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      }
+    })();
+
+    const tick = async () => {
+      try {
+        const { count, latest } = await fetchDnaLeadsUnreadCount(since);
+        if (!active) return;
+        setUnread(count || 0);
+
+        // One-shot toast when a new latest lead appears (skip the very first poll)
+        if (count > 0 && latest && seenInitial.current) {
+          const lastToasted = localStorage.getItem(TOAST_KEY(user.id));
+          if (lastToasted !== latest) {
+            toast.success(
+              count === 1 ? "New lead from DNA page" : `${count} new leads from DNA page`,
+              { icon: "💎", duration: 5000 }
+            );
+            try { localStorage.setItem(TOAST_KEY(user.id), latest); } catch (_) {}
+          }
+        }
+        seenInitial.current = true;
+      } catch (_) { /* swallow */ }
+    };
+
+    tick();
+    const id = setInterval(tick, POLL_MS);
+    return () => { active = false; clearInterval(id); };
+  }, [user?.id]);
+
+  // When the user opens the contacts page, mark all current DNA leads as seen
+  useEffect(() => {
+    if (!user?.id) return;
+    if (location.pathname.startsWith("/crm/contacts")) {
+      try {
+        localStorage.setItem(SEEN_KEY(user.id), new Date().toISOString());
+        setUnread(0);
+      } catch (_) {}
+    }
+  }, [location.pathname, user?.id]);
+
+  // Inject badge counts into the nav definition
+  const navWithBadges = NAV.map((item) =>
+    item.to === "/crm/contacts" ? { ...item, badge: unread } : item
+  );
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-stone-50 pb-20 sm:pb-12">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
@@ -69,13 +136,13 @@ export default function CrmLayout() {
         {/* Tabs - Desktop */}
         <div className="hidden sm:block border-b border-stone-200 mb-6 overflow-x-auto">
           <nav className="flex gap-1 min-w-max">
-            {NAV.map((item) => (
+            {navWithBadges.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  `relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                     isActive
                       ? "border-stone-900 text-stone-900"
                       : "border-transparent text-stone-500 hover:text-stone-800 hover:border-stone-300"
@@ -84,6 +151,11 @@ export default function CrmLayout() {
               >
                 {item.icon}
                 {item.label}
+                {item.badge > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -98,21 +170,26 @@ export default function CrmLayout() {
         className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 grid grid-cols-5"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}
       >
-        {NAV.map((item) => (
+        {navWithBadges.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
+              `relative flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
                 isActive ? "text-stone-900" : "text-stone-400 hover:text-stone-700"
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <div className={`p-1 rounded-lg ${isActive ? "bg-stone-900 text-white" : ""}`}>
+                <div className={`relative p-1 rounded-lg ${isActive ? "bg-stone-900 text-white" : ""}`}>
                   {item.icon}
+                  {item.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-emerald-500 text-white text-[9px] font-bold">
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  )}
                 </div>
                 {item.label}
               </>

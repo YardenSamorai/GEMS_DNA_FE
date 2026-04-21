@@ -26,6 +26,18 @@ const typeStyle = (type) => {
   return t?.color || "bg-stone-100 text-stone-700 border-stone-200";
 };
 
+const DnaBadge = () => (
+  <span
+    title="Created from a public DNA page"
+    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-700 border border-emerald-200"
+  >
+    <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M5 2a1 1 0 011 1c0 2.5 2 4.5 4 4.5s4-2 4-4.5a1 1 0 112 0c0 3-1.74 5.36-4 6.27v.96c2.26.91 4 3.27 4 6.27a1 1 0 11-2 0c0-2.5-2-4.5-4-4.5s-4 2-4 4.5a1 1 0 11-2 0c0-3 1.74-5.36 4-6.27v-.96C5.74 8.36 4 6 4 3a1 1 0 011-1z" clipRule="evenodd" />
+    </svg>
+    DNA
+  </span>
+);
+
 export default function CrmContacts() {
   const { user } = useUser();
   const { id: routeId } = useParams();
@@ -422,8 +434,14 @@ export default function CrmContacts() {
                         />
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-medium text-stone-900">{c.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-stone-900">{c.name}</span>
+                          {c.source === 'dna_lead' && <DnaBadge />}
+                        </div>
                         {c.company && <div className="text-xs text-stone-500">{c.company}</div>}
+                        {c.source === 'dna_lead' && c.dna_sku && (
+                          <div className="text-[10px] text-emerald-700 font-medium mt-0.5">From DNA · {c.dna_sku}</div>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-stone-700 text-xs">{c.title || "—"}</td>
                       <td className="py-3 px-4">
@@ -494,7 +512,10 @@ export default function CrmContacts() {
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="font-semibold text-stone-900 truncate">{c.name}</div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="font-semibold text-stone-900 truncate">{c.name}</div>
+                              {c.source === 'dna_lead' && <DnaBadge />}
+                            </div>
                             {Number(c.total_won) > 0 && (
                               <div className="text-xs font-semibold text-emerald-600 shrink-0">
                                 ${Number(c.total_won || 0).toLocaleString()}
