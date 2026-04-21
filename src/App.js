@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
-import { BrowserRouter as Router, Route, Routes, useLocation, Link } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import DiamondCard from "./pages/DiamondCard";
@@ -464,6 +464,13 @@ function AppContent() {
                 <Route path="settings" element={<CrmSettings />} />
               </Route>
 
+              {/* Short URL aliases used by iPhone home-screen shortcuts.
+                  iOS Safari saves whatever URL is in the address bar at
+                  Add-to-Home-Screen time, so we expose memorable short
+                  URLs that immediately route into the matching CRM action. */}
+              <Route path="/scan" element={<HomeShortcut to="/crm/contacts?action=scan" />} />
+              <Route path="/new" element={<HomeShortcut to="/crm/contacts?action=new" />} />
+
               {/* Public pages */}
               <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
               <Route path="/:stone_id" element={<DiamondCard />} />
@@ -474,6 +481,18 @@ function AppContent() {
     </>
   );
 }
+
+/**
+ * Tiny redirect component used by /scan, /new and any future short URLs
+ * we expose for the iPhone home-screen shortcuts. We deliberately render a
+ * single Navigate (replace=true) so the user can't hit Back to land on
+ * this stub page.
+ *
+ * If the user isn't signed in yet we still try to navigate; the protected
+ * route at the destination will hand them off to the AuthPrompt and bring
+ * them back here once they sign in (Clerk preserves the original target).
+ */
+const HomeShortcut = ({ to }) => <Navigate to={to} replace />;
 
 const AuthPrompt = ({ message }) => {
   const { theme } = useTheme();
