@@ -188,7 +188,16 @@ export default function ImportContactsModal({ onClose, onImported, defaultFolder
                 });
                 if (geo?.country && (geo.confidence === "high" || geo.confidence === "medium")) {
                   enrichedRows = enrichedRows.map((r, idx) =>
-                    idx === i ? { ...r, country: geo.country, city: r.city || geo.city || "" } : r
+                    idx === i
+                      ? {
+                          ...r,
+                          country: geo.country,
+                          city: r.city || geo.city || "",
+                          // Upgrade bare local phone numbers (e.g. "(212) 555-1234"
+                          // on a US-address row) to E.164 / international format.
+                          phone: geo.formattedPhone?.international || r.phone,
+                        }
+                      : r
                   );
                 }
               } catch (_) { /* non-blocking */ }

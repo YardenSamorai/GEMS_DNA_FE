@@ -47,6 +47,11 @@ export default function ContactFormModal({ initial, onClose, onSubmit, title = "
       ...f,
       country: f.country || s.country || "",
       city: f.city || s.city || "",
+      // If the backend was able to upgrade a bare local-format phone
+      // number into international format using the inferred country, take
+      // the upgrade. We only swap when we have a valid international
+      // representation — otherwise we leave whatever the user typed alone.
+      phone: s.formattedPhone?.international || f.phone,
     }));
     dismissGeo();
   };

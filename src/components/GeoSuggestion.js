@@ -23,23 +23,34 @@ export default function GeoSuggestion({ suggestion, onApply, onDismiss, compact 
     email: "from email domain",
   }[suggestion.source] || "auto-detected";
 
+  // When we managed to add a country code to a bare local-format phone
+  // number, surface that explicitly so the user knows what Apply will do.
+  const phoneFix = suggestion.formattedPhone?.international;
+
   return (
     <div
       className={
-        "flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 text-amber-900 " +
+        "flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 text-amber-900 " +
         (compact ? "px-2 py-1 text-[11px]" : "px-3 py-2 text-xs")
       }
     >
-      <span className="text-base leading-none">{flagEmoji(suggestion.countryCode) || "🌍"}</span>
-      <span className="flex-1 min-w-0 truncate">
-        <span className="font-medium">We think this is {suggestion.country}</span>
-        <span className="text-amber-700/70 ml-1">· {sourceLabel}</span>
+      <span className="text-base leading-none mt-0.5">{flagEmoji(suggestion.countryCode) || "🌍"}</span>
+      <span className="flex-1 min-w-0">
+        <div className="truncate">
+          <span className="font-medium">We think this is {suggestion.country}</span>
+          <span className="text-amber-700/70 ml-1">· {sourceLabel}</span>
+        </div>
+        {phoneFix && (
+          <div className="text-amber-700/80 mt-0.5 truncate">
+            Phone will become <span className="font-mono font-semibold">{phoneFix}</span>
+          </div>
+        )}
       </span>
       <button
         type="button"
         onClick={() => onApply?.(suggestion)}
         className={
-          "shrink-0 rounded font-semibold bg-amber-900 text-white hover:bg-amber-800 transition " +
+          "shrink-0 rounded font-semibold bg-amber-900 text-white hover:bg-amber-800 transition mt-0.5 " +
           (compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]")
         }
       >

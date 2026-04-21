@@ -112,6 +112,11 @@ export default function ScanCardModal({ onClose, onSaved }) {
             ...x,
             country: x.country || s.country || "",
             city: x.city || s.city || "",
+            // Business cards routinely show local numbers ("(212) 555-1234")
+            // without a country code. If the backend inferred the country
+            // from the address/email and was able to format the number with
+            // the matching country code, take it.
+            phone: s.formattedPhone?.international || x.phone,
           }
         : x
     ));
