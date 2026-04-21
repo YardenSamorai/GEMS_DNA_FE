@@ -82,9 +82,16 @@ export default function CrmContacts() {
       .then(setContacts)
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
+  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters]);
+
+  // Load tags + folders ONCE per page (not on every keystroke / filter change)
+  const reloadSidebars = useCallback(() => {
+    if (!user?.id) return;
     fetchTags(user.id).then(setTags).catch(() => {});
     fetchFolders(user.id).then(setFolders).catch(() => {});
-  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters]);
+  }, [user?.id]);
+
+  useEffect(() => { reloadSidebars(); }, [reloadSidebars]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -142,6 +149,7 @@ export default function CrmContacts() {
       toast.success(`${action === "add" ? "Tagged" : "Removed tag from"} ${selected.size} contact${selected.size > 1 ? "s" : ""}`);
       setShowTagModal(false);
       reload();
+      reloadSidebars();
     } catch (e) { toast.error(e.message); }
   };
 
@@ -153,6 +161,7 @@ export default function CrmContacts() {
       setShowMoveFolder(false);
       clearSelection();
       reload();
+      reloadSidebars();
     } catch (e) { toast.error(e.message); }
   };
 
@@ -194,7 +203,7 @@ export default function CrmContacts() {
             selectedFolderId={selectedFolderId}
             onSelect={(id) => setSelectedFolderId(id)}
             userId={user?.id}
-            onChange={reload}
+            onChange={() => { reload(); reloadSidebars(); }}
           />
         </div>
       </aside>
@@ -613,7 +622,7 @@ export default function CrmContacts() {
           selectedFolderId={selectedFolderId}
           onSelect={(id) => { setSelectedFolderId(id); setShowFoldersMobile(false); }}
           userId={user?.id}
-          onChange={reload}
+          onChange={() => { reload(); reloadSidebars(); }}
           onClose={() => setShowFoldersMobile(false)}
         />
       )}
