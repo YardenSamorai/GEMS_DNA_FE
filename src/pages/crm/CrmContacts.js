@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import {
@@ -67,6 +67,7 @@ export default function CrmContacts() {
   const { user } = useUser();
   const { id: routeId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [contacts, setContacts] = useState([]);
   const [tags, setTags] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -93,6 +94,22 @@ export default function CrmContacts() {
   useEffect(() => {
     if (routeId) setDrawerId(routeId);
   }, [routeId]);
+
+  // Deep-link support for iPhone home-screen shortcuts and PWA shortcuts.
+  //   /crm/contacts?action=scan  → opens the business-card scanner directly
+  //   /crm/contacts?action=new   → opens the "New contact" form directly
+  // The URL param is stripped after we consume it so back/forward stays clean.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const action = params.get("action");
+    if (action === "scan") setShowScan(true);
+    else if (action === "new") setShowForm(true);
+    if (action) {
+      params.delete("action");
+      const qs = params.toString();
+      navigate(`/crm/contacts${qs ? `?${qs}` : ""}`, { replace: true });
+    }
+  }, [location.search, navigate]);
 
   const [refreshing, setRefreshing] = useState(false);
 
