@@ -15,6 +15,7 @@ import {
 } from "../../../services/crmApi";
 import ContactFormModal from "./ContactFormModal";
 import CardImageLightbox from "./CardImageLightbox";
+import ContactMap from "./ContactMap";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 const timeAgo = (d) => {
@@ -532,6 +533,9 @@ function InfoTab({ contact, onOpenCard }) {
       <Row label="Country" value={contact.country} />
       <Row label="City" value={contact.city} />
       <Row label="Address" value={contact.address} />
+      {(contact.city || contact.country || contact.address) && (
+        <ContactMap city={contact.city} country={contact.country} address={contact.address} />
+      )}
       <Row label="Folder" value={contact.folder_name} />
       <Row label="Source" value={contact.source} />
       <Row label="Status" value={contact.status} />

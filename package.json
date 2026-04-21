@@ -40,6 +40,7 @@
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "jszip": "^3.10.1",
+    "libphonenumber-js": "^1.12.41",
     "lucide-react": "^0.483.0",
     "neon-cli": "^0.10.1",
     "papaparse": "^5.5.3",

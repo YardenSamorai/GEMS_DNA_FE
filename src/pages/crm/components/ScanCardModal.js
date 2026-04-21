@@ -9,6 +9,8 @@ import {
   CONTACT_TYPES,
 } from "../../../services/crmApi";
 import { smartCase, polishContact } from "../utils/smartCase";
+import { useGeoSuggestion } from "../../../utils/geoDetect";
+import GeoSuggestion from "../../../components/GeoSuggestion";
 
 const downscaleImage = (file, maxSide = 1600, quality = 0.85) =>
   new Promise((resolve, reject) => {
@@ -92,6 +94,29 @@ export default function ScanCardModal({ onClose, onSaved }) {
   const [verifying, setVerifying] = useState(false);
   const [verification, setVerification] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // Live geo suggestion for the active form. Backed by Mapbox + libphonenumber.
+  // Kept null-safe so it stays harmless before the user has scanned anything.
+  const activeForm = forms[activeFormIdx] || null;
+  const { suggestion: geoSuggestion, dismiss: dismissGeo } = useGeoSuggestion({
+    phone: activeForm?.phone,
+    city: activeForm?.city,
+    address: activeForm?.address,
+    country: activeForm?.country,
+    email: activeForm?.email,
+  });
+  const applyGeoSuggestion = (s) => {
+    setForms((arr) => arr.map((x, i) =>
+      i === activeFormIdx
+        ? {
+            ...x,
+            country: x.country || s.country || "",
+            city: x.city || s.city || "",
+          }
+        : x
+    ));
+    dismissGeo();
+  };
 
   /* ---------------- Image capture ---------------- */
   const handleFile = async (file, side) => {
@@ -318,7 +343,6 @@ export default function ScanCardModal({ onClose, onSaved }) {
   const updateForm = (idx, patch) =>
     setForms((arr) => arr.map((x, i) => i === idx ? { ...x, ...patch } : x));
 
-  const activeForm = forms[activeFormIdx] || null;
   const activeMatches = matchesPerForm[activeFormIdx] || [];
 
   return (
@@ -536,6 +560,7 @@ export default function ScanCardModal({ onClose, onSaved }) {
                   <Input label="Country" value={activeForm.country} onChange={(v) => updateForm(activeFormIdx, { country: v })} />
                   <Input label="City" value={activeForm.city} onChange={(v) => updateForm(activeFormIdx, { city: v })} />
                 </div>
+                <GeoSuggestion suggestion={geoSuggestion} onApply={applyGeoSuggestion} onDismiss={dismissGeo} compact />
                 <Input label="Address" value={activeForm.address} onChange={(v) => updateForm(activeFormIdx, { address: v })} />
                 <Textarea label="Notes" value={activeForm.notes} onChange={(v) => updateForm(activeFormIdx, { notes: v })} />
               </div>

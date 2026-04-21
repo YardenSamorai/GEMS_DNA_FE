@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { CONTACT_TYPES, fetchFolders } from "../../../services/crmApi";
 import { polishContact } from "../utils/smartCase";
+import { useGeoSuggestion } from "../../../utils/geoDetect";
+import GeoSuggestion from "../../../components/GeoSuggestion";
 
 export default function ContactFormModal({ initial, onClose, onSubmit, title = "New contact" }) {
   const { user } = useUser();
@@ -31,6 +33,23 @@ export default function ContactFormModal({ initial, onClose, onSubmit, title = "
   }, [user?.id]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Live country/city detection from phone, address, email
+  const { suggestion: geo, dismiss: dismissGeo } = useGeoSuggestion({
+    phone: form.phone,
+    city: form.city,
+    address: form.address,
+    country: form.country,
+    email: form.email,
+  });
+  const applyGeo = (s) => {
+    setForm((f) => ({
+      ...f,
+      country: f.country || s.country || "",
+      city: f.city || s.city || "",
+    }));
+    dismissGeo();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -105,6 +124,8 @@ export default function ContactFormModal({ initial, onClose, onSubmit, title = "
               <input value={form.city || ""} onChange={(e) => set("city", e.target.value)} className={inputCls} />
             </Field>
           </div>
+
+          <GeoSuggestion suggestion={geo} onApply={applyGeo} onDismiss={dismissGeo} />
 
           <Field label="Address">
             <input value={form.address || ""} onChange={(e) => set("address", e.target.value)} className={inputCls} />

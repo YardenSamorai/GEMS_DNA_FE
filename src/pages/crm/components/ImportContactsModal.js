@@ -8,6 +8,7 @@ import {
   importContactsExecute,
   fetchFolders,
 } from "../../../services/crmApi";
+import { detectGeoApi } from "../../../utils/geoDetect";
 
 const TARGET_FIELDS = [
   { key: "name", label: "Name *", required: true },
@@ -78,6 +79,10 @@ export default function ImportContactsModal({ onClose, onImported, defaultFolder
   const [selectedFolder, setSelectedFolder] = useState(defaultFolderId);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+
+  // Whether to auto-detect missing countries during import preview
+  const [autoDetectGeo, setAutoDetectGeo] = useState(true);
+  const [geoProgress, setGeoProgress] = useState(null); // { done, total } | null
 
   React.useEffect(() => {
     if (user?.id) fetchFolders(user.id).then(setFolders).catch(() => {});
@@ -156,7 +161,47 @@ export default function ImportContactsModal({ onClose, onImported, defaultFolder
     }
     setLoading(true);
     try {
-      const r = await importContactsPreview(user.id, mappedRows);
+      // Phase 1: optional country auto-detection. We only call the geo
+      // endpoint for rows that have *something* useful (phone or city) and
+      // are missing a country — keeps the API call count predictable.
+      let enrichedRows = mappedRows;
+      if (autoDetectGeo) {
+        const candidates = mappedRows
+          .map((row, i) => ({ row, i }))
+          .filter(({ row }) => {
+            const hasCountry = row.country && String(row.country).trim();
+            const hasSignal = row.phone || row.city || row.address || row.email;
+            return !hasCountry && hasSignal;
+          });
+        if (candidates.length > 0) {
+          setGeoProgress({ done: 0, total: candidates.length });
+          // Run with a small concurrency limit so we don't overwhelm Mapbox
+          const CONCURRENCY = 4;
+          let cursor = 0, done = 0;
+          const worker = async () => {
+            while (cursor < candidates.length) {
+              const my = cursor++;
+              const { row, i } = candidates[my];
+              try {
+                const geo = await detectGeoApi({
+                  phone: row.phone, city: row.city, address: row.address, email: row.email,
+                });
+                if (geo?.country && (geo.confidence === "high" || geo.confidence === "medium")) {
+                  enrichedRows = enrichedRows.map((r, idx) =>
+                    idx === i ? { ...r, country: geo.country, city: r.city || geo.city || "" } : r
+                  );
+                }
+              } catch (_) { /* non-blocking */ }
+              done++;
+              setGeoProgress({ done, total: candidates.length });
+            }
+          };
+          await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+        }
+      }
+      setGeoProgress(null);
+
+      const r = await importContactsPreview(user.id, enrichedRows);
       setPreview(r);
       const a = {}, m = {};
       for (const p of r.preview) {
@@ -306,6 +351,35 @@ export default function ImportContactsModal({ onClose, onImported, defaultFolder
                   </select>
                 </div>
               )}
+
+              <div className="pt-2 border-t border-stone-200">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoDetectGeo}
+                    onChange={(e) => setAutoDetectGeo(e.target.checked)}
+                    className="mt-0.5 rounded border-stone-300"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-stone-800">Auto-detect missing countries</div>
+                    <div className="text-[11px] text-stone-500 leading-snug mt-0.5">
+                      For rows without a country we'll infer one from the phone code or city using Mapbox.
+                      Existing country values are never overwritten.
+                    </div>
+                  </div>
+                </label>
+                {geoProgress && (
+                  <div className="mt-2 flex items-center gap-2 text-[11px] text-stone-600">
+                    <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-stone-900 transition-all"
+                        style={{ width: `${(geoProgress.done / Math.max(1, geoProgress.total)) * 100}%` }}
+                      />
+                    </div>
+                    <span>Detecting locations… {geoProgress.done}/{geoProgress.total}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
