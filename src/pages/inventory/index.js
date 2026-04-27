@@ -765,30 +765,30 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         // ---------- Category (centered, serif) ----------
         const catY = div1Y + 6;
         pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(13);
+        pdf.setFontSize(11);
         pdf.setTextColor(20, 20, 20);
         pdf.text(catLabel, x + colWidth / 2, catY, { align: 'center' });
 
         // ---------- Weight + Price ----------
         const wpY = catY + 8;
         pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(9);
+        pdf.setFontSize(10);
         pdf.setTextColor(120, 120, 120);
         pdf.text('WEIGHT:', x + 2, wpY);
         pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(10);
+        pdf.setFontSize(11.5);
         pdf.setTextColor(...green);
-        pdf.text(`${stone.weightCt || '?'}ct`, x + 18, wpY);
+        pdf.text(`${stone.weightCt || '?'}ct`, x + 20, wpY);
 
         if (showPrices && stone.priceTotal) {
           pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-          pdf.setFontSize(9);
+          pdf.setFontSize(10);
           pdf.setTextColor(120, 120, 120);
           pdf.text('PRICE:', x + colWidth / 2, wpY);
           pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-          pdf.setFontSize(10);
+          pdf.setFontSize(11.5);
           pdf.setTextColor(...green);
-          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, x + colWidth / 2 + 13, wpY);
+          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, x + colWidth / 2 + 15, wpY);
         }
 
         // Divider 2
