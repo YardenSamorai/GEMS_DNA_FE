@@ -349,6 +349,22 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     };
   };
 
+  // Shorten long multi-word Clarity values so they don't overflow the cell.
+  // Example: "Insignificant to Minor" -> "Ins - Min"
+  // Rule: take the first 3 chars of each meaningful word, joined with " - ".
+  // Connector words (to / and / & / or / of / the) are dropped.
+  // Single-word or already-short values are returned unchanged.
+  const shortenClarity = (clarity) => {
+    if (!clarity) return '-';
+    const text = String(clarity).trim();
+    if (!text || text === '-') return '-';
+    const STOP = new Set(['to', 'and', '&', 'or', 'of', 'the']);
+    const words = text.split(/\s+/).filter((w) => !STOP.has(w.toLowerCase()));
+    if (words.length <= 1) return text;
+    if (text.length <= 12) return text;
+    return words.map((w) => (w.length > 3 ? w.substring(0, 3) : w)).join(' - ');
+  };
+
   const addFooter = (pageNum, totalContentPages) => {
     const footerY = pageHeight - 12;
     pdf.setDrawColor(...lightGray);
@@ -487,7 +503,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         const labelY = y + 5;
         const valY = labelY + 5;
         const cols = ['Shape', 'Color', 'Clarity', 'Lab', 'SKU'];
-        const vals = [details.shape, details.color, details.clarity, details.lab, details.sku];
+        const vals = [details.shape, details.color, shortenClarity(details.clarity), details.lab, details.sku];
         const colWidth = (rightEdge - textX) / cols.length;
 
         pdf.setFontSize(7);
@@ -634,7 +650,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         // ---------- Specs row (Shape | Color | Clarity | Lab) ----------
         const specsY = imgY + imgH + 8;
         const specCols = ['Shape', 'Color', 'Clarity', 'Lab'];
-        const specVals = [details.shape, details.color, details.clarity, details.lab];
+        const specVals = [details.shape, details.color, shortenClarity(details.clarity), details.lab];
         const sColW = colWidth / specCols.length;
 
         pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
