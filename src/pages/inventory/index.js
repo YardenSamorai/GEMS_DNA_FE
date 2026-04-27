@@ -466,15 +466,73 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
   pdf.text('info@gems.net', sepRight + 4, footerY, { align: 'left' });
 
   // ==================== CONTENT PAGES ====================
+  const coverLogoForHeader = logoCoverBase64 || logoBase64;
+  const drawInnerHeader = () => {
+    const HEADER_H = 28;
+    if (coverBgBase64) {
+      try { pdf.addImage(coverBgBase64, 'PNG', 0, 0, pageWidth, HEADER_H); } catch (e) {
+        pdf.setFillColor(...dark);
+        pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
+      }
+    } else {
+      pdf.setFillColor(...dark);
+      pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
+    }
+    if (coverLogoForHeader) {
+      try {
+        const lp = pdf.getImageProperties(coverLogoForHeader);
+        const lh = 16;
+        const lw = lh * (lp.width / lp.height);
+        pdf.addImage(coverLogoForHeader, 'PNG', margin, (HEADER_H - lh) / 2, lw, lh);
+      } catch (e) { /* skip */ }
+    }
+    pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(
+      'N e w   Y o r k   |   T e l   A v i v   |   H o n g   K o n g   |   L o s   A n g e l e s',
+      pageWidth - margin,
+      HEADER_H / 2 - 1,
+      { align: 'right' }
+    );
+    pdf.setFontSize(7);
+    pdf.setTextColor(220, 220, 220);
+    pdf.text(
+      'www.gems.net   |   +1 (212) 869-0544   |   info@gems.net',
+      pageWidth - margin,
+      HEADER_H / 2 + 5,
+      { align: 'right' }
+    );
+    return HEADER_H;
+  };
+
+  const drawInnerFooter = (pageNum) => {
+    const fY = pageHeight - 10;
+    pdf.setDrawColor(220, 220, 220);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, fY - 5, pageWidth - margin, fY - 5);
+    pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 120, 120);
+    const fDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+    pdf.text(fDate, margin, fY);
+    pdf.text(`Page ${pageNum} of ${totalContentPages}`, pageWidth - margin, fY, { align: 'right' });
+  };
+
   if (layout === 'list') {
-    const cardHeight = 58;
-    const imgSize = 45;
+    const HEADER_H = 28;
+    const FOOTER_RESERVE = 20;
+    const startY = HEADER_H + 6;
+    const cardSlot = (pageHeight - startY - FOOTER_RESERVE) / itemsPerPage;
+    const cardHeight = Math.min(cardSlot - 4, 55);
+    const imgSize = Math.min(cardHeight - 4, 50);
     let pageNum = 0;
 
     for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
       pdf.addPage();
       pageNum++;
-      let y = 15;
+      drawInnerHeader();
+
       const pageStones = selectedStones.slice(i, i + itemsPerPage);
 
       for (let j = 0; j < pageStones.length; j++) {
@@ -482,85 +540,116 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         const details = getStoneDetails(stone);
         const catLabel = getCategoryLabel(stone);
 
-        // Image area
+        const y = startY + j * cardSlot;
+
+        // ---------- Image (left, square with thin frame) ----------
+        const imgY = y + (cardHeight - imgSize) / 2;
         pdf.setDrawColor(220, 220, 220);
         pdf.setLineWidth(0.3);
-        pdf.roundedRect(margin, y, imgSize, imgSize, 2, 2, 'S');
-        pdf.setFillColor(248, 248, 248);
-        pdf.roundedRect(margin + 0.15, y + 0.15, imgSize - 0.3, imgSize - 0.3, 2, 2, 'F');
+        pdf.rect(margin, imgY, imgSize, imgSize, 'S');
 
         if (stone.imageUrl) {
           try {
             const imgData = await loadImage(stone.imageUrl);
-            if (imgData) pdf.addImage(imgData, 'JPEG', margin + 1, y + 1, imgSize - 2, imgSize - 2);
+            if (imgData) {
+              pdf.addImage(imgData, 'JPEG', margin + 1.5, imgY + 1.5, imgSize - 3, imgSize - 3);
+            }
           } catch (e) { /* skip */ }
         }
 
-        const textX = margin + imgSize + 8;
+        // ---------- Right side text area ----------
+        const textX = margin + imgSize + 10;
         const rightEdge = pageWidth - margin;
+        const textWidth = rightEdge - textX;
 
-        // Details table header
+        // Specs row (Shape | Color | Clarity | Lab | SKU) — labels gray, values black
+        const specCols = ['Shape', 'Color', 'Clarity', 'Lab', 'SKU'];
+        const specVals = [
+          details.shape,
+          details.color,
+          shortenClarity(details.clarity),
+          details.lab,
+          details.sku,
+        ];
+        const sColW = textWidth / specCols.length;
         const labelY = y + 5;
-        const valY = labelY + 5;
-        const cols = ['Shape', 'Color', 'Clarity', 'Lab', 'SKU'];
-        const vals = [details.shape, details.color, shortenClarity(details.clarity), details.lab, details.sku];
-        const colWidth = (rightEdge - textX) / cols.length;
+        const valY = labelY + 5.5;
 
+        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
         pdf.setFontSize(7);
-        pdf.setTextColor(...gray);
-        pdf.setFont('helvetica', 'normal');
-        cols.forEach((label, ci) => { pdf.text(label, textX + ci * colWidth, labelY); });
+        pdf.setTextColor(150, 150, 150);
+        specCols.forEach((label, ci) => {
+          pdf.text(label, textX + ci * sColW, labelY);
+        });
 
+        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+        pdf.setFontSize(10);
+        pdf.setTextColor(20, 20, 20);
+        specVals.forEach((val, ci) => {
+          pdf.text(String(val), textX + ci * sColW, valY);
+        });
+
+        // Category name (large serif, left-aligned)
+        const catY = valY + 9;
+        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+        pdf.setFontSize(15);
+        pdf.setTextColor(20, 20, 20);
+        pdf.text(catLabel, textX, catY);
+
+        // Divider between category and weight/price row
+        const divY = catY + 4;
+        pdf.setDrawColor(230, 230, 230);
+        pdf.setLineWidth(0.2);
+        pdf.line(textX, divY, rightEdge, divY);
+
+        // ---------- Weight + Price + View DNA button ----------
+        const bottomY = divY + 7;
+
+        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
         pdf.setFontSize(9);
-        pdf.setTextColor(...black);
-        pdf.setFont('helvetica', 'bold');
-        vals.forEach((val, ci) => { pdf.text(val, textX + ci * colWidth, valY); });
-
-        // Category name
-        pdf.setFontSize(14);
-        pdf.setTextColor(...black);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(catLabel, textX, valY + 10);
-
-        // Weight + Price + View DNA row
-        const bottomY = valY + 18;
-        pdf.setFontSize(9);
-        pdf.setTextColor(...black);
-        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(120, 120, 120);
         pdf.text('WEIGHT:', textX, bottomY);
+        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+        pdf.setFontSize(10);
         pdf.setTextColor(...green);
         pdf.text(`${stone.weightCt || '?'}ct`, textX + 18, bottomY);
 
         if (showPrices && stone.priceTotal) {
+          pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
           pdf.setFontSize(9);
-          pdf.setTextColor(...black);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('PRICE:', textX + 42, bottomY);
+          pdf.setTextColor(120, 120, 120);
+          pdf.text('PRICE:', textX + 44, bottomY);
+          pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
           pdf.setFontSize(10);
-          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, textX + 56, bottomY);
+          pdf.setTextColor(...green);
+          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, textX + 58, bottomY);
         }
 
-        // View DNA button
-        const btnW = 22; const btnH = 7;
+        // View DNA pill button (right-aligned)
+        const btnW = 32;
+        const btnH = 7.5;
         const btnX = rightEdge - btnW;
-        const btnY = bottomY - 5;
+        const btnY = bottomY - 5.5;
         pdf.setFillColor(...green);
-        pdf.roundedRect(btnX, btnY, btnW, btnH, 1.5, 1.5, 'F');
-        pdf.setFontSize(7);
+        pdf.roundedRect(btnX, btnY, btnW, btnH, 1, 1, 'F');
+        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+        pdf.setFontSize(8);
         pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-        pdf.textWithLink('View DNA', btnX + 3, btnY + 5, { url: `https://gems-dna.com/${stone.sku}` });
+        pdf.textWithLink('View DNA', btnX + btnW / 2, btnY + 5, {
+          url: `https://gems-dna.com/${stone.sku}`,
+          align: 'center',
+        });
 
-        y += cardHeight;
-
+        // Divider between cards
         if (j < pageStones.length - 1) {
+          const sepY = y + cardSlot - 2;
           pdf.setDrawColor(230, 230, 230);
           pdf.setLineWidth(0.2);
-          pdf.line(margin, y - 3, pageWidth - margin, y - 3);
+          pdf.line(margin, sepY, pageWidth - margin, sepY);
         }
       }
 
-      addFooter(pageNum, totalContentPages);
+      drawInnerFooter(pageNum);
     }
   } else {
     // Grid layout: 2x2 = 4 per page
