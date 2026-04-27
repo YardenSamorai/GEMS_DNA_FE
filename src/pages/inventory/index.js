@@ -275,19 +275,21 @@ const registerCatalogFonts = (pdf, fonts) => {
 
 /* ---------------- Office Contacts (by Clerk publicMetadata.location) ----------------
  * To assign a user to a specific office: Clerk Dashboard -> Users -> open user ->
- * Metadata -> Public metadata -> { "location": "IL" }   (or "US", "HK", "LA")
+ * Metadata -> Public metadata -> { "location": "IL" }   (or "NY", "HK", "LA")
  *
  * The catalog and exports will pick the matching phone / email / website.
  * If no location is set, we fall back to the legacy email-based detection
  * (so existing users keep working until you migrate them).
  */
 const OFFICE_CONTACTS_BY_LOCATION = {
-  IL: { phone: '+972.3.575.1137',  email: 'info@gems.net', site: 'www.gems.net', label: 'Tel Aviv' },
-  US: { phone: '+1 (212) 869-0544', email: 'info@gems.net', site: 'www.gems.net', label: 'New York' },
-  HK: { phone: '+852.0000.0000',    email: 'info@gems.net', site: 'www.gems.net', label: 'Hong Kong' },
-  LA: { phone: '+1 (310) 000-0000', email: 'info@gems.net', site: 'www.gems.net', label: 'Los Angeles' },
+  IL: { phone: '+972-3-575-1137',  email: 'info@gems.net', site: 'www.gems.net', label: 'Tel Aviv' },
+  NY: { phone: '+1.917.309.2523',  email: 'info@gems.net', site: 'www.gems.net', label: 'New York' },
+  HK: { phone: '+852-3568-7021',   email: 'info@gems.net', site: 'www.gems.net', label: 'Hong Kong' },
+  LA: { phone: '+1-213-622-9819',  email: 'info@gems.net', site: 'www.gems.net', label: 'Los Angeles' },
 };
-const DEFAULT_OFFICE_CONTACT = OFFICE_CONTACTS_BY_LOCATION.US;
+// Backward compatibility - "US" used to be the default code; map it to NY.
+OFFICE_CONTACTS_BY_LOCATION.US = OFFICE_CONTACTS_BY_LOCATION.NY;
+const DEFAULT_OFFICE_CONTACT = OFFICE_CONTACTS_BY_LOCATION.NY;
 
 const LEGACY_ISRAEL_EMAILS = [
   'yarden@eshed.com',
