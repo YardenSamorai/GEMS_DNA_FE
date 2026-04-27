@@ -78,6 +78,43 @@ export const imageToBase64 = (url) => {
   });
 };
 
+const fetchFontAsBase64 = async (url) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Font not found: ${url}`);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+let _catalogFontsCache = null;
+const loadCatalogFonts = async () => {
+  if (_catalogFontsCache) return _catalogFontsCache;
+  try {
+    const [playfair, latoLight] = await Promise.all([
+      fetchFontAsBase64('/fonts/PlayfairDisplay-Regular.ttf'),
+      fetchFontAsBase64('/fonts/Lato-Light.ttf'),
+    ]);
+    _catalogFontsCache = { playfair, latoLight };
+    return _catalogFontsCache;
+  } catch (e) {
+    console.warn('[PDF] Custom fonts could not be loaded, falling back to Helvetica.', e);
+    return null;
+  }
+};
+
+const registerCatalogFonts = (pdf, fonts) => {
+  if (!fonts) return { title: 'helvetica', body: 'helvetica', titleStyle: 'normal', bodyStyle: 'normal' };
+  pdf.addFileToVFS('PlayfairDisplay-Regular.ttf', fonts.playfair);
+  pdf.addFont('PlayfairDisplay-Regular.ttf', 'PlayfairDisplay', 'normal');
+  pdf.addFileToVFS('Lato-Light.ttf', fonts.latoLight);
+  pdf.addFont('Lato-Light.ttf', 'LatoLight', 'normal');
+  return { title: 'PlayfairDisplay', body: 'LatoLight', titleStyle: 'normal', bodyStyle: 'normal' };
+};
+
 export const exportForLabels = async (selectedStones, shareMode = false) => {
   if (!selectedStones || selectedStones.length === 0) {
     alert("Please select stones to export");
@@ -209,8 +246,26 @@ export const generatePDFCatalog = async (selectedStones, options = {}) => {
   const gray = [140, 140, 140];
   const lightGray = [200, 200, 200];
 
+  const fonts = await loadCatalogFonts();
+  const PDF_FONTS = registerCatalogFonts(pdf, fonts);
+  console.log('[PDF Catalog] Fonts:', fonts ? 'loaded ✓' : 'fallback (Helvetica)');
+
   let logoBase64 = null;
+  let logoCoverBase64 = null;
+  let coverBgBase64 = null;
   try { logoBase64 = await imageToBase64('/gemstar-logo-footer.png'); } catch (e) { /* no logo */ }
+  try {
+    logoCoverBase64 = await imageToBase64('/images/Gemstar_logo%201.png');
+    console.log('[PDF Catalog] Cover logo: loaded ✓');
+  } catch (e) {
+    console.warn('[PDF Catalog] Cover logo failed to load:', e);
+  }
+  try {
+    coverBgBase64 = await imageToBase64('/images/A4_cover_bg.png');
+    console.log('[PDF Catalog] Cover background: loaded ✓');
+  } catch (e) {
+    console.warn('[PDF Catalog] Cover background failed to load:', e);
+  }
 
   const loadImage = async (url) => {
     if (!url) return null;
@@ -258,50 +313,48 @@ export const generatePDFCatalog = async (selectedStones, options = {}) => {
   const totalContentPages = Math.ceil(selectedStones.length / itemsPerPage);
   const totalWeight = selectedStones.reduce((sum, s) => sum + (s.weightCt || 0), 0);
 
-  pdf.setFillColor(...dark);
-  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-
-  if (logoBase64) {
-    try { pdf.addImage(logoBase64, 'PNG', pageWidth / 2 - 25, 45, 50, 18); } catch (e) { /* skip */ }
+  if (coverBgBase64) {
+    try {
+      pdf.addImage(coverBgBase64, 'PNG', 0, 0, pageWidth, pageHeight);
+    } catch (e) {
+      pdf.setFillColor(...dark);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+    }
+  } else {
+    pdf.setFillColor(...dark);
+    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
   }
 
-  pdf.setDrawColor(...gray);
-  pdf.setLineWidth(0.3);
-  pdf.line(pageWidth / 2 - 40, 72, pageWidth / 2 + 40, 72);
+  if (logoCoverBase64) {
+    try {
+      const props = pdf.getImageProperties(logoCoverBase64);
+      const logoW = 70;
+      const logoH = logoW * (props.height / props.width);
+      pdf.addImage(
+        logoCoverBase64,
+        'PNG',
+        pageWidth / 2 - logoW / 2,
+        pageHeight * 0.30 - logoH / 2,
+        logoW,
+        logoH
+      );
+    } catch (e) { /* skip */ }
+  }
 
-  pdf.setFontSize(12);
-  pdf.setTextColor(...green);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 80, { align: 'center' });
-
-  pdf.setFontSize(32);
+  pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+  pdf.setFontSize(40);
   pdf.setTextColor(255, 255, 255);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.52, { align: 'center' });
+  pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.55, { align: 'center' });
 
-  pdf.setFontSize(13);
-  pdf.setTextColor(190, 190, 190);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text(`${selectedStones.length} Stones  |  ${totalWeight.toFixed(2)} Total Carats`, pageWidth / 2, pageHeight * 0.52 + 12, { align: 'center' });
-
-  pdf.setFontSize(11);
-  pdf.setTextColor(160, 160, 160);
-  const dateStr = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-  pdf.text(dateStr, pageWidth / 2, pageHeight - 35, { align: 'center' });
-
-  pdf.setDrawColor(...gray);
-  pdf.setLineWidth(0.3);
-  pdf.line(margin, pageHeight - 22, pageWidth - margin, pageHeight - 22);
-
-  pdf.setFontSize(9);
-  pdf.setTextColor(...green);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text('www.gems.net', margin + 20, pageHeight - 15, { align: 'center' });
-  pdf.setTextColor(160, 160, 160);
-  pdf.text('|', pageWidth / 2 - 30, pageHeight - 15, { align: 'center' });
-  pdf.text('+1 (212) 869-0544', pageWidth / 2, pageHeight - 15, { align: 'center' });
-  pdf.text('|', pageWidth / 2 + 30, pageHeight - 15, { align: 'center' });
-  pdf.text('info@gems.net', pageWidth - margin - 20, pageHeight - 15, { align: 'center' });
+  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+  pdf.setFontSize(24);
+  pdf.setTextColor(220, 220, 220);
+  pdf.text(
+    `${selectedStones.length} Stones  |  ${totalWeight.toFixed(2)} Total Carats`,
+    pageWidth / 2,
+    pageHeight * 0.55 + 14,
+    { align: 'center' }
+  );
 
   if (layout === 'list') {
     const cardHeight = 58;
