@@ -394,7 +394,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     } catch (e) { /* skip */ }
   }
 
-  pdf.setDrawColor(180, 180, 180);
+  pdf.setDrawColor(255, 255, 255);
   pdf.setLineWidth(0.3);
   pdf.line(pageWidth / 2 - 35, 80, pageWidth / 2 + 35, 80);
 
@@ -402,6 +402,10 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
   pdf.setFontSize(11);
   pdf.setTextColor(...green);
   pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 88, { align: 'center' });
+
+  pdf.setDrawColor(255, 255, 255);
+  pdf.setLineWidth(0.3);
+  pdf.line(pageWidth / 2 - 35, 93, pageWidth / 2 + 35, 93);
 
   pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
   pdf.setFontSize(40);
