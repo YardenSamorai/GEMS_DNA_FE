@@ -382,13 +382,13 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
   if (coverLogo) {
     try {
       const props = pdf.getImageProperties(coverLogo);
-      const logoW = 60;
+      const logoW = 45;
       const logoH = logoW * (props.height / props.width);
       pdf.addImage(
         coverLogo,
         'PNG',
         pageWidth / 2 - logoW / 2,
-        38,
+        40,
         logoW,
         logoH
       );
@@ -396,35 +396,35 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
   }
 
   pdf.setDrawColor(255, 255, 255);
-  pdf.setLineWidth(0.5);
-  pdf.line(pageWidth / 2 - 42, 88, pageWidth / 2 + 42, 88);
+  pdf.setLineWidth(0.4);
+  pdf.line(pageWidth / 2 - 32, 86, pageWidth / 2 + 32, 86);
 
   pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(15);
+  pdf.setFontSize(11);
   pdf.setTextColor(255, 255, 255);
-  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 97, { align: 'center' });
+  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 93, { align: 'center' });
 
   pdf.setDrawColor(255, 255, 255);
-  pdf.setLineWidth(0.5);
-  pdf.line(pageWidth / 2 - 42, 104, pageWidth / 2 + 42, 104);
+  pdf.setLineWidth(0.4);
+  pdf.line(pageWidth / 2 - 32, 98, pageWidth / 2 + 32, 98);
 
   pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-  pdf.setFontSize(40);
+  pdf.setFontSize(30);
   pdf.setTextColor(255, 255, 255);
   pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.55, { align: 'center' });
 
   pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(20);
+  pdf.setFontSize(15);
   pdf.setTextColor(220, 220, 220);
   pdf.text(
     `${selectedStones.length} Stones   |   ${totalWeight.toFixed(2)} Total Carats`,
     pageWidth / 2,
-    pageHeight * 0.55 + 12,
+    pageHeight * 0.55 + 10,
     { align: 'center' }
   );
 
   pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(11);
+  pdf.setFontSize(9);
   pdf.setTextColor(200, 200, 200);
   const dateStr = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
   pdf.text(dateStr, pageWidth / 2, pageHeight - 30, { align: 'center' });
@@ -434,11 +434,11 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
   pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
 
   pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(10);
+  pdf.setFontSize(8);
   pdf.setTextColor(220, 220, 220);
   const footerY = pageHeight - 12;
-  const sepLeft = pageWidth / 2 - 35;
-  const sepRight = pageWidth / 2 + 35;
+  const sepLeft = pageWidth / 2 - 32;
+  const sepRight = pageWidth / 2 + 32;
   pdf.text('www.gems.net', sepLeft - 4, footerY, { align: 'right' });
   pdf.setTextColor(150, 150, 150);
   pdf.text('|', sepLeft, footerY, { align: 'center' });
