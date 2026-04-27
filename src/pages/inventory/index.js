@@ -548,122 +548,184 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     }
   } else {
     // Grid layout: 2x2 = 4 per page
-    const cols = 2;
-    const colWidth = (contentWidth - 8) / cols;
-    const imgH = 55;
-    const cardHeight = 105;
+    const HEADER_H = 28;
+    const FOOTER_H = 18;
+    const GUTTER = 8;
+    const colWidth = (contentWidth - GUTTER) / 2;
+    const cardHeight = (pageHeight - HEADER_H - FOOTER_H - GUTTER - 6) / 2;
     let pageNum = 0;
 
     for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
       pdf.addPage();
       pageNum++;
 
-      // Grid header
-      let headerY = 10;
-      if (logoBase64) {
-        try { pdf.addImage(logoBase64, 'PNG', margin, headerY - 2, 35, 13); } catch (e) { /* skip */ }
+      // ---------- Header (dark rocky band) ----------
+      if (coverBgBase64) {
+        try { pdf.addImage(coverBgBase64, 'PNG', 0, 0, pageWidth, HEADER_H); } catch (e) {
+          pdf.setFillColor(...dark);
+          pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
+        }
+      } else {
+        pdf.setFillColor(...dark);
+        pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
       }
-      pdf.setFontSize(7);
-      pdf.setTextColor(...green);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Premium Gemstones & Diamonds', margin, headerY + 15);
 
-      pdf.setFontSize(7);
-      pdf.setTextColor(...black);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('N e w  Y o r k  |  T e l  A v i v  |  H o n g  K o n g  |  L o s  A n g e l e s', pageWidth - margin, headerY + 3, { align: 'right' });
-      pdf.setFontSize(7);
-      pdf.setTextColor(...gray);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('www.gems.net   |   +1 (212) 869-0544   |   info@gems.net', pageWidth - margin, headerY + 9, { align: 'right' });
+      // Header logo (left)
+      if (coverLogo) {
+        try {
+          const lp = pdf.getImageProperties(coverLogo);
+          const lh = 16;
+          const lw = lh * (lp.width / lp.height);
+          pdf.addImage(coverLogo, 'PNG', margin, (HEADER_H - lh) / 2, lw, lh);
+        } catch (e) { /* skip */ }
+      }
 
-      const startY = headerY + 22;
+      // Header right column (locations + contact)
+      pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(
+        'N e w   Y o r k   |   T e l   A v i v   |   H o n g   K o n g   |   L o s   A n g e l e s',
+        pageWidth - margin,
+        HEADER_H / 2 - 1,
+        { align: 'right' }
+      );
+      pdf.setFontSize(7);
+      pdf.setTextColor(220, 220, 220);
+      pdf.text(
+        'www.gems.net   |   +1 (212) 869-0544   |   info@gems.net',
+        pageWidth - margin,
+        HEADER_H / 2 + 5,
+        { align: 'right' }
+      );
+
+      const startY = HEADER_H + 8;
       const pageStones = selectedStones.slice(i, i + itemsPerPage);
 
       for (let j = 0; j < pageStones.length; j++) {
         const stone = pageStones[j];
         const details = getStoneDetails(stone);
         const catLabel = getCategoryLabel(stone);
-        const col = j % cols;
-        const row = Math.floor(j / cols);
-        const x = margin + col * (colWidth + 8);
-        const y = startY + row * (cardHeight + 8);
+        const col = j % 2;
+        const row = Math.floor(j / 2);
+        const x = margin + col * (colWidth + GUTTER);
+        const y = startY + row * (cardHeight + GUTTER);
 
-        // Image box
+        // ---------- Image area (top of card, square) ----------
+        const imgPad = 2;
+        const imgH = Math.min(colWidth - 4, cardHeight * 0.55);
+        const imgW = imgH;
+        const imgX = x + (colWidth - imgW) / 2;
+        const imgY = y;
+
         pdf.setDrawColor(220, 220, 220);
         pdf.setLineWidth(0.3);
-        pdf.roundedRect(x, y, colWidth, imgH, 2, 2, 'S');
-        pdf.setFillColor(250, 250, 250);
-        pdf.roundedRect(x + 0.15, y + 0.15, colWidth - 0.3, imgH - 0.3, 2, 2, 'F');
+        pdf.rect(imgX, imgY, imgW, imgH, 'S');
 
         if (stone.imageUrl) {
           try {
             const imgData = await loadImage(stone.imageUrl);
             if (imgData) {
-              const imgW = Math.min(colWidth - 10, imgH - 6);
-              const imgX = x + (colWidth - imgW) / 2;
-              pdf.addImage(imgData, 'JPEG', imgX, y + 3, imgW, imgH - 6);
+              pdf.addImage(imgData, 'JPEG', imgX + imgPad, imgY + imgPad, imgW - imgPad * 2, imgH - imgPad * 2);
             }
           } catch (e) { /* skip */ }
         }
 
-        // Details below image
-        const detailY = y + imgH + 5;
-        const detailCols = ['Shape', 'Color', 'Clarity', 'Lab'];
-        const detailVals = [details.shape, details.color, details.clarity, details.lab];
-        const dColW = colWidth / detailCols.length;
+        // ---------- Specs row (Shape | Color | Clarity | Lab) ----------
+        const specsY = imgY + imgH + 8;
+        const specCols = ['Shape', 'Color', 'Clarity', 'Lab'];
+        const specVals = [details.shape, details.color, details.clarity, details.lab];
+        const sColW = colWidth / specCols.length;
 
+        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
         pdf.setFontSize(7);
-        pdf.setTextColor(...gray);
-        pdf.setFont('helvetica', 'normal');
-        detailCols.forEach((label, ci) => { pdf.text(label, x + ci * dColW, detailY); });
+        pdf.setTextColor(150, 150, 150);
+        specCols.forEach((label, ci) => {
+          pdf.text(label, x + ci * sColW + sColW / 2, specsY, { align: 'center' });
+        });
 
-        pdf.setFontSize(8);
-        pdf.setTextColor(...black);
-        pdf.setFont('helvetica', 'bold');
-        detailVals.forEach((val, ci) => { pdf.text(val, x + ci * dColW, detailY + 5); });
+        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+        pdf.setFontSize(10);
+        pdf.setTextColor(20, 20, 20);
+        specVals.forEach((val, ci) => {
+          pdf.text(String(val), x + ci * sColW + sColW / 2, specsY + 5, { align: 'center' });
+        });
 
-        // Category
-        pdf.setFontSize(12);
-        pdf.setTextColor(...black);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(catLabel, x, detailY + 14);
+        // Divider 1
+        const div1Y = specsY + 10;
+        pdf.setDrawColor(220, 220, 220);
+        pdf.setLineWidth(0.3);
+        pdf.line(x, div1Y, x + colWidth, div1Y);
 
-        // Weight + Price row
-        const bottomY = detailY + 22;
-        pdf.setFontSize(8);
-        pdf.setTextColor(...black);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('WEIGHT:', x, bottomY);
+        // ---------- Category (centered, serif) ----------
+        const catY = div1Y + 6;
+        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+        pdf.setFontSize(13);
+        pdf.setTextColor(20, 20, 20);
+        pdf.text(catLabel, x + colWidth / 2, catY, { align: 'center' });
+
+        // ---------- Weight + Price ----------
+        const wpY = catY + 8;
+        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+        pdf.setFontSize(9);
+        pdf.setTextColor(120, 120, 120);
+        pdf.text('WEIGHT:', x + 2, wpY);
+        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+        pdf.setFontSize(10);
         pdf.setTextColor(...green);
-        pdf.text(`${stone.weightCt || '?'}ct`, x + 17, bottomY);
+        pdf.text(`${stone.weightCt || '?'}ct`, x + 18, wpY);
 
         if (showPrices && stone.priceTotal) {
-          pdf.setTextColor(...black);
-          pdf.text('PRICE:', x + 35, bottomY);
+          pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
           pdf.setFontSize(9);
-          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, x + 49, bottomY);
+          pdf.setTextColor(120, 120, 120);
+          pdf.text('PRICE:', x + colWidth / 2, wpY);
+          pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
+          pdf.setFontSize(10);
+          pdf.setTextColor(...green);
+          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, x + colWidth / 2 + 13, wpY);
         }
 
-        // SKU + View DNA row
-        const skuY = bottomY + 7;
-        pdf.setFontSize(8);
-        pdf.setTextColor(...gray);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(details.sku, x, skuY);
+        // Divider 2
+        const div2Y = wpY + 4;
+        pdf.setDrawColor(230, 230, 230);
+        pdf.setLineWidth(0.2);
+        pdf.line(x, div2Y, x + colWidth, div2Y);
 
-        const btnW = 22; const btnH = 7;
+        // ---------- SKU + View DNA button ----------
+        const btnY = div2Y + 6;
+        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+        pdf.setFontSize(8);
+        pdf.setTextColor(140, 140, 140);
+        pdf.text(details.sku, x + 2, btnY + 0.5);
+
+        const btnW = 36;
+        const btnH = 7;
         const btnX = x + colWidth - btnW;
-        const btnY = skuY - 5;
+        const btnTopY = btnY - 4;
         pdf.setFillColor(...green);
-        pdf.roundedRect(btnX, btnY, btnW, btnH, 1.5, 1.5, 'F');
-        pdf.setFontSize(7);
+        pdf.roundedRect(btnX, btnTopY, btnW, btnH, 1, 1, 'F');
+        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+        pdf.setFontSize(8);
         pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-        pdf.textWithLink('View DNA', btnX + 3, btnY + 5, { url: `https://gems-dna.com/${stone.sku}` });
+        pdf.textWithLink('View DNA', btnX + btnW / 2, btnTopY + 4.7, {
+          url: `https://gems-dna.com/${stone.sku}`,
+          align: 'center',
+        });
       }
 
-      addFooter(pageNum, totalContentPages);
+      // ---------- Footer ----------
+      const fY = pageHeight - 10;
+      pdf.setDrawColor(220, 220, 220);
+      pdf.setLineWidth(0.3);
+      pdf.line(margin, fY - 5, pageWidth - margin, fY - 5);
+
+      pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      const fDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+      pdf.text(fDate, margin, fY);
+      pdf.text(`Page ${pageNum} of ${totalContentPages}`, pageWidth - margin, fY, { align: 'right' });
     }
   }
 
