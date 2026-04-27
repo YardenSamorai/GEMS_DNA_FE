@@ -378,13 +378,14 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
   }
 
-  if (logoBase64) {
+  const coverLogo = logoCoverBase64 || logoBase64;
+  if (coverLogo) {
     try {
-      const props = pdf.getImageProperties(logoBase64);
-      const logoW = 55;
+      const props = pdf.getImageProperties(coverLogo);
+      const logoW = 60;
       const logoH = logoW * (props.height / props.width);
       pdf.addImage(
-        logoBase64,
+        coverLogo,
         'PNG',
         pageWidth / 2 - logoW / 2,
         38,
@@ -396,16 +397,16 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
 
   pdf.setDrawColor(255, 255, 255);
   pdf.setLineWidth(0.5);
-  pdf.line(pageWidth / 2 - 38, 80, pageWidth / 2 + 38, 80);
+  pdf.line(pageWidth / 2 - 42, 88, pageWidth / 2 + 42, 88);
 
   pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(12);
+  pdf.setFontSize(15);
   pdf.setTextColor(255, 255, 255);
-  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 88, { align: 'center' });
+  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 97, { align: 'center' });
 
   pdf.setDrawColor(255, 255, 255);
   pdf.setLineWidth(0.5);
-  pdf.line(pageWidth / 2 - 38, 94, pageWidth / 2 + 38, 94);
+  pdf.line(pageWidth / 2 - 42, 104, pageWidth / 2 + 42, 104);
 
   pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
   pdf.setFontSize(40);
