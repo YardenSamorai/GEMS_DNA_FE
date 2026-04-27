@@ -273,6 +273,39 @@ const registerCatalogFonts = (pdf, fonts) => {
   return { title: 'PlayfairDisplay', body: 'LatoLight', titleStyle: 'normal', bodyStyle: 'normal' };
 };
 
+/* ---------------- Office Contacts (by Clerk publicMetadata.location) ----------------
+ * To assign a user to a specific office: Clerk Dashboard -> Users -> open user ->
+ * Metadata -> Public metadata -> { "location": "IL" }   (or "US", "HK", "LA")
+ *
+ * The catalog and exports will pick the matching phone / email / website.
+ * If no location is set, we fall back to the legacy email-based detection
+ * (so existing users keep working until you migrate them).
+ */
+const OFFICE_CONTACTS_BY_LOCATION = {
+  IL: { phone: '+972.3.575.1137',  email: 'info@gems.net', site: 'www.gems.net', label: 'Tel Aviv' },
+  US: { phone: '+1 (212) 869-0544', email: 'info@gems.net', site: 'www.gems.net', label: 'New York' },
+  HK: { phone: '+852.0000.0000',    email: 'info@gems.net', site: 'www.gems.net', label: 'Hong Kong' },
+  LA: { phone: '+1 (310) 000-0000', email: 'info@gems.net', site: 'www.gems.net', label: 'Los Angeles' },
+};
+const DEFAULT_OFFICE_CONTACT = OFFICE_CONTACTS_BY_LOCATION.US;
+
+const LEGACY_ISRAEL_EMAILS = [
+  'yarden@eshed.com',
+  'eyal@eshed.com',
+  'meirav@eshed.com',
+  'le@gems.net',
+];
+
+const getOfficeContact = ({ location, email } = {}) => {
+  if (location && OFFICE_CONTACTS_BY_LOCATION[location]) {
+    return OFFICE_CONTACTS_BY_LOCATION[location];
+  }
+  if (email && LEGACY_ISRAEL_EMAILS.includes(String(email).toLowerCase())) {
+    return OFFICE_CONTACTS_BY_LOCATION.IL;
+  }
+  return DEFAULT_OFFICE_CONTACT;
+};
+
 /* ---------------- PDF Catalog Generator ---------------- */
 const generatePDFCatalog = async (selectedStones, options = {}) => {
   if (!selectedStones || selectedStones.length === 0) {
@@ -284,7 +317,11 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     layout = 'grid',
     showPrices = true,
     itemsPerPage = 4,
+    userLocation,
+    userEmail,
   } = options;
+
+  const office = getOfficeContact({ location: userLocation, email: userEmail });
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -455,15 +492,15 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
   const footerY = pageHeight - 12;
   const sepLeft = pageWidth / 2 - 32;
   const sepRight = pageWidth / 2 + 32;
-  pdf.text('www.gems.net', sepLeft - 4, footerY, { align: 'right' });
+  pdf.text(office.site, sepLeft - 4, footerY, { align: 'right' });
   pdf.setTextColor(150, 150, 150);
   pdf.text('|', sepLeft, footerY, { align: 'center' });
   pdf.setTextColor(220, 220, 220);
-  pdf.text('+1 (212) 869-0544', pageWidth / 2, footerY, { align: 'center' });
+  pdf.text(office.phone, pageWidth / 2, footerY, { align: 'center' });
   pdf.setTextColor(150, 150, 150);
   pdf.text('|', sepRight, footerY, { align: 'center' });
   pdf.setTextColor(220, 220, 220);
-  pdf.text('info@gems.net', sepRight + 4, footerY, { align: 'left' });
+  pdf.text(office.email, sepRight + 4, footerY, { align: 'left' });
 
   // ==================== CONTENT PAGES ====================
   const coverLogoForHeader = logoCoverBase64 || logoBase64;
@@ -498,7 +535,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     pdf.setFontSize(7);
     pdf.setTextColor(220, 220, 220);
     pdf.text(
-      'www.gems.net   |   +1 (212) 869-0544   |   info@gems.net',
+      `${office.site}   |   ${office.phone}   |   ${office.email}`,
       pageWidth - margin,
       HEADER_H / 2 + 5,
       { align: 'right' }
@@ -698,7 +735,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
       pdf.setFontSize(7);
       pdf.setTextColor(220, 220, 220);
       pdf.text(
-        'www.gems.net   |   +1 (212) 869-0544   |   info@gems.net',
+        `${office.site}   |   ${office.phone}   |   ${office.email}`,
         pageWidth - margin,
         HEADER_H / 2 + 5,
         { align: 'right' }
@@ -6051,11 +6088,11 @@ const StoneSearchPage = () => {
 
     // Contact bar (dark background, no merge)
     const contactRow = logoRowNum + 1;
-    const israelEmails = ["yarden@eshed.com", "eyal@eshed.com", "meirav@eshed.com", "le@gems.net"];
-    const userEmail = user?.primaryEmailAddress?.emailAddress || "";
-    const phone = israelEmails.includes(userEmail.toLowerCase()) ? "+972.3.575.1137" : "+1 (212) 869-0544";
+    const userEmailExcel = user?.primaryEmailAddress?.emailAddress || "";
+    const userLocationExcel = user?.publicMetadata?.location;
+    const officeExcel = getOfficeContact({ location: userLocationExcel, email: userEmailExcel });
     fillRow(contactRow,
-      `www.gems.net     \u2502     ${phone}     \u2502     info@gems.net`,
+      `${officeExcel.site}     \u2502     ${officeExcel.phone}     \u2502     ${officeExcel.email}`,
       { size: 14, color: { argb: "FFFFFFFF" }, name: "Lato", bold: true },
       darkFill,
       null,
@@ -7646,7 +7683,11 @@ const StoneSearchPage = () => {
             const stonesToUse = pdfStonesWithPrices.length > 0 
               ? pdfStonesWithPrices 
               : applyPriceMode(allItems.filter(s => selectedStones.has(s.id)));
-            await generatePDFCatalog(stonesToUse, options);
+            await generatePDFCatalog(stonesToUse, {
+              ...options,
+              userLocation: user?.publicMetadata?.location,
+              userEmail: user?.primaryEmailAddress?.emailAddress,
+            });
             setShowPDFModal(false);
             setPdfStonesWithPrices([]);
           } catch (err) {
