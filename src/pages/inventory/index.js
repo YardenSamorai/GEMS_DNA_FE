@@ -378,21 +378,30 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
   }
 
-  if (logoCoverBase64) {
+  if (logoBase64) {
     try {
-      const props = pdf.getImageProperties(logoCoverBase64);
-      const logoW = 70;
+      const props = pdf.getImageProperties(logoBase64);
+      const logoW = 55;
       const logoH = logoW * (props.height / props.width);
       pdf.addImage(
-        logoCoverBase64,
+        logoBase64,
         'PNG',
         pageWidth / 2 - logoW / 2,
-        pageHeight * 0.30 - logoH / 2,
+        38,
         logoW,
         logoH
       );
     } catch (e) { /* skip */ }
   }
+
+  pdf.setDrawColor(180, 180, 180);
+  pdf.setLineWidth(0.3);
+  pdf.line(pageWidth / 2 - 35, 80, pageWidth / 2 + 35, 80);
+
+  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+  pdf.setFontSize(11);
+  pdf.setTextColor(...green);
+  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 88, { align: 'center' });
 
   pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
   pdf.setFontSize(40);
@@ -400,14 +409,40 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
   pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.55, { align: 'center' });
 
   pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(24);
+  pdf.setFontSize(20);
   pdf.setTextColor(220, 220, 220);
   pdf.text(
-    `${selectedStones.length} Stones  |  ${totalWeight.toFixed(2)} Total Carats`,
+    `${selectedStones.length} Stones   |   ${totalWeight.toFixed(2)} Total Carats`,
     pageWidth / 2,
-    pageHeight * 0.55 + 14,
+    pageHeight * 0.55 + 12,
     { align: 'center' }
   );
+
+  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+  pdf.setFontSize(11);
+  pdf.setTextColor(200, 200, 200);
+  const dateStr = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+  pdf.text(dateStr, pageWidth / 2, pageHeight - 30, { align: 'center' });
+
+  pdf.setDrawColor(180, 180, 180);
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+
+  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+  pdf.setFontSize(10);
+  pdf.setTextColor(220, 220, 220);
+  const footerY = pageHeight - 12;
+  const sepLeft = pageWidth / 2 - 35;
+  const sepRight = pageWidth / 2 + 35;
+  pdf.text('www.gems.net', sepLeft - 4, footerY, { align: 'right' });
+  pdf.setTextColor(150, 150, 150);
+  pdf.text('|', sepLeft, footerY, { align: 'center' });
+  pdf.setTextColor(220, 220, 220);
+  pdf.text('+1 (212) 869-0544', pageWidth / 2, footerY, { align: 'center' });
+  pdf.setTextColor(150, 150, 150);
+  pdf.text('|', sepRight, footerY, { align: 'center' });
+  pdf.setTextColor(220, 220, 220);
+  pdf.text('info@gems.net', sepRight + 4, footerY, { align: 'left' });
 
   // ==================== CONTENT PAGES ====================
   if (layout === 'list') {
