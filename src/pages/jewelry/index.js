@@ -2,13 +2,47 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import {
   fetchJewelryItems,
+  fetchJewelryCatalog,
   JEWELRY_STATUSES,
   JEWELRY_TYPES,
   JEWELRY_CATEGORIES,
 } from "../../services/jewelryApi";
+import { decryptPrice } from "../../utils/decrypt";
+import { sanitizeText } from "../../utils/helper";
 import JewelryItemCard from "./components/JewelryItemCard";
 import NewJewelryItemModal from "./components/NewJewelryItemModal";
 import StatusBadge from "./components/StatusBadge";
+
+// Map a row from `jewelry_products` (the WooCommerce-fed catalog) into the
+// shape the JewelryItemCard expects, so both catalog pieces and workshop
+// jobs can live in one grid. We tag with __source so the card knows where
+// to route on click and how to badge it.
+const mapCatalogRow = (row) => {
+  const firstImage = (row.all_pictures_link || "")
+    .split(";")
+    .map((u) => u.trim())
+    .filter(Boolean)[0] || null;
+  let price = 0;
+  try { price = row.price ? Number(decryptPrice(row.price)) || 0 : 0; } catch (_) {}
+  const category = row.category || row.jewelry_type || null;
+  const metalSummary = row.metal_type
+    ? [row.metal_type, row.style].filter(Boolean).join(" / ")
+    : null;
+  return {
+    id: `cat_${row.model_number}`,
+    __source: "catalog",
+    sku: row.model_number || "",
+    name: sanitizeText(row.title) || row.model_number || "Untitled",
+    category,
+    metal_summary: metalSummary,
+    cover_image_url: firstImage,
+    sale_price: price || null,
+    description: sanitizeText(row.description) || sanitizeText(row.full_description) || "",
+    status: null,
+    type: null,
+    model_number: row.model_number,
+  };
+};
 
 const FEATURE_PILLS = [
   "Multi-location",
@@ -51,14 +85,17 @@ const InventoryHero = () => (
 const JewelryItemsList = () => {
   const { user } = useUser();
   const userId = user?.id;
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([]);          // workshop jobs (jewelry_items)
+  const [catalogItems, setCatalogItems] = useState([]); // catalog (jewelry_products)
   const [loading, setLoading] = useState(true);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [showNewModal, setShowNewModal] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("all"); // 'all' | 'workshop' | 'catalog'
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
@@ -71,7 +108,9 @@ const JewelryItemsList = () => {
       if (typeFilter) filters.type = typeFilter;
       if (search) filters.search = search;
       const res = await fetchJewelryItems(userId, filters);
-      setItems(res.items || []);
+      setItems(
+        (res.items || []).map((it) => ({ ...it, __source: "workshop" }))
+      );
     } catch (err) {
       setError(err.message || "Failed to load");
     } finally {
@@ -79,30 +118,82 @@ const JewelryItemsList = () => {
     }
   }, [userId, statusFilter, typeFilter, search]);
 
+  // Catalog is global (not per-user) and rarely changes during a session, so
+  // we load it once and keep it in memory; filters are applied client-side.
+  const loadCatalog = useCallback(async () => {
+    try {
+      const data = await fetchJewelryCatalog();
+      const rows = (data?.jewelry || []).map(mapCatalogRow);
+      setCatalogItems(rows);
+    } catch (err) {
+      // Catalog failure shouldn't block the workshop list — log and move on
+      console.warn("Catalog load failed:", err.message);
+      setCatalogItems([]);
+    } finally {
+      setCatalogLoaded(true);
+    }
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(load, search ? 250 : 0);
     return () => clearTimeout(t);
   }, [load, search]);
 
-  // Category filter is applied client-side (BE filter doesn't support it)
+  useEffect(() => { loadCatalog(); }, [loadCatalog]);
+
+  // Combine workshop + catalog according to filters. Status/type only make
+  // sense for workshop items, so when those filters are active we hide
+  // catalog rows; otherwise both sources show together unless the user has
+  // explicitly narrowed the source.
   const visibleItems = useMemo(() => {
-    if (!categoryFilter) return items;
-    return items.filter((i) => (i.category || "") === categoryFilter);
-  }, [items, categoryFilter]);
+    const workshopActive =
+      sourceFilter !== "catalog" && (!statusFilter && !typeFilter ? true : true);
+    const showWorkshop = sourceFilter === "all" || sourceFilter === "workshop";
+    const showCatalog =
+      (sourceFilter === "all" || sourceFilter === "catalog") &&
+      !statusFilter && !typeFilter;
+
+    let combined = [];
+    if (showWorkshop && workshopActive) combined = combined.concat(items);
+    if (showCatalog) {
+      // Apply search client-side to catalog (BE filtered workshop already)
+      const q = (search || "").trim().toLowerCase();
+      const cat = q
+        ? catalogItems.filter((c) =>
+            (c.name || "").toLowerCase().includes(q) ||
+            (c.sku || "").toLowerCase().includes(q) ||
+            (c.description || "").toLowerCase().includes(q)
+          )
+        : catalogItems;
+      combined = combined.concat(cat);
+    }
+
+    if (categoryFilter) {
+      combined = combined.filter((i) => (i.category || "") === categoryFilter);
+    }
+    return combined;
+  }, [items, catalogItems, sourceFilter, statusFilter, typeFilter, categoryFilter, search]);
 
   const stats = useMemo(() => {
-    const out = { total: visibleItems.length, byStatus: {} };
+    const out = {
+      total: visibleItems.length,
+      workshop: visibleItems.filter((i) => i.__source === "workshop").length,
+      catalog: visibleItems.filter((i) => i.__source === "catalog").length,
+      byStatus: {},
+    };
     for (const it of visibleItems) {
-      out.byStatus[it.status] = (out.byStatus[it.status] || 0) + 1;
+      if (it.status) out.byStatus[it.status] = (out.byStatus[it.status] || 0) + 1;
     }
     return out;
   }, [visibleItems]);
 
-  const hasActiveFilters = statusFilter || typeFilter || categoryFilter || search;
+  const hasActiveFilters =
+    statusFilter || typeFilter || categoryFilter || search || sourceFilter !== "all";
   const clearFilters = () => {
     setStatusFilter("");
     setTypeFilter("");
     setCategoryFilter("");
+    setSourceFilter("all");
     setSearch("");
   };
 
@@ -128,6 +219,17 @@ const JewelryItemsList = () => {
           </div>
 
           <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+            title="Show workshop jobs, catalog pieces, or both"
+          >
+            <option value="all">All sources</option>
+            <option value="workshop">Workshop</option>
+            <option value="catalog">Catalog</option>
+          </select>
+
+          <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
@@ -141,7 +243,9 @@ const JewelryItemsList = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+            disabled={sourceFilter === "catalog"}
+            title={sourceFilter === "catalog" ? "Status only applies to workshop jobs" : ""}
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-stone-400"
           >
             <option value="">All statuses</option>
             {JEWELRY_STATUSES.filter((s) => s.value !== "archived").map((s) => (
@@ -152,7 +256,9 @@ const JewelryItemsList = () => {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+            disabled={sourceFilter === "catalog"}
+            title={sourceFilter === "catalog" ? "Type only applies to workshop jobs" : ""}
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-stone-400"
           >
             <option value="">All types</option>
             {JEWELRY_TYPES.map((t) => (
@@ -181,12 +287,22 @@ const JewelryItemsList = () => {
         </button>
       </div>
 
-      {/* Stats strip */}
+      {/* Stats strip — total + workshop/catalog breakdown + status counts */}
       {stats.total > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="rounded-md bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-700">
             {stats.total} {stats.total === 1 ? "item" : "items"}
           </span>
+          {stats.workshop > 0 && (
+            <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+              {stats.workshop} workshop
+            </span>
+          )}
+          {stats.catalog > 0 && (
+            <span className="rounded-md bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+              {stats.catalog} catalog
+            </span>
+          )}
           {Object.entries(stats.byStatus).slice(0, 6).map(([s, c]) => (
             <span key={s} className="inline-flex items-center gap-1.5">
               <StatusBadge status={s} size="sm" />

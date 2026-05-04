@@ -47,6 +47,12 @@ export const createJewelryItemFromTemplate = (payload) =>
     body: JSON.stringify(payload),
   }).then(json);
 
+// Public catalog (jewelry_products table populated from WooCommerce). Returns
+// a `{ jewelry: [...] }` shape; rows have `model_number`, `title`, `price`
+// (encrypted), `all_pictures_link`, etc.
+export const fetchJewelryCatalog = () =>
+  fetch(`${API_BASE}/api/jewelry`).then(json);
+
 export const updateJewelryItem = (id, payload) =>
   fetch(`${API_BASE}/api/jewelry-items/${id}`, {
     method: "PUT",
