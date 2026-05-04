@@ -15,6 +15,7 @@ import { isBluetoothAvailable } from "../../services/niimbotPrint";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
 import StoneUsagePanel from "../../components/StoneUsagePanel";
 import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL } from "../../services/stonesApi";
+import InternalExcelModal from "./components/InternalExcelModal";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -5333,6 +5334,7 @@ const StoneSearchPage = () => {
   const [showFloatingExport, setShowFloatingExport] = useState(false);
   const [drawerStone, setDrawerStone] = useState(null); // DNA Drawer
   const [showCategoryExportModal, setShowCategoryExportModal] = useState(false); // Category export choice
+  const [showInternalExcelModal, setShowInternalExcelModal] = useState(false); // Internal Excel column picker
   const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', 'diamonds'));
@@ -6247,6 +6249,128 @@ const StoneSearchPage = () => {
     saveAs(new Blob([buffer]), filename);
   };
 
+  /* Internal Excel — no logo, no branding, just the columns the user picked.
+   * Built for back-office use (inventory audits, broker memos, accounting),
+   * which is why the data layer is intentionally plain: header row, body
+   * rows, autofilter, frozen header. Pricing is shown in raw form (no
+   * "$ N/A" placeholders), URL columns are written as clickable hyperlinks. */
+  const exportToInternalExcel = async (chosenColumns, customStones = null) => {
+    const data = customStones || allItems.filter((s) => selectedStones.has(s.id));
+    if (data.length === 0) {
+      alert("Please select at least one stone to export.");
+      return;
+    }
+    if (!chosenColumns || chosenColumns.length === 0) {
+      alert("Please pick at least one column.");
+      return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Gemstar (Internal)";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet("Stones", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
+
+    sheet.columns = chosenColumns.map((c) => ({
+      key: c.key,
+      header: c.header,
+      width: c.width || 14,
+    }));
+
+    // Style the header row a bit so it's distinguishable, but keep it neutral
+    const header = sheet.getRow(1);
+    header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    header.alignment = { vertical: "middle", horizontal: "left" };
+    header.height = 22;
+    header.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+      cell.border = {
+        bottom: { style: "thin", color: { argb: "FF374151" } },
+      };
+    });
+
+    const urlKeys = new Set(["dna", "certificate", "image", "video"]);
+
+    data.forEach((stone, idx) => {
+      const row = {};
+      chosenColumns.forEach((col) => {
+        switch (col.key) {
+          case "num": row.num = idx + 1; break;
+          case "sku": row.sku = stone.sku || ""; break;
+          case "pairSku": row.pairSku = stone.pairSku || ""; break;
+          case "shape": row.shape = stone.shape || ""; break;
+          case "category": row.category = stone.category || stone.stoneType || ""; break;
+          case "weight":
+            row.weight = stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt) : "";
+            break;
+          case "color": row.color = getDisplayColor(stone) || ""; break;
+          case "clarity": row.clarity = stone.clarity || ""; break;
+          case "measurements": row.measurements = stone.measurements || ""; break;
+          case "ratio":
+            row.ratio = stone.ratio != null && stone.ratio !== "" ? Number(Number(stone.ratio).toFixed(2)) : "";
+            break;
+          case "fancyIntensity": row.fancyIntensity = stone.fancyIntensity || ""; break;
+          case "fancyColor": row.fancyColor = stone.fancyColor || ""; break;
+          case "fancyOvertone": row.fancyOvertone = stone.fancyOvertone || ""; break;
+          case "fancyColor2": row.fancyColor2 = stone.fancyColor2 || ""; break;
+          case "fancyOvertone2": row.fancyOvertone2 = stone.fancyOvertone2 || ""; break;
+          case "cut": row.cut = stone.cut || ""; break;
+          case "polish": row.polish = stone.polish || ""; break;
+          case "symmetry": row.symmetry = stone.symmetry || ""; break;
+          case "tablePercent": row.tablePercent = stone.tablePercent || ""; break;
+          case "depthPercent": row.depthPercent = stone.depthPercent || ""; break;
+          case "treatment": row.treatment = stone.treatment || ""; break;
+          case "origin":
+            row.origin = stone.origin && stone.origin.toUpperCase() !== "N/A" ? stone.origin : "";
+            break;
+          case "lab":
+            row.lab = stone.lab && stone.lab.toUpperCase() !== "N/A" ? stone.lab : "";
+            break;
+          case "fluorescence": row.fluorescence = stone.fluorescence || ""; break;
+          case "pricePerCt":
+            row.pricePerCt = stone.pricePerCt != null && stone.pricePerCt !== "" ? Number(stone.pricePerCt) : "";
+            break;
+          case "priceTotal":
+            row.priceTotal = stone.priceTotal != null && stone.priceTotal !== "" ? Number(stone.priceTotal) : "";
+            break;
+          case "rapPrice": row.rapPrice = stone.rapPrice || ""; break;
+          case "location": row.location = stone.location || ""; break;
+          case "dna": row.dna = stone.sku ? `${window.location.origin}/${stone.sku}` : ""; break;
+          case "certificate": row.certificate = stone.certificateUrl || ""; break;
+          case "image": row.image = stone.imageUrl || ""; break;
+          case "video": row.video = stone.videoUrl || stone.videoLink || ""; break;
+          default: row[col.key] = "";
+        }
+      });
+
+      const r = sheet.addRow(row);
+      r.alignment = { vertical: "middle" };
+      r.eachCell((cell, colNumber) => {
+        const colKey = chosenColumns[colNumber - 1]?.key;
+        if (urlKeys.has(colKey) && cell.value) {
+          cell.value = { text: String(cell.value), hyperlink: String(cell.value) };
+          cell.font = { color: { argb: "FF2563EB" }, underline: true };
+        }
+        if (colKey === "pricePerCt" || colKey === "priceTotal") {
+          cell.numFmt = '"$"#,##0.00';
+        }
+        if (idx % 2 === 1) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+        }
+      });
+    });
+
+    // Autofilter on the whole used range so the user can sort/filter on open
+    const lastCol = String.fromCharCode(64 + chosenColumns.length);
+    sheet.autoFilter = `A1:${lastCol}${data.length + 1}`;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const exportDate = new Date().toISOString().split("T")[0];
+    const filename = `Internal_Export_${exportDate}_${data.length}pcs.xlsx`;
+    saveAs(new Blob([buffer]), filename);
+  };
+
   const handleSort = (field) => {
     setSortConfig((prev) => ({
       field,
@@ -7094,7 +7218,28 @@ const StoneSearchPage = () => {
                           <p className="text-xs text-stone-500">Spreadsheet with all details</p>
                         </div>
                       </button>
-                      
+
+                      <button
+                        onClick={() => {
+                          if (selectedStones.size === 0) {
+                            alert("Please select at least one stone to export.");
+                            return;
+                          }
+                          setShowInternalExcelModal(true);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-slate-50 transition-colors border-t border-stone-100"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h10" />
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium">Excel (Internal)</span>
+                          <p className="text-xs text-stone-500">Pick columns · no branding</p>
+                        </div>
+                      </button>
+
                       <button
                         onClick={() => setShowPDFPriceModal(true)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
@@ -7600,7 +7745,28 @@ const StoneSearchPage = () => {
                     <p className="text-xs text-stone-500">Spreadsheet with all details</p>
                   </div>
                 </button>
-                
+
+                <button
+                  onClick={() => {
+                    if (selectedStones.size === 0) {
+                      alert("Please select at least one stone to export.");
+                      return;
+                    }
+                    setShowInternalExcelModal(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-slate-50 transition-colors border-t border-stone-100"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="font-medium">Excel (Internal)</span>
+                    <p className="text-xs text-stone-500">Pick columns · no branding</p>
+                  </div>
+                </button>
+
                 <button
                   onClick={() => setShowPDFPriceModal(true)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
@@ -7661,6 +7827,19 @@ const StoneSearchPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Internal Excel — column picker for back-office exports */}
+      <InternalExcelModal
+        isOpen={showInternalExcelModal}
+        onClose={() => setShowInternalExcelModal(false)}
+        selectedCount={selectedStones.size}
+        onExport={(chosenColumns) =>
+          exportToInternalExcel(
+            chosenColumns,
+            applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))
+          )
+        }
+      />
 
       {/* Export Modal */}
       <ExportModal
