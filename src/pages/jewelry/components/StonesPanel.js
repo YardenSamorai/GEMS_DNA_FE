@@ -12,21 +12,31 @@ const ROLE_OPTIONS = [
 ];
 
 /* Lightweight in-module cache so opening the form on multiple items
- * doesn't re-download the whole stones list each time. */
+ * doesn't re-download the whole stones list each time. We expose load
+ * errors instead of swallowing them — the autocomplete uses them to show
+ * a "Failed to load — retry" affordance, otherwise the user sees an
+ * empty dropdown with no idea why nothing is matching. */
 let _stoneCache = null;
 let _stoneCachePromise = null;
-const loadStones = () => {
+const loadStones = (force = false) => {
+  if (force) { _stoneCache = null; _stoneCachePromise = null; }
   if (_stoneCache) return Promise.resolve(_stoneCache);
   if (_stoneCachePromise) return _stoneCachePromise;
   _stoneCachePromise = fetch(`${API_BASE}/api/soap-stones`)
-    .then((r) => (r.ok ? r.json() : []))
+    .then(async (r) => {
+      if (!r.ok) {
+        const text = await r.text().catch(() => "");
+        throw new Error(`API ${r.status}${text ? `: ${text.slice(0, 80)}` : ""}`);
+      }
+      return r.json();
+    })
     .then((rows) => {
       _stoneCache = Array.isArray(rows) ? rows : [];
       return _stoneCache;
     })
-    .catch(() => {
-      _stoneCache = [];
-      return _stoneCache;
+    .catch((err) => {
+      _stoneCachePromise = null; // allow retry on next call
+      throw err;
     });
   return _stoneCachePromise;
 };
@@ -122,13 +132,20 @@ const StonesPanel = ({ itemId, stones, onChanged }) => {
             <StoneAutocomplete
               value={form.stoneSku}
               onPick={(stone) => {
+                // Field names match the /api/soap-stones response shape
+                // (weightCt + priceTotal/pricePerCt, not weight/bruto_price).
+                const w = stone?.weightCt ?? stone?.weight;
+                const total = stone?.priceTotal;
+                const perCt = stone?.pricePerCt;
+                const price = total != null
+                  ? total
+                  : (perCt != null && w != null ? perCt * w : null);
                 setForm((f) => ({
                   ...f,
                   stoneSku: stone?.sku || "",
                   snapshotShape: stone?.shape || f.snapshotShape,
-                  snapshotWeight: stone?.weight ?? f.snapshotWeight,
-                  snapshotPrice:
-                    stone?.bruto_price ?? stone?.net_price ?? f.snapshotPrice,
+                  snapshotWeight: w != null ? w : f.snapshotWeight,
+                  snapshotPrice: price != null ? price : f.snapshotPrice,
                 }));
               }}
               onClear={() => setForm((f) => ({ ...f, stoneSku: "" }))}
@@ -261,26 +278,45 @@ const StonesPanel = ({ itemId, stones, onChanged }) => {
   );
 };
 
-/* ----- Stone autocomplete (queries soap_stones once, filters in-memory) ----- */
-
+/* ----- Stone autocomplete (queries soap_stones once, filters in-memory) -----
+ *
+ * UX:
+ *   - Always opens on focus, even with no query — shows the most recent
+ *     stones so user can browse.
+ *   - Live filter on every keystroke against sku/shape/color/clarity/lab.
+ *   - Keyboard nav: ArrowDown/Up to highlight, Enter/Tab to pick, Esc closes.
+ *   - Loading + error states are visible (instead of silent empty dropdown
+ *     which made it look like the field was broken).
+ *   - "No matches" state explicitly says so + offers a retry on errors.
+ *
+ * Field names map to the /api/soap-stones response shape: weightCt,
+ * priceTotal, pricePerCt — NOT weight/bruto_price/net_price.
+ */
 const StoneAutocomplete = ({ value, onPick, onClear }) => {
   const [stones, setStones] = useState([]);
   const [query, setQuery] = useState(value || "");
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [highlight, setHighlight] = useState(0);
   const wrap = useRef(null);
+  const inputRef = useRef(null);
+  const listRef = useRef(null);
 
   useEffect(() => {
     setQuery(value || "");
   }, [value]);
 
-  useEffect(() => {
+  const fetchInventory = (force = false) => {
     setLoading(true);
-    loadStones().then((rows) => {
-      setStones(rows);
-      setLoading(false);
-    });
-  }, []);
+    setLoadError(null);
+    loadStones(force)
+      .then((rows) => setStones(rows))
+      .catch((err) => setLoadError(err.message || "Failed to load inventory"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchInventory(); }, []);
 
   useEffect(() => {
     const onDocClick = (e) => {
@@ -291,34 +327,78 @@ const StoneAutocomplete = ({ value, onPick, onClear }) => {
   }, []);
 
   const matches = useMemo(() => {
-    if (!query) return stones.slice(0, 12);
-    const q = query.toLowerCase();
+    if (!query) return stones.slice(0, 20);
+    const q = query.toLowerCase().trim();
     return stones
       .filter((s) => {
-        const fields = [s.sku, s.shape, s.color, s.clarity, s.category, s.lab].filter(Boolean).join(" ").toLowerCase();
+        const fields = [s.sku, s.shape, s.color, s.clarity, s.category, s.lab, s.location]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
         return fields.includes(q);
       })
-      .slice(0, 20);
+      .slice(0, 30);
   }, [stones, query]);
 
+  // Keep highlight inside the visible matches range whenever the list changes
+  useEffect(() => { setHighlight(0); }, [query, stones.length]);
+
   const handlePick = (s) => {
+    if (!s) return;
     setQuery(s.sku);
     setOpen(false);
     onPick && onPick(s);
   };
+
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      setOpen(true);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(matches.length - 1, h + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(0, h - 1));
+    } else if (e.key === "Enter") {
+      if (matches[highlight]) {
+        e.preventDefault();
+        handlePick(matches[highlight]);
+      }
+    } else if (e.key === "Tab" && matches[highlight] && open) {
+      // Tab also picks the highlighted match — convenient when typing exact SKU
+      handlePick(matches[highlight]);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  // Scroll highlighted row into view
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.querySelector(`[data-idx="${highlight}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [highlight, open]);
 
   return (
     <div ref={wrap} className="relative">
       <label className="mb-1 block text-xs font-medium text-stone-700">
         Stone SKU{" "}
         {loading && <span className="text-stone-400">(loading inventory…)</span>}
+        {!loading && !loadError && stones.length > 0 && (
+          <span className="text-stone-400">({stones.length} in stock)</span>
+        )}
       </label>
       <div className="flex items-center gap-2">
         <input
+          ref={inputRef}
           type="text"
           value={query}
-          placeholder="Search SKU, shape, color…"
+          placeholder={loading ? "Loading inventory…" : "Search SKU, shape, color…"}
+          autoComplete="off"
           onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
@@ -332,6 +412,7 @@ const StoneAutocomplete = ({ value, onPick, onClear }) => {
             onClick={() => {
               setQuery("");
               onClear && onClear();
+              inputRef.current?.focus();
             }}
             className="rounded-lg px-2 py-1 text-xs text-stone-500 hover:bg-stone-100"
           >
@@ -340,40 +421,78 @@ const StoneAutocomplete = ({ value, onPick, onClear }) => {
         )}
       </div>
 
-      {open && matches.length > 0 && (
-        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-stone-200 bg-white shadow-lg">
-          {matches.map((s) => (
-            <button
-              type="button"
-              key={s.sku}
-              onClick={() => handlePick(s)}
-              className="flex w-full items-center gap-3 border-b border-stone-100 px-3 py-2 text-left text-xs hover:bg-emerald-50 last:border-b-0"
-            >
-              {s.imageUrl || s.image ? (
-                <img
-                  src={s.imageUrl || s.image}
-                  alt=""
-                  className="h-10 w-10 flex-none rounded object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <div className="h-10 w-10 flex-none rounded bg-stone-100" />
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="font-mono font-semibold text-stone-900">{s.sku}</div>
-                <div className="truncate text-stone-500">
-                  {[s.shape, s.weight ? `${s.weight}ct` : null, s.color, s.clarity, s.lab]
-                    .filter(Boolean)
-                    .join(" · ") || s.category || "—"}
+      {open && (
+        <div
+          ref={listRef}
+          className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-stone-200 bg-white shadow-lg"
+        >
+          {loadError && (
+            <div className="flex items-center justify-between gap-2 border-b border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <span>Couldn't load inventory: {loadError}</span>
+              <button
+                type="button"
+                onClick={() => fetchInventory(true)}
+                className="rounded px-2 py-0.5 font-medium text-red-700 hover:bg-red-100"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!loadError && matches.length === 0 && (
+            <div className="px-3 py-3 text-center text-xs text-stone-500">
+              {loading ? "Loading…"
+                : query
+                  ? <>No stones matching "<span className="font-mono">{query}</span>"</>
+                  : "No stones available"}
+            </div>
+          )}
+
+          {matches.map((s, idx) => {
+            const isActive = idx === highlight;
+            const total = s.priceTotal != null
+              ? s.priceTotal
+              : (s.pricePerCt != null && s.weightCt != null ? s.pricePerCt * s.weightCt : null);
+            return (
+              <button
+                type="button"
+                key={s.sku}
+                data-idx={idx}
+                onMouseEnter={() => setHighlight(idx)}
+                onClick={() => handlePick(s)}
+                className={`flex w-full items-center gap-3 border-b border-stone-100 px-3 py-2 text-left text-xs last:border-b-0 ${
+                  isActive ? "bg-emerald-50" : "hover:bg-emerald-50"
+                }`}
+              >
+                {s.imageUrl || s.image ? (
+                  <img
+                    src={s.imageUrl || s.image}
+                    alt=""
+                    className="h-10 w-10 flex-none rounded object-cover"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="h-10 w-10 flex-none rounded bg-stone-100" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono font-semibold text-stone-900">{s.sku}</div>
+                  <div className="truncate text-stone-500">
+                    {[
+                      s.shape,
+                      s.weightCt ? `${s.weightCt}ct` : null,
+                      s.color,
+                      s.clarity,
+                      s.lab && s.lab !== "N/A" ? s.lab : null,
+                    ].filter(Boolean).join(" · ") || s.category || "—"}
+                  </div>
                 </div>
-              </div>
-              <div className="font-semibold text-stone-700">
-                {fmtPrice(s.bruto_price ?? s.net_price)}
-              </div>
-            </button>
-          ))}
+                <div className="text-right">
+                  <div className="font-semibold text-stone-700">{fmtPrice(total)}</div>
+                  {s.location && <div className="text-[10px] text-stone-400">{s.location}</div>}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

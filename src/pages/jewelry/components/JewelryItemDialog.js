@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchJewelryItem } from "../../../services/jewelryApi";
+import { sanitizeText } from "../../../utils/helper";
 import StatusBadge from "./StatusBadge";
 
 /* Quick-look dialog for the Jewelry Inventory grid.
@@ -392,12 +393,18 @@ const CatalogBody = ({ item }) => {
         </Section>
       )}
 
-      {/* Description */}
-      {(raw.full_description || raw.description) && (
-        <Section title="Description">
-          <p className="whitespace-pre-line text-sm text-stone-700">{raw.full_description || raw.description}</p>
-        </Section>
-      )}
+      {/* Description — strip mojibake/replacement chars from the raw catalog
+          row before showing. WooCommerce sometimes ships text with broken
+          UTF-8 sequences (e.g. "style�a perfect"), so we never trust raw. */}
+      {(() => {
+        const desc = sanitizeText(raw.full_description || raw.description || "");
+        if (!desc) return null;
+        return (
+          <Section title="Description">
+            <p className="whitespace-pre-line text-sm text-stone-700">{desc}</p>
+          </Section>
+        );
+      })()}
     </div>
   );
 };

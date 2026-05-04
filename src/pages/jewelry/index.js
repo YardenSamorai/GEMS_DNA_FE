@@ -5,7 +5,6 @@ import {
   fetchJewelryCatalog,
   JEWELRY_STATUSES,
   JEWELRY_TYPES,
-  JEWELRY_CATEGORIES,
 } from "../../services/jewelryApi";
 import { decryptPrice } from "../../utils/decrypt";
 import { sanitizeText } from "../../utils/helper";
@@ -215,10 +214,30 @@ const JewelryItemsList = () => {
     }
 
     if (categoryFilter) {
-      combined = combined.filter((i) => (i.category || "") === categoryFilter);
+      // Case-insensitive match — catalog rows from WooCommerce can come in
+      // as 'Rings'/'Ring'/'rings', and a strict equality check threw all of
+      // them out. We normalize on both sides.
+      const target = categoryFilter.toLowerCase();
+      combined = combined.filter((i) => (i.category || "").toLowerCase() === target);
     }
     return combined;
   }, [items, catalogItems, sourceFilter, statusFilter, typeFilter, categoryFilter, search]);
+
+  // Build the category dropdown options from the actual items currently in
+  // the inventory (workshop + catalog) instead of a hard-coded list. This
+  // way the user only sees categories that will actually return results.
+  const categoryOptions = useMemo(() => {
+    const seen = new Map(); // key: lowercased label, value: original casing
+    for (const it of items) {
+      const c = (it.category || "").trim();
+      if (c && !seen.has(c.toLowerCase())) seen.set(c.toLowerCase(), c);
+    }
+    for (const it of catalogItems) {
+      const c = (it.category || "").trim();
+      if (c && !seen.has(c.toLowerCase())) seen.set(c.toLowerCase(), c);
+    }
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+  }, [items, catalogItems]);
 
   const stats = useMemo(() => {
     const out = {
@@ -310,9 +329,10 @@ const JewelryItemsList = () => {
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+            title="Categories pulled from the items actually in your inventory"
           >
             <option value="">All categories</option>
-            {JEWELRY_CATEGORIES.map((c) => (
+            {categoryOptions.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
