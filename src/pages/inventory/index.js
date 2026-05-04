@@ -13,6 +13,8 @@ import { sanitizeText } from "../../utils/helper";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
+import StoneUsagePanel from "../../components/StoneUsagePanel";
+import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL } from "../../services/stonesApi";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -2498,6 +2500,14 @@ const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel }) => {
                 )}
               </div>
             )}
+
+            {/* Cross-system usage: workshop pieces + deals + DNA inquiries that touch this SKU.
+                Only shown for stones (jewelry items have their own detail page). */}
+            {!isJewelry && stone.sku && activeTab === 'details' && (
+              <div className="mt-4">
+                <StoneUsagePanel sku={stone.sku} compact />
+              </div>
+            )}
           </div>
         </div>
 
@@ -4539,7 +4549,7 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefa
 };
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns, stoneStatusMap = {} }) => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
 
@@ -4652,7 +4662,29 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
     if (!colMeta[colId]) return null;
     const cellBase = "px-3 py-2 whitespace-nowrap";
     switch (colId) {
-      case 'sku': return <td key={colId} className={cellBase}><span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span></td>;
+      case 'sku': {
+        const wsRow = stone.sku ? stoneStatusMap[stone.sku] : null;
+        const wsStatus = wsRow?.status;
+        return (
+          <td key={colId} className={cellBase}>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
+              {wsStatus && (
+                <span
+                  title={
+                    wsRow.jewelry_sku
+                      ? `${STONE_STATUS_LABELS[wsStatus] || wsStatus} in ${wsRow.jewelry_sku}${wsRow.jewelry_name ? ' (' + wsRow.jewelry_name + ')' : ''}`
+                      : STONE_STATUS_LABELS[wsStatus] || wsStatus
+                  }
+                  className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STONE_STATUS_PILL[wsStatus] || ''}`}
+                >
+                  {STONE_STATUS_LABELS[wsStatus] || wsStatus}
+                </span>
+              )}
+            </div>
+          </td>
+        );
+      }
       case 'img': return (
         <td key={colId} className="px-3 py-2">
           <div
@@ -4810,9 +4842,18 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="inline-block font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
-                    {stone.sku}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
+                      {stone.sku}
+                    </span>
+                    {stone.sku && stoneStatusMap[stone.sku] && (
+                      <span
+                        className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STONE_STATUS_PILL[stoneStatusMap[stone.sku].status] || ''}`}
+                      >
+                        {STONE_STATUS_LABELS[stoneStatusMap[stone.sku].status] || stoneStatusMap[stone.sku].status}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm font-medium text-stone-800">{getDisplayShape(stone.shape)}</span>
                     <span className="text-stone-300">|</span>
@@ -5283,6 +5324,9 @@ const StoneSearchPage = () => {
   const [filters, setFilters] = useState(defaultFilters);
 
   const [stones, setStones] = useState([]);
+  // Phase A: per-SKU map of cross-system status pulled from the workshop.
+  // { [sku]: { status, jewelry_item_id, jewelry_sku, jewelry_name, jewelry_status } }
+  const [stoneStatusMap, setStoneStatusMap] = useState({});
   const [selectedStone, setSelectedStone] = useState(null);
   const [selectedStones, setSelectedStones] = useState(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
@@ -6303,6 +6347,12 @@ const StoneSearchPage = () => {
           stones: row.stones != null ? Number(row.stones) : null,
         }));
         setStones(normalized);
+        // Pull workshop status for every SKU in one call so the grid can show
+        // a "Reserved" / "In setting" / "Sold" pill inline. Don't block the
+        // main render if this fails — the bridge is best-effort enrichment.
+        fetchStoneInventoryStatus()
+          .then((res) => setStoneStatusMap(res?.statuses || {}))
+          .catch(() => setStoneStatusMap({}));
       } catch (err) {
         setError(err.message || "Unknown error");
       } finally {
@@ -7432,6 +7482,7 @@ const StoneSearchPage = () => {
               columnConfig={columnConfig}
               onColumnConfigChange={handleColumnConfigChange}
               priceMode={priceMode}
+              stoneStatusMap={stoneStatusMap}
               activeDefaultColumns={inventoryMode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : inventoryMode === 'gemstones' ? GEMSTONE_DEFAULT_COLUMNS : JEWELRY_DEFAULT_COLUMNS}
             />
           ) : (

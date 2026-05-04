@@ -80,6 +80,9 @@ export const fetchTags = (userId) =>
   fetch(`${API_BASE}/api/crm/tags${qs({ userId })}`).then(json);
 
 /* ---------- Interactions ---------- */
+export const fetchInteractions = (userId, filters = {}) =>
+  fetch(`${API_BASE}/api/crm/interactions${qs({ userId, ...filters })}`).then(json);
+
 export const createInteraction = (payload) =>
   fetch(`${API_BASE}/api/crm/interactions`, {
     method: "POST",
@@ -87,8 +90,70 @@ export const createInteraction = (payload) =>
     body: JSON.stringify(payload),
   }).then(json);
 
+export const updateInteraction = (id, payload) =>
+  fetch(`${API_BASE}/api/crm/interactions/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
 export const deleteInteraction = (id) =>
   fetch(`${API_BASE}/api/crm/interactions/${id}`, { method: "DELETE" }).then(json);
+
+/* ---------- Invoices ---------- */
+export const fetchInvoices = (userId, filters = {}) =>
+  fetch(`${API_BASE}/api/crm/invoices${qs({ userId, ...filters })}`).then(json);
+
+export const fetchInvoice = (id) =>
+  fetch(`${API_BASE}/api/crm/invoices/${id}`).then(json);
+
+export const createInvoice = (payload) =>
+  fetch(`${API_BASE}/api/crm/invoices`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const updateInvoice = (id, payload) =>
+  fetch(`${API_BASE}/api/crm/invoices/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const deleteInvoice = (id) =>
+  fetch(`${API_BASE}/api/crm/invoices/${id}`, { method: "DELETE" }).then(json);
+
+/* ---------- Occasions (birthdays / anniversaries / etc.) ---------- */
+export const fetchOccasions = (userId, filters = {}) =>
+  fetch(`${API_BASE}/api/crm/occasions${qs({ userId, ...filters })}`).then(json);
+
+export const createOccasion = (payload) =>
+  fetch(`${API_BASE}/api/crm/occasions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const updateOccasion = (id, payload) =>
+  fetch(`${API_BASE}/api/crm/occasions/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const deleteOccasion = (id) =>
+  fetch(`${API_BASE}/api/crm/occasions/${id}`, { method: "DELETE" }).then(json);
+
+/* Phase C: idempotently materialize CRM tasks for upcoming occasions.
+ * Safe to call as a fire-and-forget on dashboard / tasks page mount;
+ * the BE skips occasions that already have a task for that exact date. */
+export const ensureOccasionTasks = (userId, opts = {}) =>
+  fetch(`${API_BASE}/api/crm/occasions/ensure-tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, days: opts.days ?? 30, leadDays: opts.leadDays ?? 7 }),
+  }).then(json);
 
 /* ---------- Deals ---------- */
 export const fetchDeals = (userId, filters = {}) =>
@@ -344,4 +409,20 @@ export const INTERACTION_TYPES = [
   { value: "email", label: "Email", icon: "mail" },
   { value: "note", label: "Note", icon: "document" },
   { value: "dna_inquiry", label: "DNA inquiry", icon: "sparkles" },
+];
+
+export const INVOICE_STATUSES = [
+  { value: "draft", label: "Draft", color: "bg-stone-100 text-stone-700" },
+  { value: "sent", label: "Sent", color: "bg-blue-100 text-blue-700" },
+  { value: "paid", label: "Paid", color: "bg-emerald-100 text-emerald-700" },
+  { value: "overdue", label: "Overdue", color: "bg-rose-100 text-rose-700" },
+  { value: "void", label: "Void", color: "bg-stone-100 text-stone-500 line-through" },
+];
+
+export const OCCASION_KINDS = [
+  { value: "birthday", label: "Birthday", emoji: "🎂" },
+  { value: "anniversary", label: "Anniversary", emoji: "💍" },
+  { value: "wedding", label: "Wedding", emoji: "💒" },
+  { value: "engagement", label: "Engagement", emoji: "💖" },
+  { value: "custom", label: "Other", emoji: "📅" },
 ];

@@ -8,6 +8,7 @@ import { getMappedCategories } from "../utils/categoryMap";
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import InterestedModal from '../components/InterestedModal';
+import StoneUsagePanel from '../components/StoneUsagePanel';
 
 // API base URL from .env
 const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
@@ -452,6 +453,14 @@ const DiamondCard = () => {
             </div>
           </div>
         </div>
+
+        {/* Staff-only cross-system usage panel: where this stone lives across
+            workshop jewelry, deals, and DNA inquiries. Hidden from public visitors. */}
+        {isSignedIn && details?.stone_id && (
+          <div className="mt-6">
+            <StoneUsagePanel sku={details.stone_id} />
+          </div>
+        )}
       </motion.div>
     </div>
   );

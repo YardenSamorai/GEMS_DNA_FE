@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import {
@@ -14,14 +15,46 @@ const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 
 export default function CrmDeals() {
   const { user } = useUser();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [deals, setDeals] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState(() => (typeof window !== "undefined" && window.innerWidth < 640 ? "list" : "kanban"));
   const [showForm, setShowForm] = useState(false);
+  // Initial values for the new-deal modal — populated from URL query when arriving
+  // from the customer profile's "Create Order" button.
+  const [formInitial, setFormInitial] = useState(null);
   const [drawerId, setDrawerId] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
   const [stageFilter, setStageFilter] = useState("all");
+
+  // Watch for ?new=1&contactId=X&title=...&value=... and auto-open the new-deal modal,
+  // or ?focus=X to open the drawer for an existing deal (used as a deep-link from
+  // the customer profile's Orders tab and the jewelry item's "Linked deal" field).
+  useEffect(() => {
+    const focusId = searchParams.get("focus");
+    const isNew = searchParams.get("new") === "1";
+    if (!focusId && !isNew) return;
+
+    if (focusId) {
+      setDrawerId(String(focusId));
+    }
+    if (isNew) {
+      setFormInitial({
+        contactId: searchParams.get("contactId") || "",
+        title: searchParams.get("title") || "",
+        value: searchParams.get("value") || "",
+        stage: searchParams.get("stage") || "lead",
+        expectedClose: searchParams.get("expectedClose") || "",
+      });
+      setShowForm(true);
+    }
+
+    // Clear the query so a refresh / back-nav doesn't reopen things forever.
+    const next = new URLSearchParams(searchParams);
+    ["new", "focus", "contactId", "title", "value", "stage", "expectedClose"].forEach((k) => next.delete(k));
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const reload = () => {
     if (!user?.id) return;
@@ -258,12 +291,14 @@ export default function CrmDeals() {
       {showForm && (
         <NewDealModal
           contacts={contacts}
-          onClose={() => setShowForm(false)}
+          initial={formInitial}
+          onClose={() => { setShowForm(false); setFormInitial(null); }}
           onSubmit={async (payload) => {
             try {
               const created = await createDeal({ userId: user.id, ...payload });
               toast.success("Deal created");
               setShowForm(false);
+              setFormInitial(null);
               reload();
               setDrawerId(String(created.id));
             } catch (e) { toast.error(e.message); }
@@ -282,8 +317,14 @@ const ToggleBtn = ({ active, onClick, children }) => (
   <button onClick={onClick} className={`px-3 py-1.5 rounded-md font-medium ${active ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"}`}>{children}</button>
 );
 
-function NewDealModal({ contacts, onClose, onSubmit }) {
-  const [form, setForm] = useState({ contactId: "", title: "", value: "", stage: "lead", expectedClose: "" });
+function NewDealModal({ contacts, initial, onClose, onSubmit }) {
+  const [form, setForm] = useState({
+    contactId: initial?.contactId ?? "",
+    title: initial?.title ?? "",
+    value: initial?.value ?? "",
+    stage: initial?.stage ?? "lead",
+    expectedClose: initial?.expectedClose ?? "",
+  });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 

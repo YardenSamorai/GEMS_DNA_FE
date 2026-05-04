@@ -8,6 +8,7 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import ExecutiveSummary from "../components/ExecutiveSummary";
 
 const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
 
@@ -947,6 +948,12 @@ const HomePage = () => {
                 <TooltipContent>Import jewelry from CSV</TooltipContent>
               </Tooltip>
             </div>
+          </motion.div>
+
+          {/* ── Executive summary (Phase B): unified KPIs across CRM, Workshop,
+                Stone Inventory, DNA, and Occasions in one strip. ── */}
+          <motion.div {...fadeUp} transition={stagger(0.5)}>
+            <ExecutiveSummary />
           </motion.div>
 
           {/* ── Search ──────────────────────────────────────── */}

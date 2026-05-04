@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import {
@@ -148,6 +149,14 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
                   </div>
                 </div>
                 <div className="hidden sm:flex items-center gap-1">
+                  <Link
+                    to={`/crm/customers/${contact.id}`}
+                    title="View full customer profile"
+                    className="inline-flex items-center gap-1 px-2.5 h-8 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 mr-1"
+                  >
+                    View full profile
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </Link>
                   <IconButton onClick={() => setEditing(true)} title="Edit">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   </IconButton>
@@ -187,6 +196,14 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
                     Email
                   </a>
                 )}
+                {/* Mobile-only — desktop has the button up in the header row */}
+                <Link
+                  to={`/crm/customers/${contact.id}`}
+                  className="sm:hidden col-span-3 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 border border-emerald-200"
+                >
+                  View full profile
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </Link>
               </div>
             </div>
 

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SignedIn } from "@clerk/clerk-react";
 import toast from 'react-hot-toast';
 import InterestedModal from './InterestedModal';
+import MakeFromTemplateModal from './MakeFromTemplateModal';
 
 const GemstoneDetails = ({ data }) => {
   const {
@@ -19,6 +20,7 @@ const GemstoneDetails = ({ data }) => {
   const [mainImage, setMainImage] = useState(images?.[0]);
   const [zoom, setZoom] = useState(false);
   const [interestedOpen, setInterestedOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -305,6 +307,25 @@ const GemstoneDetails = ({ data }) => {
                   image: images?.[0] || null,
                 }}
               />
+              <SignedIn>
+                <button
+                  type="button"
+                  onClick={() => setTemplateOpen(true)}
+                  className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+                  title="Spin off a workshop job pre-filled from this template"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  Make from this template
+                </button>
+                <MakeFromTemplateModal
+                  open={templateOpen}
+                  onClose={() => setTemplateOpen(false)}
+                  template={data}
+                />
+              </SignedIn>
             </div>
           </div>
         </div>

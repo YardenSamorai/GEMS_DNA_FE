@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   fetchDeal,
@@ -230,6 +231,58 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
                   </div>
                 )}
               </div>
+
+              {/* Jewelry items linked to this deal (from the workshop side) */}
+              {deal.jewelry_items?.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-stone-900">
+                      Jewelry items ({deal.jewelry_items.length})
+                    </h3>
+                    {deal.contact_id && (
+                      <Link
+                        to={`/crm/customers/${deal.contact_id}`}
+                        className="text-xs font-medium text-emerald-700 hover:text-emerald-800 hover:underline"
+                      >
+                        View customer →
+                      </Link>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {deal.jewelry_items.map((j) => (
+                      <Link
+                        key={j.id}
+                        to={`/jewelry/items/${j.id}`}
+                        onClick={onClose}
+                        className="flex items-center gap-3 bg-white border border-stone-200 rounded-lg p-3 hover:border-violet-300 hover:shadow-sm transition group"
+                      >
+                        {j.cover_image_url ? (
+                          <img src={j.cover_image_url} alt="" className="w-12 h-12 rounded-md object-cover bg-stone-100 shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-md bg-violet-50 text-violet-500 flex items-center justify-center shrink-0">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M6 3h12l3 7-9 11L3 10l3-7z M3 10h18 M9 3l3 7 3-7" /></svg>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-stone-900 truncate group-hover:text-violet-700">
+                            {j.name}
+                          </div>
+                          <div className="text-xs text-stone-500 truncate flex items-center gap-2 mt-0.5">
+                            <span>{j.sku || `#${j.id}`}</span>
+                            <span className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-stone-100 text-stone-600">
+                              {j.status}
+                            </span>
+                            {j.category && <span className="text-stone-400">· {j.category}</span>}
+                          </div>
+                        </div>
+                        <div className="text-sm font-semibold text-stone-900 shrink-0">
+                          {fmt(j.sale_price || j.total_cost || 0)}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Activity */}
               {deal.interactions?.length > 0 && (
