@@ -11,19 +11,32 @@ const fmtPrice = (n) => {
 };
 
 // Card now handles two kinds of items in the unified Jewelry inventory:
-//   - workshop items (jewelry_items rows)  -> link to /jewelry/items/:id
-//   - catalog items (jewelry_products rows) -> link to public /:modelNumber
-// Caller marks the source via `item.__source` ('workshop' | 'catalog').
-const InventoryCard = ({ item }) => {
+//   - workshop items (jewelry_items rows)  -> dialog preview, full page on cmd+click
+//   - catalog items (jewelry_products rows) -> dialog preview, full DNA on cmd+click
+// Caller marks the source via `item.__source` ('workshop' | 'catalog') and
+// supplies an onSelect handler that opens the quick-look dialog. We keep the
+// `to` href on the underlying Link so middle-click / cmd+click still opens
+// the full page in a new tab — power users expect this from grid UIs.
+const InventoryCard = ({ item, onSelect }) => {
   const isCatalog = item.__source === "catalog";
   const cover = item.cover_image_url;
   const price = item.sale_price || item.total_cost;
   const material = item.metal_summary || item.category;
   const href = isCatalog ? `/${item.sku}` : `/jewelry/items/${item.id}`;
 
+  const handleClick = (e) => {
+    // Honor new-tab gestures: cmd/ctrl/shift/middle click → let the Link work
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+    if (onSelect) {
+      e.preventDefault();
+      onSelect(item);
+    }
+  };
+
   return (
     <Link
       to={href}
+      onClick={handleClick}
       className="group flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
     >
       <div className="relative aspect-square w-full overflow-hidden bg-stone-100">

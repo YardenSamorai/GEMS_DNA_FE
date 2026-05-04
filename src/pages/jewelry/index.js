@@ -10,6 +10,7 @@ import {
 import { decryptPrice } from "../../utils/decrypt";
 import { sanitizeText } from "../../utils/helper";
 import JewelryItemCard from "./components/JewelryItemCard";
+import JewelryItemDialog from "./components/JewelryItemDialog";
 import NewJewelryItemModal from "./components/NewJewelryItemModal";
 import StatusBadge from "./components/StatusBadge";
 
@@ -31,6 +32,10 @@ const mapCatalogRow = (row) => {
   return {
     id: `cat_${row.model_number}`,
     __source: "catalog",
+    // Keep the original row around so the quick-look dialog can render every
+    // catalog field (center stone, certificate, all images, etc.) without
+    // a second network round-trip.
+    __raw: row,
     sku: row.model_number || "",
     name: sanitizeText(row.title) || row.model_number || "Untitled",
     category,
@@ -52,6 +57,44 @@ const FEATURE_PILLS = [
   "Rapaport pricing",
   "Low stock alerts",
 ];
+
+// Page size options for the inventory grid. "all" lets power users see
+// everything in one go, but is gated behind an explicit pick (we don't
+// want to slam the DOM with thousands of cards by default).
+const PAGE_SIZE_OPTIONS = [24, 48, 96, 192, "all"];
+const DEFAULT_PAGE_SIZE = 24;
+const PAGE_SIZE_STORAGE_KEY = "jewelry.inventory.pageSize.v1";
+
+const loadStoredPageSize = () => {
+  try {
+    const raw = localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+    if (!raw) return DEFAULT_PAGE_SIZE;
+    if (raw === "all") return "all";
+    const n = parseInt(raw, 10);
+    if (PAGE_SIZE_OPTIONS.includes(n)) return n;
+    return DEFAULT_PAGE_SIZE;
+  } catch (_) {
+    return DEFAULT_PAGE_SIZE;
+  }
+};
+
+// Build a page-button list with ellipses for long ranges, e.g.
+//   1 ... 4 5 [6] 7 8 ... 25
+const buildPageList = (current, total) => {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, total, current, current - 1, current + 1]);
+  if (current <= 4) [2, 3, 4, 5].forEach((p) => pages.add(p));
+  if (current >= total - 3) [total - 4, total - 3, total - 2, total - 1].forEach((p) => pages.add(p));
+  const sorted = Array.from(pages).filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) out.push("…");
+    out.push(p);
+    prev = p;
+  }
+  return out;
+};
 
 const InventoryHero = () => (
   <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-stone-900 via-stone-900 to-stone-800 px-6 py-8 text-white shadow-lg sm:px-10 sm:py-10">
@@ -97,6 +140,9 @@ const JewelryItemsList = () => {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all"); // 'all' | 'workshop' | 'catalog'
   const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(() => loadStoredPageSize());
+  const [page, setPage] = useState(1);
+  const [previewItem, setPreviewItem] = useState(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -186,6 +232,37 @@ const JewelryItemsList = () => {
     }
     return out;
   }, [visibleItems]);
+
+  // Reset to first page whenever the underlying result set changes (filters,
+  // search, or page size). Without this you can land on page 12 and see an
+  // empty grid because filtering shrunk the list to 3 pages.
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, typeFilter, categoryFilter, sourceFilter, pageSize]);
+
+  // Persist page size so the user's preference sticks across sessions
+  useEffect(() => {
+    try { localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(pageSize)); } catch (_) {}
+  }, [pageSize]);
+
+  const totalPages = pageSize === "all"
+    ? 1
+    : Math.max(1, Math.ceil(visibleItems.length / pageSize));
+
+  // Clamp page if it became out of range (e.g. user was on page 5 and switched
+  // page size from 24 to 192, leaving only 1 page).
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pagedItems = useMemo(() => {
+    if (pageSize === "all") return visibleItems;
+    const start = (page - 1) * pageSize;
+    return visibleItems.slice(start, start + pageSize);
+  }, [visibleItems, page, pageSize]);
+
+  const rangeStart = visibleItems.length === 0 ? 0 : pageSize === "all" ? 1 : (page - 1) * pageSize + 1;
+  const rangeEnd = pageSize === "all" ? visibleItems.length : Math.min(page * pageSize, visibleItems.length);
 
   const hasActiveFilters =
     statusFilter || typeFilter || categoryFilter || search || sourceFilter !== "all";
@@ -361,17 +438,92 @@ const JewelryItemsList = () => {
           )}
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {visibleItems.map((it) => (
-            <JewelryItemCard key={it.id} item={it} />
-          ))}
-        </div>
+        <>
+          {/* Pagination header — range counter on the left, page-size on the right */}
+          <div className="mt-6 flex flex-col items-start gap-2 text-xs text-stone-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Showing <span className="font-semibold text-stone-800">{rangeStart}–{rangeEnd}</span>
+              {" "}of <span className="font-semibold text-stone-800">{visibleItems.length}</span>
+              {visibleItems.length === 1 ? " item" : " items"}
+            </span>
+            <label className="flex items-center gap-2">
+              <span>Per page</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPageSize(v === "all" ? "all" : Number(v));
+                }}
+                className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs focus:border-emerald-500 focus:outline-none"
+              >
+                {PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt === "all" ? "All" : opt}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {pagedItems.map((it) => (
+              <JewelryItemCard key={it.id} item={it} onSelect={setPreviewItem} />
+            ))}
+          </div>
+
+          {/* Pagination footer — Prev / numbered / Next, hidden when single page */}
+          {totalPages > 1 && (
+            <nav className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Previous
+              </button>
+              {buildPageList(page, totalPages).map((p, idx) =>
+                p === "…" ? (
+                  <span key={`gap-${idx}`} className="px-2 text-stone-400">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p)}
+                    aria-current={p === page ? "page" : undefined}
+                    className={`min-w-[2.25rem] rounded-lg border px-2.5 py-1.5 text-sm font-medium transition ${
+                      p === page
+                        ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                        : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </nav>
+          )}
+        </>
       )}
 
       <NewJewelryItemModal
         open={showNewModal}
         onClose={() => setShowNewModal(false)}
         onCreated={load}
+      />
+
+      <JewelryItemDialog
+        open={!!previewItem}
+        item={previewItem}
+        onClose={() => setPreviewItem(null)}
       />
     </div>
   );
