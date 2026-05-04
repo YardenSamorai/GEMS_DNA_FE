@@ -22,6 +22,12 @@ import {
 } from "../../services/crmApi";
 import { fetchJewelryItems } from "../../services/jewelryApi";
 import NewJewelryItemModal from "../jewelry/components/NewJewelryItemModal";
+import {
+  Skeleton,
+  SkeletonAvatar,
+  SkeletonStatCard,
+  SkeletonCard,
+} from "../../components/ui/Skeleton";
 
 /* ---------------- Helpers ---------------- */
 
@@ -1063,9 +1069,63 @@ export default function CustomerProfile() {
   };
 
   if (loading && !contact) {
+    // Mirror the customer profile shape: hero card with avatar + name + chips,
+    // a strip of summary stats, then a tab strip with a 2-column body
+    // (timeline on the left, sidebar cards on the right).
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <div className="rounded-2xl border border-stone-200 bg-white p-12 text-center text-stone-500">Loading customer…</div>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+        <Skeleton className="h-3 w-40" />
+
+        {/* Hero */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-4">
+              <SkeletonAvatar size={64} />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-56" />
+                <div className="flex flex-wrap gap-1.5">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+                <div className="flex flex-wrap gap-3 pt-1">
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-9 w-24 rounded-lg" />
+              <Skeleton className="h-9 w-24 rounded-lg" />
+              <Skeleton className="h-9 w-9 rounded-lg" />
+            </div>
+          </div>
+        </div>
+
+        {/* Summary stat strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
+        </div>
+
+        {/* Tab strip */}
+        <div className="flex gap-1 border-b border-stone-200">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-24 rounded-none" />
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            <SkeletonCard lines={4} />
+            <SkeletonCard lines={3} />
+          </div>
+          <div className="space-y-4">
+            <SkeletonCard lines={3} />
+            <SkeletonCard lines={2} />
+          </div>
+        </div>
       </div>
     );
   }

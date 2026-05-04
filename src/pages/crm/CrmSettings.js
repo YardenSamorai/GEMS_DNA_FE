@@ -10,6 +10,7 @@ import {
   importOutlookEmails,
   migrateTitlesFromNotes,
 } from "../../services/crmApi";
+import { Skeleton, SkeletonText } from "../../components/ui/Skeleton";
 
 const Card = ({ title, description, children, icon }) => (
   <section className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-sm">
@@ -191,7 +192,19 @@ export default function CrmSettings() {
         description="Two-way contact sync, send emails through your Outlook account, and import recent inbox / sent emails as activity."
       >
         {loading ? (
-          <div className="text-sm text-stone-500">Loading…</div>
+          // Mirror the typical Outlook block: status pill row + 2 lines of
+          // description + a couple of action buttons.
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-24 rounded-full" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+            <SkeletonText lines={2} />
+            <div className="flex gap-2 pt-1">
+              <Skeleton className="h-9 w-32 rounded-lg" />
+              <Skeleton className="h-9 w-28 rounded-lg" />
+            </div>
+          </div>
         ) : !configured ? (
           <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3">
             Outlook is not configured on the server. Ask your administrator to set

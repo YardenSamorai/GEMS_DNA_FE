@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import InterestedModal from '../components/InterestedModal';
 import StoneUsagePanel from '../components/StoneUsagePanel';
+import { Skeleton, SkeletonText } from '../components/ui/Skeleton';
 
 // API base URL from .env
 const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
@@ -76,14 +77,34 @@ const DiamondCard = () => {
   };
 
   if (loading) {
+    // Mirror the public stone DNA layout: large media on the left, info
+    // panel on the right with title, badge row, key/value table, and a
+    // CTA strip at the bottom.
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-primary-200 rounded-full"></div>
-            <div className="w-16 h-16 border-4 border-primary-500 rounded-full border-t-transparent animate-spin absolute inset-0"></div>
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="aspect-square w-full rounded-2xl" />
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-3/4" />
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-6 w-16 rounded-full" />
+            </div>
+            <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5 space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3.5 w-32" />
+                </div>
+              ))}
+            </div>
+            <SkeletonText lines={3} />
+            <div className="flex gap-2 pt-2">
+              <Skeleton className="h-11 flex-1 rounded-xl" />
+              <Skeleton className="h-11 w-11 rounded-xl" />
+            </div>
           </div>
-          <p className="text-stone-500 font-medium">Loading stone details...</p>
         </div>
       </div>
     );

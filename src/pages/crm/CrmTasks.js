@@ -10,6 +10,7 @@ import {
   fetchContacts,
   TASK_PRIORITIES,
 } from "../../services/crmApi";
+import { Skeleton, SkeletonList } from "../../components/ui/Skeleton";
 
 const fmt = (d) => (d ? new Date(d).toLocaleString() : "");
 
@@ -91,7 +92,19 @@ export default function CrmTasks() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-stone-200 p-8 text-center text-stone-500 text-sm">Loading…</div>
+        // Mirror the real layout: 2-3 grouped sections (Overdue/Today/Upcoming),
+        // each with a header band + a list of task rows.
+        <div className="space-y-5">
+          {Array.from({ length: 3 }).map((_, g) => (
+            <div key={g} className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+              <div className="flex items-center gap-2 border-b border-stone-200 bg-stone-50 px-4 py-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-8 rounded-full" />
+              </div>
+              <SkeletonList items={g === 0 ? 4 : 3} withAvatar={false} />
+            </div>
+          ))}
+        </div>
       ) : tasks.length === 0 ? (
         <div className="bg-white rounded-xl border border-stone-200 p-12 text-center">
           <p className="text-sm text-stone-500">No tasks yet</p>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { getMappedCategories } from '../utils/categoryMap';
+import { Skeleton, SkeletonStatCard, SkeletonTableRows } from '../components/ui/Skeleton';
 
 const BARAK_URL = 'https://app.barakdiamonds.com/gemstones/Main.aspx';
 
@@ -379,14 +380,39 @@ const QAPage = () => {
   };
 
   if (loading) {
+    // Mirror the QA page layout: page header, stat strip, tab bar, then a
+    // table of stones with quality issues.
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-primary-200 rounded-full"></div>
-            <div className="w-16 h-16 border-4 border-primary-500 rounded-full border-t-transparent animate-spin absolute inset-0"></div>
-          </div>
-          <p className="text-stone-500 font-medium">Scanning data quality...</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-3 w-72" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
+        </div>
+        <div className="flex gap-2 border-b border-stone-200">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-28" />
+          ))}
+        </div>
+        <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-stone-50 border-b border-stone-200">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <th key={i} className="py-3 px-4 text-left">
+                    <Skeleton className="h-3 w-16" />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonTableRows rows={8} cols={6} />
+            </tbody>
+          </table>
         </div>
       </div>
     );

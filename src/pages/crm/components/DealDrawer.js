@@ -12,6 +12,7 @@ import {
 } from "../../../services/crmApi";
 import StonePicker from "./StonePicker";
 import ItemDetailModal from "./ItemDetailModal";
+import { Skeleton, SkeletonCard, SkeletonText } from "../../../components/ui/Skeleton";
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 const timeAgo = (d) => {
@@ -107,7 +108,29 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
       <div className="hidden sm:block flex-1 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
       <div className="w-full sm:w-[640px] bg-white shadow-2xl flex flex-col h-full overflow-hidden">
         {loading || !deal ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-stone-500">Loading…</div>
+          // Mirror the deal drawer's real layout: header (title + stage chip
+          // + value), then a few stacked cards for contact / items / notes.
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-4 sm:px-5 pt-3 pb-4 border-b border-stone-200">
+              <Skeleton className="mb-2 h-3 w-24" />
+              <Skeleton className="mb-3 h-6 w-3/4" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Skeleton className="h-7 w-28 rounded-full" />
+                <Skeleton className="h-7 w-24 rounded-full" />
+                <Skeleton className="h-7 w-20 rounded-full" />
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Skeleton className="h-9 flex-1 rounded-lg" />
+                <Skeleton className="h-9 flex-1 rounded-lg" />
+                <Skeleton className="h-9 w-9 rounded-lg" />
+              </div>
+            </div>
+            <div className="p-4 sm:p-5 space-y-3">
+              <SkeletonCard lines={2} />
+              <SkeletonCard lines={3} />
+              <SkeletonText lines={3} />
+            </div>
+          </div>
         ) : (
           <>
             {/* Mobile header bar */}

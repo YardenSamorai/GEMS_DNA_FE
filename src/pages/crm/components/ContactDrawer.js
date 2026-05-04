@@ -17,6 +17,12 @@ import {
 import ContactFormModal from "./ContactFormModal";
 import CardImageLightbox from "./CardImageLightbox";
 import ContactMap from "./ContactMap";
+import {
+  Skeleton,
+  SkeletonAvatar,
+  SkeletonText,
+  SkeletonCard,
+} from "../../../components/ui/Skeleton";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 const timeAgo = (d) => {
@@ -95,7 +101,34 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
       <div className="hidden sm:block flex-1 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
       <div className="w-full sm:w-[560px] bg-white shadow-2xl flex flex-col h-full overflow-hidden">
         {loading || !contact ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-stone-500">Loading…</div>
+          // Drawer skeleton: header (avatar + name), action buttons,
+          // info rows, then a few content cards stacked.
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-4 sm:px-5 pt-3 pb-4 border-b border-stone-200">
+              <div className="flex items-start gap-3">
+                <SkeletonAvatar size={56} />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-5 w-44" />
+                  <Skeleton className="h-3 w-32" />
+                  <div className="flex gap-1.5 pt-1">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-12 rounded-full" />
+                  </div>
+                </div>
+                <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Skeleton className="h-9 flex-1 rounded-lg" />
+                <Skeleton className="h-9 flex-1 rounded-lg" />
+                <Skeleton className="h-9 flex-1 rounded-lg" />
+              </div>
+            </div>
+            <div className="p-4 sm:p-5 space-y-3">
+              <SkeletonText lines={2} />
+              <SkeletonCard lines={3} />
+              <SkeletonCard lines={2} />
+            </div>
+          </div>
         ) : (
           <>
             {/* Header */}
