@@ -24,7 +24,6 @@ import SellItemModal from "./components/SellItemModal";
 import ReadyNotifyBanner from "./components/ReadyNotifyBanner";
 import WhatsAppCustomerButton from "./components/WhatsAppCustomerButton";
 import { Skeleton, SkeletonText, SkeletonCard } from "../../components/ui/Skeleton";
-import { Skeleton, SkeletonCard, SkeletonText } from "../../components/ui/Skeleton";
 
 const TABS = [
   { id: "overview", label: "Overview" },
