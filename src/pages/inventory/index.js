@@ -7404,7 +7404,7 @@ const StoneSearchPage = () => {
           )}
           {inventoryMode === 'jewelry' && !jewelryLoading && jewelryItems.length === 0 && (
             <div className="mb-4 p-4 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-600">
-              No jewelry items found. Upload a Jewelry CSV from the <a href="/dashboard" className="font-semibold underline">Dashboard</a>.
+              No jewelry items found. Upload a Jewelry CSV from the <Link to="/dashboard?tab=jewelry" className="font-semibold underline">Jewelry dashboard</Link>.
             </div>
           )}
 

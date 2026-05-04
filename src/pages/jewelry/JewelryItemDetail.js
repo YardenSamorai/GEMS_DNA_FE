@@ -145,7 +145,9 @@ const JewelryItemDetail = () => {
     if (!window.confirm("Delete this jewelry item permanently? This cannot be undone.")) return;
     try {
       await deleteJewelryItem(id);
-      navigate("/jewelry/items");
+      // After Sprint 1.B the jewelry grid lives in the unified inventory hub.
+      // Navigate straight there so we don't bounce through the redirect.
+      navigate("/inventory?tab=jewelry");
     } catch (err) {
       alert(err.message || "Failed to delete");
     }
