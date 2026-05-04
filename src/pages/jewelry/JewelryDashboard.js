@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { fetchJewelryItems, fetchJewelryCatalog } from "../../services/jewelryApi";
 import { fetchDeals, fetchContacts, fetchTasks, updateTask, DEAL_STAGES } from "../../services/crmApi";
 import { decryptPrice } from "../../utils/decrypt";
+import { normalizeJewelryCategory } from "../../utils/helper";
 
 /* The Jewelry Inventory page already merges workshop jobs (jewelry_items)
  * with catalog products (jewelry_products). The dashboard had been counting
@@ -16,12 +17,19 @@ import { decryptPrice } from "../../utils/decrypt";
 const mapCatalogToItem = (row) => {
   let price = 0;
   try { price = row.price ? Number(decryptPrice(row.price)) || 0 : 0; } catch (_) {}
+  // Same normalization as the inventory grid: prefer the specific
+  // jewelry_type, normalize plurals/variants to a single bucket.
+  const category =
+    normalizeJewelryCategory(row.jewelry_type) ||
+    normalizeJewelryCategory(row.style) ||
+    normalizeJewelryCategory(row.category) ||
+    "Uncategorized";
   return {
     id: `cat_${row.model_number}`,
     __source: "catalog",
     sku: row.model_number || "",
     name: row.title || row.model_number || "Untitled",
-    category: row.category || row.jewelry_type || "Uncategorized",
+    category,
     status: null,            // catalog rows aren't WIP/ready/sold
     sold_at: null,
     sale_price: price || 0,
@@ -612,7 +620,11 @@ const JewelryDashboard = () => {
     ])
       .then(([itemsR, catalogR, dealsR, contactsR, tasksR]) => {
         const workshop = itemsR.status === "fulfilled"
-          ? (itemsR.value.items || []).map((i) => ({ ...i, __source: "workshop" }))
+          ? (itemsR.value.items || []).map((i) => ({
+              ...i,
+              __source: "workshop",
+              category: normalizeJewelryCategory(i.category) || i.category,
+            }))
           : [];
         const catalog = catalogR.status === "fulfilled"
           ? (catalogR.value?.jewelry || []).map(mapCatalogToItem)

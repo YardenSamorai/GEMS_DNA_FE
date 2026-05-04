@@ -126,25 +126,35 @@ const ProductionCard = ({ item, stage, draggedId, onDragStart, onDragEnd }) => {
   );
 };
 
-/* ---------- Column ---------- */
+/* ---------- Column ----------
+ *
+ * Width strategy:
+ *   - Below xl (1280px) we keep the columns at a fixed 240px and let the
+ *     board scroll horizontally — there isn't enough room to show 8 stages
+ *     side by side without making each one unreadable.
+ *   - On xl+ we drop the fixed width and use flex-1 + min-w-0 so the 8
+ *     columns share the page width equally and no horizontal scrollbar
+ *     appears. min-w-0 is required so flex children can shrink past their
+ *     natural content size; without it long stage names would force the
+ *     row wider than the viewport. */
 const Column = ({ stage, items, onDrop, isOver, onDragOver, onDragLeave, draggedId, onDragStart, onDragEnd }) => (
   <div
-    className="flex w-72 shrink-0 flex-col"
+    className="flex w-60 shrink-0 flex-col xl:w-auto xl:min-w-0 xl:flex-1"
     onDragOver={onDragOver}
     onDragLeave={onDragLeave}
     onDrop={() => onDrop(stage.value)}
   >
     {/* Header */}
-    <div className={`flex items-center justify-between rounded-xl border px-3 py-2.5 transition ${
+    <div className={`flex items-center justify-between gap-2 rounded-xl border px-2.5 py-2.5 transition ${
       isOver ? "border-emerald-400 bg-emerald-50" : "border-stone-200 bg-white shadow-sm"
     }`}>
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${stage.bg}`}>
+      <div className="flex min-w-0 items-center gap-2">
+        <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${stage.bg}`}>
           {stage.icon}
         </div>
         <span className="truncate text-sm font-semibold text-stone-900">{stage.label}</span>
       </div>
-      <span className="shrink-0 rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-stone-700">
+      <span className="shrink-0 rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-stone-700">
         {items.length}
       </span>
     </div>
@@ -233,7 +243,10 @@ const ProductionBoard = () => {
   const totalActive = items.length;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    // The Kanban needs a wider canvas than the rest of the app so all 8
+    // stages can sit side by side on a normal desktop. We cap at 1800px so
+    // ultra-wide displays don't stretch each column to absurd widths.
+    <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -264,15 +277,15 @@ const ProductionBoard = () => {
         </button>
       </div>
 
-      {/* Board */}
+      {/* Board — horizontal scroll on tablets, full-width grid on desktop. */}
       <div
-        className={`mt-6 flex gap-3 overflow-x-auto pb-4 transition ${
+        className={`mt-6 flex gap-2 overflow-x-auto pb-4 transition xl:overflow-x-visible ${
           updating ? "pointer-events-none opacity-60" : ""
         }`}
       >
         {loading ? (
           STAGES.map((s) => (
-            <div key={s.value} className="flex w-72 shrink-0 flex-col gap-2">
+            <div key={s.value} className="flex w-60 shrink-0 flex-col gap-2 xl:w-auto xl:min-w-0 xl:flex-1">
               <div className="h-12 animate-pulse rounded-xl bg-stone-100" />
               <div className="h-20 animate-pulse rounded-lg bg-stone-100" />
               <div className="h-20 animate-pulse rounded-lg bg-stone-100" />

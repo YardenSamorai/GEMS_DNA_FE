@@ -7,7 +7,7 @@ import {
   JEWELRY_TYPES,
 } from "../../services/jewelryApi";
 import { decryptPrice } from "../../utils/decrypt";
-import { sanitizeText } from "../../utils/helper";
+import { sanitizeText, normalizeJewelryCategory } from "../../utils/helper";
 import JewelryItemCard from "./components/JewelryItemCard";
 import JewelryItemDialog from "./components/JewelryItemDialog";
 import NewJewelryItemModal from "./components/NewJewelryItemModal";
@@ -24,7 +24,14 @@ const mapCatalogRow = (row) => {
     .filter(Boolean)[0] || null;
   let price = 0;
   try { price = row.price ? Number(decryptPrice(row.price)) || 0 : 0; } catch (_) {}
-  const category = row.category || row.jewelry_type || null;
+  // Prefer the specific jewelry_type ("Bracelet", "Ring") over the generic
+  // top-level WooCommerce category ("Jewelry"), then normalize so plurals
+  // and variants ("Bracelets", "Bangle Bracelet") collapse into one bucket.
+  const category =
+    normalizeJewelryCategory(row.jewelry_type) ||
+    normalizeJewelryCategory(row.style) ||
+    normalizeJewelryCategory(row.category) ||
+    null;
   const metalSummary = row.metal_type
     ? [row.metal_type, row.style].filter(Boolean).join(" / ")
     : null;
@@ -153,8 +160,14 @@ const JewelryItemsList = () => {
       if (typeFilter) filters.type = typeFilter;
       if (search) filters.search = search;
       const res = await fetchJewelryItems(userId, filters);
+      // Normalize the workshop category too so a user-typed "Rings" buckets
+      // with the catalog's "Ring" instead of showing as a separate option.
       setItems(
-        (res.items || []).map((it) => ({ ...it, __source: "workshop" }))
+        (res.items || []).map((it) => ({
+          ...it,
+          __source: "workshop",
+          category: normalizeJewelryCategory(it.category) || it.category,
+        }))
       );
     } catch (err) {
       setError(err.message || "Failed to load");
