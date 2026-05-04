@@ -6290,7 +6290,10 @@ const StoneSearchPage = () => {
       };
     });
 
-    const urlKeys = new Set(["dna", "certificate", "image", "video"]);
+    // Always point DNA links at the public production page (not the dev
+    // origin) so an Excel exported locally still works for everyone.
+    const DNA_BASE = "https://gems-dna.com";
+    const urlKeys = new Set(["certificate", "image", "video"]);
 
     data.forEach((stone, idx) => {
       const row = {};
@@ -6336,7 +6339,13 @@ const StoneSearchPage = () => {
             break;
           case "rapPrice": row.rapPrice = stone.rapPrice || ""; break;
           case "location": row.location = stone.location || ""; break;
-          case "dna": row.dna = stone.sku ? `${window.location.origin}/${stone.sku}` : ""; break;
+          // DNA cell shows "View DNA · SKU" as the visible label but the
+          // hyperlink underneath is the full public URL.
+          case "dna":
+            row.dna = stone.sku
+              ? { text: `View DNA · ${stone.sku}`, hyperlink: `${DNA_BASE}/${stone.sku}` }
+              : "";
+            break;
           case "certificate": row.certificate = stone.certificateUrl || ""; break;
           case "image": row.image = stone.imageUrl || ""; break;
           case "video": row.video = stone.videoUrl || stone.videoLink || ""; break;
@@ -6350,6 +6359,9 @@ const StoneSearchPage = () => {
         const colKey = chosenColumns[colNumber - 1]?.key;
         if (urlKeys.has(colKey) && cell.value) {
           cell.value = { text: String(cell.value), hyperlink: String(cell.value) };
+          cell.font = { color: { argb: "FF2563EB" }, underline: true };
+        }
+        if (colKey === "dna" && cell.value && typeof cell.value === "object") {
           cell.font = { color: { argb: "FF2563EB" }, underline: true };
         }
         if (colKey === "pricePerCt" || colKey === "priceTotal") {

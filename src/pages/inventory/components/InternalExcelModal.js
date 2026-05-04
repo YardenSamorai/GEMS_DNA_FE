@@ -82,7 +82,7 @@ export const INTERNAL_COLUMN_GROUPS = [
     label: "Internal / Inventory",
     columns: [
       { key: "location", header: "Location", width: 14 },
-      { key: "dna", header: "DNA URL", width: 28 },
+      { key: "dna", header: "DNA Link", width: 22 },
       { key: "certificate", header: "Certificate URL", width: 28 },
       { key: "image", header: "Image URL", width: 28 },
       { key: "video", header: "Video URL", width: 28 },
