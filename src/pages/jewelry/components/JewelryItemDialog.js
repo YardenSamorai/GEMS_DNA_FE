@@ -281,14 +281,27 @@ const WorkshopBody = ({ baseItem }) => {
    ========================================================= */
 const CatalogBody = ({ item }) => {
   const raw = item.__raw || {};
-  const allImages = (raw.all_pictures_link || "")
-    .split(";")
-    .map((u) => u.trim())
-    .filter(Boolean);
-  const [activeImage, setActiveImage] = useState(allImages[0] || item.cover_image_url || null);
+
+  // Build the gallery once per item — the previous version derived a fresh
+  // array on every render and listed it as an effect dep, which made every
+  // setActiveImage trigger a re-render -> new array reference -> effect ->
+  // reset back to image[0]. Net result: thumbnail clicks did nothing.
+  const allImages = useMemo(() => {
+    const fromAll = (raw.all_pictures_link || "")
+      .split(";")
+      .map((u) => u.trim())
+      .filter(Boolean);
+    const cover = item.cover_image_url || raw.image_link || null;
+    const merged = cover && !fromAll.includes(cover) ? [cover, ...fromAll] : fromAll;
+    return merged.length ? merged : (cover ? [cover] : []);
+  }, [raw.all_pictures_link, raw.image_link, item.cover_image_url]);
+
+  const [activeImage, setActiveImage] = useState(allImages[0] || null);
+  // Reset to the first image only when we switch to a different item, not
+  // every time the user picks a thumbnail.
   useEffect(() => {
-    setActiveImage(allImages[0] || item.cover_image_url || null);
-  }, [allImages, item.cover_image_url]);
+    setActiveImage(allImages[0] || null);
+  }, [item.id, item.sku]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-5">
@@ -308,14 +321,20 @@ const CatalogBody = ({ item }) => {
           </div>
           {allImages.length > 1 && (
             <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-              {allImages.slice(0, 8).map((img) => (
+              {allImages.map((img, idx) => (
                 <button
-                  key={img}
+                  key={`${img}-${idx}`}
                   type="button"
                   onClick={() => setActiveImage(img)}
                   className={`h-12 w-12 shrink-0 overflow-hidden rounded-md border-2 transition ${activeImage === img ? "border-emerald-500" : "border-transparent hover:border-stone-300"}`}
+                  title={`Image ${idx + 1} / ${allImages.length}`}
                 >
-                  <img src={img} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={img}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
                 </button>
               ))}
             </div>

@@ -2,8 +2,34 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
-import { fetchJewelryItems } from "../../services/jewelryApi";
+import { fetchJewelryItems, fetchJewelryCatalog } from "../../services/jewelryApi";
 import { fetchDeals, fetchContacts, fetchTasks, updateTask, DEAL_STAGES } from "../../services/crmApi";
+import { decryptPrice } from "../../utils/decrypt";
+
+/* The Jewelry Inventory page already merges workshop jobs (jewelry_items)
+ * with catalog products (jewelry_products). The dashboard had been counting
+ * only workshop, so a tenant with 241 catalog pieces and 1 in-progress job
+ * saw "Items: 1" and an inventory value of $1,800. We now pull both and let
+ * the existing aggregators see one combined list — catalog rows have
+ * status:null which is correctly treated as "in stock, not sold" by every
+ * downstream filter. */
+const mapCatalogToItem = (row) => {
+  let price = 0;
+  try { price = row.price ? Number(decryptPrice(row.price)) || 0 : 0; } catch (_) {}
+  return {
+    id: `cat_${row.model_number}`,
+    __source: "catalog",
+    sku: row.model_number || "",
+    name: row.title || row.model_number || "Untitled",
+    category: row.category || row.jewelry_type || "Uncategorized",
+    status: null,            // catalog rows aren't WIP/ready/sold
+    sold_at: null,
+    sale_price: price || 0,
+    // Catalog items don't have a tracked production cost, so for value
+    // calculations we fall back to sale price below.
+    total_cost: 0,
+  };
+};
 
 /* ---------- formatters ---------- */
 const fmtMoney = (n) =>
@@ -432,13 +458,17 @@ const MonthlyGoalsCard = ({ revenue, orders, newCustomers }) => {
 const InventoryValueCard = ({ items }) => {
   const data = useMemo(() => {
     const inStock = items.filter((i) => i.status !== "sold" && i.status !== "archived");
-    const total = inStock.reduce((a, b) => a + Number(b.total_cost || 0), 0);
+    // For workshop pieces we prefer sale_price (what we'd get on the
+    // market); falling back to total_cost (production cost) when no sale
+    // price is set. For catalog rows, only sale_price exists.
+    const valueOf = (i) => Number(i.sale_price || i.total_cost || 0);
+    const total = inStock.reduce((a, b) => a + valueOf(b), 0);
     const grouped = {};
     inStock.forEach((i) => {
       const k = i.category || "Other";
       if (!grouped[k]) grouped[k] = { count: 0, total: 0 };
       grouped[k].count += 1;
-      grouped[k].total += Number(i.total_cost || 0);
+      grouped[k].total += valueOf(i);
     });
     const breakdown = Object.entries(grouped)
       .map(([k, v]) => ({ label: k, ...v }))
@@ -575,12 +605,20 @@ const JewelryDashboard = () => {
     setLoading(true);
     Promise.allSettled([
       fetchJewelryItems(userId, {}),
+      fetchJewelryCatalog(),
       fetchDeals(userId),
       fetchContacts(userId),
       fetchTasks(userId, { status: "pending" }),
     ])
-      .then(([itemsR, dealsR, contactsR, tasksR]) => {
-        if (itemsR.status === "fulfilled") setItems(itemsR.value.items || []);
+      .then(([itemsR, catalogR, dealsR, contactsR, tasksR]) => {
+        const workshop = itemsR.status === "fulfilled"
+          ? (itemsR.value.items || []).map((i) => ({ ...i, __source: "workshop" }))
+          : [];
+        const catalog = catalogR.status === "fulfilled"
+          ? (catalogR.value?.jewelry || []).map(mapCatalogToItem)
+          : [];
+        // Single combined list — all KPIs/cards downstream just see "items".
+        setItems([...workshop, ...catalog]);
         if (dealsR.status === "fulfilled") setDeals(Array.isArray(dealsR.value) ? dealsR.value : (dealsR.value?.deals || []));
         if (contactsR.status === "fulfilled") setContacts(Array.isArray(contactsR.value) ? contactsR.value : (contactsR.value?.contacts || []));
         if (tasksR.status === "fulfilled") setTasks(Array.isArray(tasksR.value) ? tasksR.value : (tasksR.value?.tasks || []));

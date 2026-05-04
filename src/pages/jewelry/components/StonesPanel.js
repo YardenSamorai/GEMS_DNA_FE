@@ -30,8 +30,16 @@ const loadStones = (force = false) => {
       }
       return r.json();
     })
-    .then((rows) => {
-      _stoneCache = Array.isArray(rows) ? rows : [];
+    .then((payload) => {
+      // /api/soap-stones currently returns { stones: [...] }, but earlier
+      // versions returned a bare array. Be tolerant of both so this keeps
+      // working if the BE ever changes back.
+      const rows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.stones)
+          ? payload.stones
+          : [];
+      _stoneCache = rows;
       return _stoneCache;
     })
     .catch((err) => {
