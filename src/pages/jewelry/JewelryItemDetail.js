@@ -23,6 +23,7 @@ import HistoryTimeline from "./components/HistoryTimeline";
 import SellItemModal from "./components/SellItemModal";
 import ReadyNotifyBanner from "./components/ReadyNotifyBanner";
 import WhatsAppCustomerButton from "./components/WhatsAppCustomerButton";
+import { Skeleton, SkeletonCard, SkeletonText } from "../../components/ui/Skeleton";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -152,8 +153,52 @@ const JewelryItemDetail = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-sm text-stone-500">
-        Loading...
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Back link placeholder */}
+        <Skeleton className="mb-4 h-3 w-32" />
+
+        {/* Header: title + status badge + action buttons */}
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-64" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-24 rounded-lg" />
+            <Skeleton className="h-9 w-9 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Tab strip placeholder */}
+        <div className="mb-6 flex gap-1 border-b border-stone-200">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-20 rounded-none" />
+          ))}
+        </div>
+
+        {/* Two-column body: cover image + details card */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Skeleton className="aspect-square w-full rounded-xl lg:col-span-1" />
+          <div className="space-y-4 lg:col-span-2">
+            <SkeletonCard lines={4} />
+            <SkeletonCard lines={3} />
+            <div className="rounded-xl border border-stone-200 bg-white p-4">
+              <Skeleton className="mb-3 h-4 w-32" />
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <Skeleton className="h-2.5 w-16" />
+                    <Skeleton className="h-3.5 w-24" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <SkeletonText lines={3} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -164,7 +209,7 @@ const JewelryItemDetail = () => {
         <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
           {error || "Item not found"}
         </div>
-        <Link to="/jewelry/items" className="mt-4 inline-block text-sm text-emerald-700 hover:underline">
+        <Link to="/inventory?tab=jewelry" className="mt-4 inline-block text-sm text-emerald-700 hover:underline">
           ← Back to jewelry items
         </Link>
       </div>
@@ -177,7 +222,7 @@ const JewelryItemDetail = () => {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Top breadcrumb / back */}
-      <Link to="/jewelry/items" className="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-stone-900">
+      <Link to="/inventory?tab=jewelry" className="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-stone-900">
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>

@@ -9,9 +9,12 @@ const SEEN_KEY = (uid) => `crm.dnaLeadsSeenAt.${uid || "anon"}`;
 const TOAST_KEY = (uid) => `crm.dnaLeadsLastToastedLatest.${uid || "anon"}`;
 
 const NAV = [
+  // After Sprint 1.A the CRM "Home" view lives in the global Dashboard
+  // (Dashboard → CRM tab). We keep an entry here so users browsing CRM can
+  // jump to that tab in one click without going through the sidebar.
   {
-    to: "/crm",
-    label: "Home",
+    to: "/dashboard?tab=crm",
+    label: "Dashboard",
     end: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

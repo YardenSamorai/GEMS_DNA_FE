@@ -2,22 +2,18 @@ import React, { useState, useEffect, createContext, useContext } from "react";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet, useParams } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
-import HomePage from "./pages/HomePage";
+import Dashboard from "./pages/Dashboard";
 import JewelryPage from "./pages/JewelryPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import { Toaster } from "react-hot-toast";
-import Inventory from "./pages/inventory";
-import JewelryItems from "./pages/jewelry";
+import InventoryHub from "./pages/InventoryHub";
 import JewelryItemDetail from "./pages/jewelry/JewelryItemDetail";
-import JewelryDashboard from "./pages/jewelry/JewelryDashboard";
 import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
-import JewelryReports from "./pages/jewelry/Reports";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
-import CrmDashboard from "./pages/crm/CrmDashboard";
 import CrmContacts from "./pages/crm/CrmContacts";
 import CustomerProfile from "./pages/crm/CustomerProfile";
 import CrmDeals from "./pages/crm/CrmDeals";
@@ -102,46 +98,55 @@ const NAV_SECTIONS = [
       },
     ],
   },
-  // INVENTORY section
+  // INVENTORY section — single unified hub. The Sprint 1.B merge folds the
+  // legacy /jewelry/items grid into this surface as the second tab.
   {
     label: "INVENTORY",
     dot: "bg-emerald-500",
     items: [
       {
         to: "/inventory",
-        label: "Stones",
-        matches: (path) => path === "/inventory",
+        label: "Inventory",
+        // Match any /inventory URL (with or without ?tab=) and the legacy
+        // /jewelry/items / /jewelry-items aliases (which redirect into the
+        // unified hub) so the sidebar entry stays highlighted on those URLs
+        // mid-redirect.
+        matches: (path) =>
+          path === "/inventory" ||
+          path === "/jewelry" ||
+          path === "/jewelry/" ||
+          path === "/jewelry/items" ||
+          path === "/jewelry-items",
         icon: (cls) => (
           <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
           </svg>
         ),
       },
+    ],
+  },
+  // JEWELRY section — workflow surfaces only. Inventory moved up to the
+  // unified hub (Sprint 1.B), Dashboard + Reports moved into /dashboard tabs
+  // (Sprint 1.A). This section is now the workshop's working space.
+  {
+    label: "JEWELRY",
+    dot: "bg-pink-500",
+    items: [
       {
-        to: "/jewelry",
-        label: "Jewelry",
+        to: "/jewelry/production",
+        label: "Production",
         matches: (path) =>
-          path === "/jewelry" || path.startsWith("/jewelry/") || path.startsWith("/jewelry-items"),
+          path === "/jewelry/production" ||
+          path === "/jewelry/sold" ||
+          path === "/jewelry/designs" ||
+          path === "/jewelry/settings" ||
+          path.startsWith("/jewelry/items/"),
         icon: (cls) => (
           <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 3l3.057-3 4.886 0L16 3l4 5-8 13L4 8l1-5z" />
           </svg>
         ),
         children: [
-          {
-            to: "/jewelry/dashboard",
-            label: "Dashboard",
-            matches: (p) => p === "/jewelry" || p === "/jewelry/" || p === "/jewelry/dashboard",
-          },
-          {
-            to: "/jewelry/items",
-            label: "Inventory",
-            matches: (p) =>
-              p === "/jewelry/items" ||
-              p.startsWith("/jewelry/items/") ||
-              p === "/jewelry-items" ||
-              p.startsWith("/jewelry-items/"),
-          },
           {
             to: "/jewelry/production",
             label: "Production Board",
@@ -158,11 +163,6 @@ const NAV_SECTIONS = [
             matches: (p) => p === "/jewelry/designs",
           },
           {
-            to: "/jewelry/reports",
-            label: "Reports",
-            matches: (p) => p === "/jewelry/reports",
-          },
-          {
             to: "/jewelry/settings",
             label: "Settings",
             matches: (p) => p === "/jewelry/settings",
@@ -177,7 +177,10 @@ const NAV_SECTIONS = [
     dot: "bg-sky-500",
     items: [
       {
-        to: "/crm",
+        // /crm itself now redirects to /dashboard?tab=crm, so we send the
+        // sidebar straight into the CRM workspace (contacts list — most-used
+        // entry point).
+        to: "/crm/contacts",
         label: "CRM",
         matches: (path) => path.startsWith("/crm"),
         icon: (cls) => (
@@ -374,22 +377,38 @@ function AppContent() {
 
           {/* Protected app routes (sidebar + top bar) */}
           <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<HomePage />} />
-            <Route path="/inventory" element={<Inventory />} />
+            {/* Sprint 1.A merge — single tabbed dashboard hosting Overview /
+                Stones / CRM / Jewelry / Reports. The legacy /jewelry/dashboard,
+                /jewelry/reports and /crm landing pages all redirect into the
+                matching tab, see below. */}
+            <Route path="/dashboard" element={<Dashboard />} />
+            {/* Sprint 1.B merge — InventoryHub fans out into Stones / Jewelry tabs. */}
+            <Route path="/inventory" element={<InventoryHub />} />
 
             {/* Jewelry sub-system */}
-            <Route path="/jewelry" element={<Navigate to="/jewelry/dashboard" replace />} />
-            <Route path="/jewelry/dashboard" element={<JewelryDashboard />} />
-            <Route path="/jewelry/items" element={<JewelryItems />} />
+            <Route path="/jewelry" element={<Navigate to="/inventory?tab=jewelry" replace />} />
+            {/* Back-compat: old jewelry-domain dashboards fold into the global
+                Dashboard tabs. */}
+            <Route
+              path="/jewelry/dashboard"
+              element={<Navigate to="/dashboard?tab=jewelry" replace />}
+            />
+            <Route
+              path="/jewelry/reports"
+              element={<Navigate to="/dashboard?tab=reports" replace />}
+            />
+            {/* Back-compat: the jewelry inventory grid moved into the unified
+                /inventory?tab=jewelry surface, but /jewelry/items/:id (single
+                item detail page) keeps its own dedicated route. */}
+            <Route path="/jewelry/items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
             <Route path="/jewelry/items/:id" element={<JewelryItemDetail />} />
             <Route path="/jewelry/production" element={<ProductionBoard />} />
             <Route path="/jewelry/sold" element={<JewelrySoldItems />} />
             <Route path="/jewelry/designs" element={<JewelryDesigns />} />
-            <Route path="/jewelry/reports" element={<JewelryReports />} />
             <Route path="/jewelry/settings" element={<JewelrySettings />} />
 
-            {/* Back-compat: old /jewelry-items URLs → new /jewelry/items */}
-            <Route path="/jewelry-items" element={<Navigate to="/jewelry/items" replace />} />
+            {/* Back-compat: old /jewelry-items URLs → new unified inventory */}
+            <Route path="/jewelry-items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
             <Route path="/jewelry-items/:id" element={<RedirectJewelryItem />} />
 
             <Route path="/qa-data" element={<QAPage />} />
@@ -398,7 +417,10 @@ function AppContent() {
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>
-              <Route index element={<CrmDashboard />} />
+              {/* The CRM landing page is now the CRM tab inside the global
+                  Dashboard. Sub-pages (contacts/deals/tasks/settings) keep
+                  their own URLs and continue to render inside CrmLayout. */}
+              <Route index element={<Navigate to="/dashboard?tab=crm" replace />} />
               <Route path="contacts" element={<CrmContacts />} />
               <Route path="contacts/:id" element={<CrmContacts />} />
               <Route path="deals" element={<CrmDeals />} />

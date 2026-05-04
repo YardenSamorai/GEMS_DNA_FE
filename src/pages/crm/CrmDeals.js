@@ -10,6 +10,7 @@ import {
   DEAL_STAGES,
 } from "../../services/crmApi";
 import DealDrawer from "./components/DealDrawer";
+import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 
@@ -152,7 +153,30 @@ export default function CrmDeals() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-stone-200 p-8 text-center text-stone-500 text-sm">Loading…</div>
+        <>
+          {/* Desktop: 5-column kanban skeleton (matches the actual stage columns) */}
+          <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {Array.from({ length: 5 }).map((_, col) => (
+              <div key={col} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                <div className="mb-3 flex items-center justify-between">
+                  <Skeleton className="h-3.5 w-20" />
+                  <Skeleton className="h-3 w-6" />
+                </div>
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, c) => (
+                    <SkeletonCard key={c} lines={2} className="bg-white" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Mobile: stacked card list */}
+          <div className="sm:hidden space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonCard key={i} lines={2} />
+            ))}
+          </div>
+        </>
       ) : (
         <>
           {/* Mobile: stacked stage list with chip filter */}

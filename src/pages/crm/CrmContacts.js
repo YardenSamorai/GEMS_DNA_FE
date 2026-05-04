@@ -21,6 +21,7 @@ import AdvancedFiltersDrawer, { EMPTY_FILTERS, countActiveFilters } from "./comp
 import ImportContactsModal from "./components/ImportContactsModal";
 import BroadcastEmailModal from "./components/BroadcastEmailModal";
 import CardImageLightbox from "./components/CardImageLightbox";
+import { SkeletonTableRows, SkeletonList } from "../../components/ui/Skeleton";
 
 const typeStyle = (type) => {
   const t = CONTACT_TYPES.find((x) => x.value === type);
@@ -485,7 +486,29 @@ export default function CrmContacts() {
         {/* List */}
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-stone-500 text-sm">Loading…</div>
+            <>
+              {/* Desktop: 8 rows × 7 columns matching the real header */}
+              <table className="hidden md:table w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-stone-500 bg-stone-50 border-b border-stone-200">
+                    <th className="py-3 px-4 w-10"></th>
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">Type</th>
+                    <th className="py-3 px-4">Company</th>
+                    <th className="py-3 px-4">Phone</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <SkeletonTableRows rows={8} cols={7} />
+                </tbody>
+              </table>
+              {/* Mobile: list of avatar+rows */}
+              <div className="md:hidden">
+                <SkeletonList items={6} withAvatar />
+              </div>
+            </>
           ) : filteredContacts.length === 0 ? (
             <EmptyState onCreate={() => setShowForm(true)} hasFilter={tagFilter || search || typeFilter !== "all" || selectedFolderId || activeFiltersCount > 0} />
           ) : (
