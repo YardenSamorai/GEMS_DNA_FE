@@ -20,6 +20,7 @@ import StonesPanel from "./components/StonesPanel";
 import MetalsPanel from "./components/MetalsPanel";
 import CostsPanel from "./components/CostsPanel";
 import HistoryTimeline from "./components/HistoryTimeline";
+import Visualize3DPanel from "./components/Visualize3DPanel";
 import SellItemModal from "./components/SellItemModal";
 import ReadyNotifyBanner from "./components/ReadyNotifyBanner";
 import WhatsAppCustomerButton from "./components/WhatsAppCustomerButton";
@@ -31,6 +32,7 @@ const TABS = [
   { id: "stones", label: "Stones" },
   { id: "metals", label: "Metals" },
   { id: "costs", label: "Costs" },
+  { id: "preview3d", label: "3D Preview" },
   { id: "history", label: "History" },
 ];
 
@@ -507,6 +509,7 @@ const JewelryItemDetail = () => {
       {tab === "stones" && <StonesPanel itemId={id} stones={stones} onChanged={load} />}
       {tab === "metals" && <MetalsPanel itemId={id} metals={metals} onChanged={load} />}
       {tab === "costs" && <CostsPanel itemId={id} costs={costs} item={item} onChanged={load} />}
+      {tab === "preview3d" && <Visualize3DPanel item={item} />}
       {tab === "history" && <HistoryTimeline history={history} />}
 
       <SellItemModal
