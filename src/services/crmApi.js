@@ -342,6 +342,17 @@ export const submitDnaLead = (payload) =>
 export const fetchDnaLeadsUnreadCount = (since) =>
   fetch(`${API_BASE}/api/crm/dna-leads/unread-count${qs({ since })}`).then(json);
 
+/* ---------- Activity log (Sprint 2 / Phase 1) ----------
+ * Read-side helper for the unified activity_log. Used by:
+ *   - OverviewTab "What just happened" feed (no entityType filter)
+ *   - Per-entity timelines (Phase 3): pass { entityType, entityId } to scope
+ *
+ * Filters: entityType, entityId, actorId, action, since, until, limit, offset.
+ * Returns { items, limit, offset, has_more }.
+ */
+export const fetchActivity = (userId, filters = {}) =>
+  fetch(`${API_BASE}/api/activity${qs({ userId, ...filters })}`).then(json);
+
 /* ---------- Outlook integration ---------- */
 export const fetchOutlookStatus = (userId) =>
   fetch(`${API_BASE}/api/crm/outlook/status${qs({ userId })}`).then(json);

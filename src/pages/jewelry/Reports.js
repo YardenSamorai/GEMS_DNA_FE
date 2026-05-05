@@ -201,10 +201,11 @@ const Reports = () => {
               </thead>
               <tbody>
                 {data.topCustomers.map((c) => {
-                  const name =
-                    c.contact_type === "business"
-                      ? c.business_name || [c.first_name, c.last_name].filter(Boolean).join(" ")
-                      : [c.first_name, c.last_name].filter(Boolean).join(" ") || c.business_name;
+                  const personName = (c.name || "").trim();
+                  const company = (c.company || "").trim();
+                  const name = c.type === "business"
+                    ? company || personName
+                    : personName || company;
                   return (
                     <tr key={c.id} className="border-b border-stone-100 hover:bg-stone-50">
                       <td className="py-2 pr-3">

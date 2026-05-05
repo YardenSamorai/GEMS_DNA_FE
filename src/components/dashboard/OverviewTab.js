@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { ensureOccasionTasks } from "../../services/crmApi";
+import { activityRowLink, activityIconMeta, timeAgo } from "../../utils/activity";
 
 const API_BASE =
   process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
 
 /* ============================================================================
- * Overview tab — Sprint 1.F.
+ * Overview tab — Sprint 1.F + Sprint 2 / Phase 2.
  *
  * The Overview tab on /dashboard answers a single question:
  *   "What do I need to know about the business right now?"
@@ -16,8 +17,8 @@ const API_BASE =
  * four tabs (Stones / CRM / Jewelry / Reports). This view is the *pulse*:
  *   1. KPI strip       — 8 cross-system numbers, all click-throughs
  *   2. Today's queue   — items demanding action TODAY
- *   3. Live activity   — recent significant events across the company
- *                        (proxy feed today; replaced by activity_log in Sprint 2)
+ *   3. Live activity   — last 14 days of mutations from activity_log,
+ *                        each row a clickable backlink to the entity it touched
  *   4. Drill cards     — one-tap entry into each domain tab
  *
  * Powered by GET /api/dashboard/overview which returns all three blocks in
@@ -41,15 +42,6 @@ const fmtMoney = (n) => {
   return `$${Math.round(v).toLocaleString()}`;
 };
 const fmtCount = (n) => Number(n || 0).toLocaleString();
-
-const timeAgo = (iso) => {
-  if (!iso) return "";
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-};
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Card primitives
@@ -122,14 +114,11 @@ const QueueIcon = ({ type }) => {
   );
 };
 
-const ActivityIcon = ({ type }) => {
-  const map = {
-    deal_update: { color: "bg-emerald-500", letter: "D" },
-    jewelry_update: { color: "bg-violet-500", letter: "J" },
-    new_lead: { color: "bg-sky-500", letter: "L" },
-    jewelry_sold: { color: "bg-amber-500", letter: "$" },
-  };
-  const cfg = map[type] || { color: "bg-stone-400", letter: "·" };
+// activity_log rows carry { entity_type, action } — translate that to a
+// coloured chip via the shared helper so every place that renders the feed
+// (Overview today, per-entity timelines in Phase 3) stays visually consistent.
+const ActivityIcon = ({ entityType, action }) => {
+  const cfg = activityIconMeta(entityType, action);
   return (
     <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white ${cfg.color}`}>
       {cfg.letter}
@@ -334,15 +323,19 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
           )}
         </div>
 
-        {/* Live activity */}
+        {/* Live activity — backed by activity_log (Sprint 2 / Phase 1) */}
         <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
           <SectionHeader
             title="What just happened"
-            hint="Recent activity across CRM and the workshop."
+            hint="Mutations across CRM and the workshop in the last 14 days."
             action={
-              <span className="text-[10px] font-medium text-stone-400" title="Real-time updates land in Sprint 3 (SSE)">
-                proxy feed · live in Sprint 3
-              </span>
+              <Link
+                to="/dashboard?tab=overview"
+                className="text-[11px] font-medium text-emerald-700 hover:underline"
+                title="Real-time updates land in Sprint 3 (SSE)"
+              >
+                Refresh ↻
+              </Link>
             }
           />
           {loading ? (
@@ -355,13 +348,13 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
             </div>
           ) : (
             <ol className="space-y-1">
-              {data.activity.map((a) => (
-                <li key={a.id}>
-                  <Link
-                    to={a.link}
-                    className="flex items-start gap-3 rounded-lg p-2 hover:bg-stone-50 transition-colors group"
-                  >
-                    <ActivityIcon type={a.type} />
+              {data.activity.map((a) => {
+                const link = activityRowLink(a);
+                // Inert rows when we can't resolve a target (e.g. bulk
+                // synthetic ids with no related entity). Render as <div>.
+                const Inner = (
+                  <>
+                    <ActivityIcon entityType={a.entity_type} action={a.action} />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-stone-900 truncate group-hover:text-emerald-700">
                         {a.label}
@@ -369,9 +362,22 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
                       {a.sub && <p className="text-[11px] text-stone-500 truncate">{a.sub}</p>}
                     </div>
                     <span className="text-[10px] text-stone-400 mt-1.5 shrink-0">{timeAgo(a.ts)}</span>
-                  </Link>
-                </li>
-              ))}
+                  </>
+                );
+                return (
+                  <li key={a.id}>
+                    {link ? (
+                      <Link to={link} className="flex items-start gap-3 rounded-lg p-2 hover:bg-stone-50 transition-colors group">
+                        {Inner}
+                      </Link>
+                    ) : (
+                      <div className="flex items-start gap-3 rounded-lg p-2 group">
+                        {Inner}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           )}
         </div>

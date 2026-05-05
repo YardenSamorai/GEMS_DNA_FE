@@ -34,9 +34,10 @@ const ReadyNotifyBanner = ({ item, userId, onLogged }) => {
 
   if (item?.status !== "ready" || !item?.contact_id) return null;
 
+  const firstWord = (s) => (s ? String(s).trim().split(/\s+/)[0] : "");
   const firstName =
-    contact?.first_name ||
-    (item.contact_name ? String(item.contact_name).split(" ")[0] : "there");
+    firstWord(contact?.name) ||
+    (item.contact_name ? firstWord(item.contact_name) : "there");
   const piece = item.name || item.category || "your piece";
   const sku = item.sku ? ` (${item.sku})` : "";
   const messageBody = `Hi ${firstName}, just letting you know that ${piece}${sku} is ready! Let us know when you'd like to come by and pick it up. — Gemstar`;

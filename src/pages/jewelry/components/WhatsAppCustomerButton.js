@@ -15,10 +15,12 @@ const STATUS_LABELS = Object.fromEntries(
   (JEWELRY_STATUSES || []).map((s) => [s.value, s.label])
 );
 
+const firstWord = (s) => (s ? String(s).trim().split(/\s+/)[0] : "");
+
 const buildMessage = (item, contact) => {
   const firstName =
-    contact?.first_name ||
-    (item.contact_name ? String(item.contact_name).split(" ")[0] : "there");
+    firstWord(contact?.name) ||
+    (item.contact_name ? firstWord(item.contact_name) : "there");
   const piece = item.name || item.category || "your piece";
   const sku = item.sku ? ` (${item.sku})` : "";
   const stage = STATUS_LABELS[item.status] || item.status;
@@ -76,7 +78,7 @@ const WhatsAppCustomerButton = ({ item, userId }) => {
     <button
       type="button"
       onClick={handleClick}
-      title={`WhatsApp ${contact?.first_name || "customer"}`}
+      title={`WhatsApp ${firstWord(contact?.name) || "customer"}`}
       className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100"
     >
       <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
