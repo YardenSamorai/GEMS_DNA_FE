@@ -9,22 +9,41 @@ import {
   MeshTransmissionMaterial,
 } from "@react-three/drei";
 import * as THREE from "three";
+import toast from "react-hot-toast";
+import { updateJewelryItem } from "../../../services/jewelryApi";
 
 /* =========================================================================
- * Phase 1 / POC — 3D Preview tab.
+ * 3D Preview tab — hybrid: real iJewel3D model when an item is linked, or
+ * a procedural placeholder otherwise.
  *
- * Built on top of @react-three/drei's primitives because there is no
- * production-ready npm jewelry configurator (the closest, @y-media/
- * jewelry3dviewer, has 8 weekly downloads and ships a Vue-flavoured dist).
- * drei is what those projects wrap under the hood — using it directly skips
- * a layer of middleman.
+ * Hybrid model:
+ *   - When `item.ijewel_file_id` is set we mount the iJewel mini-viewer
+ *     (CDN script, ~bundle.iife.js) pointed at the workspace `instance`.
+ *     That viewer carries its own ring configurator + AR + materials UI,
+ *     so we hide our own controls in that mode (no duplicate state).
+ *   - When no file id is set we keep the existing drei-based placeholder
+ *     so the tab is never empty: 9 procedural cuts, fancy-colour palette,
+ *     metal swatches, side-stones, the lot. Useful for items that haven't
+ *     been onboarded to iJewel yet (the long tail).
  *
- * Until we drop in a real GLB ring (Phase 2), the band + setting are still
- * procedural primitives. The big upgrade in this iteration is the *stone
- * configurator* — 9 cuts with per-cut procedural geometry, carat-scale
- * resizing, fancy-color palette, and side-stone flanking. That's the bit
- * the user asked for ("be able to swap stones, see the piece take shape").
+ * The procedural rig stays here because (a) drei has no production-ready
+ * jewelry npm package — drei is what such packages wrap — and (b) it
+ * doubles as a "before / after" reference vs. the iJewel viewer.
  * ========================================================================= */
+
+// FE-level default workspace name. Per-item override lives on
+// item.ijewel_instance, falling back to this when null. Ship a no-op default
+// so a missing env var doesn't crash render — the link form still works,
+// the user just types the instance once.
+const DEFAULT_IJEWEL_INSTANCE =
+  (process.env.REACT_APP_IJEWEL_INSTANCE || "").trim() || null;
+
+// Pinned mini-viewer build. Bump when iJewel publishes a stable release
+// after testing it locally — we never want to track "latest" because their
+// iife bundle can change globals between minor versions.
+const IJEWEL_VIEWER_SCRIPT_URL =
+  "https://releases.ijewel3d.com/libs/mini-viewer/0.5.10/bundle.iife.js";
+const IJEWEL_SCRIPT_ID = "ijewel-mini-viewer-script";
 
 // PBR-correct metal palettes — picked from real jewellery photography refs.
 const METALS = {
@@ -613,11 +632,95 @@ function RingScene({ metal, autoRotate, centerCfg, sideCfg }) {
 }
 
 /* ---------- Top-level panel ---------- */
-const Visualize3DPanel = ({ item, stones }) => {
+const Visualize3DPanel = ({ item, stones, onItemUpdated }) => {
+  const fileId = item?.ijewel_file_id || null;
+  const instance =
+    item?.ijewel_instance || DEFAULT_IJEWEL_INSTANCE || null;
+  const linked = Boolean(fileId && instance);
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-stone-900">
+            3D Preview {linked ? <span className="ml-2 align-middle inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-800">Real model · iJewel3D</span> : <span className="ml-2 align-middle inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-600">Placeholder configurator</span>}
+          </h2>
+          <p className="mt-0.5 text-xs text-stone-500">
+            {linked
+              ? "Live render of this item's CAD model. Use the on-canvas controls to change components, materials, and try in AR."
+              : "No real CAD model linked yet. The configurator below previews shape, colour and metal so you can iterate before committing."}
+          </p>
+        </div>
+      </div>
+
+      {linked ? (
+        <LinkedView
+          fileId={fileId}
+          instance={instance}
+          item={item}
+          onItemUpdated={onItemUpdated}
+        />
+      ) : (
+        <UnlinkedView
+          item={item}
+          stones={stones}
+          onItemUpdated={onItemUpdated}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ---------- "Linked" view: real iJewel3D viewer + manage controls ---------- */
+function LinkedView({ fileId, instance, item, onItemUpdated }) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <>
+      <IJewelViewer fileId={fileId} instance={instance} />
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-[11px] text-stone-600">
+        <div className="space-x-3">
+          <span>
+            File ID <span className="font-mono text-stone-800">{fileId}</span>
+          </span>
+          <span>
+            Workspace <span className="font-mono text-stone-800">{instance}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            className="rounded border border-stone-300 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:bg-stone-50"
+          >
+            {editing ? "Cancel" : "Change link"}
+          </button>
+        </div>
+      </div>
+
+      {editing && (
+        <div className="mt-3">
+          <LinkIJewelForm
+            item={item}
+            onItemUpdated={onItemUpdated}
+            onDone={() => setEditing(false)}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ---------- "Unlinked" view: placeholder + invite to link a model ---------- */
+function UnlinkedView({ item, stones, onItemUpdated }) {
   // Seed everything from the item's actual data so the viewer opens looking
   // like the piece, not a generic placeholder.
   const detected = useMemo(() => detectStoneFromItem(stones), [stones]);
-  const initialMetal = useMemo(() => detectMetalKey(item?.metal_summary), [item?.metal_summary]);
+  const initialMetal = useMemo(
+    () => detectMetalKey(item?.metal_summary),
+    [item?.metal_summary]
+  );
 
   const [metal, setMetal] = useState(initialMetal);
   const [autoRotate, setAutoRotate] = useState(true);
@@ -639,32 +742,23 @@ const Visualize3DPanel = ({ item, stones }) => {
   const centerCfg = { shape: centerShape, color: centerColor, sizeMm: centerSizeMm };
   const sideCfg = { enabled: sideEnabled, shape: sideShape, color: sideColor, sizeMm: sideSizeMm };
 
-  const isRing = (item?.category || item?.type || "").toLowerCase().includes("ring")
-    || (item?.name || "").toLowerCase().includes("ring");
+  const isRing =
+    (item?.category || item?.type || "").toLowerCase().includes("ring") ||
+    (item?.name || "").toLowerCase().includes("ring");
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-5">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-stone-900">3D Preview &amp; configurator</h2>
-          <p className="mt-0.5 text-xs text-stone-500">
-            Drag to orbit · scroll to zoom · pinch on touch. Picker below
-            previews how the piece would look with different stone cuts,
-            colours and metal — without locking anything in yet.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex items-center gap-2 text-xs text-stone-700">
-            <input
-              type="checkbox"
-              checked={autoRotate}
-              onChange={(e) => setAutoRotate(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-stone-400 text-emerald-600 focus:ring-emerald-500"
-            />
-            Auto-rotate
-          </label>
-          <ARButton item={item} />
-        </div>
+    <>
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+        <label className="inline-flex items-center gap-2 text-xs text-stone-700">
+          <input
+            type="checkbox"
+            checked={autoRotate}
+            onChange={(e) => setAutoRotate(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-stone-400 text-emerald-600 focus:ring-emerald-500"
+          />
+          Auto-rotate
+        </label>
+        <ARButton item={item} />
       </div>
 
       {/* Canvas */}
@@ -695,6 +789,33 @@ const Visualize3DPanel = ({ item, stones }) => {
             Placeholder ring shown — this item is a {item?.category || item?.type || "piece"}, real model coming
           </div>
         )}
+      </div>
+
+      {/* iJewel link invite — the real reason this view exists. */}
+      <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-emerald-900">
+              Want to show the real CAD here?
+            </p>
+            <p className="mt-0.5 text-[11px] text-emerald-800/80">
+              Upload this piece to{" "}
+              <a
+                href="https://www.ijewel3d.com/drive"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                iJewel3D Drive
+              </a>{" "}
+              from Rhino, copy the File ID, and paste it below. The placeholder
+              will be replaced with your actual model — including AR.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3">
+          <LinkIJewelForm item={item} onItemUpdated={onItemUpdated} />
+        </div>
       </div>
 
       {/* Centre stone configurator */}
@@ -779,22 +900,9 @@ const Visualize3DPanel = ({ item, stones }) => {
           Item record: <span className="font-mono">{item.metal_summary}</span>
         </p>
       )}
-
-      {/* Roadmap callout */}
-      <details className="mt-5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
-        <summary className="cursor-pointer select-none font-medium text-stone-700">
-          What's coming next
-        </summary>
-        <ul className="mt-2 list-inside list-disc space-y-1">
-          <li>Phase 2 — replace the procedural band/prongs with a real GLB converted from your CAD files.</li>
-          <li>Phase 3 — replace the procedural stones with real cut-faceted GLBs for diamond-grade sparkle.</li>
-          <li>Phase 4 — &quot;Save this configuration&quot; button that writes the chosen shape/colour/metal back to the item so the workshop builds what the customer saw.</li>
-          <li>Phase 5 — true AR launch on iOS (USDZ) and Android (scene-viewer).</li>
-        </ul>
-      </details>
-    </div>
+    </>
   );
-};
+}
 
 /* ---------- UI sub-components ---------- */
 const SectionTitle = ({ title }) => (
@@ -884,6 +992,254 @@ const ColorPicker = ({ label, value, onChange }) => (
     </div>
   </div>
 );
+
+/* ---------- iJewel3D Drive viewer (real CAD render + configurator) ----------
+ *
+ * Loads iJewel's CDN-hosted mini-viewer bundle exactly once per page (the
+ * script registers a global `window.ijewelViewer`). On mount we ensure the
+ * script is present, then call `loadModelById(fileId, instance, container)`.
+ * The viewer paints its own controls inside `containerRef` — we do NOT try
+ * to mirror them in React state because their plugin system already does
+ * that. Our job is purely lifecycle: mount, swap fileId, unmount cleanly.
+ *
+ * Why a hand-rolled <script> injector vs. an npm package?
+ *   - iJewel's npm package targets module consumers and asks you to ship
+ *     ~5 MB of three.js builds yourself, which fights with the version we
+ *     already bundle for drei. Their iife CDN bundle dodges all that — it
+ *     loads once, on demand, only on this tab.
+ *   - It also means upgrades are a one-line URL bump, not a dependency
+ *     graveyard pin. The cost is one global, isolated to this component.
+ */
+function IJewelViewer({ fileId, instance, height = 480 }) {
+  const containerRef = useRef(null);
+  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    let readyHandler = null;
+
+    function ensureScript() {
+      return new Promise((resolve, reject) => {
+        if (typeof window === "undefined") return reject(new Error("no window"));
+        if (window.ijewelViewer) return resolve();
+
+        const existing = document.getElementById(IJEWEL_SCRIPT_ID);
+        if (existing) {
+          if (window.ijewelViewer) return resolve();
+          existing.addEventListener("load", () => resolve(), { once: true });
+          existing.addEventListener(
+            "error",
+            () => reject(new Error("iJewel viewer script failed to load")),
+            { once: true }
+          );
+          return;
+        }
+
+        const tag = document.createElement("script");
+        tag.id = IJEWEL_SCRIPT_ID;
+        tag.src = IJEWEL_VIEWER_SCRIPT_URL;
+        tag.async = true;
+        tag.onload = () => resolve();
+        tag.onerror = () => reject(new Error("iJewel viewer script failed to load"));
+        document.head.appendChild(tag);
+      });
+    }
+
+    setStatus("loading");
+    setErrorMsg("");
+
+    readyHandler = () => {
+      if (!cancelled) setStatus("ready");
+    };
+    window.addEventListener("ijewel-viewer-ready", readyHandler);
+
+    ensureScript()
+      .then(() => {
+        if (cancelled || !containerRef.current) return;
+        try {
+          window.ijewelViewer.loadModelById(
+            fileId,
+            instance,
+            containerRef.current,
+            {
+              showCard: false,
+              showLogo: true,
+              transparentBg: false,
+              brandingSettings: { enable: true, showLoadingScreenLogo: true },
+            }
+          );
+        } catch (e) {
+          if (!cancelled) {
+            setErrorMsg(e?.message || "Failed to load iJewel model");
+            setStatus("error");
+          }
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setErrorMsg(e?.message || "iJewel viewer unavailable");
+          setStatus("error");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (readyHandler) {
+        window.removeEventListener("ijewel-viewer-ready", readyHandler);
+      }
+      // Wipe the container so re-mount on fileId change starts clean. We
+      // don't try to call into the iJewel viewer instance itself — their
+      // SDK doesn't expose a public destroy() and DOM-clearing is enough
+      // to garbage-collect the canvas + WebGL context.
+      try {
+        if (containerRef.current) containerRef.current.innerHTML = "";
+      } catch (_) { /* ignore */ }
+    };
+  }, [fileId, instance]);
+
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100">
+      <div
+        ref={containerRef}
+        style={{ height, width: "100%" }}
+        className="ijewel-viewer-container"
+      />
+      {status === "loading" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/60 text-xs text-stone-600">
+          Loading 3D model…
+        </div>
+      )}
+      {status === "error" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/90 px-6 text-center">
+          <p className="text-sm font-medium text-stone-800">Couldn't load model</p>
+          <p className="text-[11px] text-stone-500">{errorMsg}</p>
+          <p className="text-[11px] text-stone-500">
+            Check the File ID and that the model is set to{" "}
+            <span className="font-medium">Public</span> in iJewel3D Drive.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Link form: paste an iJewel File ID and persist ----------
+ *
+ * Two text inputs. The instance is optional in the UI: most setups have a
+ * single workspace and the FE-level default does the trick. We only force
+ * the user to type it when the env var isn't set AND the item doesn't have
+ * one yet — that's the "first time on this deployment" path.
+ *
+ * "Disconnect" sends nulls so the BE clears the columns; the panel then
+ * re-renders into the placeholder mode.
+ */
+function LinkIJewelForm({ item, onItemUpdated, onDone }) {
+  const [fileId, setFileId] = useState(item?.ijewel_file_id || "");
+  const [instance, setInstance] = useState(
+    item?.ijewel_instance || DEFAULT_IJEWEL_INSTANCE || ""
+  );
+  const [busy, setBusy] = useState(false);
+
+  const persist = async (payload) => {
+    setBusy(true);
+    try {
+      await updateJewelryItem(item.id, payload);
+      toast.success(payload.ijewelFileId ? "Model linked" : "Model disconnected");
+      if (typeof onItemUpdated === "function") await onItemUpdated();
+      if (typeof onDone === "function") onDone();
+    } catch (e) {
+      toast.error(e?.message || "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSave = (e) => {
+    e?.preventDefault?.();
+    const trimmedFile = (fileId || "").trim();
+    const trimmedInstance = (instance || "").trim();
+    if (!trimmedFile) {
+      toast.error("File ID is required");
+      return;
+    }
+    if (!trimmedInstance && !DEFAULT_IJEWEL_INSTANCE) {
+      toast.error("Workspace name is required (set REACT_APP_IJEWEL_INSTANCE or fill it in)");
+      return;
+    }
+    persist({
+      ijewelFileId: trimmedFile,
+      // Only persist a per-item instance if the user explicitly typed one
+      // different from the FE default. Keeps rows clean.
+      ijewelInstance:
+        trimmedInstance && trimmedInstance !== DEFAULT_IJEWEL_INSTANCE
+          ? trimmedInstance
+          : null,
+    });
+  };
+
+  const onDisconnect = () => {
+    if (!window.confirm("Remove the linked iJewel3D model from this item?")) return;
+    persist({ ijewelFileId: null, ijewelInstance: null });
+  };
+
+  return (
+    <form onSubmit={onSave} className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]">
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-stone-600">
+            File ID
+          </span>
+          <input
+            type="text"
+            value={fileId}
+            onChange={(e) => setFileId(e.target.value)}
+            placeholder="e.g. abc123def456"
+            className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm font-mono text-stone-900 focus:border-emerald-500 focus:ring-emerald-500"
+            disabled={busy}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-stone-600">
+            Workspace {DEFAULT_IJEWEL_INSTANCE ? <span className="font-normal text-stone-400">(optional)</span> : null}
+          </span>
+          <input
+            type="text"
+            value={instance}
+            onChange={(e) => setInstance(e.target.value)}
+            placeholder={DEFAULT_IJEWEL_INSTANCE || "e.g. drive"}
+            className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm font-mono text-stone-900 focus:border-emerald-500 focus:ring-emerald-500"
+            disabled={busy}
+          />
+        </label>
+        <div className="flex items-end gap-2">
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy ? "Saving…" : "Save link"}
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-stone-500">
+        <span>
+          Tip: in iJewel3D Drive, right-click the model → <em>Make Public</em>, then copy the file ID from the share URL.
+        </span>
+        {item?.ijewel_file_id && (
+          <button
+            type="button"
+            onClick={onDisconnect}
+            disabled={busy}
+            className="rounded border border-rose-200 bg-white px-2 py-0.5 text-[11px] font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+          >
+            Disconnect
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
 
 /* ---------- AR launcher (Phase 5 — needs real GLB+USDZ) ---------- */
 const ARButton = ({ item }) => {

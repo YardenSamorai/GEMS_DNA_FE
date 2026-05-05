@@ -509,7 +509,9 @@ const JewelryItemDetail = () => {
       {tab === "stones" && <StonesPanel itemId={id} stones={stones} onChanged={load} />}
       {tab === "metals" && <MetalsPanel itemId={id} metals={metals} onChanged={load} />}
       {tab === "costs" && <CostsPanel itemId={id} costs={costs} item={item} onChanged={load} />}
-      {tab === "preview3d" && <Visualize3DPanel item={item} stones={stones} />}
+      {tab === "preview3d" && (
+        <Visualize3DPanel item={item} stones={stones} onItemUpdated={load} />
+      )}
       {tab === "history" && <HistoryTimeline history={history} />}
 
       <SellItemModal
