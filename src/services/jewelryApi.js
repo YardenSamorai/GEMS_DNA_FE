@@ -102,6 +102,16 @@ export const addJewelryStone = (id, payload) =>
     body: JSON.stringify(payload),
   }).then(json);
 
+// Batch add — wraps the same endpoint with a `stones: [...]` payload so the
+// queue UI in StonesPanel can submit several picks (and same-SKU splits) in a
+// single round trip. The BE inserts atomically: any conflict aborts the batch.
+export const addJewelryStones = (id, stones) =>
+  fetch(`${API_BASE}/api/jewelry-items/${id}/stones`, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify({ stones }),
+  }).then(json);
+
 export const removeJewelryStone = (id, stoneId) =>
   fetch(`${API_BASE}/api/jewelry-items/${id}/stones/${stoneId}`, {
     method: "DELETE",
