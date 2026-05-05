@@ -154,6 +154,53 @@ export const sellJewelryItem = (id, payload) =>
     body: JSON.stringify(payload),
   }).then(json);
 
+/* ---------- Customer Preview: Shares + AI Mockups ----------
+ * The 3D-Preview tab has been retired in favour of a customer-facing flow:
+ *   - Share links: workshop generates a public URL with an opaque token
+ *     so the client can view the piece + approve / request changes /
+ *     comment, without ever signing in.
+ *   - AI mockups: prompt-driven photoreal renders via OpenAI's gpt-image-1,
+ *     stored on the item exactly like any uploaded photo.
+ * The public-side helpers (fetchPublicShare, respondToShare) hit the BE
+ * without auth headers — they're consumed by /share/:token, not the app.
+ */
+
+export const listJewelryShares = (id) =>
+  fetch(`${API_BASE}/api/jewelry-items/${id}/shares`).then(json);
+
+export const createJewelryShare = (id, payload = {}) =>
+  fetch(`${API_BASE}/api/jewelry-items/${id}/shares`, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  }).then(json);
+
+export const revokeJewelryShare = (id, shareId) =>
+  fetch(`${API_BASE}/api/jewelry-items/${id}/shares/${shareId}`, {
+    method: "DELETE",
+  }).then(json);
+
+export const listJewelryShareResponses = (id) =>
+  fetch(`${API_BASE}/api/jewelry-items/${id}/share-responses`).then(json);
+
+export const generateAiMockup = (id, payload) =>
+  fetch(`${API_BASE}/api/jewelry-items/${id}/ai-mockup`, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  }).then(json);
+
+// Public-side helpers used by the unauthenticated /share/:token page.
+export const fetchPublicShare = (token) =>
+  fetch(`${API_BASE}/api/share/${token}`).then(json);
+
+export const respondToShare = (token, payload) =>
+  fetch(`${API_BASE}/api/share/${token}/respond`, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  }).then(json);
+
 /* ---------- Constants ---------- */
 
 export const JEWELRY_STATUSES = [
@@ -189,6 +236,7 @@ export const JEWELRY_CATEGORIES = [
 export const FILE_KINDS = [
   { value: "sketch", label: "Sketch" },
   { value: "cad", label: "CAD" },
+  { value: "ai_mockup", label: "AI mockup" },
   { value: "progress", label: "Progress photo" },
   { value: "final", label: "Final photo" },
   { value: "video", label: "Video" },

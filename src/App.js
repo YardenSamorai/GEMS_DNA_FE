@@ -8,6 +8,7 @@ import OnboardingPage from "./pages/OnboardingPage";
 import { Toaster } from "react-hot-toast";
 import InventoryHub from "./pages/InventoryHub";
 import JewelryItemDetail from "./pages/jewelry/JewelryItemDetail";
+import CustomerSharePage from "./pages/share/CustomerSharePage";
 import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
@@ -434,6 +435,10 @@ function AppContent() {
           <Route path="/new" element={<HomeShortcut to="/crm/contacts?action=new" />} />
 
           {/* Fully public pages (no app chrome) */}
+          {/* Customer-facing preview & approval — opaque-token URL the
+              workshop sends to the buyer. Rendered outside <AppLayout> so
+              the customer never sees our sidebar / TopBar / Clerk gates. */}
+          <Route path="/share/:token" element={<CustomerSharePage />} />
           <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
           <Route path="/:stone_id" element={<DiamondCard />} />
         </Routes>
