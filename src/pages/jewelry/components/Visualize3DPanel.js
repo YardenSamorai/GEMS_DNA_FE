@@ -440,9 +440,22 @@ function ConfiguredStone({ shape, color, sizeMm, position = [0, 0, 0] }) {
 }
 
 /* ---------- Procedural placeholder ring (band + setting) ----------
- * Stones are now driven by props so the configurator lives outside the
- * model. The ring just defines the SLOTS — a centre slot at y=1.18 and
- * two side slots flanking it. */
+ *
+ * Proportions matter — the previous version had a 0.18-radius band tube
+ * that read as a bracelet and a setting floating 1.2 units above the
+ * band, with a "seat" torus that made every stone look like a tiny ring
+ * of its own. This rewrite mirrors how a real solitaire is built:
+ *
+ *   - Band cross-section is a thin torus (tube ~ 1mm equivalent in the
+ *     scene), proportioned for a finger ring of ~18mm inner diameter.
+ *   - The setting (head) sits ON TOP of the band with no visible gap —
+ *     we lift the centre stone just enough that its bottom culet kisses
+ *     the band's outer surface.
+ *   - Prongs are 4 short, slightly-angled-inward cylinders that hug the
+ *     stone's girdle from below; no separate "seat torus" any more.
+ *   - Side stones in the three-stone variant sit directly on the band
+ *     too, with their own micro-prongs — never wrapped in a seat ring.
+ */
 function PlaceholderRing({ metal, autoRotate, centerCfg, sideCfg }) {
   const groupRef = useRef();
   useFrame((_, delta) => {
@@ -450,59 +463,108 @@ function PlaceholderRing({ metal, autoRotate, centerCfg, sideCfg }) {
   });
   const m = METALS[metal].material;
 
+  // Band geometry: radius 1 ≈ 18mm inner diameter, tube 0.06 ≈ 1.1mm thick
+  // shank — "delicate solitaire" proportions, not chunky.
+  const BAND_RADIUS = 1;
+  const BAND_TUBE = 0.06;
+
+  // Centre stone vertical placement: stone radius from mm + bottom culet
+  // of the cut sits ON the band's top surface (y = BAND_TUBE).
+  const centerR = (centerCfg.sizeMm * 0.055) / 2;
+  const centerY = BAND_TUBE + centerR * 0.55; // pavilion height ≈ 0.55 of radius
+
+  // Centre prongs: 4 thin posts reaching from band up to the girdle of
+  // the stone, slightly tilted inward so they actually GRIP it.
+  const prongCount = 4;
+  const prongHeight = centerR * 0.7;
+  const prongMidY = BAND_TUBE + prongHeight / 2;
+  const prongInnerR = centerR * 0.85; // top of prong, hugs the girdle
+  const prongOuterR = centerR * 1.05; // base of prong, sits on band
+
+  // Side stones: smaller, also seated on the band, with their own micro-prongs.
+  const sideR = (sideCfg.sizeMm * 0.055) / 2;
+  const sideY = BAND_TUBE + sideR * 0.55;
+  // Place side stones along the band's "top" (y=BAND_TUBE), spaced by
+  // centre+side radii + small gap so the stones don't overlap.
+  const sideOffsetX = centerR + sideR + 0.04;
+
   return (
     <group ref={groupRef}>
       {/* Band */}
       <mesh castShadow receiveShadow rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1, 0.18, 64, 200]} />
-        <meshStandardMaterial {...m} envMapIntensity={1.2} />
+        <torusGeometry args={[BAND_RADIUS, BAND_TUBE, 32, 200]} />
+        <meshStandardMaterial {...m} envMapIntensity={1.3} />
       </mesh>
 
-      {/* Centre prongs — 4 cylinders reaching up to the stone */}
-      {[0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((theta, i) => (
-        <mesh
-          key={i}
-          position={[Math.cos(theta) * 0.32, 1.05, Math.sin(theta) * 0.32]}
-          castShadow
-        >
-          <cylinderGeometry args={[0.04, 0.06, 0.5, 12]} />
-          <meshStandardMaterial {...m} envMapIntensity={1.2} />
-        </mesh>
-      ))}
-
-      {/* Centre seat ring */}
-      <mesh position={[0, 0.88, 0]} castShadow>
-        <torusGeometry args={[0.4, 0.05, 32, 64]} />
-        <meshStandardMaterial {...m} envMapIntensity={1.2} />
-      </mesh>
+      {/* Centre prongs — slim, slightly tapered, top is closer to centre */}
+      {Array.from({ length: prongCount }).map((_, i) => {
+        const theta = (i / prongCount) * Math.PI * 2 + Math.PI / prongCount;
+        const baseX = Math.cos(theta) * prongOuterR;
+        const baseZ = Math.sin(theta) * prongOuterR;
+        const tipX = Math.cos(theta) * prongInnerR;
+        const tipZ = Math.sin(theta) * prongInnerR;
+        // Position at midpoint
+        const px = (baseX + tipX) / 2;
+        const pz = (baseZ + tipZ) / 2;
+        // Compute rotation so the cylinder points from base to tip
+        const dx = tipX - baseX;
+        const dy = prongHeight;
+        const dz = tipZ - baseZ;
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        // Default cylinder is along +Y. We want it along (dx, dy, dz)/len.
+        // Build a quaternion that rotates +Y to that direction.
+        const dir = new THREE.Vector3(dx, dy, dz).normalize();
+        const up = new THREE.Vector3(0, 1, 0);
+        const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
+        return (
+          <mesh
+            key={i}
+            position={[px, prongMidY, pz]}
+            quaternion={quat}
+            castShadow
+          >
+            <cylinderGeometry args={[centerR * 0.06, centerR * 0.08, len, 12]} />
+            <meshStandardMaterial {...m} envMapIntensity={1.3} />
+          </mesh>
+        );
+      })}
 
       {/* Centre stone */}
-      <ConfiguredStone {...centerCfg} position={[0, 1.2, 0]} />
+      <ConfiguredStone {...centerCfg} position={[0, centerY, 0]} />
 
-      {/* Side stones (three-stone setting) — half size, flank centre */}
+      {/* Side stones (three-stone setting) — same approach, smaller scale */}
       {sideCfg.enabled && (
         <>
+          {/* Side stones themselves */}
           <ConfiguredStone
             shape={sideCfg.shape}
             color={sideCfg.color}
             sizeMm={sideCfg.sizeMm}
-            position={[-0.78, 1.0, 0]}
+            position={[-sideOffsetX, sideY, 0]}
           />
           <ConfiguredStone
             shape={sideCfg.shape}
             color={sideCfg.color}
             sizeMm={sideCfg.sizeMm}
-            position={[0.78, 1.0, 0]}
+            position={[sideOffsetX, sideY, 0]}
           />
-          {/* Tiny seats for the side stones */}
-          <mesh position={[-0.78, 0.78, 0]} castShadow>
-            <torusGeometry args={[0.18, 0.035, 16, 32]} />
-            <meshStandardMaterial {...m} envMapIntensity={1.2} />
-          </mesh>
-          <mesh position={[0.78, 0.78, 0]} castShadow>
-            <torusGeometry args={[0.18, 0.035, 16, 32]} />
-            <meshStandardMaterial {...m} envMapIntensity={1.2} />
-          </mesh>
+          {/* Two micro-prongs per side stone — front + back so the stone
+              looks gripped without obscuring it from the typical viewing
+              angle. */}
+          {[-sideOffsetX, sideOffsetX].map((cx) => (
+            <React.Fragment key={cx}>
+              {[-1, 1].map((zSign) => (
+                <mesh
+                  key={zSign}
+                  position={[cx, BAND_TUBE + sideR * 0.4, zSign * sideR * 0.85]}
+                  castShadow
+                >
+                  <cylinderGeometry args={[sideR * 0.08, sideR * 0.1, sideR * 0.7, 10]} />
+                  <meshStandardMaterial {...m} envMapIntensity={1.3} />
+                </mesh>
+              ))}
+            </React.Fragment>
+          ))}
         </>
       )}
     </group>
@@ -610,7 +672,7 @@ const Visualize3DPanel = ({ item, stones }) => {
         <Canvas
           shadows
           dpr={[1, 2]}
-          camera={{ position: [2.4, 1.8, 3.4], fov: 35 }}
+          camera={{ position: [1.6, 1.0, 2.4], fov: 35 }}
           style={{ height: 480, width: "100%" }}
         >
           <RingScene
@@ -621,8 +683,8 @@ const Visualize3DPanel = ({ item, stones }) => {
           />
           <OrbitControls
             enablePan={false}
-            minDistance={2.2}
-            maxDistance={7}
+            minDistance={1.4}
+            maxDistance={5}
             minPolarAngle={Math.PI / 6}
             maxPolarAngle={(2 * Math.PI) / 3}
           />
