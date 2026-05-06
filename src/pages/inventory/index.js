@@ -6254,109 +6254,148 @@ const StoneSearchPage = () => {
    * which is why the data layer is intentionally plain: header row, body
    * rows, autofilter, frozen header. Pricing is shown in raw form (no
    * "$ N/A" placeholders), URL columns are written as clickable hyperlinks. */
-  const exportToInternalExcel = async (chosenColumns, customStones = null) => {
-    const data = customStones || allItems.filter((s) => selectedStones.has(s.id));
-    if (data.length === 0) {
-      alert("Please select at least one stone to export.");
-      return;
-    }
-    if (!chosenColumns || chosenColumns.length === 0) {
-      alert("Please pick at least one column.");
-      return;
-    }
+  /* =========================================================================
+   *  Internal Excel — multi-sheet exporter
+   * =========================================================================
+   *
+   * Splits the user's selection into Diamond / Gemstone / Jewelry buckets and
+   * produces ONE workbook with up to three sheets. Each sheet uses the column
+   * set the user picked for that type in InternalExcelModal — so a mixed
+   * export ("4 diamonds + 3 emeralds + 2 rings") gets each item rendered with
+   * the columns appropriate to it.
+   *
+   * `selections` shape: { diamond?: { sheetName, columns }, gemstone?: {...},
+   * jewelry?: {...} }. Empty types are simply skipped.
+   */
 
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = "Gemstar (Internal)";
-    workbook.created = new Date();
-    const sheet = workbook.addWorksheet("Stones", {
+  // Tag each item with the bucket it belongs to. We treat anything coming
+  // from /api/jewelry as a jewelry item (those have category === "Jewelry"
+  // because of fetchJewelry); the rest are split via getMappedCategories.
+  const _bucketFor = (item) => {
+    if ((item?.category || "").toLowerCase() === "jewelry" || item?.jewelryType) {
+      return "jewelry";
+    }
+    const mapped = getMappedCategories(item?.category);
+    if (mapped.includes("Diamond")) return "diamond";
+    return "gemstone";
+  };
+
+  const _renderStoneCell = (key, stone, idx) => {
+    const DNA_BASE = "https://gems-dna.com";
+    switch (key) {
+      case "num": return idx + 1;
+      case "sku": return stone.sku || "";
+      case "pairSku": return stone.pairSku || "";
+      case "shape": return stone.shape || "";
+      case "category": return stone.category || stone.stoneType || "";
+      case "type": return stone.type || "";
+      case "weight":
+        return stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt) : "";
+      case "color": return getDisplayColor(stone) || "";
+      case "clarity": return stone.clarity || "";
+      case "measurements": return stone.measurements || "";
+      case "ratio":
+        return stone.ratio != null && stone.ratio !== "" ? Number(Number(stone.ratio).toFixed(2)) : "";
+      case "fancyIntensity": return stone.fancyIntensity || "";
+      case "fancyColor": return stone.fancyColor || "";
+      case "fancyOvertone": return stone.fancyOvertone || "";
+      case "fancyColor2": return stone.fancyColor2 || "";
+      case "fancyOvertone2": return stone.fancyOvertone2 || "";
+      case "cut": return stone.cut || "";
+      case "polish": return stone.polish || "";
+      case "symmetry": return stone.symmetry || "";
+      case "tablePercent":
+        return stone.tablePercent != null && stone.tablePercent !== "" ? Number(stone.tablePercent) : "";
+      case "depthPercent":
+        return stone.depthPercent != null && stone.depthPercent !== "" ? Number(stone.depthPercent) : "";
+      case "treatment": return stone.treatment || "";
+      case "certComments": return stone.certComments || "";
+      case "origin":
+        return stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : "";
+      case "lab":
+        return stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : "";
+      case "fluorescence": return stone.fluorescence || "";
+      case "pricePerCt":
+        return stone.pricePerCt != null && stone.pricePerCt !== "" ? Number(stone.pricePerCt) : "";
+      case "priceTotal":
+        return stone.priceTotal != null && stone.priceTotal !== "" ? Number(stone.priceTotal) : "";
+      case "rapPrice": return stone.rapPrice != null && stone.rapPrice !== "" ? Number(stone.rapPrice) : "";
+      case "rapListPrice":
+        return stone.rapListPrice != null && stone.rapListPrice !== "" ? Number(stone.rapListPrice) : "";
+      case "branch": return stone.branch || "";
+      case "exactLocation": return stone.exactLocation || "";
+      case "box": return stone.box || "";
+      case "groupingType": return stone.groupingType || "";
+      case "stonesCount":
+        return stone.stones != null && stone.stones !== "" ? Number(stone.stones) : "";
+      case "homePage": return stone.homePage || "";
+      case "tradeShow": return stone.tradeShow || "";
+      case "certificateNumber": return stone.certificateNumber || "";
+      case "certificate": return stone.certificateUrl || "";
+      case "certificateImageJpg": return stone.certificateImageJpg || "";
+      case "image": return stone.imageUrl || "";
+      case "additionalPictures": return stone.additionalPictures || "";
+      case "video": return stone.videoUrl || stone.videoLink || "";
+      case "updatedAt": return stone.updatedAt || "";
+      case "dna":
+        return stone.sku
+          ? { text: `View DNA · ${stone.sku}`, hyperlink: `${DNA_BASE}/${stone.sku}` }
+          : "";
+      // Jewelry-specific
+      case "stockNumber": return stone.stockNumber || "";
+      case "title": return stone.title || "";
+      case "jewelryType": return stone.jewelryType || "";
+      case "style": return stone.style || "";
+      case "collection": return stone.collection || "";
+      case "metalType": return stone.metalType || "";
+      case "jewelryWeight":
+        return stone.jewelryWeight != null && stone.jewelryWeight !== "" ? Number(stone.jewelryWeight) : "";
+      case "jewelrySize": return stone.jewelrySize || "";
+      case "totalCarat":
+        return stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt) : "";
+      case "stoneType": return stone.stoneType || "";
+      case "centerStoneCarat":
+        return stone.centerStoneCarat != null && stone.centerStoneCarat !== "" ? Number(stone.centerStoneCarat) : "";
+      case "currency": return stone.currency || "";
+      case "availability": return stone.availability || "";
+      case "shippingFrom": return stone.shippingFrom || "";
+      default: return "";
+    }
+  };
+
+  const _writeSheet = (workbook, sheetName, columns, items) => {
+    const sheet = workbook.addWorksheet(sheetName, {
       views: [{ state: "frozen", ySplit: 1 }],
     });
-
-    sheet.columns = chosenColumns.map((c) => ({
+    sheet.columns = columns.map((c) => ({
       key: c.key,
       header: c.header,
       width: c.width || 14,
     }));
 
-    // Style the header row a bit so it's distinguishable, but keep it neutral
     const header = sheet.getRow(1);
     header.font = { bold: true, color: { argb: "FFFFFFFF" } };
     header.alignment = { vertical: "middle", horizontal: "left" };
     header.height = 22;
     header.eachCell((cell) => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-      cell.border = {
-        bottom: { style: "thin", color: { argb: "FF374151" } },
-      };
+      cell.border = { bottom: { style: "thin", color: { argb: "FF374151" } } };
     });
 
-    // Always point DNA links at the public production page (not the dev
-    // origin) so an Excel exported locally still works for everyone.
-    const DNA_BASE = "https://gems-dna.com";
-    const urlKeys = new Set(["certificate", "image", "video"]);
+    const urlKeys = new Set([
+      "certificate", "certificateImageJpg", "image", "additionalPictures", "video",
+    ]);
+    const moneyKeys = new Set(["pricePerCt", "priceTotal", "rapListPrice"]);
 
-    data.forEach((stone, idx) => {
-      const row = {};
-      chosenColumns.forEach((col) => {
-        switch (col.key) {
-          case "num": row.num = idx + 1; break;
-          case "sku": row.sku = stone.sku || ""; break;
-          case "pairSku": row.pairSku = stone.pairSku || ""; break;
-          case "shape": row.shape = stone.shape || ""; break;
-          case "category": row.category = stone.category || stone.stoneType || ""; break;
-          case "weight":
-            row.weight = stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt) : "";
-            break;
-          case "color": row.color = getDisplayColor(stone) || ""; break;
-          case "clarity": row.clarity = stone.clarity || ""; break;
-          case "measurements": row.measurements = stone.measurements || ""; break;
-          case "ratio":
-            row.ratio = stone.ratio != null && stone.ratio !== "" ? Number(Number(stone.ratio).toFixed(2)) : "";
-            break;
-          case "fancyIntensity": row.fancyIntensity = stone.fancyIntensity || ""; break;
-          case "fancyColor": row.fancyColor = stone.fancyColor || ""; break;
-          case "fancyOvertone": row.fancyOvertone = stone.fancyOvertone || ""; break;
-          case "fancyColor2": row.fancyColor2 = stone.fancyColor2 || ""; break;
-          case "fancyOvertone2": row.fancyOvertone2 = stone.fancyOvertone2 || ""; break;
-          case "cut": row.cut = stone.cut || ""; break;
-          case "polish": row.polish = stone.polish || ""; break;
-          case "symmetry": row.symmetry = stone.symmetry || ""; break;
-          case "tablePercent": row.tablePercent = stone.tablePercent || ""; break;
-          case "depthPercent": row.depthPercent = stone.depthPercent || ""; break;
-          case "treatment": row.treatment = stone.treatment || ""; break;
-          case "origin":
-            row.origin = stone.origin && stone.origin.toUpperCase() !== "N/A" ? stone.origin : "";
-            break;
-          case "lab":
-            row.lab = stone.lab && stone.lab.toUpperCase() !== "N/A" ? stone.lab : "";
-            break;
-          case "fluorescence": row.fluorescence = stone.fluorescence || ""; break;
-          case "pricePerCt":
-            row.pricePerCt = stone.pricePerCt != null && stone.pricePerCt !== "" ? Number(stone.pricePerCt) : "";
-            break;
-          case "priceTotal":
-            row.priceTotal = stone.priceTotal != null && stone.priceTotal !== "" ? Number(stone.priceTotal) : "";
-            break;
-          case "rapPrice": row.rapPrice = stone.rapPrice || ""; break;
-          case "location": row.location = stone.location || ""; break;
-          // DNA cell shows "View DNA · SKU" as the visible label but the
-          // hyperlink underneath is the full public URL.
-          case "dna":
-            row.dna = stone.sku
-              ? { text: `View DNA · ${stone.sku}`, hyperlink: `${DNA_BASE}/${stone.sku}` }
-              : "";
-            break;
-          case "certificate": row.certificate = stone.certificateUrl || ""; break;
-          case "image": row.image = stone.imageUrl || ""; break;
-          case "video": row.video = stone.videoUrl || stone.videoLink || ""; break;
-          default: row[col.key] = "";
-        }
+    items.forEach((stone, idx) => {
+      const rowObj = {};
+      columns.forEach((col) => {
+        rowObj[col.key] = _renderStoneCell(col.key, stone, idx);
       });
-
-      const r = sheet.addRow(row);
+      const r = sheet.addRow(rowObj);
       r.alignment = { vertical: "middle" };
       r.eachCell((cell, colNumber) => {
-        const colKey = chosenColumns[colNumber - 1]?.key;
+        const colKey = columns[colNumber - 1]?.key;
         if (urlKeys.has(colKey) && cell.value) {
           cell.value = { text: String(cell.value), hyperlink: String(cell.value) };
           cell.font = { color: { argb: "FF2563EB" }, underline: true };
@@ -6364,7 +6403,7 @@ const StoneSearchPage = () => {
         if (colKey === "dna" && cell.value && typeof cell.value === "object") {
           cell.font = { color: { argb: "FF2563EB" }, underline: true };
         }
-        if (colKey === "pricePerCt" || colKey === "priceTotal") {
+        if (moneyKeys.has(colKey)) {
           cell.numFmt = '"$"#,##0.00';
         }
         if (idx % 2 === 1) {
@@ -6373,13 +6412,64 @@ const StoneSearchPage = () => {
       });
     });
 
-    // Autofilter on the whole used range so the user can sort/filter on open
-    const lastCol = String.fromCharCode(64 + chosenColumns.length);
-    sheet.autoFilter = `A1:${lastCol}${data.length + 1}`;
+    if (columns.length && items.length) {
+      // ExcelJS uses 1-based column indices; convert to letter (A..Z, AA, AB…)
+      const colToLetter = (n) => {
+        let s = "";
+        let x = n;
+        while (x > 0) {
+          const r = (x - 1) % 26;
+          s = String.fromCharCode(65 + r) + s;
+          x = Math.floor((x - 1) / 26);
+        }
+        return s;
+      };
+      const lastCol = colToLetter(columns.length);
+      sheet.autoFilter = `A1:${lastCol}${items.length + 1}`;
+    }
+  };
+
+  const exportToInternalExcel = async (selections, customStones = null) => {
+    const data = customStones || allItems.filter((s) => selectedStones.has(s.id));
+    if (!data.length) {
+      alert("Please select at least one stone to export.");
+      return;
+    }
+    if (!selections || typeof selections !== "object" || !Object.keys(selections).length) {
+      alert("Please pick at least one column for at least one category.");
+      return;
+    }
+
+    // Bucket items by type so each goes into its own sheet
+    const buckets = { diamond: [], gemstone: [], jewelry: [] };
+    data.forEach((item) => {
+      const b = _bucketFor(item);
+      if (buckets[b]) buckets[b].push(item);
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Gemstar (Internal)";
+    workbook.created = new Date();
+
+    let totalRows = 0;
+    let sheetsWritten = 0;
+    for (const typeId of ["diamond", "gemstone", "jewelry"]) {
+      const sel = selections[typeId];
+      const items = buckets[typeId] || [];
+      if (!sel || !sel.columns?.length || !items.length) continue;
+      _writeSheet(workbook, sel.sheetName || typeId, sel.columns, items);
+      totalRows += items.length;
+      sheetsWritten += 1;
+    }
+
+    if (!sheetsWritten) {
+      alert("No matching items for the selected column sets.");
+      return;
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     const exportDate = new Date().toISOString().split("T")[0];
-    const filename = `Internal_Export_${exportDate}_${data.length}pcs.xlsx`;
+    const filename = `Internal_Export_${exportDate}_${totalRows}pcs.xlsx`;
     saveAs(new Blob([buffer]), filename);
   };
 
@@ -6448,9 +6538,13 @@ const StoneSearchPage = () => {
           measurements: row.measurements ?? "",
           priceTotal: row.priceTotal != null ? Number(row.priceTotal) : null,
           pricePerCt: row.pricePerCt != null ? Number(row.pricePerCt) : null,
+          rapListPrice: row.rapListPrice != null ? Number(row.rapListPrice) : null,
           imageUrl: row.imageUrl ?? null,
+          additionalPictures: row.additionalPictures ?? "",
           videoUrl: row.videoUrl ?? null,
+          additionalVideos: row.additionalVideos ?? "",
           certificateUrl: row.certificateUrl ?? null,
+          certificateImageJpg: row.certificateImageJpg ?? null,
           lab: (row.lab && row.lab.toUpperCase() !== 'N/A') ? row.lab : null,
           origin: (row.origin && row.origin.toUpperCase() !== 'N/A') ? row.origin : null,
           ratio: row.ratio != null && row.ratio !== "" ? Number(row.ratio) : null,
@@ -6459,9 +6553,14 @@ const StoneSearchPage = () => {
           luster: row.luster ?? "",
           fluorescence: row.fluorescence ?? "",
           certificateNumber: row.certificateNumber ?? "",
+          certComments: row.certComments ?? "",
           treatment: row.treatment ?? "",
           category: row.category ?? "",
+          type: row.type ?? "",
+          // 📍 Location — three layers (location kept for back-compat = branch)
           location: row.location ?? "",
+          branch: row.branch ?? "",
+          exactLocation: row.exactLocation ?? "",
           // Diamond-specific fields
           cut: row.cut ?? "",
           polish: row.polish ?? "",
@@ -6477,10 +6576,15 @@ const StoneSearchPage = () => {
           fancyOvertone2: row.fancyOvertone2 ?? "",
           // Pair stone
           pairSku: row.pairSku ?? null,
-          // Grouping
+          // Grouping & inventory layout
           groupingType: row.groupingType ?? "",
           box: row.box ?? "",
           stones: row.stones != null ? Number(row.stones) : null,
+          // Marketing
+          homePage: row.homePage ?? "",
+          tradeShow: row.tradeShow ?? "",
+          // Sync
+          updatedAt: row.updatedAt ?? null,
         }));
         setStones(normalized);
         // Pull workshop status for every SKU in one call so the grid can show
@@ -7901,14 +8005,29 @@ const StoneSearchPage = () => {
         )}
       </AnimatePresence>
 
-      {/* Internal Excel — column picker for back-office exports */}
+      {/* Internal Excel — per-type column picker for back-office exports.
+          Counts feed the modal so empty tabs are disabled and the right
+          starting tab is auto-selected. */}
       <InternalExcelModal
         isOpen={showInternalExcelModal}
         onClose={() => setShowInternalExcelModal(false)}
-        selectedCount={selectedStones.size}
-        onExport={(chosenColumns) =>
+        counts={(() => {
+          const sel = applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)));
+          const c = { diamond: 0, gemstone: 0, jewelry: 0 };
+          sel.forEach((it) => {
+            if ((it?.category || "").toLowerCase() === "jewelry" || it?.jewelryType) {
+              c.jewelry += 1;
+            } else if (getMappedCategories(it?.category).includes("Diamond")) {
+              c.diamond += 1;
+            } else {
+              c.gemstone += 1;
+            }
+          });
+          return c;
+        })()}
+        onExport={(selections) =>
           exportToInternalExcel(
-            chosenColumns,
+            selections,
             applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))
           )
         }
