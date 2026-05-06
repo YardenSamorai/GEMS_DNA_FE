@@ -7133,8 +7133,11 @@ const StoneSearchPage = () => {
                         </svg>
                       </button>
                       
-                      {/* Mobile Dropdown Menu - opens upward */}
-                      <div className="absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
+                      {/* Mobile Dropdown Menu — opens downward with internal
+                          scroll so it never overflows the iPhone viewport.
+                          (Earlier `bottom-full` upward layout clipped the
+                          first item once we added the 7th entry.) */}
+                      <div className="absolute right-0 top-full mt-2 w-56 max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200">
                         <button
                           onClick={handleExportClick}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
@@ -7224,8 +7227,9 @@ const StoneSearchPage = () => {
                       </svg>
                     </button>
                     
-                    {/* Actions Dropdown Menu */}
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200 overflow-hidden">
+                    {/* Actions Dropdown Menu — capped height + scroll so a
+                        short laptop window doesn't clip CRM / labels rows. */}
+                    <div className="absolute right-0 mt-2 w-56 max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200">
                       {/* Export Section */}
                       <div className="px-3 py-2 bg-stone-50 border-b border-stone-200">
                         <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Export</span>
@@ -7770,8 +7774,12 @@ const StoneSearchPage = () => {
                 </svg>
               </button>
               
-              {/* Floating Actions Dropdown - appears above */}
-              <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-stone-200 overflow-hidden">
+              {/* Floating Actions Dropdown — appears above the FAB. We keep
+                  the upward direction (no room below — FAB lives at
+                  bottom-right of the viewport) but cap the height + allow
+                  scroll so the menu never punches above the status bar on
+                  small screens. */}
+              <div className="absolute bottom-full right-0 mb-2 w-56 max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-stone-200">
                 {/* Export Section */}
                 <div className="px-3 py-2 bg-stone-50 border-b border-stone-200">
                   <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Export</span>
