@@ -941,13 +941,21 @@ export default function CustomerProfile() {
       fetchTasks(userId, { contactId: id }).catch(() => []),
     ])
       .then(([c, d, inv, occ, intr, jw, tk]) => {
+        // Each list helper returns its server payload as-is. Most CRM
+        // endpoints emit a bare array (`result.rows`), but jewelry-items
+        // is the lone exception that wraps as `{ items: [...] }`. Guard
+        // every slot with Array.isArray so a single drift in any one
+        // endpoint can't blank the page (this was the cause of the
+        // "m.forEach is not a function" crash in the activity timeline).
         setContact(c);
-        setDeals(d || []);
-        setInvoices(inv || []);
-        setOccasions(occ || []);
-        setInteractions(intr || []);
-        setJewelryItems(jw || []);
-        setTasks(tk || []);
+        setDeals(Array.isArray(d) ? d : []);
+        setInvoices(Array.isArray(inv) ? inv : []);
+        setOccasions(Array.isArray(occ) ? occ : []);
+        setInteractions(Array.isArray(intr) ? intr : []);
+        setJewelryItems(
+          Array.isArray(jw) ? jw : Array.isArray(jw?.items) ? jw.items : []
+        );
+        setTasks(Array.isArray(tk) ? tk : []);
       })
       .finally(() => setLoading(false));
   }, [userId, id]);
