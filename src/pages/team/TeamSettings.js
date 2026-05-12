@@ -165,47 +165,59 @@ const TeamSettings = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6">
-      <header className="flex items-start justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-800">Team & Sales Reps</h1>
-          <p className="text-stone-500 text-sm mt-0.5">
-            Invite up to 10 reps. Each rep sees only the contacts, deals, and jewelry items they're assigned to.
-          </p>
+    <div className="max-w-6xl mx-auto p-3 sm:p-6">
+      <header className="mb-5 sm:mb-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-stone-800 leading-tight">
+              Team &amp; Sales Reps
+            </h1>
+            <p className="text-stone-500 text-xs sm:text-sm mt-1">
+              Invite up to 10 reps. Each rep sees only the contacts, deals, and jewelry items they're assigned to.
+            </p>
+          </div>
+          <div className="hidden sm:block text-right text-xs text-stone-500 shrink-0">
+            <div className="text-2xl font-bold text-stone-800">{(team.members || []).length}</div>
+            <div>of {cap} seats used</div>
+          </div>
         </div>
-        <div className="text-right text-xs text-stone-500">
-          <div className="text-2xl font-bold text-stone-800">{(team.members || []).length}</div>
-          <div>of {cap} seats used</div>
+        <div className="sm:hidden mt-2.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-medium text-stone-700 ring-1 ring-stone-200">
+            <span className="text-stone-900 font-bold">{(team.members || []).length}</span>
+            <span className="text-stone-500">/ {cap} seats used</span>
+          </span>
         </div>
       </header>
 
-      <div className="grid sm:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5 sm:mb-6">
         <StatCard
           label="Active reps"
           value={reps.filter((m) => m.active).length}
           accent="emerald"
         />
         <StatCard
-          label="Pending sign-in"
+          label="Pending"
+          fullLabel="Pending sign-in"
           value={reps.filter((m) => !m.clerk_user_id).length}
           accent="amber"
         />
         <StatCard
-          label="Seats remaining"
+          label="Seats left"
+          fullLabel="Seats remaining"
           value={remaining}
           accent="sky"
         />
       </div>
 
-      <section className="mb-6">
+      <section className="mb-5 sm:mb-6">
         {!showInvite ? (
           <button
             onClick={() => setShowInvite(true)}
             disabled={remaining <= 0}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium shadow-sm transition ${
+            className={`inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg px-4 py-2.5 sm:py-2 text-sm font-medium shadow-sm transition ${
               remaining <= 0
                 ? "bg-stone-100 text-stone-400 cursor-not-allowed"
-                : "bg-emerald-600 text-white hover:bg-emerald-700"
+                : "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800"
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -218,36 +230,38 @@ const TeamSettings = () => {
             onSubmit={handleInvite}
             className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
           >
-            <div className="grid md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <Field label="Full name" required>
                 <input name="name" required placeholder="Liora Cohen"
+                  autoComplete="off"
                   className="input-base" />
               </Field>
               <Field label="Email" required>
                 <input name="email" type="email" required placeholder="liora@example.com"
+                  autoComplete="off"
                   className="input-base" />
               </Field>
               <Field label="Commission %">
-                <input name="commissionPct" type="number" step="0.5" min="0" max="100" placeholder="10"
+                <input name="commissionPct" type="number" inputMode="decimal" step="0.5" min="0" max="100" placeholder="10"
                   className="input-base" />
               </Field>
               <Field label="Monthly quota (USD)">
-                <input name="quotaMonthly" type="number" step="100" min="0" placeholder="20000"
+                <input name="quotaMonthly" type="number" inputMode="numeric" step="100" min="0" placeholder="20000"
                   className="input-base" />
               </Field>
             </div>
-            <p className="text-[11px] text-stone-500 mt-2">
+            <p className="text-[11px] text-stone-500 mt-2 leading-relaxed">
               The rep will be linked automatically the first time they sign in with this email.
             </p>
-            <div className="flex justify-end gap-2 mt-3">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3">
               <button type="button" onClick={() => setShowInvite(false)}
-                className="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50">
+                className="rounded-lg px-3 py-2 sm:py-1.5 text-sm text-stone-600 hover:bg-stone-50 border border-stone-200 sm:border-0">
                 Cancel
               </button>
               <button
                 type="submit" disabled={inviting}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm transition ${
-                  inviting ? "bg-emerald-400 cursor-wait" : "bg-emerald-600 hover:bg-emerald-700"
+                className={`rounded-lg px-3 py-2 sm:py-1.5 text-sm font-medium text-white shadow-sm transition ${
+                  inviting ? "bg-emerald-400 cursor-wait" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800"
                 }`}
               >
                 {inviting ? "Inviting…" : "Invite"}
@@ -257,135 +271,267 @@ const TeamSettings = () => {
         )}
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
-        <table className="min-w-full divide-y divide-stone-200">
-          <thead className="bg-stone-50">
-            <tr className="text-[11px] uppercase tracking-wider text-stone-500">
-              <th className="px-4 py-2 text-left font-medium">Member</th>
-              <th className="px-3 py-2 text-left font-medium">Role</th>
-              <th className="px-3 py-2 text-left font-medium">Commission</th>
-              <th className="px-3 py-2 text-left font-medium">Quota</th>
-              <th className="px-3 py-2 text-left font-medium">Won (MTD)</th>
-              <th className="px-3 py-2 text-left font-medium">Pipeline</th>
-              <th className="px-3 py-2 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100 text-sm">
-            {[owner, ...reps].filter(Boolean).map((m) => {
-              const lb = leaderboard.find((x) => x.memberId === m.id) || {};
-              const isEditing = editingId === m.id;
-              return (
-                <tr key={m.id} className="hover:bg-stone-50/60">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <MemberAvatar member={m} size="md" />
-                      <div className="min-w-0">
-                        {isEditing ? (
-                          <input
-                            value={draft.name}
-                            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                            className="input-base w-44"
-                          />
-                        ) : (
-                          <div className="font-semibold text-stone-800 truncate">{m.name}</div>
-                        )}
-                        <div className="text-xs text-stone-500 truncate">{m.email}</div>
-                        {!m.clerk_user_id && m.role !== "owner" && <PendingBadge />}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3"><RoleBadge role={m.role} /></td>
-                  <td className="px-3 py-3">
-                    {isEditing ? (
-                      <input
-                        type="number" step="0.5" min="0" max="100"
-                        value={draft.commissionPct}
-                        onChange={(e) => setDraft((d) => ({ ...d, commissionPct: e.target.value }))}
-                        className="input-base w-20"
-                      />
-                    ) : (
-                      <span className="text-stone-700">{Number(m.commission_pct || 0)}%</span>
+      <section className="md:hidden space-y-3">
+        {[owner, ...reps].filter(Boolean).map((m) => {
+          const lb = leaderboard.find((x) => x.memberId === m.id) || {};
+          const isEditing = editingId === m.id;
+          return (
+            <div
+              key={m.id}
+              className="rounded-xl border border-stone-200 bg-white shadow-sm p-4"
+            >
+              <div className="flex items-start gap-3">
+                <MemberAvatar member={m} size="md" />
+                <div className="flex-1 min-w-0">
+                  {isEditing ? (
+                    <input
+                      value={draft.name}
+                      onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                      className="input-base"
+                    />
+                  ) : (
+                    <div className="font-semibold text-stone-800 truncate">{m.name}</div>
+                  )}
+                  <div className="text-xs text-stone-500 truncate">{m.email}</div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <RoleBadge role={m.role} />
+                    {!m.clerk_user_id && m.role !== "owner" && <PendingBadge />}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-3 pt-3 border-t border-stone-100">
+                <MobileStat label="Commission">
+                  {isEditing ? (
+                    <input
+                      type="number" step="0.5" min="0" max="100"
+                      value={draft.commissionPct}
+                      onChange={(e) => setDraft((d) => ({ ...d, commissionPct: e.target.value }))}
+                      className="input-base"
+                    />
+                  ) : (
+                    <span className="text-stone-800 font-medium text-sm">
+                      {Number(m.commission_pct || 0)}%
+                    </span>
+                  )}
+                </MobileStat>
+                <MobileStat label="Quota / mo">
+                  {isEditing ? (
+                    <input
+                      type="number" step="100" min="0"
+                      value={draft.quotaMonthly}
+                      onChange={(e) => setDraft((d) => ({ ...d, quotaMonthly: e.target.value }))}
+                      className="input-base"
+                    />
+                  ) : (
+                    <span className="text-stone-800 font-medium text-sm">
+                      {fmtMoney(m.quota_monthly)}
+                    </span>
+                  )}
+                </MobileStat>
+                <MobileStat label="Won (MTD)">
+                  <div className="text-stone-800 font-medium text-sm">
+                    {fmtMoney(lb.revenueMtd)}
+                  </div>
+                  <div className="text-[10px] text-stone-500 leading-tight">
+                    {lb.wonDealsMtd || 0} deal{lb.wonDealsMtd === 1 ? "" : "s"}
+                    {lb.quotaPct != null && ` · ${lb.quotaPct}% quota`}
+                  </div>
+                </MobileStat>
+                <MobileStat label="Pipeline">
+                  <div className="text-stone-800 font-medium text-sm">
+                    {lb.assignedContacts || 0} contacts
+                  </div>
+                  <div className="text-[10px] text-stone-500 leading-tight">
+                    {lb.jewelryInProgress || 0} jewelry in progress
+                  </div>
+                </MobileStat>
+              </div>
+
+              <div className="flex gap-2 mt-3 pt-3 border-t border-stone-100">
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={() => saveEdit(m)}
+                      className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 active:bg-emerald-800"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-xs text-stone-600 hover:bg-stone-50"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => startEdit(m)}
+                      className="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 active:bg-stone-100"
+                    >
+                      Edit
+                    </button>
+                    {m.role !== "owner" && (
+                      <button
+                        onClick={() => removeMember(m)}
+                        className="flex-1 rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 active:bg-rose-100"
+                      >
+                        Remove
+                      </button>
                     )}
-                  </td>
-                  <td className="px-3 py-3">
-                    {isEditing ? (
-                      <input
-                        type="number" step="100" min="0"
-                        value={draft.quotaMonthly}
-                        onChange={(e) => setDraft((d) => ({ ...d, quotaMonthly: e.target.value }))}
-                        className="input-base w-28"
-                      />
-                    ) : (
-                      <span className="text-stone-700">{fmtMoney(m.quota_monthly)}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="text-stone-800 font-medium">
-                      {fmtMoney(lb.revenueMtd)}
-                    </div>
-                    <div className="text-[11px] text-stone-500">
-                      {lb.wonDealsMtd || 0} deal{lb.wonDealsMtd === 1 ? "" : "s"}
-                      {lb.quotaPct != null && ` · ${lb.quotaPct}% of quota`}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="text-stone-700">
-                      {lb.assignedContacts || 0} contacts
-                    </div>
-                    <div className="text-[11px] text-stone-500">
-                      {lb.jewelryInProgress || 0} jewelry in progress
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    {isEditing ? (
-                      <>
-                        <button
-                          onClick={() => saveEdit(m)}
-                          className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="ml-2 rounded-md border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => startEdit(m)}
-                          className="rounded-md border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50"
-                        >
-                          Edit
-                        </button>
-                        {m.role !== "owner" && (
-                          <button
-                            onClick={() => removeMember(m)}
-                            className="ml-2 rounded-md border border-rose-200 px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-50"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-            {reps.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-stone-500 text-sm">
-                  No reps invited yet. Click <span className="font-medium">Invite a sales rep</span> above to add your first team member.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {reps.length === 0 && (
+          <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50/50 px-4 py-10 text-center">
+            <div className="inline-flex w-12 h-12 items-center justify-center rounded-full bg-white ring-1 ring-stone-200 mb-3">
+              <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-3a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <div className="text-sm font-medium text-stone-700">No reps invited yet</div>
+            <div className="text-xs text-stone-500 mt-1">
+              Tap <span className="font-medium">Invite a sales rep</span> above to add your first team member.
+            </div>
+          </div>
+        )}
       </section>
 
-      <p className="text-[11px] text-stone-400 mt-4">
+      <section className="hidden md:block rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-stone-200">
+            <thead className="bg-stone-50">
+              <tr className="text-[11px] uppercase tracking-wider text-stone-500">
+                <th className="px-4 py-2 text-left font-medium">Member</th>
+                <th className="px-3 py-2 text-left font-medium">Role</th>
+                <th className="px-3 py-2 text-left font-medium">Commission</th>
+                <th className="px-3 py-2 text-left font-medium">Quota</th>
+                <th className="px-3 py-2 text-left font-medium">Won (MTD)</th>
+                <th className="px-3 py-2 text-left font-medium">Pipeline</th>
+                <th className="px-3 py-2 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100 text-sm">
+              {[owner, ...reps].filter(Boolean).map((m) => {
+                const lb = leaderboard.find((x) => x.memberId === m.id) || {};
+                const isEditing = editingId === m.id;
+                return (
+                  <tr key={m.id} className="hover:bg-stone-50/60">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <MemberAvatar member={m} size="md" />
+                        <div className="min-w-0">
+                          {isEditing ? (
+                            <input
+                              value={draft.name}
+                              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                              className="input-base w-44"
+                            />
+                          ) : (
+                            <div className="font-semibold text-stone-800 truncate">{m.name}</div>
+                          )}
+                          <div className="text-xs text-stone-500 truncate">{m.email}</div>
+                          {!m.clerk_user_id && m.role !== "owner" && <PendingBadge />}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3"><RoleBadge role={m.role} /></td>
+                    <td className="px-3 py-3">
+                      {isEditing ? (
+                        <input
+                          type="number" step="0.5" min="0" max="100"
+                          value={draft.commissionPct}
+                          onChange={(e) => setDraft((d) => ({ ...d, commissionPct: e.target.value }))}
+                          className="input-base w-20"
+                        />
+                      ) : (
+                        <span className="text-stone-700">{Number(m.commission_pct || 0)}%</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {isEditing ? (
+                        <input
+                          type="number" step="100" min="0"
+                          value={draft.quotaMonthly}
+                          onChange={(e) => setDraft((d) => ({ ...d, quotaMonthly: e.target.value }))}
+                          className="input-base w-28"
+                        />
+                      ) : (
+                        <span className="text-stone-700">{fmtMoney(m.quota_monthly)}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-stone-800 font-medium">
+                        {fmtMoney(lb.revenueMtd)}
+                      </div>
+                      <div className="text-[11px] text-stone-500">
+                        {lb.wonDealsMtd || 0} deal{lb.wonDealsMtd === 1 ? "" : "s"}
+                        {lb.quotaPct != null && ` · ${lb.quotaPct}% of quota`}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-stone-700">
+                        {lb.assignedContacts || 0} contacts
+                      </div>
+                      <div className="text-[11px] text-stone-500">
+                        {lb.jewelryInProgress || 0} jewelry in progress
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => saveEdit(m)}
+                            className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="ml-2 rounded-md border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEdit(m)}
+                            className="rounded-md border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50"
+                          >
+                            Edit
+                          </button>
+                          {m.role !== "owner" && (
+                            <button
+                              onClick={() => removeMember(m)}
+                              className="ml-2 rounded-md border border-rose-200 px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-50"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {reps.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-stone-500 text-sm">
+                    No reps invited yet. Click <span className="font-medium">Invite a sales rep</span> above to add your first team member.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p className="text-[11px] text-stone-400 mt-4 leading-relaxed">
         Tip: when a rep signs in for the first time with the email you invited, they're linked automatically.
         Until then, their row shows <span className="font-medium">Pending sign-in</span>.
       </p>
@@ -417,18 +563,30 @@ const Field = ({ label, required, children }) => (
   </label>
 );
 
-const StatCard = ({ label, value, accent = "emerald" }) => {
+const StatCard = ({ label, fullLabel, value, accent = "emerald" }) => {
   const tints = {
     emerald: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     amber:   "bg-amber-50 text-amber-700 ring-amber-200",
     sky:     "bg-sky-50 text-sky-700 ring-sky-200",
   };
   return (
-    <div className={`rounded-xl ring-1 ${tints[accent]} p-4`}>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="text-xs uppercase tracking-wider mt-1 opacity-80">{label}</div>
+    <div className={`rounded-xl ring-1 ${tints[accent]} p-3 sm:p-4`}>
+      <div className="text-xl sm:text-2xl font-bold leading-none">{value}</div>
+      <div className="text-[10px] sm:text-xs uppercase tracking-wider mt-1 opacity-80 leading-tight">
+        <span className="sm:hidden">{label}</span>
+        <span className="hidden sm:inline">{fullLabel || label}</span>
+      </div>
     </div>
   );
 };
+
+const MobileStat = ({ label, children }) => (
+  <div className="min-w-0">
+    <div className="text-[10px] uppercase tracking-wider font-medium text-stone-500 mb-0.5">
+      {label}
+    </div>
+    {children}
+  </div>
+);
 
 export default TeamSettings;
