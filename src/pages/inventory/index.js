@@ -14,8 +14,12 @@ import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
 import StoneUsagePanel from "../../components/StoneUsagePanel";
-import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL } from "../../services/stonesApi";
+import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL, fetchSoapStones, assignStone } from "../../services/stonesApi";
 import InternalExcelModal from "./components/InternalExcelModal";
+import MemberAvatar from "../../components/team/MemberAvatar";
+import AssigneeFilter from "../../components/team/AssigneeFilter";
+import { useTeam } from "../../context/TeamContext";
+import toast from "react-hot-toast";
 
 const ITEMS_PER_PAGE = 50;
 // API base URL from .env
@@ -3847,7 +3851,68 @@ const shortTreatment = (t) => {
   return t;
 };
 
-const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, priceMode }) => (
+/* ---------------- Loose-stone assignment chip (Sprint 3) ---------------- */
+const StoneAssignmentChip = ({ stone, onAssign, busy }) => {
+  const team = useTeam();
+  if (!team?.ready || (team.members || []).length <= 1) return null;
+
+  const assignedMember =
+    stone.assignedTo && team.membersByClerkId
+      ? team.membersByClerkId[stone.assignedTo]
+      : null;
+  const isMine = stone.assignedTo && stone.assignedTo === team.actorUserId;
+
+  if (!stone.assignedTo) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); if (onAssign) onAssign(stone, "me"); }}
+        disabled={busy}
+        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-medium px-2 py-0.5 ring-1 transition ${
+          busy
+            ? "bg-emerald-50 text-emerald-400 ring-emerald-100 cursor-wait"
+            : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+        }`}
+        title="Claim this stone for yourself"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        Claim
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isMine && !team.isOwner) return;
+        if (onAssign) onAssign(stone, null);
+      }}
+      disabled={busy || (!isMine && !team.isOwner)}
+      className={`inline-flex items-center gap-1.5 rounded-full text-[10px] font-medium pl-0.5 pr-2 py-0.5 ring-1 transition ${
+        isMine
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+          : "bg-stone-50 text-stone-700 ring-stone-200"
+      } ${(!isMine && !team.isOwner) ? "cursor-default" : "cursor-pointer"}`}
+      title={isMine ? "Click to release this stone" : `Assigned to ${assignedMember?.name || "team member"}`}
+    >
+      <MemberAvatar
+        member={assignedMember}
+        clerkUserId={stone.assignedTo}
+        size="xs"
+        ring={false}
+      />
+      <span className="truncate max-w-[80px]">
+        {isMine ? "Mine" : (assignedMember?.name?.split(" ")[0] || "Assigned")}
+      </span>
+    </button>
+  );
+};
+
+const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, priceMode, onAssign, assigningSku }) => (
   <motion.div
     layout
     className={`rounded-2xl border-2 overflow-hidden shadow-md transition-all duration-200 ${
@@ -3887,8 +3952,11 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <span className="text-xs font-mono text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{stone.sku}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-mono text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{stone.sku}</span>
+                <StoneAssignmentChip stone={stone} onAssign={onAssign} busy={assigningSku === stone.sku} />
+              </div>
               <h3 className="font-semibold text-stone-800 mt-1">{getDisplayShape(stone.shape)}</h3>
             </div>
             <span className="text-lg font-bold text-stone-800">
@@ -4843,7 +4911,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="inline-block font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
                       {stone.sku}
                     </span>
@@ -4854,6 +4922,11 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         {STONE_STATUS_LABELS[stoneStatusMap[stone.sku].status] || stoneStatusMap[stone.sku].status}
                       </span>
                     )}
+                    <StoneAssignmentChip
+                      stone={stone}
+                      onAssign={handleAssignStone}
+                      busy={assigningStoneSku === stone.sku}
+                    />
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm font-medium text-stone-800">{getDisplayShape(stone.shape)}</span>
@@ -5328,6 +5401,15 @@ const StoneSearchPage = () => {
   // Phase A: per-SKU map of cross-system status pulled from the workshop.
   // { [sku]: { status, jewelry_item_id, jewelry_sku, jewelry_name, jewelry_status } }
   const [stoneStatusMap, setStoneStatusMap] = useState({});
+  // Sales-rep filter: "all" | "me" | "unassigned" | <clerk_user_id>
+  // Persisted in localStorage so a rep doesn't lose their preferred view.
+  const [assigneeFilter, setAssigneeFilter] = useState(() => {
+    try { return localStorage.getItem("inventory.assigneeFilter") || "all"; } catch { return "all"; }
+  });
+  // SKU currently being claimed/released — used to disable the chip while
+  // the request is in flight.
+  const [assigningStoneSku, setAssigningStoneSku] = useState(null);
+  const team = useTeam();
   const [selectedStone, setSelectedStone] = useState(null);
   const [selectedStones, setSelectedStones] = useState(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
@@ -6526,9 +6608,10 @@ const StoneSearchPage = () => {
         setLoading(true);
         setError("");
         startProgress();
-        const res = await fetch(`${API_BASE}/api/soap-stones`);
-        if (!res.ok) throw new Error("Failed to load stones");
-        const data = await res.json();
+        const data = await fetchSoapStones(
+          { id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName },
+          { assignedTo: assigneeFilter !== "all" ? assigneeFilter : undefined }
+        );
         const rows = Array.isArray(data.stones) ? data.stones : Array.isArray(data) ? data : [];
         const normalized = rows.map((row, index) => ({
           id: row.id ?? index,
@@ -6585,6 +6668,11 @@ const StoneSearchPage = () => {
           tradeShow: row.tradeShow ?? "",
           // Sync
           updatedAt: row.updatedAt ?? null,
+          // Sales-rep assignment (Sprint 3)
+          assignedTo:        row.assignedTo        || null,
+          assignedBy:        row.assignedBy        || null,
+          assignmentNotes:   row.assignmentNotes   || null,
+          assignmentUpdated: row.assignmentUpdated || null,
         }));
         setStones(normalized);
         // Pull workshop status for every SKU in one call so the grid can show
@@ -6603,7 +6691,52 @@ const StoneSearchPage = () => {
 
     fetchStones();
     return () => { if (intervalId) clearInterval(intervalId); };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, assigneeFilter]);
+
+  // Persist the assignee filter so reps don't have to re-pick it every time.
+  useEffect(() => {
+    try { localStorage.setItem("inventory.assigneeFilter", assigneeFilter); } catch (_) {}
+  }, [assigneeFilter]);
+
+  /* Claim / release a loose stone from the inventory grid. Optimistic update
+   * because the chip lives inside a card and a full refetch would feel laggy. */
+  const handleAssignStone = useCallback(async (stone, assignedTo) => {
+    if (!stone?.sku) return;
+    setAssigningStoneSku(stone.sku);
+    const previousAssignedTo = stone.assignedTo || null;
+    // Optimistic UI flip first.
+    setStones((prev) =>
+      prev.map((s) =>
+        s.sku === stone.sku
+          ? { ...s, assignedTo: assignedTo === "me" ? team.actorUserId : assignedTo }
+          : s
+      )
+    );
+    try {
+      await assignStone(
+        { id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName },
+        stone.sku,
+        { assignedTo: assignedTo === "me" ? team.actorUserId : assignedTo }
+      );
+      toast.success(
+        assignedTo
+          ? `${stone.sku} claimed`
+          : `${stone.sku} released`
+      );
+    } catch (err) {
+      // Roll back on failure.
+      setStones((prev) =>
+        prev.map((s) =>
+          s.sku === stone.sku ? { ...s, assignedTo: previousAssignedTo } : s
+        )
+      );
+      toast.error(err.message || "Could not update assignment");
+    } finally {
+      setAssigningStoneSku(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [team.actorUserId, user?.id, user?.primaryEmailAddress?.emailAddress, user?.fullName]);
 
   useEffect(() => {
     if (!initialSearch || loading || stones.length === 0) return;
@@ -7550,6 +7683,27 @@ const StoneSearchPage = () => {
             </div>
           )}
 
+          {/* Sales-rep scope filter (only renders if the workspace has more
+              than one team member). Wraps the existing StoneFilters so reps
+              can flip between "All / Mine / Unassigned / specific rep". */}
+          {team?.ready && (team.members || []).length > 1 && (
+            <div className="mb-3 flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] uppercase tracking-wider font-semibold text-stone-500">
+                Show:
+              </span>
+              <AssigneeFilter value={assigneeFilter} onChange={setAssigneeFilter} />
+              {assigneeFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setAssigneeFilter("all")}
+                  className="text-[11px] text-stone-500 underline hover:text-stone-700"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Filters */}
           {inventoryMode === 'jewelry' ? (
             jewelryItems.length > 0 && (
@@ -7820,6 +7974,8 @@ const StoneSearchPage = () => {
                     onViewDNA={setDrawerStone}
                     onImageClick={setLightboxImage}
                     priceMode={priceMode}
+                    onAssign={handleAssignStone}
+                    assigningSku={assigningStoneSku}
                   />
                 ))
               )}

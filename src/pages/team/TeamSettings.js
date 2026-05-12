@@ -221,7 +221,8 @@ const TeamSettings = () => {
               Team &amp; Sales Reps
             </h1>
             <p className="text-stone-500 text-xs sm:text-sm mt-1">
-              Invite up to 10 reps. Each rep sees only the contacts, deals, and jewelry items they're assigned to.
+              Invite up to 10 reps. Each rep sees only the contacts, deals, jewelry items
+              and loose stones (diamonds &amp; gemstones) they're assigned to.
             </p>
           </div>
           <div className="hidden sm:block text-right text-xs text-stone-500 shrink-0">
@@ -399,7 +400,7 @@ const TeamSettings = () => {
                     {lb.assignedContacts || 0} contacts
                   </div>
                   <div className="text-[10px] text-stone-500 leading-tight">
-                    {lb.jewelryInProgress || 0} jewelry in progress
+                    {lb.jewelryInProgress || 0} jewelry · {lb.stonesInProgress || 0} stones
                   </div>
                 </MobileStat>
               </div>
@@ -559,7 +560,7 @@ const TeamSettings = () => {
                         {lb.assignedContacts || 0} contacts
                       </div>
                       <div className="text-[11px] text-stone-500">
-                        {lb.jewelryInProgress || 0} jewelry in progress
+                        {lb.jewelryInProgress || 0} jewelry · {lb.stonesInProgress || 0} stones
                       </div>
                     </td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">

@@ -4,8 +4,87 @@ import { getDisplayShape, getDisplayColor, shortTreatment } from "../helpers/con
 import { createEmailText, createEmailHtml } from "../helpers/exportHelpers";
 import { shareToWhatsApp } from "../helpers/whatsappHelpers";
 import TagSelector from "./TagSelector";
+import MemberAvatar from "../../../components/team/MemberAvatar";
+import { useTeam } from "../../../context/TeamContext";
 
-const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, priceMode }) => (
+const StoneAssignmentChip = ({ stone, onAssign, busy }) => {
+  const team = useTeam();
+  if (!team?.ready || (team.members || []).length <= 1) return null;
+
+  const assignedMember =
+    stone.assignedTo && team.membersByClerkId
+      ? team.membersByClerkId[stone.assignedTo]
+      : null;
+  const isMine = stone.assignedTo && stone.assignedTo === team.actorUserId;
+
+  if (!stone.assignedTo) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); if (onAssign) onAssign(stone, "me"); }}
+        disabled={busy}
+        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-medium px-2 py-0.5 ring-1 transition ${
+          busy
+            ? "bg-emerald-50 text-emerald-400 ring-emerald-100 cursor-wait"
+            : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+        }`}
+        title="Claim this stone for yourself"
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        Claim
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isMine && !team.isOwner) return;
+        if (onAssign) onAssign(stone, null);
+      }}
+      disabled={busy || (!isMine && !team.isOwner)}
+      className={`inline-flex items-center gap-1.5 rounded-full text-[10px] font-medium pl-0.5 pr-2 py-0.5 ring-1 transition ${
+        isMine
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+          : "bg-stone-50 text-stone-700 ring-stone-200"
+      } ${(!isMine && !team.isOwner) ? "cursor-default" : "cursor-pointer"}`}
+      title={isMine ? "Click to release" : `Assigned to ${assignedMember?.name || "team member"}`}
+    >
+      <MemberAvatar
+        member={assignedMember}
+        clerkUserId={stone.assignedTo}
+        size="xs"
+        ring={false}
+      />
+      <span className="truncate max-w-[80px]">
+        {isMine ? "Mine" : (assignedMember?.name?.split(" ")[0] || "Assigned")}
+      </span>
+    </button>
+  );
+};
+
+const StoneCard = ({
+  stone,
+  onToggle,
+  isExpanded,
+  isSelected,
+  onToggleSelection,
+  stoneTags,
+  allTags,
+  onAddTag,
+  onRemoveTag,
+  onManageTags,
+  onViewDNA,
+  onImageClick,
+  onVideoClick,
+  priceMode,
+  onAssign,
+  assigningSku,
+}) => (
   <motion.div
     layout
     className={`rounded-lg border overflow-hidden transition-all duration-200 ${
@@ -44,8 +123,15 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <span className="text-xs font-mono text-primary px-1.5 py-0.5 rounded bg-primary/10">{stone.sku}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-mono text-primary px-1.5 py-0.5 rounded bg-primary/10">{stone.sku}</span>
+                <StoneAssignmentChip
+                  stone={stone}
+                  onAssign={onAssign}
+                  busy={assigningSku === stone.sku}
+                />
+              </div>
               <h3 className="font-medium text-foreground mt-1 text-sm">{getDisplayShape(stone.shape)}</h3>
             </div>
             <span className="text-sm font-semibold text-foreground tabular-nums">
