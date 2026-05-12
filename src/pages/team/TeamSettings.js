@@ -99,7 +99,10 @@ const TeamSettings = () => {
 
   const handleInvite = async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    // React recycles the SyntheticEvent after the first await, so we must
+    // grab a stable reference to the form element before any async call.
+    const formEl = e.currentTarget;
+    const fd = new FormData(formEl);
     const payload = {
       email: String(fd.get("email") || "").trim().toLowerCase(),
       name: String(fd.get("name") || "").trim(),
@@ -115,7 +118,7 @@ const TeamSettings = () => {
     try {
       await inviteTeamMember(team.actor, payload);
       toast.success(`Invited ${payload.name}`);
-      e.currentTarget.reset();
+      try { formEl?.reset(); } catch { /* form may have unmounted already */ }
       setShowInvite(false);
       await team.refresh();
       await loadLeaderboard();
