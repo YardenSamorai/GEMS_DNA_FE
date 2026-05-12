@@ -11,21 +11,33 @@ import {
   TASK_PRIORITIES,
 } from "../../services/crmApi";
 import { Skeleton, SkeletonList } from "../../components/ui/Skeleton";
+import AssigneeFilter from "../../components/team/AssigneeFilter";
+import MemberAvatar from "../../components/team/MemberAvatar";
+import { useTeam } from "../../context/TeamContext";
 
 const fmt = (d) => (d ? new Date(d).toLocaleString() : "");
 
 export default function CrmTasks() {
   const { user } = useUser();
+  const team = useTeam();
   const [tasks, setTasks] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("pending");
+  const [assigneeFilter, setAssigneeFilter] = useState(() => {
+    try { return localStorage.getItem("crm.tasks.assigneeFilter") || "all"; } catch { return "all"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("crm.tasks.assigneeFilter", assigneeFilter); } catch {}
+  }, [assigneeFilter]);
   const [showForm, setShowForm] = useState(false);
 
   const reload = () => {
     if (!user?.id) return;
     setLoading(true);
-    fetchTasks(user.id, { status: filter })
+    const filters = { status: filter };
+    if (assigneeFilter && assigneeFilter !== "all") filters.assignedTo = assigneeFilter;
+    fetchTasks(user.id, filters)
       .then(setTasks)
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
@@ -36,7 +48,7 @@ export default function CrmTasks() {
     reload();
     fetchContacts(user.id).then(setContacts).catch(() => {});
     // eslint-disable-next-line
-  }, [user?.id, filter]);
+  }, [user?.id, filter, assigneeFilter]);
 
   const groups = useMemo(() => {
     const overdue = [];
@@ -85,6 +97,7 @@ export default function CrmTasks() {
           ))}
         </div>
         <div className="flex-1" />
+        <AssigneeFilter value={assigneeFilter} onChange={setAssigneeFilter} align="right" />
         <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           <span>New task</span>
@@ -139,7 +152,9 @@ export default function CrmTasks() {
 }
 
 function Group({ title, tone, muted, tasks, onToggle, onRemove }) {
+  const team = useTeam();
   const titleColor = tone === "rose" ? "text-rose-600" : tone === "amber" ? "text-amber-600" : "text-stone-700";
+  const showAssignees = team.ready && team.members.length > 1;
   return (
     <div>
       <h3 className={`text-xs uppercase tracking-wider font-semibold mb-2 ${titleColor}`}>{title} ({tasks.length})</h3>
@@ -154,7 +169,16 @@ function Group({ title, tone, muted, tasks, onToggle, onRemove }) {
                 {t.status === "done" && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
               </button>
               <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium ${t.status === "done" ? "line-through text-stone-400" : "text-stone-900"}`}>{t.title}</div>
+                <div className="flex items-center gap-2">
+                  <div className={`text-sm font-medium flex-1 ${t.status === "done" ? "line-through text-stone-400" : "text-stone-900"}`}>{t.title}</div>
+                  {showAssignees && (
+                    <MemberAvatar
+                      member={t.assigned_to ? team.membersByClerkId[t.assigned_to] : null}
+                      size="xs"
+                      ring={false}
+                    />
+                  )}
+                </div>
                 {t.description && <div className="text-xs text-stone-500 mt-0.5 whitespace-pre-line">{t.description}</div>}
                 <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px]">
                   {t.due_date && <span className="text-stone-500">Due {fmt(t.due_date)}</span>}

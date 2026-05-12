@@ -25,6 +25,8 @@ import SellItemModal from "./components/SellItemModal";
 import ReadyNotifyBanner from "./components/ReadyNotifyBanner";
 import WhatsAppCustomerButton from "./components/WhatsAppCustomerButton";
 import { Skeleton, SkeletonText, SkeletonCard } from "../../components/ui/Skeleton";
+import AssigneePicker from "../../components/team/AssigneePicker";
+import { useTeam } from "../../context/TeamContext";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -40,6 +42,7 @@ const JewelryItemDetail = () => {
   const { id } = useParams();
   const { user } = useUser();
   const navigate = useNavigate();
+  const team = useTeam();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -266,6 +269,20 @@ const JewelryItemDetail = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {team.ready && team.members.length > 1 && (
+              <AssigneePicker
+                value={item.assigned_to || null}
+                onChange={async (next) => {
+                  try {
+                    await updateJewelryItem(id, { assignedTo: next });
+                    await load();
+                  } catch (err) {
+                    alert(err.message || "Failed to assign");
+                  }
+                }}
+                disabled={!team.isOwner && item.assigned_to && item.assigned_to !== team.actorUserId}
+              />
+            )}
             <WhatsAppCustomerButton item={item} userId={user?.id} />
             <select
               value={item.status}

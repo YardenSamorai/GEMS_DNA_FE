@@ -1,7 +1,9 @@
 import React from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
 import { useTheme } from "../App";
+import { useTeam } from "../context/TeamContext";
+import MemberAvatar from "./team/MemberAvatar";
 
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
@@ -65,8 +67,10 @@ const getPageTitle = (pathname, navItems) => {
 const TopBar = ({ navItems, onOpenMobileMenu }) => {
   const location = useLocation();
   const { theme } = useTheme();
+  const team = useTeam();
   const isDark = theme === "dark";
   const title = getPageTitle(location.pathname, navItems);
+  const showActorBadge = team.ready && team.me && (team.members || []).length > 1;
 
   return (
     <header
@@ -93,6 +97,25 @@ const TopBar = ({ navItems, onOpenMobileMenu }) => {
       </div>
 
       <div className="flex items-center gap-3">
+        {showActorBadge && (
+          <Link
+            to="/team"
+            title={team.isOwner ? "Manage team" : "View team"}
+            className={`hidden sm:inline-flex items-center gap-2 rounded-full pl-1 pr-2.5 py-0.5 text-xs font-medium transition ${
+              isDark
+                ? "bg-stone-900 hover:bg-stone-800 text-stone-200 ring-1 ring-stone-800"
+                : "bg-stone-100 hover:bg-stone-200 text-stone-700 ring-1 ring-stone-200"
+            }`}
+          >
+            <MemberAvatar member={team.me} size="xs" ring={false} />
+            <span className="truncate max-w-[120px]">{team.me?.name || "You"}</span>
+            <span className={`text-[9px] uppercase tracking-wider ${
+              team.isOwner ? "text-amber-600" : "text-emerald-600"
+            }`}>
+              {team.isOwner ? "Admin" : "Rep"}
+            </span>
+          </Link>
+        )}
         <ThemeToggle />
         <div className={`h-6 w-px hidden sm:block ${isDark ? "bg-stone-700" : "bg-stone-200"}`} />
         <UserButton

@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import { fetchJewelryItems, changeJewelryStatus } from "../../services/jewelryApi";
+import AssigneeFilter from "../../components/team/AssigneeFilter";
+import MemberAvatar from "../../components/team/MemberAvatar";
+import { useTeam } from "../../context/TeamContext";
 
 /* ---------- Stage config ---------- */
 /*
@@ -87,9 +90,12 @@ const PRIORITY_STYLES = {
 };
 
 const ProductionCard = ({ item, stage, draggedId, onDragStart, onDragEnd }) => {
+  const team = useTeam();
   const priority = derivePriority(item);
   const dateStr = formatDate(item.created_at);
   const overdue = priority === "urgent";
+  const showAssignee = team.ready && team.members.length > 1;
+  const assignee = item.assigned_to ? team.membersByClerkId[item.assigned_to] : null;
 
   return (
     <Link
@@ -102,11 +108,18 @@ const ProductionCard = ({ item, stage, draggedId, onDragStart, onDragEnd }) => {
       }`}
       style={{ borderLeft: `3px solid ${stage.hex}` }}
     >
-      <div className="text-[13px] font-bold leading-tight text-stone-900">
-        {item.sku || "—"}
-      </div>
-      <div className="mt-0.5 truncate text-xs text-stone-500" title={item.name}>
-        {item.name || "Untitled"}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-bold leading-tight text-stone-900">
+            {item.sku || "—"}
+          </div>
+          <div className="mt-0.5 truncate text-xs text-stone-500" title={item.name}>
+            {item.name || "Untitled"}
+          </div>
+        </div>
+        {showAssignee && (
+          <MemberAvatar member={assignee} size="xs" ring={false} />
+        )}
       </div>
 
       <div className="mt-2.5 flex items-center gap-2 text-[11px]">
@@ -190,11 +203,18 @@ const ProductionBoard = () => {
   const [updating, setUpdating] = useState(false);
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
+  const [assigneeFilter, setAssigneeFilter] = useState(() => {
+    try { return localStorage.getItem("production.assigneeFilter") || "all"; } catch { return "all"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("production.assigneeFilter", assigneeFilter); } catch {}
+  }, [assigneeFilter]);
 
   const load = useCallback(() => {
     if (!userId) return;
     setLoading(true);
-    fetchJewelryItems(userId, {})
+    const filters = assigneeFilter && assigneeFilter !== "all" ? { assignedTo: assigneeFilter } : {};
+    fetchJewelryItems(userId, filters)
       .then((res) => {
         const all = res.items || [];
         // Only items that are in an active production stage
@@ -202,7 +222,7 @@ const ProductionBoard = () => {
       })
       .catch((err) => toast.error(err.message || "Failed to load items"))
       .finally(() => setLoading(false));
-  }, [userId]);
+  }, [userId, assigneeFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -268,13 +288,16 @@ const ProductionBoard = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => toast("Production workflow docs are coming soon", { icon: "📘" })}
-          className="shrink-0 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
-        >
-          Learn more →
-        </button>
+        <div className="flex items-center gap-3">
+          <AssigneeFilter value={assigneeFilter} onChange={setAssigneeFilter} align="right" />
+          <button
+            type="button"
+            onClick={() => toast("Production workflow docs are coming soon", { icon: "📘" })}
+            className="shrink-0 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+          >
+            Learn more →
+          </button>
+        </div>
       </div>
 
       {/* Board — horizontal scroll on tablets, full-width grid on desktop. */}

@@ -13,6 +13,8 @@ import {
 import StonePicker from "./StonePicker";
 import ItemDetailModal from "./ItemDetailModal";
 import { Skeleton, SkeletonCard, SkeletonText } from "../../../components/ui/Skeleton";
+import AssigneePicker from "../../../components/team/AssigneePicker";
+import { useTeam } from "../../../context/TeamContext";
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 const timeAgo = (d) => {
@@ -25,10 +27,20 @@ const timeAgo = (d) => {
 };
 
 export default function DealDrawer({ dealId, onClose, onChanged }) {
+  const team = useTeam();
   const [deal, setDeal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
+
+  const handleAssign = async (next) => {
+    try {
+      const updated = await updateDeal(dealId, { assignedTo: next });
+      setDeal((d) => ({ ...d, ...updated }));
+      onChanged?.();
+      toast.success(next ? "Assigned" : "Unassigned");
+    } catch (e) { toast.error(e.message); }
+  };
 
   const reload = async () => {
     setLoading(true);
@@ -159,6 +171,15 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
                   <div className="text-sm text-stone-500 mt-1">{deal.contact_name}{deal.contact_company ? ` · ${deal.contact_company}` : ""}</div>
                 </div>
                 <div className="hidden sm:flex items-center gap-1">
+                  {team.ready && team.members.length > 1 && (
+                    <div className="mr-1">
+                      <AssigneePicker
+                        value={deal.assigned_to || null}
+                        onChange={handleAssign}
+                        disabled={!team.isOwner && deal.assigned_to && deal.assigned_to !== team.actorUserId}
+                      />
+                    </div>
+                  )}
                   <button onClick={handleDelete} className="p-2 rounded-lg text-rose-600 hover:bg-rose-50">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
                   </button>
@@ -167,6 +188,16 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
                   </button>
                 </div>
               </div>
+
+              {team.ready && team.members.length > 1 && (
+                <div className="sm:hidden mt-3">
+                  <AssigneePicker
+                    value={deal.assigned_to || null}
+                    onChange={handleAssign}
+                    disabled={!team.isOwner && deal.assigned_to && deal.assigned_to !== team.actorUserId}
+                  />
+                </div>
+              )}
 
               {/* Stage pills */}
               <div className="mt-3 flex gap-1 overflow-x-auto pb-1">

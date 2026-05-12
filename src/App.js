@@ -20,6 +20,8 @@ import CustomerProfile from "./pages/crm/CustomerProfile";
 import CrmDeals from "./pages/crm/CrmDeals";
 import CrmTasks from "./pages/crm/CrmTasks";
 import CrmSettings from "./pages/crm/CrmSettings";
+import TeamSettings from "./pages/team/TeamSettings";
+import { TeamProvider } from "./context/TeamContext";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 
@@ -190,6 +192,16 @@ const NAV_SECTIONS = [
           </svg>
         ),
       },
+      {
+        to: "/team",
+        label: "Team",
+        matches: (path) => path.startsWith("/team"),
+        icon: (cls) => (
+          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zm6 13v-2a4 4 0 00-3-3.87M2 20v-2a4 4 0 014-4h6a4 4 0 014 4v2" />
+          </svg>
+        ),
+      },
     ],
   },
   // TOOLS section — internal QA / data integrity tooling.
@@ -347,7 +359,9 @@ const MarketingLayout = () => (
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <TeamProvider>
+        <AppContent />
+      </TeamProvider>
     </ThemeProvider>
   );
 }
@@ -415,6 +429,8 @@ function AppContent() {
             <Route path="/qa-data" element={<QAPage />} />
             {/* Back-compat: old /qa URL still resolves to the same data-quality page. */}
             <Route path="/qa" element={<Navigate to="/qa-data" replace />} />
+            {/* Sprint 3 — sales-rep management (admin) + per-rep KPIs. */}
+            <Route path="/team" element={<TeamSettings />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>

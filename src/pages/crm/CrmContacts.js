@@ -22,6 +22,9 @@ import ImportContactsModal from "./components/ImportContactsModal";
 import BroadcastEmailModal from "./components/BroadcastEmailModal";
 import CardImageLightbox from "./components/CardImageLightbox";
 import { SkeletonTableRows, SkeletonList } from "../../components/ui/Skeleton";
+import AssigneeFilter from "../../components/team/AssigneeFilter";
+import MemberAvatar from "../../components/team/MemberAvatar";
+import { useTeam } from "../../context/TeamContext";
 
 const typeStyle = (type) => {
   const t = CONTACT_TYPES.find((x) => x.value === type);
@@ -78,6 +81,15 @@ export default function CrmContacts() {
   const [tagFilter, setTagFilter] = useState(null);
   const [selectedFolderId, setSelectedFolderId] = useState(null);
   const [advancedFilters, setAdvancedFilters] = useState({ ...EMPTY_FILTERS });
+  // Sprint 3 — sales-rep visibility chip ("All / Mine / Unassigned / <rep>").
+  // Persisted per-user so reps don't have to re-pick "Mine" every page load.
+  const team = useTeam();
+  const [assigneeFilter, setAssigneeFilter] = useState(() => {
+    try { return localStorage.getItem("crm.contacts.assigneeFilter") || "all"; } catch { return "all"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("crm.contacts.assigneeFilter", assigneeFilter); } catch {}
+  }, [assigneeFilter]);
 
   const [showForm, setShowForm] = useState(false);
   const [showScan, setShowScan] = useState(false);
@@ -125,6 +137,7 @@ export default function CrmContacts() {
       search,
       type: typeFilter,
       folderId: selectedFolderId,
+      assignedTo: assigneeFilter !== "all" ? assigneeFilter : undefined,
       ...stripTypeFromFilters(advancedFilters),
     };
     const key = cacheKey(user.id, filterPayload);
@@ -171,7 +184,7 @@ export default function CrmContacts() {
         setLoading(false);
         setRefreshing(false);
       });
-  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, thumbCache]);
+  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, assigneeFilter, thumbCache]);
 
   // Load tags + folders ONCE per page (not on every keystroke / filter change)
   const reloadSidebars = useCallback(() => {
@@ -186,7 +199,7 @@ export default function CrmContacts() {
     if (!user?.id) return;
     const t = setTimeout(reload, 250);
     return () => clearTimeout(t);
-  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, reload]);
+  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, assigneeFilter, reload]);
 
   const filteredContacts = useMemo(() => {
     if (!tagFilter) return contacts;
@@ -402,18 +415,23 @@ export default function CrmContacts() {
           </div>
         )}
 
-        {/* Type chips */}
-        <div className="flex gap-1.5 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 pb-1 scrollbar-hide">
-          <Chip label={`All (${counts.all || 0})`} active={typeFilter === "all"} onClick={() => setTypeFilter("all")} />
-          {CONTACT_TYPES.map((t) => (
-            <Chip
-              key={t.value}
-              label={`${t.label} (${counts[t.value] || 0})`}
-              active={typeFilter === t.value}
-              onClick={() => setTypeFilter(t.value)}
-              color={t.color}
-            />
-          ))}
+        {/* Type chips + team filter (right-aligned) */}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 gap-1.5 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 pb-1 scrollbar-hide">
+            <Chip label={`All (${counts.all || 0})`} active={typeFilter === "all"} onClick={() => setTypeFilter("all")} />
+            {CONTACT_TYPES.map((t) => (
+              <Chip
+                key={t.value}
+                label={`${t.label} (${counts[t.value] || 0})`}
+                active={typeFilter === t.value}
+                onClick={() => setTypeFilter(t.value)}
+                color={t.color}
+              />
+            ))}
+          </div>
+          <div className="shrink-0">
+            <AssigneeFilter value={assigneeFilter} onChange={setAssigneeFilter} align="right" />
+          </div>
         </div>
 
         {/* Tag chips */}
@@ -570,6 +588,18 @@ export default function CrmContacts() {
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-stone-900">{c.name}</span>
                           {c.source === 'dna_lead' && <DnaBadge />}
+                          {team.ready && team.members.length > 1 && (
+                            <MemberAvatar
+                              member={c.assigned_to ? team.membersByClerkId[c.assigned_to] : null}
+                              size="xs"
+                              ring={false}
+                              tooltip={
+                                c.assigned_to
+                                  ? `Assigned to ${team.membersByClerkId[c.assigned_to]?.name || "team member"}`
+                                  : "Unassigned"
+                              }
+                            />
+                          )}
                         </div>
                         {c.company && <div className="text-xs text-stone-500">{c.company}</div>}
                         {c.source === 'dna_lead' && c.dna_sku && (
@@ -648,6 +678,13 @@ export default function CrmContacts() {
                             <div className="flex items-center gap-1.5 min-w-0">
                               <div className="font-semibold text-stone-900 truncate">{c.name}</div>
                               {c.source === 'dna_lead' && <DnaBadge />}
+                              {team.ready && team.members.length > 1 && (
+                                <MemberAvatar
+                                  member={c.assigned_to ? team.membersByClerkId[c.assigned_to] : null}
+                                  size="xs"
+                                  ring={false}
+                                />
+                              )}
                             </div>
                             {Number(c.total_won) > 0 && (
                               <div className="text-xs font-semibold text-emerald-600 shrink-0">

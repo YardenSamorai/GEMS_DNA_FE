@@ -11,6 +11,9 @@ import {
 } from "../../services/crmApi";
 import DealDrawer from "./components/DealDrawer";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
+import AssigneeFilter from "../../components/team/AssigneeFilter";
+import MemberAvatar from "../../components/team/MemberAvatar";
+import { useTeam } from "../../context/TeamContext";
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 
@@ -28,6 +31,13 @@ export default function CrmDeals() {
   const [drawerId, setDrawerId] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
   const [stageFilter, setStageFilter] = useState("all");
+  const team = useTeam();
+  const [assigneeFilter, setAssigneeFilter] = useState(() => {
+    try { return localStorage.getItem("crm.deals.assigneeFilter") || "all"; } catch { return "all"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("crm.deals.assigneeFilter", assigneeFilter); } catch {}
+  }, [assigneeFilter]);
 
   // Watch for ?new=1&contactId=X&title=...&value=... and auto-open the new-deal modal,
   // or ?focus=X to open the drawer for an existing deal (used as a deep-link from
@@ -60,7 +70,10 @@ export default function CrmDeals() {
   const reload = () => {
     if (!user?.id) return;
     setLoading(true);
-    fetchDeals(user.id)
+    const filters = assigneeFilter && assigneeFilter !== "all"
+      ? { assignedTo: assigneeFilter }
+      : {};
+    fetchDeals(user.id, filters)
       .then(setDeals)
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
@@ -71,7 +84,7 @@ export default function CrmDeals() {
     reload();
     fetchContacts(user.id).then(setContacts).catch(() => {});
     // eslint-disable-next-line
-  }, [user?.id]);
+  }, [user?.id, assigneeFilter]);
 
   const grouped = useMemo(() => {
     const out = Object.fromEntries(DEAL_STAGES.map((s) => [s.value, []]));
@@ -120,6 +133,7 @@ export default function CrmDeals() {
           <ToggleBtn active={view === "list"} onClick={() => setView("list")}>List</ToggleBtn>
         </div>
         <div className="flex-1" />
+        <AssigneeFilter value={assigneeFilter} onChange={setAssigneeFilter} align="right" />
         <button
           onClick={() => setShowForm(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800"
@@ -195,7 +209,16 @@ export default function CrmDeals() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-stone-900 truncate">{d.title}</div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="font-semibold text-stone-900 truncate flex-1">{d.title}</div>
+                            {team.ready && team.members.length > 1 && (
+                              <MemberAvatar
+                                member={d.assigned_to ? team.membersByClerkId[d.assigned_to] : null}
+                                size="xs"
+                                ring={false}
+                              />
+                            )}
+                          </div>
                           <div className="text-xs text-stone-500 truncate mt-0.5">{d.contact_name || "No contact"}</div>
                         </div>
                         <div className="text-right shrink-0">
@@ -259,7 +282,16 @@ export default function CrmDeals() {
                               draggingId === d.id ? "opacity-50" : ""
                             }`}
                           >
-                            <div className="font-medium text-sm text-stone-900 truncate">{d.title}</div>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="font-medium text-sm text-stone-900 truncate flex-1">{d.title}</div>
+                              {team.ready && team.members.length > 1 && (
+                                <MemberAvatar
+                                  member={d.assigned_to ? team.membersByClerkId[d.assigned_to] : null}
+                                  size="xs"
+                                  ring={false}
+                                />
+                              )}
+                            </div>
                             <div className="text-xs text-stone-500 truncate mt-0.5">{d.contact_name || "No contact"}</div>
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-sm font-semibold text-stone-900">{fmt(d.value)}</span>
@@ -285,13 +317,16 @@ export default function CrmDeals() {
                       <th className="py-3 px-4 font-medium">Title</th>
                       <th className="py-3 px-4 font-medium">Contact</th>
                       <th className="py-3 px-4 font-medium">Stage</th>
+                      {team.ready && team.members.length > 1 && (
+                        <th className="py-3 px-4 font-medium">Owner</th>
+                      )}
                       <th className="py-3 px-4 font-medium">Items</th>
                       <th className="py-3 px-4 font-medium text-right">Value</th>
                     </tr>
                   </thead>
                   <tbody>
                     {deals.length === 0 ? (
-                      <tr><td colSpan={5} className="py-12 text-center text-stone-500">No deals yet</td></tr>
+                      <tr><td colSpan={team.ready && team.members.length > 1 ? 6 : 5} className="py-12 text-center text-stone-500">No deals yet</td></tr>
                     ) : deals.map((d) => {
                       const s = DEAL_STAGES.find((x) => x.value === d.stage);
                       return (
@@ -299,6 +334,15 @@ export default function CrmDeals() {
                           <td className="py-3 px-4 font-medium text-stone-900">{d.title}</td>
                           <td className="py-3 px-4 text-stone-700">{d.contact_name || "—"}</td>
                           <td className="py-3 px-4"><span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${s?.color}`}>{s?.label || d.stage}</span></td>
+                          {team.ready && team.members.length > 1 && (
+                            <td className="py-3 px-4">
+                              <MemberAvatar
+                                member={d.assigned_to ? team.membersByClerkId[d.assigned_to] : null}
+                                size="xs"
+                                ring={false}
+                              />
+                            </td>
+                          )}
                           <td className="py-3 px-4 text-stone-700">{d.items_count || 0}</td>
                           <td className="py-3 px-4 text-right font-semibold text-stone-900">{fmt(d.value)}</td>
                         </tr>

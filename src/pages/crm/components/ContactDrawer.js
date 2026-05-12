@@ -23,6 +23,8 @@ import {
   SkeletonText,
   SkeletonCard,
 } from "../../../components/ui/Skeleton";
+import AssigneePicker from "../../../components/team/AssigneePicker";
+import { useTeam } from "../../../context/TeamContext";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleString() : "—");
 const timeAgo = (d) => {
@@ -36,12 +38,22 @@ const timeAgo = (d) => {
 
 export default function ContactDrawer({ contactId, onClose, onChanged }) {
   const { user } = useUser();
+  const team = useTeam();
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("info");
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCardLightbox, setShowCardLightbox] = useState(false);
+
+  const handleAssign = async (next) => {
+    try {
+      await updateContact(contactId, { assignedTo: next });
+      toast.success(next ? "Assigned" : "Unassigned");
+      reload();
+      onChanged?.();
+    } catch (e) { toast.error(e.message); }
+  };
 
   const reload = async () => {
     if (!user?.id || !contactId) return;
@@ -160,6 +172,13 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
                     {contact.company && <div className="text-sm text-stone-500 truncate">{contact.company}</div>}
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
                       <Badge type={contact.type} />
+                      {team.ready && team.members.length > 1 && (
+                        <AssigneePicker
+                          value={contact.assigned_to}
+                          onChange={handleAssign}
+                          disabled={!team.isOwner && contact.assigned_to && contact.assigned_to !== team.actorUserId}
+                        />
+                      )}
                       {contact.country && (
                         <span className="text-xs text-stone-500 inline-flex items-center gap-1">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -182,6 +201,15 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
                   </div>
                 </div>
                 <div className="hidden sm:flex items-center gap-1">
+                  {team.ready && team.members.length > 1 && (
+                    <div className="mr-1">
+                      <AssigneePicker
+                        value={contact.assigned_to || null}
+                        onChange={handleAssign}
+                        disabled={!team.isOwner && contact.assigned_to && contact.assigned_to !== team.actorUserId}
+                      />
+                    </div>
+                  )}
                   <Link
                     to={`/crm/customers/${contact.id}`}
                     title="View full customer profile"
@@ -201,6 +229,17 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
                   </IconButton>
                 </div>
               </div>
+
+              {/* Mobile assignee picker (desktop has it inline above) */}
+              {team.ready && team.members.length > 1 && (
+                <div className="sm:hidden mt-3">
+                  <AssigneePicker
+                    value={contact.assigned_to || null}
+                    onChange={handleAssign}
+                    disabled={!team.isOwner && contact.assigned_to && contact.assigned_to !== team.actorUserId}
+                  />
+                </div>
+              )}
 
               {/* Tags */}
               <TagsRow tags={contact.tags || []} onAdd={handleAddTag} onRemove={handleRemoveTag} />
