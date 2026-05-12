@@ -4618,7 +4618,7 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefa
 };
 
 /* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns, stoneStatusMap = {} }) => {
+const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns, stoneStatusMap = {}, onAssign, assigningSku }) => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
 
@@ -4924,8 +4924,8 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                     )}
                     <StoneAssignmentChip
                       stone={stone}
-                      onAssign={handleAssignStone}
-                      busy={assigningStoneSku === stone.sku}
+                      onAssign={onAssign}
+                      busy={assigningSku === stone.sku}
                     />
                   </div>
                   <div className="flex items-center gap-2 mt-1">
@@ -7937,6 +7937,8 @@ const StoneSearchPage = () => {
               priceMode={priceMode}
               stoneStatusMap={stoneStatusMap}
               activeDefaultColumns={inventoryMode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : inventoryMode === 'gemstones' ? GEMSTONE_DEFAULT_COLUMNS : JEWELRY_DEFAULT_COLUMNS}
+              onAssign={handleAssignStone}
+              assigningSku={assigningStoneSku}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
