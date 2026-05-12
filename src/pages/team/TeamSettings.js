@@ -5,6 +5,7 @@ import {
   inviteTeamMember,
   updateTeamMember,
   removeTeamMember,
+  resendTeamInvite,
   fetchTeamLeaderboard,
 } from "../../services/teamApi";
 import MemberAvatar from "../../components/team/MemberAvatar";
@@ -28,6 +29,24 @@ const fmtMoney = (n, cur = "USD") => {
       style: "currency", currency: cur, maximumFractionDigits: 0,
     }).format(v);
   } catch { return `${cur} ${v.toLocaleString()}`; }
+};
+
+// "5 minutes ago" / "3 hours ago" / "2 days ago" — keeps copy honest about
+// when the last invite went out so the admin knows when to nudge.
+const timeAgo = (iso) => {
+  if (!iso) return "";
+  const ts = new Date(iso).getTime();
+  if (!Number.isFinite(ts)) return "";
+  const diff = Math.max(0, Date.now() - ts);
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d} day${d === 1 ? "" : "s"} ago`;
+  const mo = Math.floor(d / 30);
+  return `${mo} month${mo === 1 ? "" : "s"} ago`;
 };
 
 const RoleBadge = ({ role }) => (
@@ -55,6 +74,7 @@ const TeamSettings = () => {
   const [inviting, setInviting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({ name: "", commissionPct: "", quotaMonthly: "" });
+  const [resendingId, setResendingId] = useState(null);
 
   const loadLeaderboard = useCallback(async () => {
     if (!team.actor?.id) return;
@@ -116,8 +136,19 @@ const TeamSettings = () => {
     }
     setInviting(true);
     try {
-      await inviteTeamMember(team.actor, payload);
-      toast.success(`Invited ${payload.name}`);
+      const r = await inviteTeamMember(team.actor, payload);
+      const emailSent    = r?.email?.sent === true;
+      const emailSkipped = r?.email?.skipped === true;
+      if (emailSent) {
+        toast.success(`Invitation email sent to ${payload.name}`);
+      } else if (emailSkipped) {
+        toast(
+          `${payload.name} added — email service not configured, share the sign-in link manually.`,
+          { icon: "ℹ️", duration: 6000 }
+        );
+      } else {
+        toast.success(`${payload.name} added (email delivery failed — try Resend later)`);
+      }
       try { formEl?.reset(); } catch { /* form may have unmounted already */ }
       setShowInvite(false);
       await team.refresh();
@@ -126,6 +157,20 @@ const TeamSettings = () => {
       toast.error(err.message || "Invite failed");
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleResend = async (m) => {
+    if (!m?.id) return;
+    setResendingId(m.id);
+    try {
+      await resendTeamInvite(team.actor, m.id);
+      toast.success(`Invitation re-sent to ${m.name}`);
+      await team.refresh();
+    } catch (err) {
+      toast.error(err.message || "Resend failed");
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -278,6 +323,8 @@ const TeamSettings = () => {
         {[owner, ...reps].filter(Boolean).map((m) => {
           const lb = leaderboard.find((x) => x.memberId === m.id) || {};
           const isEditing = editingId === m.id;
+          const isPending = !m.clerk_user_id && m.role !== "owner";
+          const lastInviteIso = m.last_invited_at || m.invited_at;
           return (
             <div
               key={m.id}
@@ -298,8 +345,14 @@ const TeamSettings = () => {
                   <div className="text-xs text-stone-500 truncate">{m.email}</div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <RoleBadge role={m.role} />
-                    {!m.clerk_user_id && m.role !== "owner" && <PendingBadge />}
+                    {isPending && <PendingBadge />}
                   </div>
+                  {isPending && lastInviteIso && (
+                    <div className="mt-1 text-[10px] text-stone-400 leading-tight">
+                      Invited {timeAgo(lastInviteIso)}
+                      {m.invite_count > 1 && ` · ${m.invite_count}x sent`}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -351,7 +404,7 @@ const TeamSettings = () => {
                 </MobileStat>
               </div>
 
-              <div className="flex gap-2 mt-3 pt-3 border-t border-stone-100">
+              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-stone-100">
                 {isEditing ? (
                   <>
                     <button
@@ -369,6 +422,19 @@ const TeamSettings = () => {
                   </>
                 ) : (
                   <>
+                    {isPending && (
+                      <button
+                        onClick={() => handleResend(m)}
+                        disabled={resendingId === m.id}
+                        className={`flex-1 basis-full rounded-lg px-3 py-2 text-xs font-medium transition ${
+                          resendingId === m.id
+                            ? "bg-emerald-50 text-emerald-400 cursor-wait ring-1 ring-emerald-100"
+                            : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 active:bg-emerald-200"
+                        }`}
+                      >
+                        {resendingId === m.id ? "Sending…" : "Resend invitation email"}
+                      </button>
+                    )}
                     <button
                       onClick={() => startEdit(m)}
                       className="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 active:bg-stone-100"
@@ -422,6 +488,8 @@ const TeamSettings = () => {
               {[owner, ...reps].filter(Boolean).map((m) => {
                 const lb = leaderboard.find((x) => x.memberId === m.id) || {};
                 const isEditing = editingId === m.id;
+                const isPending = !m.clerk_user_id && m.role !== "owner";
+                const lastInviteIso = m.last_invited_at || m.invited_at;
                 return (
                   <tr key={m.id} className="hover:bg-stone-50/60">
                     <td className="px-4 py-3">
@@ -438,7 +506,17 @@ const TeamSettings = () => {
                             <div className="font-semibold text-stone-800 truncate">{m.name}</div>
                           )}
                           <div className="text-xs text-stone-500 truncate">{m.email}</div>
-                          {!m.clerk_user_id && m.role !== "owner" && <PendingBadge />}
+                          {isPending && (
+                            <div className="mt-0.5 flex items-center gap-1.5">
+                              <PendingBadge />
+                              {lastInviteIso && (
+                                <span className="text-[10px] text-stone-400">
+                                  · Invited {timeAgo(lastInviteIso)}
+                                  {m.invite_count > 1 && ` · ${m.invite_count}x`}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -502,6 +580,20 @@ const TeamSettings = () => {
                         </>
                       ) : (
                         <>
+                          {isPending && (
+                            <button
+                              onClick={() => handleResend(m)}
+                              disabled={resendingId === m.id}
+                              title="Resend invitation email"
+                              className={`mr-2 rounded-md px-2.5 py-1 text-xs font-medium ring-1 transition ${
+                                resendingId === m.id
+                                  ? "bg-emerald-50 text-emerald-400 ring-emerald-100 cursor-wait"
+                                  : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+                              }`}
+                            >
+                              {resendingId === m.id ? "Sending…" : "Resend"}
+                            </button>
+                          )}
                           <button
                             onClick={() => startEdit(m)}
                             className="rounded-md border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50"
@@ -535,8 +627,9 @@ const TeamSettings = () => {
       </section>
 
       <p className="text-[11px] text-stone-400 mt-4 leading-relaxed">
-        Tip: when a rep signs in for the first time with the email you invited, they're linked automatically.
-        Until then, their row shows <span className="font-medium">Pending sign-in</span>.
+        Tip: every new rep gets an invitation email automatically. Once they sign in with that email
+        they're linked to your team. Until then their row shows <span className="font-medium">Pending sign-in</span> —
+        use <span className="font-medium">Resend</span> if their first email got lost.
       </p>
 
       <style>{`

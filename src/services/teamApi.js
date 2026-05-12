@@ -70,6 +70,17 @@ export const removeTeamMember = (user, memberId) =>
     headers: authHeaders(user),
   }).then(json);
 
+/* POST /api/team/members/:id/resend-invite
+ * Owner-only. Re-sends the invite email and bumps the row's last_invited_at. */
+export const resendTeamInvite = (user, memberId) =>
+  fetch(
+    `${API_BASE}/api/team/members/${memberId}/resend-invite${qs({ userId: user?.id, userEmail: user?.email })}`,
+    {
+      method: "POST",
+      headers: authHeaders(user),
+    }
+  ).then(json);
+
 export const fetchTeamLeaderboard = (user) =>
   fetch(`${API_BASE}/api/team/leaderboard${qs({ userId: user?.id, userEmail: user?.email })}`, {
     headers: authHeaders(user),
