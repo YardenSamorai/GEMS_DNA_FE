@@ -9,6 +9,7 @@ import { Toaster } from "react-hot-toast";
 import InventoryHub from "./pages/InventoryHub";
 import JewelryItemDetail from "./pages/jewelry/JewelryItemDetail";
 import CustomerSharePage from "./pages/share/CustomerSharePage";
+import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
 import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
@@ -455,6 +456,17 @@ function AppContent() {
               workshop sends to the buyer. Rendered outside <AppLayout> so
               the customer never sees our sidebar / TopBar / Clerk gates. */}
           <Route path="/share/:token" element={<CustomerSharePage />} />
+
+          {/* Standalone auth pages — must be registered BEFORE the catch-all
+              `/:stone_id` route below, otherwise Clerk's hosted SignIn/SignUp
+              paths get matched as a stone id and the user lands on a blank
+              DNA card. The pages also accept an `?email=` query that we
+              pre-fill into the form (used by the team-invite emails). Clerk
+              uses subpaths under /sign-in and /sign-up for verification
+              steps, so we mount them with a trailing /* wildcard. */}
+          <Route path="/sign-in/*" element={<SignInPage />} />
+          <Route path="/sign-up/*" element={<SignUpPage />} />
+
           <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
           <Route path="/:stone_id" element={<DiamondCard />} />
         </Routes>
