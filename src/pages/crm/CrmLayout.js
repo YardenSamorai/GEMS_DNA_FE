@@ -41,6 +41,24 @@ const NAV = [
     ),
   },
   {
+    to: "/crm/stores",
+    label: "Stores",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 21h18M3 7v14m18-14v14M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
+      </svg>
+    ),
+  },
+  {
+    to: "/crm/memos",
+    label: "Memos",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
     to: "/crm/settings",
     label: "Settings",
     icon: (
@@ -164,10 +182,16 @@ export default function CrmLayout() {
         <Outlet key={location.pathname} />
       </div>
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile bottom tab bar — uses CSS grid with `repeat(N,1fr)` so it
+          stays balanced as we add tabs (Stores + Memos pushed us from 4
+          to 6 items). On very narrow screens this still fits because
+          each cell is just an icon + tiny label. */}
       <nav
-        className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 grid grid-cols-4"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}
+        className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 grid"
+        style={{
+          paddingBottom: "max(env(safe-area-inset-bottom), 0px)",
+          gridTemplateColumns: `repeat(${navWithBadges.length}, minmax(0, 1fr))`,
+        }}
       >
         {navWithBadges.map((item) => (
           <NavLink
@@ -175,7 +199,7 @@ export default function CrmLayout() {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `relative flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
+              `relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
                 isActive ? "text-stone-900" : "text-stone-400 hover:text-stone-700"
               }`
             }
@@ -190,7 +214,7 @@ export default function CrmLayout() {
                     </span>
                   )}
                 </div>
-                {item.label}
+                <span className="truncate max-w-full">{item.label}</span>
               </>
             )}
           </NavLink>

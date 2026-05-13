@@ -17,12 +17,16 @@ import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
 import CrmContacts from "./pages/crm/CrmContacts";
+import CrmCompanies from "./pages/crm/CrmCompanies";
+import CrmMemos from "./pages/crm/CrmMemos";
+import MemoDetail from "./pages/crm/MemoDetail";
 import CustomerProfile from "./pages/crm/CustomerProfile";
 import CrmDeals from "./pages/crm/CrmDeals";
 import CrmTasks from "./pages/crm/CrmTasks";
 import CrmSettings from "./pages/crm/CrmSettings";
 import TeamSettings from "./pages/team/TeamSettings";
 import { TeamProvider, useTeam } from "./context/TeamContext";
+import { MemoSkusProvider } from "./context/MemoSkusContext";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 
@@ -361,7 +365,12 @@ function App() {
   return (
     <ThemeProvider>
       <TeamProvider>
-        <AppContent />
+        {/* MemoSkusProvider exposes the set of SKUs currently sitting on
+            an active memo so any inventory view can show an "On memo"
+            chip without per-row queries. */}
+        <MemoSkusProvider>
+          <AppContent />
+        </MemoSkusProvider>
       </TeamProvider>
     </ThemeProvider>
   );
@@ -443,6 +452,9 @@ function AppContent() {
               <Route path="contacts/:id" element={<CrmContacts />} />
               <Route path="deals" element={<CrmDeals />} />
               <Route path="tasks" element={<CrmTasks />} />
+              <Route path="stores" element={<CrmCompanies />} />
+              <Route path="memos" element={<CrmMemos />} />
+              <Route path="memos/:id" element={<MemoDetail />} />
               <Route path="settings" element={<CrmSettings />} />
             </Route>
           </Route>

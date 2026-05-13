@@ -6,6 +6,7 @@ import { shareToWhatsApp } from "../helpers/whatsappHelpers";
 import { StoneDetails } from "./StoneCard";
 import TagSelector from "./TagSelector";
 import ColumnSettingsModal from "./ColumnSettingsModal";
+import OnMemoBadge from "../../../components/OnMemoBadge";
 
 const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns }) => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
@@ -111,7 +112,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
   const renderCell = (colId, stone) => {
     const cellBase = "px-3 py-2 whitespace-nowrap";
     switch (colId) {
-      case 'sku': return <td key={colId} className={cellBase}><span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span></td>;
+      case 'sku': return (
+        <td key={colId} className={cellBase}>
+          <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
+          <OnMemoBadge sku={stone.sku} type="stone" size="sm" className="ml-1.5" />
+        </td>
+      );
       case 'img': return (
         <td key={colId} className="px-3 py-2">
           <div
@@ -276,9 +282,12 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="inline-block font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
-                    {stone.sku}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-block font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
+                      {stone.sku}
+                    </span>
+                    <OnMemoBadge sku={stone.sku} type="stone" size="sm" />
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-sm font-medium text-stone-800">{getDisplayShape(stone.shape)}</span>
                     <span className="text-stone-300">•</span>

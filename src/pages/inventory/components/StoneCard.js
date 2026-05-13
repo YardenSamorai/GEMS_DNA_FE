@@ -6,6 +6,7 @@ import { shareToWhatsApp } from "../helpers/whatsappHelpers";
 import TagSelector from "./TagSelector";
 import MemberAvatar from "../../../components/team/MemberAvatar";
 import { useTeam } from "../../../context/TeamContext";
+import OnMemoBadge from "../../../components/OnMemoBadge";
 
 const StoneAssignmentChip = ({ stone, onAssign, busy }) => {
   const team = useTeam();
@@ -131,6 +132,7 @@ const StoneCard = ({
                   onAssign={onAssign}
                   busy={assigningSku === stone.sku}
                 />
+                <OnMemoBadge sku={stone.sku} type="stone" size="sm" />
               </div>
               <h3 className="font-medium text-foreground mt-1 text-sm">{getDisplayShape(stone.shape)}</h3>
             </div>
