@@ -348,7 +348,11 @@ export default function StonePicker({ onClose, onSelect }) {
                       {item.priceTotal != null && (
                         <div className="text-right shrink-0">
                           <div className="text-sm font-semibold text-stone-900">${Number(item.priceTotal).toLocaleString()}</div>
-                          <div className="text-[10px] text-stone-400">${Math.round(Number(item.priceTotal) / 2).toLocaleString()} neto</div>
+                          {/* Jewelry prices are already neto in the catalog, so the
+                              "$X neto" footnote only applies to stones (Bruto → Neto = ÷2). */}
+                          {tab !== "jewelry" && (
+                            <div className="text-[10px] text-stone-400">${Math.round(Number(item.priceTotal) / 2).toLocaleString()} neto</div>
+                          )}
                         </div>
                       )}
                     </button>

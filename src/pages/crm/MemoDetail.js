@@ -65,14 +65,18 @@ export default function MemoDetail() {
   }, [memo]);
 
   const handleAddItems = async (picked) => {
+    // Jewelry catalog prices are already neto (no Bruto → Neto split),
+    // stones are stored as Bruto so we halve them for the default memo
+    // price. The user can always edit memoPrice per row afterwards.
     const items = picked.map((s) => {
       const isJewelry = s.category === "Jewelry";
-      const bruto = Number(s.priceTotal || 0);
+      const listed = Number(s.priceTotal || 0);
+      const defaultPrice = isJewelry ? listed : (listed ? Math.round(listed / 2) : null);
       return {
         itemType: isJewelry ? "jewelry" : "stone",
         itemSku: s.sku,
         itemId: isJewelry ? null : String(s.id || ""),
-        memoPrice: bruto ? Math.round(bruto / 2) : null,
+        memoPrice: defaultPrice,
         snapshot: {
           shape: s.shape, weightCt: s.weightCt, color: s.color, clarity: s.clarity,
           lab: s.lab, certificateNumber: s.certificateNumber, imageUrl: s.imageUrl,
