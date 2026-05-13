@@ -221,16 +221,10 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
               {/* Numbers */}
               <div className="grid grid-cols-2 gap-3">
                 <Card label="Deal value">
-                  <div className="flex items-center gap-1">
-                    <span className="text-stone-500">$</span>
-                    <input
-                      type="number" min="0"
-                      value={deal.value || 0}
-                      onChange={(e) => setDeal({ ...deal, value: e.target.value })}
-                      onBlur={(e) => handleField("value", Number(e.target.value) || 0)}
-                      className="w-full bg-transparent text-lg font-semibold text-stone-900 focus:outline-none"
-                    />
-                  </div>
+                  <DealValueInput
+                    value={deal.value}
+                    onCommit={(n) => handleField("value", n)}
+                  />
                 </Card>
                 <Card label="Items total">
                   <div className="text-lg font-semibold text-stone-900">{fmt(itemsTotal)}</div>
@@ -438,3 +432,56 @@ const Card = ({ label, children }) => (
     {children}
   </div>
 );
+
+/**
+ * DealValueInput
+ * Editable currency field that mirrors the look of the read-only "Items total"
+ * card (commas, $-prefix, large semibold). Internally:
+ *   - When NOT focused: show formatted string via toLocaleString() so 582126
+ *     renders as "582,126".
+ *   - When focused: switch to a raw digit/decimal string the user can edit
+ *     freely without commas getting in the way of caret positioning.
+ *   - Only commits to the parent on blur, parsed back to a Number.
+ * Empty input is treated as 0 to match the previous behavior.
+ */
+function DealValueInput({ value, onCommit }) {
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState(String(value ?? 0));
+
+  useEffect(() => {
+    if (!focused) setRaw(String(value ?? 0));
+  }, [value, focused]);
+
+  const display = focused
+    ? raw
+    : Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-stone-500">$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={display}
+        onFocus={(e) => {
+          setFocused(true);
+          setRaw(String(value ?? 0));
+          requestAnimationFrame(() => e.target.select());
+        }}
+        onChange={(e) => {
+          // Allow digits + a single dot. Strip everything else so paste-with-commas
+          // ("$582,126.00") still produces a valid number.
+          const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+          const oneDot = cleaned.replace(/(\..*?)\..*/g, "$1");
+          setRaw(oneDot);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          const n = Number(raw) || 0;
+          if (n !== Number(value || 0)) onCommit(n);
+        }}
+        className="w-full bg-transparent text-lg font-semibold text-stone-900 focus:outline-none"
+      />
+    </div>
+  );
+}
