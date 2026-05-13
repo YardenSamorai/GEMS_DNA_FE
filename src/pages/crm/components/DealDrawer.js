@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import {
   fetchDeal,
@@ -27,7 +28,9 @@ const timeAgo = (d) => {
 };
 
 export default function DealDrawer({ dealId, onClose, onChanged }) {
+  const { user } = useUser();
   const team = useTeam();
+  const userId = user?.id || null;
   const [deal, setDeal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
@@ -35,7 +38,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
 
   const handleAssign = async (next) => {
     try {
-      const updated = await updateDeal(dealId, { assignedTo: next });
+      const updated = await updateDeal(userId, dealId, { assignedTo: next });
       setDeal((d) => ({ ...d, ...updated }));
       onChanged?.();
       toast.success(next ? "Assigned" : "Unassigned");
@@ -43,18 +46,19 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
   };
 
   const reload = async () => {
+    if (!userId || !dealId) return;
     setLoading(true);
     try {
-      setDeal(await fetchDeal(dealId));
+      setDeal(await fetchDeal(userId, dealId));
     } catch (e) { toast.error(e.message); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [dealId]);
+  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [dealId, userId]);
 
   const handleField = async (field, value) => {
     try {
-      const updated = await updateDeal(dealId, { [field]: value });
+      const updated = await updateDeal(userId, dealId, { [field]: value });
       setDeal((d) => ({ ...d, ...updated }));
       onChanged?.();
     } catch (e) { toast.error(e.message); }
@@ -80,7 +84,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
       },
     }));
     try {
-      await addDealItems(dealId, items);
+      await addDealItems(userId, dealId, items);
       toast.success(`${items.length} item(s) added`);
       setShowPicker(false);
       reload();
@@ -90,14 +94,14 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
 
   const handleItemPrice = async (itemId, price) => {
     try {
-      await updateDealItem(itemId, { customPrice: Number(price) || 0 });
+      await updateDealItem(userId, itemId, { customPrice: Number(price) || 0 });
       reload();
     } catch (e) { toast.error(e.message); }
   };
 
   const handleRemoveItem = async (itemId) => {
     try {
-      await deleteDealItem(itemId);
+      await deleteDealItem(userId, itemId);
       reload();
       onChanged?.();
     } catch (e) { toast.error(e.message); }
@@ -106,7 +110,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
   const handleDelete = async () => {
     if (!window.confirm("Delete this deal?")) return;
     try {
-      await deleteDeal(dealId);
+      await deleteDeal(userId, dealId);
       toast.success("Deal deleted");
       onChanged?.();
       onClose();

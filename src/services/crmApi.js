@@ -155,12 +155,15 @@ export const ensureOccasionTasks = (userId, opts = {}) =>
     body: JSON.stringify({ userId, days: opts.days ?? 30, leadDays: opts.leadDays ?? 7 }),
   }).then(json);
 
-/* ---------- Deals ---------- */
+/* ---------- Deals ----------
+ * All endpoints below pass `userId` so the BE can resolve team context
+ * (owner vs. rep) and enforce assignment-based visibility. The detail GET
+ * actively rejects requests without userId with "userId is required". */
 export const fetchDeals = (userId, filters = {}) =>
   fetch(`${API_BASE}/api/crm/deals${qs({ userId, ...filters })}`).then(json);
 
-export const fetchDeal = (id) =>
-  fetch(`${API_BASE}/api/crm/deals/${id}`).then(json);
+export const fetchDeal = (userId, id) =>
+  fetch(`${API_BASE}/api/crm/deals/${id}${qs({ userId })}`).then(json);
 
 export const createDeal = (payload) =>
   fetch(`${API_BASE}/api/crm/deals`, {
@@ -169,32 +172,36 @@ export const createDeal = (payload) =>
     body: JSON.stringify(payload),
   }).then(json);
 
-export const updateDeal = (id, payload) =>
-  fetch(`${API_BASE}/api/crm/deals/${id}`, {
+export const updateDeal = (userId, id, payload) =>
+  fetch(`${API_BASE}/api/crm/deals/${id}${qs({ userId })}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ userId, ...payload }),
   }).then(json);
 
-export const deleteDeal = (id) =>
-  fetch(`${API_BASE}/api/crm/deals/${id}`, { method: "DELETE" }).then(json);
+export const deleteDeal = (userId, id) =>
+  fetch(`${API_BASE}/api/crm/deals/${id}${qs({ userId })}`, {
+    method: "DELETE",
+  }).then(json);
 
-export const addDealItems = (dealId, items) =>
-  fetch(`${API_BASE}/api/crm/deals/${dealId}/items`, {
+export const addDealItems = (userId, dealId, items) =>
+  fetch(`${API_BASE}/api/crm/deals/${dealId}/items${qs({ userId })}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ userId, items }),
   }).then(json);
 
-export const updateDealItem = (itemId, payload) =>
-  fetch(`${API_BASE}/api/crm/deal-items/${itemId}`, {
+export const updateDealItem = (userId, itemId, payload) =>
+  fetch(`${API_BASE}/api/crm/deal-items/${itemId}${qs({ userId })}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ userId, ...payload }),
   }).then(json);
 
-export const deleteDealItem = (itemId) =>
-  fetch(`${API_BASE}/api/crm/deal-items/${itemId}`, { method: "DELETE" }).then(json);
+export const deleteDealItem = (userId, itemId) =>
+  fetch(`${API_BASE}/api/crm/deal-items/${itemId}${qs({ userId })}`, {
+    method: "DELETE",
+  }).then(json);
 
 /* ---------- Tasks ---------- */
 export const fetchTasks = (userId, filters = {}) =>

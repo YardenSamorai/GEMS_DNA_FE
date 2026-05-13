@@ -111,7 +111,7 @@ export default function CrmDeals() {
     if (deal.stage === newStage) return;
     setDeals((prev) => prev.map((d) => (d.id === deal.id ? { ...d, stage: newStage } : d)));
     try {
-      await updateDeal(deal.id, { stage: newStage });
+      await updateDeal(user.id, deal.id, { stage: newStage });
       toast.success(`Moved to ${DEAL_STAGES.find((s) => s.value === newStage)?.label}`);
     } catch (e) {
       toast.error(e.message);

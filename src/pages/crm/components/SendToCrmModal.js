@@ -98,7 +98,7 @@ export default function SendToCrmModal({ stones, onClose, onSuccess }) {
         });
         dealId = created.id;
       } else if (dealId) {
-        await addDealItems(dealId, items);
+        await addDealItems(user.id, dealId, items);
       }
       toast.success(`Added ${stones.length} item(s) to deal`);
       onSuccess?.(dealId);
