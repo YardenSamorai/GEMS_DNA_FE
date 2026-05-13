@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { ensureOccasionTasks } from "../../services/crmApi";
 import { activityRowLink, activityIconMeta, timeAgo } from "../../utils/activity";
+import { useTeam } from "../../context/TeamContext";
 
 const API_BASE =
   process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
@@ -131,6 +132,8 @@ const ActivityIcon = ({ entityType, action }) => {
  * ───────────────────────────────────────────────────────────────────────── */
 const OverviewTab = ({ onJumpTab, drillTabs }) => {
   const { user, isSignedIn } = useUser();
+  const team = useTeam();
+  const isRep = team?.isOwner === false;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -156,8 +159,11 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
   if (!isSignedIn) return null;
 
   /* ─── Cards definition (driven by API response) ─────────── */
+  // Cards flagged `ownerOnly` are hidden from sales reps because they
+  // either link to admin-only surfaces (Production board, Reports tab)
+  // or describe workshop-wide totals reps never personally touch.
   const k = data?.kpis || {};
-  const kpiCards = [
+  const allKpiCards = [
     {
       to: "/dashboard?tab=crm",
       label: "Pipeline",
@@ -173,6 +179,7 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
       sub: `${fmtCount(k.wip?.count)} jewelry items in production`,
       tone: "violet",
       icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10l9-7 9 7-9 12-9-12z"/></svg>,
+      ownerOnly: true,
     },
     {
       to: "/inventory",
@@ -181,6 +188,7 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
       sub: `${fmtCount(k.inventory?.count)} stones in stock`,
       tone: "sky",
       icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 4-9 16-9-16 9-4z"/></svg>,
+      ownerOnly: true,
     },
     {
       to: "/dashboard?tab=reports",
@@ -189,6 +197,7 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
       sub: `${fmtCount(k.sold_mtd?.count)} pieces this month`,
       tone: "amber",
       icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>,
+      ownerOnly: true,
     },
     {
       to: "/crm/tasks",
@@ -206,6 +215,7 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
       sub: "awaiting handoff",
       tone: "indigo",
       icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      ownerOnly: true,
     },
     {
       to: "/crm/contacts?folder=dna",
@@ -224,6 +234,7 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
       icon: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 15.5V19a2 2 0 01-2 2H5a2 2 0 01-2-2v-3.5M3 7.5l1.5 1.5L9 4.5 13.5 9 18 4.5l3 3v4L18 14.5l-4.5-4.5L9 14.5 4.5 10 3 11.5v-4z"/></svg>,
     },
   ];
+  const kpiCards = isRep ? allKpiCards.filter((c) => !c.ownerOnly) : allKpiCards;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
@@ -233,7 +244,9 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
           {greeting()}{user?.firstName ? `, ${user.firstName}` : ""}
         </h1>
         <p className="mt-0.5 text-sm text-stone-500">
-          A live snapshot across CRM, workshop, stones, DNA leads, and customer occasions.
+          {isRep
+            ? "Your open deals, today's tasks, and the customers waiting to hear from you."
+            : "A live snapshot across CRM, workshop, stones, DNA leads, and customer occasions."}
         </p>
       </header>
 
@@ -244,15 +257,15 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
         </div>
       )}
 
-      {/* ─── KPI strip (8 cards) ─── */}
+      {/* ─── KPI strip (8 cards for owners, 5 for reps) ─── */}
       <section>
         <SectionHeader
-          title="Today across the company"
+          title={isRep ? "Your day at a glance" : "Today across the company"}
           hint="Click any card to jump straight to where the action lives."
         />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
           {loading
-            ? Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: kpiCards.length }).map((_, i) => (
                 <div key={i} className="h-[112px] rounded-xl border border-stone-200 bg-white animate-pulse" />
               ))
             : kpiCards.map((c) => <KpiCard key={c.label} {...c} />)}

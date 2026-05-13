@@ -22,7 +22,7 @@ import CrmDeals from "./pages/crm/CrmDeals";
 import CrmTasks from "./pages/crm/CrmTasks";
 import CrmSettings from "./pages/crm/CrmSettings";
 import TeamSettings from "./pages/team/TeamSettings";
-import { TeamProvider } from "./context/TeamContext";
+import { TeamProvider, useTeam } from "./context/TeamContext";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 
@@ -418,16 +418,16 @@ function AppContent() {
                 item detail page) keeps its own dedicated route. */}
             <Route path="/jewelry/items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
             <Route path="/jewelry/items/:id" element={<JewelryItemDetail />} />
-            <Route path="/jewelry/production" element={<ProductionBoard />} />
-            <Route path="/jewelry/sold" element={<JewelrySoldItems />} />
-            <Route path="/jewelry/designs" element={<JewelryDesigns />} />
-            <Route path="/jewelry/settings" element={<JewelrySettings />} />
+            <Route path="/jewelry/production" element={<OwnerOnly><ProductionBoard /></OwnerOnly>} />
+            <Route path="/jewelry/sold" element={<OwnerOnly><JewelrySoldItems /></OwnerOnly>} />
+            <Route path="/jewelry/designs" element={<OwnerOnly><JewelryDesigns /></OwnerOnly>} />
+            <Route path="/jewelry/settings" element={<OwnerOnly><JewelrySettings /></OwnerOnly>} />
 
             {/* Back-compat: old /jewelry-items URLs → new unified inventory */}
             <Route path="/jewelry-items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
             <Route path="/jewelry-items/:id" element={<RedirectJewelryItem />} />
 
-            <Route path="/qa-data" element={<QAPage />} />
+            <Route path="/qa-data" element={<OwnerOnly><QAPage /></OwnerOnly>} />
             {/* Back-compat: old /qa URL still resolves to the same data-quality page. */}
             <Route path="/qa" element={<Navigate to="/qa-data" replace />} />
             {/* Sprint 3 — sales-rep management (admin) + per-rep KPIs. */}
@@ -476,6 +476,40 @@ function AppContent() {
 }
 
 const HomeShortcut = ({ to }) => <Navigate to={to} replace />;
+
+// Route-level guard for owner-only pages (Production board, Designs, QA
+// data, Jewelry settings). Reps that hit these URLs directly land on a
+// friendly screen pointing them back to their CRM workspace instead of
+// rendering the page (and confusing them with admin-only data).
+const OwnerOnly = ({ children }) => {
+  const team = useTeam();
+  const { theme } = useTheme();
+  if (team.loading) {
+    return (
+      <div className={`flex min-h-[60vh] items-center justify-center ${theme === "dark" ? "text-stone-400" : "text-stone-500"}`}>
+        Loading…
+      </div>
+    );
+  }
+  if (team.isOwner) return children;
+  return (
+    <div className="max-w-2xl mx-auto p-8 text-center">
+      <div className="inline-flex w-16 h-16 items-center justify-center rounded-full bg-amber-50 mb-4">
+        <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                d="M12 9v3m0 4h.01M5 19h14a2 2 0 001.7-3L13.7 5a2 2 0 00-3.4 0L3.3 16A2 2 0 005 19z" />
+        </svg>
+      </div>
+      <h2 className="text-xl font-bold text-stone-800">Workshop admins only</h2>
+      <p className="text-stone-500 mt-2">
+        This page manages production / inventory tooling. Your sales workspace lives in
+        <Link to="/crm/contacts" className="ml-1 font-semibold text-emerald-700 hover:text-emerald-800">CRM</Link>
+        {" — "}or jump straight to your{" "}
+        <Link to="/dashboard?tab=crm" className="font-semibold text-emerald-700 hover:text-emerald-800">CRM dashboard</Link>.
+      </p>
+    </div>
+  );
+};
 
 // Redirect old /jewelry-items/:id → /jewelry/items/:id
 const RedirectJewelryItem = () => {

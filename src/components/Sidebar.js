@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../App";
+import { useTeam } from "../context/TeamContext";
 
 const DiamondLogo = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
@@ -56,8 +57,25 @@ const Chevron = ({ open, className = "" }) => (
 const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, onMobileClose }) => {
   const location = useLocation();
   const { theme } = useTheme();
+  const team = useTeam();
   const isDark = theme === "dark";
   const [expanded, setExpanded] = useState(loadExpanded);
+
+  // Filter out owner-only sections / items for sales reps. We do this here
+  // (not in App.js) so the same NAV_SECTIONS list still feeds the TopBar
+  // title resolver — reps simply never see the entries in their sidebar.
+  // Sections with `ownerOnly: true` are dropped wholesale; individual items
+  // can also be flagged `ownerOnly: true` for partial hiding.
+  const visibleSections = useMemo(() => {
+    if (team?.isOwner !== false) return navSections; // owner / loading / unknown -> show all
+    return navSections
+      .filter((s) => !s.ownerOnly)
+      .map((s) => ({
+        ...s,
+        items: (s.items || []).filter((it) => !it.ownerOnly),
+      }))
+      .filter((s) => (s.items || []).length > 0);
+  }, [navSections, team?.isOwner]);
 
   const toggleSection = (key) => {
     setExpanded((prev) => {
@@ -72,7 +90,7 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
   useEffect(() => {
     let changed = false;
     const next = new Set(expanded);
-    for (const section of navSections) {
+    for (const section of visibleSections) {
       for (const item of section.items) {
         if (!item.children) continue;
         const childActive = item.children.some((c) => c.matches(location.pathname));
@@ -229,7 +247,7 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
       <div className={`mx-3 mb-2 border-t ${isDark ? "border-stone-800" : "border-stone-200"}`} />
 
       <nav className="flex-1 overflow-y-auto overflow-x-visible px-2 py-1">
-        {navSections.map((section, idx) => (
+        {visibleSections.map((section, idx) => (
           <div key={section.label || `__top-${idx}`} className={idx > 0 ? "mt-1" : ""}>
             {section.label && (
               collapsed ? (

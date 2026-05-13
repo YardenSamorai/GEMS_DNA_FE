@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 
 import HomePage from "./HomePage";              // Stones tab body (the legacy stones dashboard)
@@ -6,6 +6,7 @@ import CrmDashboard from "./crm/CrmDashboard";  // CRM tab body
 import JewelryDashboard from "./jewelry/JewelryDashboard"; // Jewelry tab body
 import Reports from "./jewelry/Reports";        // Reports tab body
 import OverviewTab from "../components/dashboard/OverviewTab";
+import { useTeam } from "../context/TeamContext";
 
 /* ============================================================================
  * Unified Dashboard — Sprint 1.A of the Unified System Spine roadmap.
@@ -30,6 +31,10 @@ import OverviewTab from "../components/dashboard/OverviewTab";
  * the corresponding tab — see the routes in App.js.
  * ============================================================================ */
 
+// `ownerOnly` tabs are hidden from sales reps — they expose workshop-wide
+// data (every stone in inventory, every jewelry item in production, the
+// full revenue report) that reps shouldn't see. Reps still get Overview
+// (their own KPIs) and CRM (their own contacts/deals/tasks) tabs.
 const TABS = [
   {
     id: "overview",
@@ -40,6 +45,7 @@ const TABS = [
     id: "stones",
     label: "Stones",
     description: "Inventory, distribution & QA",
+    ownerOnly: true,
   },
   {
     id: "crm",
@@ -50,11 +56,13 @@ const TABS = [
     id: "jewelry",
     label: "Jewelry",
     description: "Production, sales & items",
+    ownerOnly: true,
   },
   {
     id: "reports",
     label: "Reports",
     description: "Revenue & performance",
+    ownerOnly: true,
   },
 ];
 
@@ -75,8 +83,19 @@ const CrmTabWrapper = () => (
 
 const Dashboard = () => {
   const [params, setParams] = useSearchParams();
+  const team = useTeam();
+
+  // Reps only see Overview + CRM. If a rep deep-links into one of the
+  // owner-only tabs (e.g. /dashboard?tab=stones from an old bookmark) we
+  // silently coerce them back to the safe Overview tab.
+  const visibleTabs = useMemo(() => {
+    if (team?.isOwner !== false) return TABS;
+    return TABS.filter((t) => !t.ownerOnly);
+  }, [team?.isOwner]);
+
   const requested = params.get("tab");
-  const tabId = isValidTab(requested) ? requested : "overview";
+  const tabIsAllowed = visibleTabs.some((t) => t.id === requested);
+  const tabId = tabIsAllowed ? requested : "overview";
 
   const setTab = (id) => {
     setParams(
@@ -101,7 +120,7 @@ const Dashboard = () => {
       <div className="sticky top-0 z-20 border-b border-stone-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-1 overflow-x-auto" aria-label="Dashboard sections">
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -132,7 +151,9 @@ const Dashboard = () => {
         {tabId === "overview" && (
           <OverviewTab
             onJumpTab={setTab}
-            drillTabs={TABS.filter((t) => t.id !== "overview")}
+            // Drill-down chips on Overview should only point at tabs the
+            // current actor can actually open.
+            drillTabs={visibleTabs.filter((t) => t.id !== "overview")}
           />
         )}
         {tabId === "stones" && <HomePage />}
