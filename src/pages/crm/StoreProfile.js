@@ -1,0 +1,843 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
+import toast from "react-hot-toast";
+import {
+  fetchCompany,
+  updateCompany,
+  deleteCompany,
+  COMPANY_TYPES,
+  PAYMENT_TERMS,
+  CURRENCIES,
+  WEEKDAYS,
+} from "../../services/companiesApi";
+import { fetchMemos, MEMO_STATUSES, isMemoEffectivelyExpired } from "../../services/memosApi";
+import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
+import MemoWizard from "./components/MemoWizard";
+
+/**
+ * StoreProfile — full-page Store profile.
+ *
+ * Replaces the old "edit store" modal with a proper profile UI inspired
+ * by CustomerProfile: a hero with logo + cover, a KPI strip, and tabbed
+ * content (Overview / Contacts / Memos / Activity). Edits are inline
+ * per-section instead of a single giant form.
+ */
+export default function StoreProfile() {
+  const { id } = useParams();
+  const { user } = useUser();
+  const navigate = useNavigate();
+  const [store, setStore] = useState(null);
+  const [memos, setMemos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("overview");
+  const [createMemoOpen, setCreateMemoOpen] = useState(false);
+
+  const reload = async () => {
+    if (!user?.id || !id) return;
+    setLoading(true);
+    try {
+      const [s, m] = await Promise.all([
+        fetchCompany(user.id, id),
+        fetchMemos(user.id, { companyId: id }),
+      ]);
+      setStore(s);
+      setMemos(m);
+    } catch (e) {
+      toast.error(e.message);
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [id, user?.id]);
+
+  const kpis = useMemo(() => {
+    if (!memos.length) return { active: 0, itemsOut: 0, totalValue: 0, lifetime: 0, soldValue: 0 };
+    const active = memos.filter((m) => m.status === "out" || m.status === "partially_returned").length;
+    const itemsOut = memos.reduce((a, m) => a + (m.items_out || 0), 0);
+    const totalValue = memos
+      .filter((m) => m.status !== "draft" && m.status !== "closed")
+      .reduce((a, m) => a + Number(m.total_value || 0), 0);
+    const lifetime = memos.length;
+    return { active, itemsOut, totalValue, lifetime };
+  }, [memos]);
+
+  const handlePatch = async (patch) => {
+    try {
+      const updated = await updateCompany(user.id, id, patch);
+      setStore((s) => ({ ...s, ...updated }));
+      toast.success("Saved");
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete "${store.name}"? This cannot be undone.`)) return;
+    try {
+      await deleteCompany(user.id, id);
+      toast.success("Store deleted");
+      navigate("/crm/stores");
+    } catch (e) { toast.error(e.message); }
+  };
+
+  if (loading || !store) {
+    return (
+      <div className="space-y-3 max-w-5xl mx-auto">
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <SkeletonCard lines={4} />
+        <SkeletonCard lines={6} />
+      </div>
+    );
+  }
+
+  const type = COMPANY_TYPES.find((t) => t.value === store.type) || COMPANY_TYPES[0];
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5">
+      {/* Top bar */}
+      <div className="flex items-center justify-between">
+        <Link to="/crm/stores" className="inline-flex items-center gap-1 text-sm text-stone-600 hover:text-stone-900">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Back to stores
+        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCreateMemoOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            New memo
+          </button>
+          <button
+            onClick={handleDelete}
+            className="px-3 py-1.5 rounded-lg bg-white border border-stone-200 text-rose-600 text-xs font-semibold hover:bg-rose-50"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {/* Hero card */}
+      <Hero store={store} type={type} onPatch={handlePatch} />
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Kpi
+          label="Active memos"
+          value={kpis.active}
+          accent="text-blue-600"
+          icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
+        <Kpi
+          label="Items out"
+          value={kpis.itemsOut}
+          accent="text-amber-600"
+          icon="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"
+        />
+        <Kpi
+          label="Open value"
+          value={`$${Number(kpis.totalValue).toLocaleString()}`}
+          accent="text-emerald-600"
+          icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+        <Kpi
+          label="Lifetime memos"
+          value={kpis.lifetime}
+          accent="text-stone-700"
+          icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+        />
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-stone-200">
+        <nav className="flex gap-1 overflow-x-auto">
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "memos",    label: `Memos (${memos.length})` },
+            { id: "contacts", label: `Contacts (${(store.contacts || []).length})` },
+            { id: "settings", label: "Settings" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`shrink-0 px-4 py-2.5 text-sm font-semibold border-b-2 transition ${
+                tab === t.id
+                  ? "border-stone-900 text-stone-900"
+                  : "border-transparent text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab content */}
+      {tab === "overview" && <OverviewTab store={store} memos={memos} onPatch={handlePatch} />}
+      {tab === "memos"    && <MemosTab memos={memos} storeId={store.id} onCreate={() => setCreateMemoOpen(true)} />}
+      {tab === "contacts" && <ContactsTab contacts={store.contacts || []} storeId={store.id} />}
+      {tab === "settings" && <SettingsTab store={store} onPatch={handlePatch} />}
+
+      {createMemoOpen && (
+        <MemoWizard
+          companies={[store]}
+          preselectCompanyId={store.id}
+          onClose={() => setCreateMemoOpen(false)}
+          onCreated={(memo) => { setCreateMemoOpen(false); navigate(`/crm/memos/${memo.id}`); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Hero header (logo + cover + identity) ─────────────── */
+
+function Hero({ store, type, onPatch }) {
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState(store.name);
+  useEffect(() => setName(store.name), [store.name]);
+
+  const initials = (store.name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase();
+  const cover = store.cover_image_url;
+
+  return (
+    <div className="relative bg-white border border-stone-200 rounded-2xl overflow-hidden">
+      {/* Cover */}
+      <div
+        className="h-32 sm:h-40 w-full relative"
+        style={
+          cover
+            ? { backgroundImage: `url(${cover})`, backgroundSize: "cover", backgroundPosition: "center" }
+            : { backgroundImage: "linear-gradient(135deg, #1c1917 0%, #44403c 100%)" }
+        }
+      >
+        {!cover && (
+          <div className="absolute inset-0 opacity-20" style={{
+            backgroundImage: "radial-gradient(circle at 25% 30%, rgba(255,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 75% 70%, rgba(255,255,255,0.1) 0%, transparent 50%)",
+          }} />
+        )}
+        <div className="absolute top-3 right-3">
+          <CoverEditButton store={store} onPatch={onPatch} />
+        </div>
+      </div>
+
+      {/* Identity strip */}
+      <div className="px-4 sm:px-6 pb-5 -mt-10 sm:-mt-12">
+        <div className="flex items-end gap-4">
+          {store.logo_url ? (
+            <img
+              src={store.logo_url}
+              alt={store.name}
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover bg-white ring-4 ring-white shadow-md shrink-0"
+            />
+          ) : (
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-2xl sm:text-3xl ring-4 ring-white shadow-md shrink-0">
+              {initials || "?"}
+            </div>
+          )}
+          <div className="flex-1 min-w-0 pb-1">
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={() => { setEditingName(false); if (name.trim() && name !== store.name) onPatch({ name: name.trim() }); else setName(store.name); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setName(store.name); setEditingName(false); } }}
+                  className="text-xl sm:text-2xl font-bold text-stone-900 bg-stone-50 border-b-2 border-stone-300 focus:outline-none focus:border-stone-900 px-1 w-full"
+                />
+              </div>
+            ) : (
+              <h1
+                onClick={() => setEditingName(true)}
+                title="Click to rename"
+                className="text-xl sm:text-2xl font-bold text-stone-900 cursor-text hover:bg-stone-50 -mx-1 px-1 rounded truncate"
+              >
+                {store.name}
+              </h1>
+            )}
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${type.color}`}>
+                {type.label}
+              </span>
+              {(store.city || store.country) && (
+                <span className="text-xs text-stone-500 inline-flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  {[store.city, store.country].filter(Boolean).join(", ")}
+                </span>
+              )}
+              {store.established_year && (
+                <span className="text-xs text-stone-500">est. {store.established_year}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        {store.description && (
+          <p className="mt-4 text-sm text-stone-600 leading-relaxed">{store.description}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CoverEditButton({ store, onPatch }) {
+  const [open, setOpen] = useState(false);
+  const [logo, setLogo] = useState(store.logo_url || "");
+  const [cover, setCover] = useState(store.cover_image_url || "");
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/90 backdrop-blur-sm border border-white/40 text-stone-700 text-xs font-semibold hover:bg-white"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+        Cover
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl">
+            <h3 className="font-semibold text-stone-900 mb-3">Store imagery</h3>
+            <label className="block mb-3">
+              <div className="text-xs font-medium text-stone-600 mb-1">Logo URL</div>
+              <input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://..." className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:border-stone-400" />
+            </label>
+            <label className="block mb-4">
+              <div className="text-xs font-medium text-stone-600 mb-1">Cover image URL</div>
+              <input value={cover} onChange={(e) => setCover(e.target.value)} placeholder="https://..." className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:border-stone-400" />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setOpen(false)} className="px-3 py-1.5 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100">Cancel</button>
+              <button
+                onClick={() => { onPatch({ logoUrl: logo || null, coverImageUrl: cover || null }); setOpen(false); }}
+                className="px-3 py-1.5 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ─────────────── KPI tile ─────────────── */
+
+function Kpi({ label, value, accent = "text-stone-900", icon }) {
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-3 sm:p-4">
+      <div className="flex items-center gap-2 text-stone-500">
+        {icon && (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={icon} />
+          </svg>
+        )}
+        <span className="text-[10px] uppercase tracking-wider font-bold">{label}</span>
+      </div>
+      <div className={`text-xl sm:text-2xl font-bold mt-1 ${accent}`}>{value}</div>
+    </div>
+  );
+}
+
+/* ─────────────── Overview tab ─────────────── */
+
+function OverviewTab({ store, memos, onPatch }) {
+  const recentMemos = memos.slice(0, 5);
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="lg:col-span-2 space-y-3 sm:space-y-4">
+        {/* About / description */}
+        <DescriptionCard description={store.description} onPatch={onPatch} />
+        {/* Recent memos preview */}
+        <div className="bg-white border border-stone-200 rounded-xl">
+          <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+            <h3 className="font-semibold text-stone-900 text-sm">Recent memos</h3>
+            {memos.length > 5 && (
+              <Link to={`/crm/memos?companyId=${store.id}`} className="text-xs font-semibold text-stone-600 hover:text-stone-900">
+                View all →
+              </Link>
+            )}
+          </div>
+          {recentMemos.length === 0 ? (
+            <div className="p-6 text-center text-sm text-stone-400">No memos yet</div>
+          ) : (
+            <div className="divide-y divide-stone-100">
+              {recentMemos.map((m) => <MemoListRow key={m.id} memo={m} />)}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="space-y-3 sm:space-y-4">
+        <ContactBlock store={store} onPatch={onPatch} />
+        <SocialBlock store={store} onPatch={onPatch} />
+        <BusinessHoursBlock store={store} onPatch={onPatch} />
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── Description (inline editable) ─────────────── */
+
+function DescriptionCard({ description, onPatch }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(description || "");
+  useEffect(() => setVal(description || ""), [description]);
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold text-stone-900 text-sm">About this store</h3>
+        {!editing && (
+          <button onClick={() => setEditing(true)} className="text-xs font-semibold text-stone-600 hover:text-stone-900">
+            {description ? "Edit" : "+ Add description"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <>
+          <textarea
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            rows={5}
+            placeholder="Tell your team about this store — relationship history, who runs it, what styles they favor, what's worked in the past..."
+            className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:border-stone-400 resize-none"
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <button onClick={() => { setEditing(false); setVal(description || ""); }} className="px-3 py-1 rounded-md text-xs font-semibold text-stone-600 hover:bg-stone-100">Cancel</button>
+            <button
+              onClick={() => { onPatch({ description: val.trim() || null }); setEditing(false); }}
+              className="px-3 py-1 rounded-md bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+            >
+              Save
+            </button>
+          </div>
+        </>
+      ) : description ? (
+        <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap">{description}</p>
+      ) : (
+        <p className="text-sm text-stone-400 italic">No description yet</p>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Contact block (sidebar) ─────────────── */
+
+function ContactBlock({ store, onPatch }) {
+  const [editing, setEditing] = useState(false);
+  const [data, setData] = useState({
+    primaryContact: store.primary_contact || "",
+    email: store.email || "",
+    phone: store.phone || "",
+    website: store.website || "",
+    address: store.address || "",
+    city: store.city || "",
+    country: store.country || "",
+  });
+  useEffect(() => setData({
+    primaryContact: store.primary_contact || "", email: store.email || "",
+    phone: store.phone || "", website: store.website || "",
+    address: store.address || "", city: store.city || "", country: store.country || "",
+  }), [store]);
+
+  const items = [
+    { icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z", label: "Contact",  value: store.primary_contact, link: null },
+    { icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",      label: "Email",    value: store.email, link: store.email && `mailto:${store.email}` },
+    { icon: "M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z", label: "Phone",    value: store.phone, link: store.phone && `tel:${store.phone}` },
+    { icon: "M21 12a9 9 0 11-18 0 9 9 0 0118 0z M3 12h18 M12 3a15.3 15.3 0 0140 0", label: "Website", value: store.website, link: store.website },
+    { icon: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z", label: "Address", value: [store.address, store.city, store.country].filter(Boolean).join(", "), link: null },
+  ];
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-stone-900 text-sm">Contact</h3>
+        {!editing && (
+          <button onClick={() => setEditing(true)} className="text-xs font-semibold text-stone-600 hover:text-stone-900">Edit</button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <Input label="Primary contact" value={data.primaryContact} onChange={(v) => setData({ ...data, primaryContact: v })} />
+          <Input label="Email" value={data.email} onChange={(v) => setData({ ...data, email: v })} type="email" />
+          <Input label="Phone" value={data.phone} onChange={(v) => setData({ ...data, phone: v })} />
+          <Input label="Website" value={data.website} onChange={(v) => setData({ ...data, website: v })} />
+          <Input label="Address" value={data.address} onChange={(v) => setData({ ...data, address: v })} />
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="City" value={data.city} onChange={(v) => setData({ ...data, city: v })} />
+            <Input label="Country" value={data.country} onChange={(v) => setData({ ...data, country: v })} />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setEditing(false)} className="px-3 py-1 rounded-md text-xs font-semibold text-stone-600 hover:bg-stone-100">Cancel</button>
+            <button
+              onClick={() => { onPatch(data); setEditing(false); }}
+              className="px-3 py-1 rounded-md bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.filter((i) => i.value).length === 0 ? (
+            <p className="text-xs text-stone-400 italic">No contact info yet — click Edit to add</p>
+          ) : items.filter((i) => i.value).map((i) => (
+            <div key={i.label} className="flex items-start gap-2 text-sm">
+              <svg className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={i.icon} /></svg>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] uppercase tracking-wider text-stone-400 font-medium">{i.label}</div>
+                {i.link ? (
+                  <a href={i.link} target={i.link.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" className="text-stone-700 hover:text-stone-900 break-words">{i.value}</a>
+                ) : (
+                  <div className="text-stone-700 break-words">{i.value}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Social links block ─────────────── */
+
+function SocialBlock({ store, onPatch }) {
+  const [editing, setEditing] = useState(false);
+  const [data, setData] = useState({
+    instagram: store.instagram || "", facebook: store.facebook || "",
+    linkedin: store.linkedin || "", whatsapp: store.whatsapp || "",
+  });
+  useEffect(() => setData({
+    instagram: store.instagram || "", facebook: store.facebook || "",
+    linkedin: store.linkedin || "", whatsapp: store.whatsapp || "",
+  }), [store]);
+
+  const links = [
+    { key: "instagram", label: "Instagram", value: store.instagram, prefix: "https://instagram.com/" },
+    { key: "facebook",  label: "Facebook",  value: store.facebook,  prefix: "https://facebook.com/" },
+    { key: "linkedin",  label: "LinkedIn",  value: store.linkedin,  prefix: "https://linkedin.com/in/" },
+    { key: "whatsapp",  label: "WhatsApp",  value: store.whatsapp,  prefix: "https://wa.me/" },
+  ];
+  const hasAny = links.some((l) => l.value);
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-stone-900 text-sm">Social</h3>
+        {!editing && (
+          <button onClick={() => setEditing(true)} className="text-xs font-semibold text-stone-600 hover:text-stone-900">
+            {hasAny ? "Edit" : "+ Add"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          {links.map((l) => (
+            <Input key={l.key} label={l.label} value={data[l.key]} onChange={(v) => setData({ ...data, [l.key]: v })} placeholder={l.key === "whatsapp" ? "+972 50..." : "@username or full URL"} />
+          ))}
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setEditing(false)} className="px-3 py-1 rounded-md text-xs font-semibold text-stone-600 hover:bg-stone-100">Cancel</button>
+            <button
+              onClick={() => { onPatch(data); setEditing(false); }}
+              className="px-3 py-1 rounded-md bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : !hasAny ? (
+        <p className="text-xs text-stone-400 italic">No social links yet</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {links.filter((l) => l.value).map((l) => (
+            <a
+              key={l.key}
+              href={l.value.startsWith("http") ? l.value : l.prefix + l.value.replace(/^@/, "")}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-stone-100 text-stone-700 text-xs font-semibold hover:bg-stone-200"
+            >
+              {l.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Business hours block ─────────────── */
+
+function BusinessHoursBlock({ store, onPatch }) {
+  const [editing, setEditing] = useState(false);
+  const initial = store.business_hours || {};
+  const [data, setData] = useState(() => Object.fromEntries(WEEKDAYS.map((d) => [d.key, initial[d.key] || ""])));
+  useEffect(() => {
+    const v = store.business_hours || {};
+    setData(Object.fromEntries(WEEKDAYS.map((d) => [d.key, v[d.key] || ""])));
+  }, [store]);
+
+  const hasAny = Object.values(initial || {}).some((v) => v && v.trim());
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-stone-900 text-sm">Business hours</h3>
+        {!editing && (
+          <button onClick={() => setEditing(true)} className="text-xs font-semibold text-stone-600 hover:text-stone-900">
+            {hasAny ? "Edit" : "+ Add"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-1.5">
+          {WEEKDAYS.map((d) => (
+            <div key={d.key} className="flex items-center gap-2">
+              <span className="w-9 text-xs font-semibold text-stone-600">{d.label}</span>
+              <input
+                value={data[d.key]}
+                onChange={(e) => setData({ ...data, [d.key]: e.target.value })}
+                placeholder="9:00 – 18:00 or Closed"
+                className="flex-1 px-2 py-1 text-xs rounded border border-stone-200 focus:outline-none focus:border-stone-400"
+              />
+            </div>
+          ))}
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => setEditing(false)} className="px-3 py-1 rounded-md text-xs font-semibold text-stone-600 hover:bg-stone-100">Cancel</button>
+            <button
+              onClick={() => { onPatch({ businessHours: data }); setEditing(false); }}
+              className="px-3 py-1 rounded-md bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : !hasAny ? (
+        <p className="text-xs text-stone-400 italic">No hours set</p>
+      ) : (
+        <div className="space-y-1">
+          {WEEKDAYS.map((d) => (
+            <div key={d.key} className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-stone-600 w-9">{d.label}</span>
+              <span className="text-stone-700">{initial[d.key] || "—"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Memos tab ─────────────── */
+
+function MemosTab({ memos, storeId, onCreate }) {
+  if (memos.length === 0) {
+    return (
+      <div className="bg-white border border-dashed border-stone-300 rounded-xl p-10 text-center">
+        <p className="text-sm text-stone-500 mb-4">No memos for this store yet</p>
+        <button
+          onClick={onCreate}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          Create first memo
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100">
+      {memos.map((m) => <MemoListRow key={m.id} memo={m} />)}
+    </div>
+  );
+}
+
+function MemoListRow({ memo }) {
+  const expired = isMemoEffectivelyExpired(memo);
+  const effective = expired ? "expired" : memo.status;
+  const status = MEMO_STATUSES.find((s) => s.value === effective) || MEMO_STATUSES[0];
+  return (
+    <Link to={`/crm/memos/${memo.id}`} className="flex items-center gap-3 p-3 hover:bg-stone-50">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-mono font-semibold text-stone-400">{memo.memo_number}</span>
+          <span className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full border ${status.color}`}>
+            {status.label}
+          </span>
+        </div>
+        <div className="text-xs text-stone-500 mt-0.5">
+          {memo.item_count || 0} item{memo.item_count !== 1 ? "s" : ""}
+          {memo.items_out > 0 && memo.items_out < memo.item_count && (
+            <span className="text-amber-600 ml-1">({memo.items_out} out)</span>
+          )}
+          {memo.due_at && <> · due {new Date(memo.due_at).toLocaleDateString()}</>}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="text-sm font-semibold text-stone-900">${Number(memo.total_value || 0).toLocaleString()}</div>
+      </div>
+    </Link>
+  );
+}
+
+/* ─────────────── Contacts tab ─────────────── */
+
+function ContactsTab({ contacts, storeId }) {
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl">
+      <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+        <h3 className="font-semibold text-stone-900 text-sm">People at this store</h3>
+        <Link
+          to={`/crm/contacts?action=new&companyId=${storeId}`}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          Link contact
+        </Link>
+      </div>
+      {contacts.length === 0 ? (
+        <div className="p-10 text-center text-sm text-stone-400">
+          No contacts linked yet. Link an existing CRM contact to this store, or create a new one.
+        </div>
+      ) : (
+        <div className="divide-y divide-stone-100">
+          {contacts.map((c) => (
+            <Link
+              key={c.id}
+              to={`/crm/customers/${c.id}`}
+              className="flex items-center gap-3 p-3 hover:bg-stone-50"
+            >
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-200 to-stone-300 text-stone-700 flex items-center justify-center font-bold text-sm shrink-0">
+                {(c.name || "?").slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-stone-900 truncate">{c.name}</div>
+                <div className="text-xs text-stone-500 truncate">
+                  {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || c.type}
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-stone-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Settings tab (memo defaults, taxonomy, etc.) ─────────────── */
+
+function SettingsTab({ store, onPatch }) {
+  const [data, setData] = useState({
+    type: store.type || "retail_store",
+    defaultMemoDays: store.default_memo_days || 30,
+    paymentTerms: store.payment_terms || "",
+    creditLimit: store.credit_limit || "",
+    currency: store.currency || "USD",
+    taxId: store.tax_id || "",
+    establishedYear: store.established_year || "",
+    notes: store.notes || "",
+  });
+
+  const dirty = useMemo(() => (
+    data.type !== (store.type || "retail_store") ||
+    Number(data.defaultMemoDays) !== (store.default_memo_days || 30) ||
+    data.paymentTerms !== (store.payment_terms || "") ||
+    String(data.creditLimit) !== String(store.credit_limit || "") ||
+    data.currency !== (store.currency || "USD") ||
+    data.taxId !== (store.tax_id || "") ||
+    String(data.establishedYear) !== String(store.established_year || "") ||
+    data.notes !== (store.notes || "")
+  ), [data, store]);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+      <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
+        <h3 className="font-semibold text-stone-900 text-sm">Classification</h3>
+        <Select label="Type" value={data.type} onChange={(v) => setData({ ...data, type: v })} options={COMPANY_TYPES.map((t) => ({ value: t.value, label: t.label }))} />
+        <Input label="Tax ID / VAT" value={data.taxId} onChange={(v) => setData({ ...data, taxId: v })} />
+        <Input label="Established year" value={data.establishedYear} onChange={(v) => setData({ ...data, establishedYear: v })} type="number" />
+      </div>
+
+      <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
+        <h3 className="font-semibold text-stone-900 text-sm">Memo defaults</h3>
+        <p className="text-xs text-stone-500 -mt-2">These values pre-fill when issuing a new memo to this store.</p>
+        <Input label="Default memo length (days)" value={data.defaultMemoDays} onChange={(v) => setData({ ...data, defaultMemoDays: v })} type="number" />
+        <Select label="Payment terms" value={data.paymentTerms} onChange={(v) => setData({ ...data, paymentTerms: v })} options={[{ value: "", label: "—" }, ...PAYMENT_TERMS]} />
+        <Input label="Credit limit (USD)" value={data.creditLimit} onChange={(v) => setData({ ...data, creditLimit: v })} type="number" placeholder="No limit" />
+        <Select label="Currency" value={data.currency} onChange={(v) => setData({ ...data, currency: v })} options={CURRENCIES} />
+      </div>
+
+      <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3 lg:col-span-2">
+        <h3 className="font-semibold text-stone-900 text-sm">Internal notes</h3>
+        <textarea
+          value={data.notes}
+          onChange={(e) => setData({ ...data, notes: e.target.value })}
+          rows={3}
+          placeholder="Sensitive info (negotiation history, credit issues, contact preferences) only visible to the team..."
+          className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:border-stone-400 resize-none"
+        />
+      </div>
+
+      {dirty && (
+        <div className="lg:col-span-2 sticky bottom-4 z-10 bg-white border border-stone-200 rounded-xl p-3 flex items-center justify-between shadow-lg">
+          <span className="text-xs text-stone-500">Unsaved changes</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setData({
+                type: store.type, defaultMemoDays: store.default_memo_days, paymentTerms: store.payment_terms || "",
+                creditLimit: store.credit_limit || "", currency: store.currency || "USD",
+                taxId: store.tax_id || "", establishedYear: store.established_year || "", notes: store.notes || "",
+              })}
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100"
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => onPatch({
+                ...data,
+                defaultMemoDays: Number(data.defaultMemoDays) || 30,
+                creditLimit: data.creditLimit !== "" ? Number(data.creditLimit) : null,
+                establishedYear: data.establishedYear !== "" ? Number(data.establishedYear) : null,
+              })}
+              className="px-3 py-1.5 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800"
+            >
+              Save changes
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Tiny inputs ─────────────── */
+
+function Input({ label, value, onChange, type = "text", placeholder }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-medium text-stone-600 mb-0.5">{label}</div>
+      <input
+        type={type}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-stone-200 focus:outline-none focus:border-stone-400"
+      />
+    </label>
+  );
+}
+
+function Select({ label, value, onChange, options }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-medium text-stone-600 mb-0.5">{label}</div>
+      <select
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-stone-200 focus:outline-none focus:border-stone-400 bg-white"
+      >
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </label>
+  );
+}

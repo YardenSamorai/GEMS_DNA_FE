@@ -18,6 +18,7 @@ import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
 import CrmContacts from "./pages/crm/CrmContacts";
 import CrmCompanies from "./pages/crm/CrmCompanies";
+import StoreProfile from "./pages/crm/StoreProfile";
 import CrmMemos from "./pages/crm/CrmMemos";
 import MemoDetail from "./pages/crm/MemoDetail";
 import CustomerProfile from "./pages/crm/CustomerProfile";
@@ -453,6 +454,7 @@ function AppContent() {
               <Route path="deals" element={<CrmDeals />} />
               <Route path="tasks" element={<CrmTasks />} />
               <Route path="stores" element={<CrmCompanies />} />
+              <Route path="stores/:id" element={<StoreProfile />} />
               <Route path="memos" element={<CrmMemos />} />
               <Route path="memos/:id" element={<MemoDetail />} />
               <Route path="settings" element={<CrmSettings />} />

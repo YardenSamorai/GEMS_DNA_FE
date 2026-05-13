@@ -69,3 +69,20 @@ export const PAYMENT_TERMS = [
   { value: "net_60",      label: "Net 60" },
   { value: "consignment", label: "Consignment only" },
 ];
+
+export const CURRENCIES = [
+  { value: "USD", label: "USD ($)" },
+  { value: "EUR", label: "EUR (€)" },
+  { value: "ILS", label: "ILS (₪)" },
+  { value: "GBP", label: "GBP (£)" },
+];
+
+export const WEEKDAYS = [
+  { key: "mon", label: "Mon" },
+  { key: "tue", label: "Tue" },
+  { key: "wed", label: "Wed" },
+  { key: "thu", label: "Thu" },
+  { key: "fri", label: "Fri" },
+  { key: "sat", label: "Sat" },
+  { key: "sun", label: "Sun" },
+];
