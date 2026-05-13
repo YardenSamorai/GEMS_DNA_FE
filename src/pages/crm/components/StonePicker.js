@@ -176,7 +176,7 @@ export default function StonePicker({ onClose, onSelect }) {
   const activeFilterCount = (shapes.length > 0 ? 1 : 0) + (minCt !== "" || maxCt !== "" ? 1 : 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between shrink-0">
