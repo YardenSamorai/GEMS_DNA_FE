@@ -199,9 +199,10 @@ function Hero({ store, type, onPatch }) {
 
   return (
     <div className="relative bg-white border border-stone-200 rounded-2xl overflow-hidden">
-      {/* Cover */}
+      {/* Cover banner — short enough that the logo can sit half-on /
+          half-off the boundary without colliding with the name. */}
       <div
-        className="h-32 sm:h-40 w-full relative"
+        className="h-24 sm:h-32 w-full relative"
         style={
           cover
             ? { backgroundImage: `url(${cover})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -213,64 +214,64 @@ function Hero({ store, type, onPatch }) {
             backgroundImage: "radial-gradient(circle at 25% 30%, rgba(255,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 75% 70%, rgba(255,255,255,0.1) 0%, transparent 50%)",
           }} />
         )}
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 z-10">
           <CoverEditButton store={store} onPatch={onPatch} />
         </div>
       </div>
 
-      {/* Identity strip */}
-      <div className="px-4 sm:px-6 pb-5 -mt-10 sm:-mt-12">
-        <div className="flex items-end gap-4">
-          {store.logo_url ? (
-            <img
-              src={store.logo_url}
-              alt={store.name}
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover bg-white ring-4 ring-white shadow-md shrink-0"
-            />
-          ) : (
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-2xl sm:text-3xl ring-4 ring-white shadow-md shrink-0">
-              {initials || "?"}
-            </div>
-          )}
-          <div className="flex-1 min-w-0 pb-1">
-            {editingName ? (
-              <div className="flex items-center gap-2">
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onBlur={() => { setEditingName(false); if (name.trim() && name !== store.name) onPatch({ name: name.trim() }); else setName(store.name); }}
-                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setName(store.name); setEditingName(false); } }}
-                  className="text-xl sm:text-2xl font-bold text-stone-900 bg-stone-50 border-b-2 border-stone-300 focus:outline-none focus:border-stone-900 px-1 w-full"
-                />
-              </div>
-            ) : (
-              <h1
-                onClick={() => setEditingName(true)}
-                title="Click to rename"
-                className="text-xl sm:text-2xl font-bold text-stone-900 cursor-text hover:bg-stone-50 -mx-1 px-1 rounded truncate"
-              >
-                {store.name}
-              </h1>
-            )}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${type.color}`}>
-                {type.label}
-              </span>
-              {(store.city || store.country) && (
-                <span className="text-xs text-stone-500 inline-flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  {[store.city, store.country].filter(Boolean).join(", ")}
-                </span>
-              )}
-              {store.established_year && (
-                <span className="text-xs text-stone-500">est. {store.established_year}</span>
-              )}
-            </div>
+      {/* Logo — pulled up so it floats over the cover/white boundary.
+          Lives in its own row so the name strip below has full width
+          and is never visually cut by the dark cover behind it. */}
+      <div className="px-4 sm:px-6 -mt-10 sm:-mt-12 mb-3">
+        {store.logo_url ? (
+          <img
+            src={store.logo_url}
+            alt={store.name}
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover bg-white ring-4 ring-white shadow-md"
+          />
+        ) : (
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-2xl sm:text-3xl ring-4 ring-white shadow-md">
+            {initials || "?"}
           </div>
+        )}
+      </div>
+
+      {/* Identity strip — entirely below the cover, full width. */}
+      <div className="px-4 sm:px-6 pb-5">
+        {editingName ? (
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => { setEditingName(false); if (name.trim() && name !== store.name) onPatch({ name: name.trim() }); else setName(store.name); }}
+            onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setName(store.name); setEditingName(false); } }}
+            className="text-xl sm:text-2xl font-bold text-stone-900 bg-stone-50 border-b-2 border-stone-300 focus:outline-none focus:border-stone-900 px-1 w-full"
+          />
+        ) : (
+          <h1
+            onClick={() => setEditingName(true)}
+            title="Click to rename"
+            className="text-xl sm:text-2xl font-bold text-stone-900 cursor-text hover:bg-stone-50 -mx-1 px-1 rounded inline-block max-w-full break-words"
+          >
+            {store.name}
+          </h1>
+        )}
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${type.color}`}>
+            {type.label}
+          </span>
+          {(store.city || store.country) && (
+            <span className="text-xs text-stone-500 inline-flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              {[store.city, store.country].filter(Boolean).join(", ")}
+            </span>
+          )}
+          {store.established_year && (
+            <span className="text-xs text-stone-500">est. {store.established_year}</span>
+          )}
         </div>
         {store.description && (
-          <p className="mt-4 text-sm text-stone-600 leading-relaxed">{store.description}</p>
+          <p className="mt-3 text-sm text-stone-600 leading-relaxed">{store.description}</p>
         )}
       </div>
     </div>
