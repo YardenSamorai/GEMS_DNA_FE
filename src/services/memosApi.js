@@ -95,6 +95,10 @@ export const closeMemo = (userId, memoId) =>
 export const fetchActiveMemoSkus = (userId) =>
   fetch(`${API_BASE}/api/memos/active-skus${qs({ userId })}`).then(json);
 
+/* Activity feed for a single memo (issued / item sold / item returned / etc.) */
+export const fetchMemoActivity = (userId, memoId) =>
+  fetch(`${API_BASE}/api/memos/${memoId}/activity${qs({ userId })}`).then(json);
+
 export const MEMO_STATUSES = [
   { value: "draft",               label: "Draft",                color: "bg-stone-100 text-stone-700 border-stone-200" },
   { value: "out",                 label: "Out",                  color: "bg-blue-100 text-blue-700 border-blue-200" },
