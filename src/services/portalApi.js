@@ -87,6 +87,14 @@ export const declineMemoItemRequest = (userId, memoId, itemId, reason = null) =>
 export const fetchPortalCatalog = (userId, filters = {}) =>
   fetch(`${API_BASE}/api/portal/catalog${qs({ userId, ...filters })}`).then(json);
 
+/** Full inventory record for a single catalog item, scoped to the
+ *  store-portal (no pricing fields). kind is 'stone' or 'jewelry';
+ *  identifier is the SKU for stones, and id-or-SKU for jewelry. */
+export const fetchPortalItemDetail = (userId, kind, identifier) =>
+  fetch(
+    `${API_BASE}/api/portal/items/${encodeURIComponent(kind)}/${encodeURIComponent(identifier)}${qs({ userId })}`
+  ).then(json);
+
 /* ============================================================
    Portal — Memo Requests (store users)
    ============================================================ */

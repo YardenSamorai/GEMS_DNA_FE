@@ -1,0 +1,16 @@
+feat(portal): full spec dialog when clicking a catalog item
+
+Clicking the photo (or title) of any card on the store-portal catalog
+now opens a comprehensive details dialog so the store can see every
+spec the supplier has on file before committing to a memo request.
+
+- Image gallery (cover + additional pictures), thumbnail strip,
+  optional 360-deg video link and certificate link for stones.
+- Spec table covering shape, carat, color, clarity, cut/polish/symmetry,
+  table/depth, ratio, measurements, lab, origin, treatment, fluorescence,
+  fancy color attributes, pair SKU and certificate number for stones.
+- For jewelry: metal mix, stones list (with thumbnail snapshots),
+  description and full attribute grid.
+- Pricing intentionally absent. Footer line reminds the store that
+  pricing is set when the supplier issues the memo.
+- Add to request / In your request CTA mirrored in the dialog footer.
