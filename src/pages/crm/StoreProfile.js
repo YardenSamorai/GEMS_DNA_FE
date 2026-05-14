@@ -13,6 +13,7 @@ import {
 } from "../../services/companiesApi";
 import { fetchMemos, MEMO_STATUSES, isMemoEffectivelyExpired } from "../../services/memosApi";
 import { fetchTeamMembers, inviteTeamMember, removeTeamMember, resendTeamInvite } from "../../services/teamApi";
+import { fetchContacts, createContact, updateContact } from "../../services/crmApi";
 import {
   fetchOwnerMemoRequest,
   declineMemoRequest,
@@ -212,7 +213,7 @@ export default function StoreProfile() {
       {tab === "overview" && <OverviewTab store={store} memos={memos} onPatch={handlePatch} />}
       {tab === "requests" && <RequestsTab requests={memoRequests} onChanged={reload} />}
       {tab === "memos"    && <MemosTab memos={memos} storeId={store.id} onCreate={() => setCreateMemoOpen(true)} />}
-      {tab === "contacts" && <ContactsTab contacts={store.contacts || []} storeId={store.id} />}
+      {tab === "contacts" && <ContactsTab contacts={store.contacts || []} storeId={store.id} storeName={store.name} onChanged={reload} />}
       {tab === "settings" && <SettingsTab store={store} onPatch={handlePatch} />}
 
       {createMemoOpen && (
@@ -1302,18 +1303,32 @@ function MemoListRow({ memo }) {
 
 /* ─────────────── Contacts tab ─────────────── */
 
-function ContactsTab({ contacts, storeId }) {
+function ContactsTab({ contacts, storeId, storeName, onChanged }) {
+  const [linking, setLinking] = useState(false);
+  const linkedIds = useMemo(() => new Set(contacts.map((c) => c.id)), [contacts]);
+
+  const handleUnlink = async (contact) => {
+    if (!window.confirm(`Unlink ${contact.name} from ${storeName || "this store"}? The contact will stay in your CRM.`)) return;
+    try {
+      await updateContact(contact.id, { companyId: null });
+      toast.success("Contact unlinked");
+      onChanged?.();
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
+
   return (
     <div className="bg-white border border-stone-200 rounded-xl">
       <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
         <h3 className="font-semibold text-stone-900 text-sm">People at this store</h3>
-        <Link
-          to={`/crm/contacts?action=new&companyId=${storeId}`}
+        <button
+          onClick={() => setLinking(true)}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Link contact
-        </Link>
+        </button>
       </div>
       {contacts.length === 0 ? (
         <div className="p-10 text-center text-sm text-stone-400">
@@ -1322,26 +1337,280 @@ function ContactsTab({ contacts, storeId }) {
       ) : (
         <div className="divide-y divide-stone-100">
           {contacts.map((c) => (
-            <Link
-              key={c.id}
-              to={`/crm/customers/${c.id}`}
-              className="flex items-center gap-3 p-3 hover:bg-stone-50"
-            >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-200 to-stone-300 text-stone-700 flex items-center justify-center font-bold text-sm shrink-0">
-                {(c.name || "?").slice(0, 2).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-stone-900 truncate">{c.name}</div>
-                <div className="text-xs text-stone-500 truncate">
-                  {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || c.type}
+            <div key={c.id} className="flex items-center gap-3 p-3 hover:bg-stone-50 group">
+              <Link
+                to={`/crm/customers/${c.id}`}
+                className="flex items-center gap-3 flex-1 min-w-0"
+              >
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-200 to-stone-300 text-stone-700 flex items-center justify-center font-bold text-sm shrink-0">
+                  {(c.name || "?").slice(0, 2).toUpperCase()}
                 </div>
-              </div>
-              <svg className="w-4 h-4 text-stone-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </Link>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-stone-900 truncate">{c.name}</div>
+                  <div className="text-xs text-stone-500 truncate">
+                    {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || c.type}
+                  </div>
+                </div>
+              </Link>
+              <button
+                onClick={() => handleUnlink(c)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-semibold text-stone-500 hover:text-rose-600 px-2 py-1"
+                title="Unlink from this store"
+              >
+                Unlink
+              </button>
+              <Link to={`/crm/customers/${c.id}`} aria-hidden>
+                <svg className="w-4 h-4 text-stone-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </Link>
+            </div>
           ))}
         </div>
       )}
+      {linking && (
+        <LinkContactModal
+          storeId={storeId}
+          storeName={storeName}
+          excludeIds={linkedIds}
+          onClose={() => setLinking(false)}
+          onLinked={() => { setLinking(false); onChanged?.(); }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ─────────────── Link contact modal (search existing or create new) ─────────────── */
+
+function LinkContactModal({ storeId, storeName, excludeIds, onClose, onLinked }) {
+  const { user } = useUser();
+  const [mode, setMode]       = useState("pick"); // pick | create
+  const [search, setSearch]   = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy]       = useState(false);
+  const [form, setForm]       = useState({ name: "", title: "", email: "", phone: "" });
+
+  useEffect(() => {
+    if (!user?.id || mode !== "pick") return;
+    let alive = true;
+    const t = setTimeout(() => {
+      setLoading(true);
+      fetchContacts(user.id, search ? { search } : {})
+        .then((rows) => alive && setResults(Array.isArray(rows) ? rows : []))
+        .catch((e) => alive && toast.error(e.message))
+        .finally(() => alive && setLoading(false));
+    }, 200);
+    return () => { alive = false; clearTimeout(t); };
+  }, [user?.id, search, mode]);
+
+  // Close on Escape.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const filtered = useMemo(
+    () => results.filter((c) => !excludeIds.has(c.id)),
+    [results, excludeIds]
+  );
+
+  const linkExisting = async (contact) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await updateContact(contact.id, { companyId: storeId });
+      toast.success(`${contact.name} linked to ${storeName || "store"}`);
+      onLinked?.();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createAndLink = async () => {
+    if (busy) return;
+    if (!form.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    setBusy(true);
+    try {
+      const created = await createContact({
+        userId: user.id,
+        name: form.name.trim(),
+        title: form.title.trim() || null,
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        companyId: storeId,
+        type: "lead",
+      });
+      toast.success(`${created.name} created and linked`);
+      onLinked?.();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-sm p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="px-5 py-4 border-b border-stone-200 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400">Link contact</div>
+            <h3 className="text-lg font-bold text-stone-900 mt-0.5">{storeName || "Store"}</h3>
+            <p className="text-xs text-stone-500 mt-0.5">
+              {mode === "pick"
+                ? "Pick an existing CRM contact, or create a new one."
+                : "New contact will be saved to your CRM and linked to this store."}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Mode tabs */}
+        <div className="flex items-center gap-1 px-5 border-b border-stone-200 bg-stone-50/50">
+          <button
+            onClick={() => setMode("pick")}
+            className={`relative px-3 py-2.5 text-xs font-semibold transition-colors ${mode === "pick" ? "text-stone-900" : "text-stone-500 hover:text-stone-800"}`}
+          >
+            Pick from CRM
+            {mode === "pick" && <span className="absolute left-3 right-3 bottom-0 h-0.5 rounded-full bg-stone-900" />}
+          </button>
+          <button
+            onClick={() => setMode("create")}
+            className={`relative px-3 py-2.5 text-xs font-semibold transition-colors ${mode === "create" ? "text-stone-900" : "text-stone-500 hover:text-stone-800"}`}
+          >
+            Create new
+            {mode === "create" && <span className="absolute left-3 right-3 bottom-0 h-0.5 rounded-full bg-stone-900" />}
+          </button>
+        </div>
+
+        {mode === "pick" ? (
+          <>
+            <div className="px-5 py-3 border-b border-stone-100">
+              <div className="relative">
+                <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.85-5.65a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" />
+                </svg>
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name, email, phone, company…"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400 placeholder-stone-400"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="p-5 space-y-2 animate-pulse">
+                  {[1,2,3,4].map((i) => <div key={i} className="h-12 bg-stone-100 rounded-lg" />)}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <div className="text-sm font-semibold text-stone-700 mb-1">
+                    {search ? "No matching contacts" : "No contacts yet"}
+                  </div>
+                  <div className="text-xs text-stone-400 mb-4 max-w-xs mx-auto">
+                    {search ? "Try a different search, or create a new contact for this store." : "Your CRM is empty — start by adding the first one."}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (search) setForm((f) => ({ ...f, name: search }));
+                      setMode("create");
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Create new contact
+                  </button>
+                </div>
+              ) : (
+                <div className="divide-y divide-stone-100">
+                  {filtered.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => linkExisting(c)}
+                      disabled={busy}
+                      className="group w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-stone-200 to-stone-300 text-stone-700 flex items-center justify-center font-bold text-sm shrink-0">
+                        {(c.name || "?").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-stone-900 truncate group-hover:text-indigo-700">{c.name}</div>
+                        <div className="text-xs text-stone-500 truncate">
+                          {[c.title, c.email, c.phone, c.company].filter(Boolean).join(" · ") || c.type}
+                        </div>
+                      </div>
+                      {c.company_id && c.company_id !== storeId && (
+                        <span className="shrink-0 text-[10px] uppercase tracking-wider font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                          Linked elsewhere
+                        </span>
+                      )}
+                      <svg className="w-4 h-4 text-stone-300 shrink-0 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              <Field label="Full name *" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Jane Doe" autoFocus />
+              <Field label="Title / role" value={form.title} onChange={(v) => setForm({ ...form, title: v })} placeholder="Owner, Buyer, Sales…" />
+              <Field label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} placeholder="jane@example.com" type="email" />
+              <Field label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} placeholder="+1 555…" />
+              <div className="rounded-xl bg-blue-50/60 border border-blue-100 p-3 text-[12px] text-blue-900 leading-relaxed flex gap-2">
+                <svg className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>This contact will be added to your CRM and pre-linked to <strong>{storeName || "this store"}</strong>. You can edit the rest of the details from the contact's profile later.</span>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-stone-200 flex items-center justify-end gap-2 bg-stone-50/70">
+              <button
+                onClick={() => setMode("pick")}
+                disabled={busy}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-200 disabled:opacity-50"
+              >Back</button>
+              <button
+                onClick={createAndLink}
+                disabled={busy || !form.name.trim()}
+                className="px-5 py-2 rounded-lg bg-stone-900 text-white text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-800"
+              >
+                {busy ? "Saving…" : "Create & link"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, placeholder, type = "text", autoFocus = false }) {
+  return (
+    <label className="block">
+      <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-stone-400 mb-1.5">{label}</div>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400 placeholder-stone-400"
+      />
+    </label>
   );
 }
 
