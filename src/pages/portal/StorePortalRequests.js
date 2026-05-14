@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
@@ -182,8 +183,13 @@ function RequestDrawer({ id, onClose, onChanged }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-stone-900/50 backdrop-blur-sm">
+  // Render through a portal to document.body. The portal's <main> has
+  // `relative z-0` which creates a stacking context, so without the portal
+  // the drawer (z-50) would still get trapped *under* the layout header
+  // (z-30 at the document level) and the close button would be hidden
+  // behind the sticky header / sub-nav strip.
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex justify-end bg-stone-900/50 backdrop-blur-sm">
       <div className="w-full sm:max-w-lg bg-white shadow-2xl flex flex-col animate-in slide-in-from-right">
         <div className="px-5 py-4 border-b border-stone-200 flex items-start justify-between gap-3">
           <div>
@@ -273,7 +279,8 @@ function RequestDrawer({ id, onClose, onChanged }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
