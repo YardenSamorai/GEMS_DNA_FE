@@ -200,93 +200,94 @@ function Hero({ store, type, onPatch, onPortalChanged }) {
 
   return (
     <div className="relative bg-white border border-stone-200 rounded-2xl overflow-hidden">
-      {/* Cover banner — short enough that the logo can sit half-on /
-          half-off the boundary without colliding with the name.
-          Default gradient is brand blue → indigo so it matches the
-          consignment portal palette and reads as "store / partner". */}
-      <div
-        className="h-24 sm:h-32 w-full relative"
-        style={
-          cover
-            ? { backgroundImage: `url(${cover})`, backgroundSize: "cover", backgroundPosition: "center" }
-            : { backgroundImage: "linear-gradient(135deg, #2563eb 0%, #4f46e5 60%, #6366f1 100%)" }
-        }
-      >
-        {!cover && (
-          <div className="absolute inset-0 opacity-30" style={{
-            backgroundImage: "radial-gradient(circle at 22% 28%, rgba(255,255,255,0.35) 0%, transparent 45%), radial-gradient(circle at 78% 75%, rgba(255,255,255,0.18) 0%, transparent 50%)",
-          }} />
-        )}
-        <div className="absolute top-3 right-3 z-10">
-          <CoverEditButton store={store} onPatch={onPatch} />
+      {/* Thin top accent — just enough to brand the card without
+          stealing space from the identity row. If the owner uploaded
+          a cover image we render that as a shorter banner instead. */}
+      {cover ? (
+        <div
+          className="h-20 sm:h-24 w-full relative"
+          style={{ backgroundImage: `url(${cover})`, backgroundSize: "cover", backgroundPosition: "center" }}
+        >
+          <div className="absolute top-3 right-3 z-10">
+            <CoverEditButton store={store} onPatch={onPatch} />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          className="h-2 sm:h-2.5 w-full"
+          style={{ backgroundImage: "linear-gradient(90deg, #2563eb 0%, #4f46e5 60%, #6366f1 100%)" }}
+        />
+      )}
 
-      {/* Logo — pulled up so it floats over the cover/white boundary.
-          Lives in its own row so the name strip below has full width
-          and is never visually cut by the cover behind it. */}
-      <div className="px-4 sm:px-6 -mt-10 sm:-mt-12 mb-3">
+      {/* Identity row — logo, name & chips side-by-side. No more
+          "logo floats over the banner" trick: it sits cleanly on the
+          white surface so the cover never blocks it. */}
+      <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-5 flex items-start gap-3 sm:gap-4">
         {store.logo_url ? (
           <img
             src={store.logo_url}
             alt={store.name}
-            className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover bg-white ring-4 ring-white shadow-md"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover bg-white ring-1 ring-stone-200 shrink-0"
           />
         ) : (
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-2xl sm:text-3xl ring-4 ring-white shadow-md">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xl sm:text-2xl shrink-0">
             {initials || "?"}
           </div>
         )}
-      </div>
 
-      {/* Identity strip — entirely below the cover, full width. */}
-      <div className="px-4 sm:px-6 pb-4 sm:pb-5">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0 flex-1">
-            {editingName ? (
-              <input
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={() => { setEditingName(false); if (name.trim() && name !== store.name) onPatch({ name: name.trim() }); else setName(store.name); }}
-                onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setName(store.name); setEditingName(false); } }}
-                className="text-xl sm:text-2xl font-bold text-stone-900 bg-stone-50 border-b-2 border-stone-300 focus:outline-none focus:border-stone-900 px-1 w-full"
-              />
-            ) : (
-              <h1
-                onClick={() => setEditingName(true)}
-                title="Click to rename"
-                className="text-xl sm:text-2xl font-bold text-stone-900 cursor-text hover:bg-stone-50 -mx-1 px-1 rounded inline-block max-w-full break-words"
-              >
-                {store.name}
-              </h1>
-            )}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${type.color}`}>
-                {type.label}
+        <div className="min-w-0 flex-1">
+          {editingName ? (
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => { setEditingName(false); if (name.trim() && name !== store.name) onPatch({ name: name.trim() }); else setName(store.name); }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setName(store.name); setEditingName(false); } }}
+              className="text-xl sm:text-2xl font-bold text-stone-900 bg-stone-50 border-b-2 border-stone-300 focus:outline-none focus:border-stone-900 px-1 w-full"
+            />
+          ) : (
+            <h1
+              onClick={() => setEditingName(true)}
+              title="Click to rename"
+              className="text-xl sm:text-2xl font-bold text-stone-900 cursor-text hover:bg-stone-50 -mx-1 px-1 rounded inline-block max-w-full break-words leading-tight"
+            >
+              {store.name}
+            </h1>
+          )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${type.color}`}>
+              {type.label}
+            </span>
+            {(store.city || store.country) && (
+              <span className="text-xs text-stone-500 inline-flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                {[store.city, store.country].filter(Boolean).join(", ")}
               </span>
-              {(store.city || store.country) && (
-                <span className="text-xs text-stone-500 inline-flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  {[store.city, store.country].filter(Boolean).join(", ")}
-                </span>
-              )}
-              {store.established_year && (
-                <span className="text-xs text-stone-500">est. {store.established_year}</span>
-              )}
-            </div>
+            )}
+            {store.established_year && (
+              <span className="text-xs text-stone-500">est. {store.established_year}</span>
+            )}
           </div>
+          {store.description && (
+            <p className="mt-2 text-sm text-stone-600 leading-relaxed">{store.description}</p>
+          )}
         </div>
 
-        {store.description && (
-          <p className="mt-3 text-sm text-stone-600 leading-relaxed">{store.description}</p>
+        {/* When there's no cover image, the "Cover" button still needs
+            a home — tucked at the top-right of the identity row so the
+            owner can add a cover image without an extra click. */}
+        {!cover && (
+          <div className="shrink-0">
+            <CoverEditButton store={store} onPatch={onPatch} />
+          </div>
         )}
       </div>
 
       {/* Portal access strip — sits at the bottom of the hero so it's
-          impossible to miss. Renders one of two states:
-          1. No active portal user → red CTA "Invite portal user".
-          2. Has portal user(s)    → green pill + "Manage" button. */}
+          impossible to miss. Renders one of three states:
+          1. No portal user        → red CTA "Invite portal user".
+          2. Pending invitation    → amber strip with name/email + Resend/Cancel.
+          3. Active portal user    → green strip with "Revoke access". */}
       <PortalAccessStrip store={store} onPortalChanged={onPortalChanged} />
     </div>
   );
