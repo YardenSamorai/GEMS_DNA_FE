@@ -34,6 +34,8 @@ import StorePortalLayout from "./pages/portal/StorePortalLayout";
 import StorePortalMemos from "./pages/portal/StorePortalMemos";
 import StorePortalMemoDetail from "./pages/portal/StorePortalMemoDetail";
 import StorePortalAccount from "./pages/portal/StorePortalAccount";
+import StorePortalCatalog from "./pages/portal/StorePortalCatalog";
+import StorePortalRequests from "./pages/portal/StorePortalRequests";
 
 // ---------- Theme Context ----------
 const ThemeContext = createContext();
@@ -481,6 +483,8 @@ function AppContent() {
               empty memos list (BE returns 403 on /api/portal/*). */}
           <Route element={<StorePortalLayout />}>
             <Route path="/store-portal" element={<StorePortalMemos historyMode={false} />} />
+            <Route path="/store-portal/catalog" element={<StorePortalCatalog />} />
+            <Route path="/store-portal/requests" element={<StorePortalRequests />} />
             <Route path="/store-portal/history" element={<StorePortalMemos historyMode={true} />} />
             <Route path="/store-portal/account" element={<StorePortalAccount />} />
             <Route path="/store-portal/memos/:id" element={<StorePortalMemoDetail />} />

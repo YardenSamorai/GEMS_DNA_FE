@@ -79,3 +79,59 @@ export const declineMemoItemRequest = (userId, memoId, itemId, reason = null) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, reason }),
   }).then(json);
+
+/* ============================================================
+   Portal — Catalog (browse available inventory)
+   ============================================================ */
+
+export const fetchPortalCatalog = (userId, filters = {}) =>
+  fetch(`${API_BASE}/api/portal/catalog${qs({ userId, ...filters })}`).then(json);
+
+/* ============================================================
+   Portal — Memo Requests (store users)
+   ============================================================ */
+
+/** Submit a wishlist of items + optional message → owner receives it. */
+export const createMemoRequest = (userId, payload) =>
+  fetch(`${API_BASE}/api/portal/memo-requests${qs({ userId })}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, ...payload }),
+  }).then(json);
+
+export const fetchMyMemoRequests = (userId) =>
+  fetch(`${API_BASE}/api/portal/memo-requests${qs({ userId })}`).then(json);
+
+export const fetchMyMemoRequest = (userId, id) =>
+  fetch(`${API_BASE}/api/portal/memo-requests/${id}${qs({ userId })}`).then(json);
+
+export const cancelMyMemoRequest = (userId, id) =>
+  fetch(`${API_BASE}/api/portal/memo-requests/${id}/cancel${qs({ userId })}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  }).then(json);
+
+/* ============================================================
+   Owner-side — Memo Requests inbox
+   ============================================================ */
+
+export const fetchOwnerMemoRequests = (userId, filters = {}) =>
+  fetch(`${API_BASE}/api/memo-requests${qs({ userId, ...filters })}`).then(json);
+
+export const fetchOwnerMemoRequest = (userId, id) =>
+  fetch(`${API_BASE}/api/memo-requests/${id}${qs({ userId })}`).then(json);
+
+export const declineMemoRequest = (userId, id, reason = null) =>
+  fetch(`${API_BASE}/api/memo-requests/${id}/decline${qs({ userId })}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, reason }),
+  }).then(json);
+
+export const convertMemoRequest = (userId, id) =>
+  fetch(`${API_BASE}/api/memo-requests/${id}/convert${qs({ userId })}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  }).then(json);
