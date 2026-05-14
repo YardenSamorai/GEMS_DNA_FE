@@ -345,6 +345,59 @@ function RequestRow({ req, onOpen }) {
   );
 }
 
+/**
+ * InboxItemRow — clickable row in the request inbox drawer that
+ * deep-links to the full jewelry / stone detail page (in a new tab,
+ * to keep the drawer context alive).
+ */
+function InboxItemRow({ item }) {
+  const snap = item.snapshot || {};
+  const isJewelry = item.item_type === "jewelry";
+  const title = isJewelry
+    ? (snap.name || item.item_sku)
+    : `${snap.shape || ""} ${snap.weightCt ? `${snap.weightCt} ct` : ""}`.trim() || item.item_sku;
+
+  let href = null;
+  if (isJewelry) {
+    const jid = snap.id || item.item_id;
+    if (jid) href = `/jewelry/items/${jid}`;
+  } else if (item.item_sku) {
+    href = `/${encodeURIComponent(item.item_sku)}`;
+  }
+
+  const body = (
+    <>
+      <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
+        {snap.imageUrl ? <img src={snap.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-stone-900 truncate group-hover:text-indigo-700 transition-colors">{title}</div>
+        <div className="text-[10px] text-stone-400 truncate">{item.item_sku}</div>
+      </div>
+      <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${isJewelry ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{item.item_type}</span>
+      {href && (
+        <svg className="w-3.5 h-3.5 text-stone-300 group-hover:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+        </svg>
+      )}
+    </>
+  );
+
+  if (!href) {
+    return <div className="flex items-center gap-3 px-3 py-2.5">{body}</div>;
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-center gap-3 px-3 py-2.5 hover:bg-stone-50 transition-colors cursor-pointer"
+    >
+      {body}
+    </a>
+  );
+}
+
 function RequestDetail({ id, onClose, onChanged }) {
   const { user } = useUser();
   const [data, setData]       = useState(null);
@@ -434,24 +487,9 @@ function RequestDetail({ id, onClose, onChanged }) {
               <div>
                 <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-stone-400 mb-2">Items · {data.items?.length || 0}</div>
                 <div className="rounded-xl border border-stone-200 divide-y divide-stone-100 overflow-hidden">
-                  {(data.items || []).map((it) => {
-                    const snap = it.snapshot || {};
-                    const title = it.item_type === "jewelry"
-                      ? (snap.name || it.item_sku)
-                      : `${snap.shape || ""} ${snap.weightCt ? `${snap.weightCt} ct` : ""}`.trim() || it.item_sku;
-                    return (
-                      <div key={it.id} className="flex items-center gap-3 px-3 py-2.5">
-                        <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
-                          {snap.imageUrl ? <img src={snap.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-stone-900 truncate">{title}</div>
-                          <div className="text-[10px] text-stone-400 truncate">{it.item_sku}</div>
-                        </div>
-                        <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${it.item_type === "jewelry" ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{it.item_type}</span>
-                      </div>
-                    );
-                  })}
+                  {(data.items || []).map((it) => (
+                    <InboxItemRow key={it.id} item={it} />
+                  ))}
                 </div>
               </div>
               {data.decline_reason && (

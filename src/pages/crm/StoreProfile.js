@@ -1006,6 +1006,78 @@ function RequestRow({ req, onOpen }) {
   );
 }
 
+/**
+ * RequestItemRow — clickable row that previews a stone or jewelry item
+ * inside a request. Click opens the canonical detail page in a new tab
+ * so the supplier doesn't lose the request drawer context.
+ *
+ *   - jewelry → /jewelry/items/:id (uses snapshot.id / item_id)
+ *   - stone   → /<sku> (the legacy DiamondCard route)
+ */
+function RequestItemRow({ item }) {
+  const snap = item.snapshot || {};
+  const isJewelry = item.item_type === "jewelry";
+  const title = isJewelry
+    ? (snap.name || item.item_sku)
+    : `${snap.shape || ""} ${snap.weightCt ? `${snap.weightCt} ct` : ""}`.trim() || item.item_sku;
+  const subBits = isJewelry
+    ? [snap.metalType, snap.category].filter(Boolean)
+    : [snap.color, snap.clarity, snap.origin].filter(Boolean);
+
+  // Build the deep-link to the full detail page. Jewelry items prefer
+  // a numeric DB id (snapshot.id or item.item_id) — fall back to SKU.
+  // Stones go to the legacy /<sku> DiamondCard route.
+  let href = null;
+  if (isJewelry) {
+    const jid = snap.id || item.item_id;
+    if (jid) href = `/jewelry/items/${jid}`;
+  } else if (item.item_sku) {
+    href = `/${encodeURIComponent(item.item_sku)}`;
+  }
+
+  const inner = (
+    <>
+      <div className="w-14 h-14 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
+        {snap.imageUrl ? <img src={snap.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${isJewelry ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{item.item_type}</span>
+          <span className="text-[11px] font-mono font-semibold text-stone-400">{item.item_sku}</span>
+        </div>
+        <div className="text-sm font-semibold text-stone-900 mt-1 truncate group-hover:text-indigo-700 transition-colors">{title}</div>
+        {subBits.length > 0 && (
+          <div className="text-[11px] text-stone-500 mt-0.5 truncate">{subBits.join(" · ")}</div>
+        )}
+        {item.notes && <div className="text-[11px] text-stone-500 mt-1 italic">"{item.notes}"</div>}
+      </div>
+      {href && (
+        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-stone-400 group-hover:text-indigo-600 self-center shrink-0 transition-colors">
+          <span className="hidden sm:inline">Details</span>
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+        </div>
+      )}
+    </>
+  );
+
+  if (!href) {
+    return (
+      <div className="flex items-start gap-3 px-3 py-3">{inner}</div>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-start gap-3 px-3 py-3 hover:bg-stone-50 transition-colors cursor-pointer"
+    >
+      {inner}
+    </a>
+  );
+}
+
 function RequestDetailDrawer({ id, onClose, onChanged }) {
   const { user } = useUser();
   const navigate = useNavigate();
@@ -1098,33 +1170,9 @@ function RequestDetailDrawer({ id, onClose, onChanged }) {
                   Items · {data.items?.length || 0}
                 </div>
                 <div className="rounded-xl border border-stone-200 divide-y divide-stone-100 overflow-hidden">
-                  {(data.items || []).map((it) => {
-                    const snap = it.snapshot || {};
-                    const title = it.item_type === "jewelry"
-                      ? (snap.name || it.item_sku)
-                      : `${snap.shape || ""} ${snap.weightCt ? `${snap.weightCt} ct` : ""}`.trim() || it.item_sku;
-                    const subBits = it.item_type === "jewelry"
-                      ? [snap.metalType, snap.category].filter(Boolean)
-                      : [snap.color, snap.clarity, snap.origin].filter(Boolean);
-                    return (
-                      <div key={it.id} className="flex items-start gap-3 px-3 py-3">
-                        <div className="w-14 h-14 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
-                          {snap.imageUrl ? <img src={snap.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${it.item_type === "jewelry" ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{it.item_type}</span>
-                            <span className="text-[11px] font-mono font-semibold text-stone-400">{it.item_sku}</span>
-                          </div>
-                          <div className="text-sm font-semibold text-stone-900 mt-1 truncate">{title}</div>
-                          {subBits.length > 0 && (
-                            <div className="text-[11px] text-stone-500 mt-0.5 truncate">{subBits.join(" · ")}</div>
-                          )}
-                          {it.notes && <div className="text-[11px] text-stone-500 mt-1 italic">"{it.notes}"</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {(data.items || []).map((it) => (
+                    <RequestItemRow key={it.id} item={it} />
+                  ))}
                   {(!data.items || data.items.length === 0) && (
                     <div className="px-3 py-4 text-xs text-stone-400 italic">Free-text request only — no specific items listed.</div>
                   )}

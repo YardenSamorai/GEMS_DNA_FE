@@ -308,6 +308,7 @@ function SubmitRequestModal({ onClose, onSubmitted }) {
           sku: i.sku,
           id: i.id ?? null,
           snapshot: {
+            id: i.id ?? null,
             sku: i.sku,
             kind: i.kind,
             name: i.name,
@@ -317,6 +318,7 @@ function SubmitRequestModal({ onClose, onSubmitted }) {
             weightCt: i.weightCt,
             color: i.color,
             clarity: i.clarity,
+            origin: i.origin,
             metalType: i.metalType,
             metalColor: i.metalColor,
             imageUrl: i.imageUrl,
