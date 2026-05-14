@@ -314,8 +314,25 @@ function PortalAccessStrip({ store, onPortalChanged }) {
         { id: user.id, email: user.primaryEmailAddress?.emailAddress },
         confirmRevoke.id
       );
-      toast.success("Portal access revoked");
+      toast.success(confirmRevoke.pending ? "Invitation cancelled" : "Portal access revoked");
       setConfirmRevoke(null);
+      if (onPortalChanged) await onPortalChanged();
+    } catch (e) {
+      toast.error(e.message);
+    } finally { setBusy(false); }
+  };
+
+  const resend = async (m) => {
+    setBusy(true);
+    try {
+      const r = await resendTeamInvite(
+        { id: user.id, email: user.primaryEmailAddress?.emailAddress },
+        m.id
+      );
+      const sent = r?.email?.sent === true;
+      if (sent) toast.success(`Invitation re-sent to ${m.email}`);
+      else if (r?.email?.skipped) toast(`Invitation row updated — email service is not configured.`, { icon: "i" });
+      else toast.error(`Re-send failed: ${r?.email?.error || "unknown error"}`);
       if (onPortalChanged) await onPortalChanged();
     } catch (e) {
       toast.error(e.message);
@@ -360,18 +377,22 @@ function PortalAccessStrip({ store, onPortalChanged }) {
     );
   }
 
-  // Portal user(s) exist — green/amber strip with primary user + Revoke.
-  const activeColor   = activeUser  ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200";
-  const pillColor     = activeUser  ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200";
-  const pillLabel     = activeUser  ? "Portal active" : "Pending sign-in";
-  const dotColor      = activeUser  ? "bg-emerald-500" : "bg-amber-500";
+  // Portal user(s) exist — green/amber strip with primary user + actions.
+  const isPending     = !activeUser;
+  const stripBg       = isPending ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200";
+  const pillColor     = isPending ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-emerald-100 text-emerald-800 border-emerald-200";
+  const pillLabel     = isPending ? "Invitation sent" : "Portal active";
+  const dotColor      = isPending ? "bg-amber-500" : "bg-emerald-500";
+  const subtitle      = isPending
+    ? "Waiting for them to accept the email and sign in"
+    : "Can sign in to the consignment portal right now";
 
   return (
     <>
-      <div className={`flex items-center justify-between gap-3 flex-wrap px-4 sm:px-6 py-3 border-t ${activeColor}`}>
+      <div className={`flex items-center justify-between gap-3 flex-wrap px-4 sm:px-6 py-3 border-t ${stripBg}`}>
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-9 h-9 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0"
+            className="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold text-sm shrink-0 ring-2 ring-white"
             style={{ backgroundColor: primary?.avatar_color || "#0ea5e9" }}
           >
             {(primary?.name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase()}
@@ -379,7 +400,7 @@ function PortalAccessStrip({ store, onPortalChanged }) {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${pillColor}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${isPending ? "animate-pulse" : ""}`} />
                 {pillLabel}
               </span>
               {portalUsers.length > 1 && (
@@ -389,10 +410,20 @@ function PortalAccessStrip({ store, onPortalChanged }) {
               )}
             </div>
             <div className="text-sm font-semibold text-stone-900 truncate mt-0.5">{primary?.name}</div>
-            <div className="text-[11px] text-stone-500 truncate">{primary?.email}</div>
+            <div className="text-[11px] text-stone-500 truncate break-all">{primary?.email}</div>
+            <div className="text-[11px] text-stone-400 mt-0.5 italic">{subtitle}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {isPending && (
+            <button
+              onClick={() => resend(primary)}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-700 text-xs font-semibold hover:bg-amber-100 disabled:opacity-50"
+            >
+              Resend email
+            </button>
+          )}
           <button
             onClick={() => setShowInvite(true)}
             title="Invite another portal user"
@@ -404,7 +435,7 @@ function PortalAccessStrip({ store, onPortalChanged }) {
             onClick={() => setConfirmRevoke(primary)}
             className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-600 text-xs font-semibold hover:bg-rose-50"
           >
-            Revoke access
+            {isPending ? "Cancel invitation" : "Revoke access"}
           </button>
         </div>
       </div>
@@ -422,18 +453,21 @@ function PortalAccessStrip({ store, onPortalChanged }) {
 
       {confirmRevoke && (
         <ConfirmDialog
-          title="Revoke portal access?"
+          title={isPending ? "Cancel invitation?" : "Revoke portal access?"}
           body={
             <>
               <p className="text-sm text-stone-700">
-                <span className="font-semibold">{confirmRevoke.name}</span> ({confirmRevoke.email}) will lose access to the consignment portal immediately.
+                <span className="font-semibold">{confirmRevoke.name}</span> ({confirmRevoke.email}){" "}
+                {isPending
+                  ? "will no longer be able to use the invitation link from the email."
+                  : "will lose access to the consignment portal immediately."}
               </p>
               <p className="text-xs text-stone-500 mt-2">
                 Memos and history stay intact — you can re-invite them or someone else later.
               </p>
             </>
           }
-          confirmLabel={busy ? "Revoking…" : "Revoke access"}
+          confirmLabel={busy ? (isPending ? "Cancelling…" : "Revoking…") : (isPending ? "Cancel invitation" : "Revoke access")}
           confirmTone="rose"
           busy={busy}
           onCancel={() => setConfirmRevoke(null)}
