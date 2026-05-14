@@ -30,6 +30,10 @@ import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
+import StorePortalLayout from "./pages/portal/StorePortalLayout";
+import StorePortalMemos from "./pages/portal/StorePortalMemos";
+import StorePortalMemoDetail from "./pages/portal/StorePortalMemoDetail";
+import StorePortalAccount from "./pages/portal/StorePortalAccount";
 
 // ---------- Theme Context ----------
 const ThemeContext = createContext();
@@ -237,6 +241,7 @@ const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 // ---------- App layout: sidebar + topbar + content (for protected app pages) ----------
 const AppLayout = () => {
   const { theme } = useTheme();
+  const team = useTeam();
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
   });
@@ -253,6 +258,13 @@ const AppLayout = () => {
 
   // Close the mobile drawer on navigation
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  // Hard redirect: store-portal users have no business inside the
+  // sidebar app at all. Send them to /store-portal the moment we
+  // resolve their role.
+  if (team?.ready && team?.isStoreUser) {
+    return <Navigate to="/store-portal" replace />;
+  }
 
   return (
     <>
@@ -459,6 +471,19 @@ function AppContent() {
               <Route path="memos/:id" element={<MemoDetail />} />
               <Route path="settings" element={<CrmSettings />} />
             </Route>
+          </Route>
+
+          {/* Sprint 4 / Phase 3 — Store Portal (retail-store users).
+              Lives outside <AppLayout> so it gets its own minimal chrome
+              (no sidebar / TopBar). The TeamProvider already gates the
+              entry: anyone with role='store_user' is bounced here from
+              the main app, and anyone else hitting /store-portal sees an
+              empty memos list (BE returns 403 on /api/portal/*). */}
+          <Route element={<StorePortalLayout />}>
+            <Route path="/store-portal" element={<StorePortalMemos historyMode={false} />} />
+            <Route path="/store-portal/history" element={<StorePortalMemos historyMode={true} />} />
+            <Route path="/store-portal/account" element={<StorePortalAccount />} />
+            <Route path="/store-portal/memos/:id" element={<StorePortalMemoDetail />} />
           </Route>
 
           {/* Short URL aliases */}

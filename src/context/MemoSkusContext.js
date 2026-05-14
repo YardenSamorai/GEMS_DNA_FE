@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { fetchActiveMemoSkus } from "../services/memosApi";
+import { useTeam } from "./TeamContext";
 
 /**
  * MemoSkusContext — provides a workspace-wide map of SKUs currently
@@ -18,11 +19,18 @@ const Ctx = createContext({
 
 export function MemoSkusProvider({ children }) {
   const { user } = useUser();
+  const { isStoreUser } = useTeam();
   const [maps, setMaps] = useState({ byStoneSku: {}, byJewelrySku: {}, ready: false });
   const aliveRef = useRef(true);
 
   const refresh = useCallback(async () => {
     if (!user?.id) return;
+    // Store-portal users can't read the supplier's full inventory map
+    // (and the BE blocks it anyway). Skip the request entirely.
+    if (isStoreUser) {
+      setMaps({ byStoneSku: {}, byJewelrySku: {}, ready: true });
+      return;
+    }
     try {
       const data = await fetchActiveMemoSkus(user.id);
       if (!aliveRef.current) return;
@@ -36,7 +44,7 @@ export function MemoSkusProvider({ children }) {
       if (!aliveRef.current) return;
       setMaps((prev) => ({ ...prev, ready: true }));
     }
-  }, [user?.id]);
+  }, [user?.id, isStoreUser]);
 
   useEffect(() => {
     aliveRef.current = true;

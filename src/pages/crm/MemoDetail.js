@@ -16,6 +16,7 @@ import {
   ITEM_STATUSES,
   isMemoEffectivelyExpired,
 } from "../../services/memosApi";
+import { approveMemoItemRequest, declineMemoItemRequest } from "../../services/portalApi";
 import StonePicker from "./components/StonePicker";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 
@@ -177,6 +178,28 @@ export default function MemoDetail() {
     catch (e) { toast.error(e.message); }
   };
 
+  // Owner-side approval workflow — confirm / reject the store user's
+  // pending request (sold/return) on a single item.
+  const approveRequest = async (item) => {
+    try {
+      await approveMemoItemRequest(user.id, id, item.id);
+      toast.success(`Approved · ${item.item_sku} marked ${item.pending_status}`);
+      reload();
+    } catch (e) { toast.error(e.message); }
+  };
+  const declineRequest = async (item) => {
+    const reason = window.prompt(
+      `Decline the store's request to mark ${item.item_sku} as ${item.pending_status}?\n\nOptional reason (sent to your activity log):`,
+      ""
+    );
+    if (reason === null) return;
+    try {
+      await declineMemoItemRequest(user.id, id, item.id, reason || null);
+      toast.success("Request declined");
+      reload();
+    } catch (e) { toast.error(e.message); }
+  };
+
   if (loading || !memo) {
     return (
       <div className="space-y-3 max-w-5xl mx-auto">
@@ -220,6 +243,8 @@ export default function MemoDetail() {
         onAddClick={() => setShowPicker(true)}
         onUpdate={updateItem}
         onRemove={removeItem}
+        onApprove={approveRequest}
+        onDecline={declineRequest}
       />
 
       {/* Lower row: timeline + notes */}
@@ -461,11 +486,20 @@ function Legend({ color, label }) {
 
 /* ─────────── Items card ─────────── */
 
-function ItemsCard({ memo, isDraft, isOpen, onAddClick, onUpdate, onRemove }) {
+function ItemsCard({ memo, isDraft, isOpen, onAddClick, onUpdate, onRemove, onApprove, onDecline }) {
+  const pendingCount = memo.items.filter((i) => i.pending_status).length;
   return (
     <div className="bg-white border border-stone-200 rounded-xl overflow-hidden print:rounded-none">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
-        <h2 className="font-semibold text-stone-900">Items ({memo.items.length})</h2>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="font-semibold text-stone-900">Items ({memo.items.length})</h2>
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200 print:hidden">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              {pendingCount} store request{pendingCount !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
         {isDraft && (
           <button
             onClick={onAddClick}
@@ -488,6 +522,8 @@ function ItemsCard({ memo, isDraft, isOpen, onAddClick, onUpdate, onRemove }) {
               isOpen={isOpen}
               onUpdate={onUpdate}
               onRemove={() => onRemove(it)}
+              onApprove={onApprove}
+              onDecline={onDecline}
             />
           ))}
         </div>
@@ -496,7 +532,7 @@ function ItemsCard({ memo, isDraft, isOpen, onAddClick, onUpdate, onRemove }) {
   );
 }
 
-function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove }) {
+function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove, onApprove, onDecline }) {
   const [price, setPrice] = useState(item.memo_price ?? "");
   const [notesOpen, setNotesOpen] = useState(false);
   const [notes, setNotes] = useState(item.notes || "");
@@ -521,9 +557,10 @@ function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove }) {
     : snap.certificateNumber ? `Cert: ${snap.certificateNumber}` : null;
 
   const title = snap.title || (isJewelry ? snap.jewelryType : snap.shape) || item.item_sku;
+  const isPending = !!item.pending_status;
 
   return (
-    <div className="hover:bg-stone-50 transition-colors print:hover:bg-transparent">
+    <div className={`transition-colors print:hover:bg-transparent ${isPending ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-stone-50"}`}>
       <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4">
         {snap.imageUrl ? (
           <img src={snap.imageUrl} alt={item.item_sku} className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-cover bg-stone-100 ring-1 ring-stone-200 shrink-0" />
@@ -538,6 +575,11 @@ function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove }) {
             <span className={`text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${status.color}`}>
               {status.label}
             </span>
+            {isPending && (
+              <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 print:hidden">
+                Store requested · {item.pending_status === "sold" ? "sale" : "return"}
+              </span>
+            )}
             {item.status === "sold" && item.sold_at && (
               <span className="text-[10px] text-stone-400">{fmtDate(item.sold_at)}</span>
             )}
@@ -548,6 +590,11 @@ function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove }) {
           <div className="text-sm font-semibold text-stone-900 mt-0.5 truncate">{title}</div>
           {specLine && <div className="text-xs text-stone-500 mt-0.5 truncate">{specLine}</div>}
           {subSpec && <div className="text-[11px] text-stone-400 mt-0.5 truncate">{subSpec}</div>}
+          {isPending && item.pending_note && (
+            <div className="text-xs text-amber-700 mt-1.5 italic line-clamp-2 break-words print:hidden">
+              <span className="font-semibold not-italic">Store note:</span> "{item.pending_note}"
+            </div>
+          )}
           {item.notes && !notesOpen && (
             <div className="text-xs text-stone-600 mt-1.5 italic line-clamp-2 break-words">"{item.notes}"</div>
           )}
@@ -582,7 +629,7 @@ function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove }) {
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             )}
-            {isOpen && item.status === "out" && (
+            {isOpen && item.status === "out" && !isPending && (
               <>
                 <button
                   onClick={() => onUpdate(item, { status: "returned" }, "Marked returned")}
@@ -595,6 +642,28 @@ function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove }) {
                   className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-semibold hover:bg-emerald-200"
                 >
                   Sold
+                </button>
+              </>
+            )}
+            {isPending && onApprove && onDecline && (
+              <>
+                <button
+                  onClick={() => onDecline(item)}
+                  title="Decline store request"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-300 text-stone-700 text-[10px] font-semibold hover:bg-stone-50"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={() => onApprove(item)}
+                  title={`Approve · mark ${item.item_sku} as ${item.pending_status}`}
+                  className={`px-2 py-1 rounded-md text-white text-[10px] font-semibold ${
+                    item.pending_status === "sold"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-stone-700 hover:bg-stone-800"
+                  }`}
+                >
+                  Approve
                 </button>
               </>
             )}

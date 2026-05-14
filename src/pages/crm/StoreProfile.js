@@ -12,6 +12,7 @@ import {
   WEEKDAYS,
 } from "../../services/companiesApi";
 import { fetchMemos, MEMO_STATUSES, isMemoEffectivelyExpired } from "../../services/memosApi";
+import { fetchTeamMembers, inviteTeamMember, removeTeamMember, resendTeamInvite } from "../../services/teamApi";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 import MemoWizard from "./components/MemoWizard";
 
@@ -779,6 +780,8 @@ function SettingsTab({ store, onPatch }) {
         />
       </div>
 
+      <PortalAccessCard storeId={store.id} />
+
       {dirty && (
         <div className="lg:col-span-2 sticky bottom-4 z-10 bg-white border border-stone-200 rounded-xl p-3 flex items-center justify-between shadow-lg">
           <span className="text-xs text-stone-500">Unsaved changes</span>
@@ -807,6 +810,188 @@ function SettingsTab({ store, onPatch }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────── Portal access card ─────────────── */
+
+function PortalAccessCard({ storeId }) {
+  const { user } = useUser();
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showInvite, setShowInvite] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+
+  const reload = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const data = await fetchTeamMembers({ id: user.id, email: user.primaryEmailAddress?.emailAddress });
+      const all = Array.isArray(data?.members) ? data.members : [];
+      setMembers(all.filter((m) => m.role === "store_user" && Number(m.company_id) === Number(storeId)));
+    } catch (e) {
+      // Silent — settings tab can render without portal users.
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [user?.id, storeId]);
+
+  const remove = async (m) => {
+    if (!window.confirm(`Revoke ${m.name}'s portal access?`)) return;
+    setBusyId(m.id);
+    try {
+      await removeTeamMember({ id: user.id, email: user.primaryEmailAddress?.emailAddress }, m.id);
+      toast.success("Portal access revoked");
+      reload();
+    } catch (e) { toast.error(e.message); }
+    finally { setBusyId(null); }
+  };
+
+  const resend = async (m) => {
+    setBusyId(m.id);
+    try {
+      await resendTeamInvite({ id: user.id, email: user.primaryEmailAddress?.emailAddress }, m.id);
+      toast.success("Invitation re-sent");
+    } catch (e) { toast.error(e.message); }
+    finally { setBusyId(null); }
+  };
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3 lg:col-span-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="font-semibold text-stone-900 text-sm">Portal access</h3>
+          <p className="text-xs text-stone-500 mt-0.5">
+            People at this store who can sign in to the consignment portal and request sold/return on memo items.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowInvite(true)}
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Invite portal user
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-xs text-stone-400">Loading…</div>
+      ) : members.length === 0 ? (
+        <div className="text-xs text-stone-400 italic">No portal users yet — invite someone from this store to give them access.</div>
+      ) : (
+        <ul className="divide-y divide-stone-100 -mx-4">
+          {members.map((m) => (
+            <li key={m.id} className="px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className="w-8 h-8 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0"
+                  style={{ backgroundColor: m.avatar_color || "#0ea5e9" }}
+                >
+                  {(m.name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-stone-900 truncate">{m.name}</div>
+                  <div className="text-[11px] text-stone-500 truncate">{m.email}</div>
+                </div>
+                {m.pending && (
+                  <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
+                    Pending sign-in
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {m.pending && (
+                  <button
+                    onClick={() => resend(m)}
+                    disabled={busyId === m.id}
+                    className="px-2.5 py-1 rounded-md bg-white border border-stone-300 text-stone-700 text-[11px] font-semibold hover:border-stone-500 disabled:opacity-50"
+                  >
+                    Resend
+                  </button>
+                )}
+                <button
+                  onClick={() => remove(m)}
+                  disabled={busyId === m.id}
+                  className="px-2.5 py-1 rounded-md bg-white border border-stone-200 text-rose-600 text-[11px] font-semibold hover:bg-rose-50 disabled:opacity-50"
+                >
+                  Revoke
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showInvite && (
+        <InvitePortalUserModal
+          storeId={storeId}
+          onClose={() => setShowInvite(false)}
+          onInvited={() => { setShowInvite(false); reload(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function InvitePortalUserModal({ storeId, onClose, onInvited }) {
+  const { user } = useUser();
+  const [form, setForm] = useState({ name: "", email: "" });
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+    setBusy(true);
+    try {
+      await inviteTeamMember(
+        { id: user.id, email: user.primaryEmailAddress?.emailAddress },
+        {
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          role: "store_user",
+          companyId: storeId,
+        }
+      );
+      toast.success("Invitation sent");
+      onInvited();
+    } catch (err) { toast.error(err.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
+        <div className="px-4 sm:px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-stone-900">Invite portal user</h2>
+            <p className="text-xs text-stone-500 mt-0.5">They'll get an email with a link to sign in to the consignment portal.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100" aria-label="Close">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <form onSubmit={submit} className="p-4 sm:p-6 space-y-3">
+          <Input label="Full name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Sarah Levi" />
+          <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" placeholder="sarah@store.com" />
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="px-3 py-2 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 disabled:opacity-50"
+            >
+              {busy ? "Sending…" : "Send invitation"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

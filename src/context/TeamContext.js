@@ -35,6 +35,8 @@ const TeamContext = createContext({
   actorUserId: null,
   role: null,
   isOwner: true,
+  isStoreUser: false,
+  companyId: null,
   refresh: () => {},
 });
 
@@ -49,6 +51,8 @@ export const TeamProvider = ({ children }) => {
     actorUserId: null,
     role: null,
     isOwner: true,
+    isStoreUser: false,
+    companyId: null,
   });
 
   const actor = useMemo(() => {
@@ -76,6 +80,8 @@ export const TeamProvider = ({ children }) => {
         actorUserId: data?.actorUserId || actor.id,
         role: data?.role || "owner",
         isOwner: data?.isOwner !== undefined ? !!data.isOwner : true,
+        isStoreUser: !!data?.isStoreUser,
+        companyId: data?.companyId || null,
       });
     } catch (e) {
       // Failure should never break the app — fall back to "you're a solo owner".
@@ -89,6 +95,8 @@ export const TeamProvider = ({ children }) => {
         actorUserId: actor.id,
         role: "owner",
         isOwner: true,
+        isStoreUser: false,
+        companyId: null,
       });
     }
   }, [isSignedIn, actor]);
