@@ -948,7 +948,7 @@ function InvitePortalUserModal({ storeId, onClose, onInvited }) {
     }
     setBusy(true);
     try {
-      await inviteTeamMember(
+      const r = await inviteTeamMember(
         { id: user.id, email: user.primaryEmailAddress?.emailAddress },
         {
           name: form.name.trim(),
@@ -957,7 +957,26 @@ function InvitePortalUserModal({ storeId, onClose, onInvited }) {
           companyId: storeId,
         }
       );
-      toast.success("Invitation sent");
+      // The BE returns the row even when email delivery failed; surface
+      // the actual delivery state so the owner knows whether the store
+      // user got the email or whether they need to resend / share link
+      // manually.
+      const emailSent    = r?.email?.sent === true;
+      const emailSkipped = r?.email?.skipped === true;
+      const emailError   = r?.email?.error;
+      if (emailSent) {
+        toast.success(`Portal invitation sent to ${form.name.trim()}`);
+      } else if (emailSkipped) {
+        toast(
+          `${form.name.trim()} added — email service is not configured on the server (RESEND_API_KEY).`,
+          { icon: "i", duration: 7000 }
+        );
+      } else {
+        toast.error(
+          `${form.name.trim()} added but email delivery failed: ${emailError || "unknown error"} — use Resend to retry.`,
+          { duration: 9000 }
+        );
+      }
       onInvited();
     } catch (err) { toast.error(err.message); }
     finally { setBusy(false); }
