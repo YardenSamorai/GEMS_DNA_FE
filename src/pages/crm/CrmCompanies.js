@@ -126,6 +126,8 @@ function CompanyCard({ company }) {
   const portalActive  = (company.portal_user_active || 0) > 0;
   const portalPending = !portalActive && (company.portal_user_count || 0) > 0;
   const portalNone    = !portalActive && !portalPending;
+  const pendingRequests = Number(company.pending_requests_count || 0);
+  const hasRequests = pendingRequests > 0;
 
   let portalPill = null;
   if (portalActive) {
@@ -153,11 +155,30 @@ function CompanyCard({ company }) {
 
   return (
     <Link
-      to={`/crm/stores/${company.id}`}
-      className={`bg-white border rounded-xl p-4 hover:shadow-md transition-all flex flex-col group ${
-        portalNone ? "border-stone-200 hover:border-rose-300" : "border-stone-200 hover:border-stone-300"
+      to={`/crm/stores/${company.id}${hasRequests ? "?tab=requests" : ""}`}
+      className={`relative bg-white border rounded-xl p-4 hover:shadow-md transition-all flex flex-col group overflow-hidden ${
+        hasRequests
+          ? "border-amber-300 ring-2 ring-amber-200/60 shadow-[0_0_0_1px_rgba(251,191,36,0.15)] hover:border-amber-400"
+          : portalNone
+          ? "border-stone-200 hover:border-rose-300"
+          : "border-stone-200 hover:border-stone-300"
       }`}
     >
+      {/* Pending memo-request ribbon — surfaces store-portal asks
+          right on the card so the supplier can spot them without
+          drilling into the Memos page first. */}
+      {hasRequests && (
+        <div className="-mx-4 -mt-4 mb-3 px-4 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-white text-[11px] font-bold uppercase tracking-[0.16em] flex items-center gap-1.5">
+          <span className="relative flex w-1.5 h-1.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-70 animate-ping" />
+            <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-white" />
+          </span>
+          {pendingRequests} new memo request{pendingRequests === 1 ? "" : "s"}
+          <svg className="w-3.5 h-3.5 ml-auto opacity-90 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      )}
       <div className="flex items-start gap-3 mb-3">
         {company.logo_url ? (
           <img src={company.logo_url} alt={company.name} className="w-12 h-12 rounded-xl object-cover bg-stone-100 shrink-0 ring-1 ring-stone-200" />

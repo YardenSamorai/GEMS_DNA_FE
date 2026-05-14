@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import {
@@ -13,6 +13,11 @@ import {
 } from "../../services/companiesApi";
 import { fetchMemos, MEMO_STATUSES, isMemoEffectivelyExpired } from "../../services/memosApi";
 import { fetchTeamMembers, inviteTeamMember, removeTeamMember, resendTeamInvite } from "../../services/teamApi";
+import {
+  fetchOwnerMemoRequest,
+  declineMemoRequest,
+  convertMemoRequest,
+} from "../../services/portalApi";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 import MemoWizard from "./components/MemoWizard";
 
@@ -28,10 +33,26 @@ export default function StoreProfile() {
   const { id } = useParams();
   const { user } = useUser();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [store, setStore] = useState(null);
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("overview");
+  // Honour ?tab=requests so a click on the orange ribbon on the
+  // CrmCompanies card lands directly on the requests view.
+  const initialTab = searchParams.get("tab") || "overview";
+  const [tab, setTab] = useState(initialTab);
+  useEffect(() => {
+    if (tab && tab !== "overview") {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", tab);
+      setSearchParams(next, { replace: true });
+    } else if (searchParams.get("tab")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("tab");
+      setSearchParams(next, { replace: true });
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [tab]);
   const [createMemoOpen, setCreateMemoOpen] = useState(false);
 
   const reload = async () => {
@@ -49,6 +70,15 @@ export default function StoreProfile() {
     } finally { setLoading(false); }
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [id, user?.id]);
+
+  const memoRequests = useMemo(
+    () => Array.isArray(store?.memo_requests) ? store.memo_requests : [],
+    [store?.memo_requests]
+  );
+  const pendingRequestCount = useMemo(
+    () => memoRequests.filter((r) => r.status === "pending").length,
+    [memoRequests]
+  );
 
   const kpis = useMemo(() => {
     if (!memos.length) return { active: 0, itemsOut: 0, totalValue: 0, lifetime: 0, soldValue: 0 };
@@ -151,6 +181,7 @@ export default function StoreProfile() {
         <nav className="flex gap-1 overflow-x-auto">
           {[
             { id: "overview", label: "Overview" },
+            { id: "requests", label: "Requests", count: pendingRequestCount, accent: pendingRequestCount > 0 },
             { id: "memos",    label: `Memos (${memos.length})` },
             { id: "contacts", label: `Contacts (${(store.contacts || []).length})` },
             { id: "settings", label: "Settings" },
@@ -158,13 +189,20 @@ export default function StoreProfile() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`shrink-0 px-4 py-2.5 text-sm font-semibold border-b-2 transition ${
+              className={`shrink-0 px-4 py-2.5 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 ${
                 tab === t.id
                   ? "border-stone-900 text-stone-900"
                   : "border-transparent text-stone-500 hover:text-stone-800"
               }`}
             >
               {t.label}
+              {t.count != null && t.count > 0 && (
+                <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                  t.accent
+                    ? "bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm"
+                    : "bg-stone-200 text-stone-700"
+                }`}>{t.count}</span>
+              )}
             </button>
           ))}
         </nav>
@@ -172,6 +210,7 @@ export default function StoreProfile() {
 
       {/* Tab content */}
       {tab === "overview" && <OverviewTab store={store} memos={memos} onPatch={handlePatch} />}
+      {tab === "requests" && <RequestsTab requests={memoRequests} onChanged={reload} />}
       {tab === "memos"    && <MemosTab memos={memos} storeId={store.id} onCreate={() => setCreateMemoOpen(true)} />}
       {tab === "contacts" && <ContactsTab contacts={store.contacts || []} storeId={store.id} />}
       {tab === "settings" && <SettingsTab store={store} onPatch={handlePatch} />}
@@ -859,6 +898,304 @@ function BusinessHoursBlock({ store, onPatch }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────── Requests tab (memo requests from the store-portal) ─────────────── */
+
+const REQUEST_STATUS = {
+  pending:   { label: "Pending review",      color: "bg-amber-50 text-amber-700 border-amber-200" },
+  converted: { label: "Converted to memo",   color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  declined:  { label: "Declined",            color: "bg-rose-50 text-rose-700 border-rose-200" },
+  cancelled: { label: "Cancelled by store",  color: "bg-stone-100 text-stone-600 border-stone-200" },
+};
+
+function RequestsTab({ requests, onChanged }) {
+  const [openId, setOpenId] = useState(null);
+  const pending = useMemo(() => requests.filter((r) => r.status === "pending"), [requests]);
+  const past    = useMemo(() => requests.filter((r) => r.status !== "pending"), [requests]);
+
+  if (requests.length === 0) {
+    return (
+      <div className="bg-white border border-dashed border-stone-300 rounded-xl p-10 text-center">
+        <div className="mx-auto w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+          <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h3 className="text-sm font-semibold text-stone-900 mb-1">No memo requests yet</h3>
+        <p className="text-xs text-stone-500">When this store's portal users ask for a memo, it'll appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {pending.length > 0 && (
+        <div className="bg-white border border-amber-200 rounded-xl overflow-hidden ring-1 ring-amber-100">
+          <div className="px-4 py-3 border-b border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 flex items-center gap-2">
+            <span className="relative flex w-2 h-2">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-70 animate-ping" />
+              <span className="relative inline-flex w-2 h-2 rounded-full bg-amber-500" />
+            </span>
+            <h3 className="font-semibold text-amber-900 text-sm">
+              {pending.length} pending request{pending.length === 1 ? "" : "s"}
+            </h3>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {pending.map((r) => (
+              <RequestRow key={r.id} req={r} onOpen={() => setOpenId(r.id)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {past.length > 0 && (
+        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-stone-200">
+            <h3 className="font-semibold text-stone-900 text-sm">Past requests</h3>
+          </div>
+          <div className="divide-y divide-stone-100">
+            {past.map((r) => (
+              <RequestRow key={r.id} req={r} onOpen={() => setOpenId(r.id)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {openId != null && (
+        <RequestDetailDrawer
+          id={openId}
+          onClose={() => setOpenId(null)}
+          onChanged={() => { setOpenId(null); onChanged?.(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RequestRow({ req, onOpen }) {
+  const meta = REQUEST_STATUS[req.status] || REQUEST_STATUS.pending;
+  return (
+    <button
+      onClick={onOpen}
+      className="group w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-stone-50/70 transition-colors"
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${meta.color}`}>
+            {meta.label}
+          </span>
+          <span className="text-[11px] text-stone-400">#{req.id}</span>
+          <span className="text-[11px] text-stone-400">· {new Date(req.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+          {req.preferred_due_at && (
+            <span className="text-[11px] text-stone-500">· wants by {new Date(req.preferred_due_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+          )}
+        </div>
+        <div className="font-bold text-stone-900 text-sm mt-1 group-hover:text-indigo-700 transition-colors">
+          {req.item_count} item{req.item_count === 1 ? "" : "s"}
+          {req.requester_name && <span className="text-stone-500 font-normal"> · from {req.requester_name}</span>}
+        </div>
+        {req.message && <div className="text-xs text-stone-500 truncate mt-0.5">"{req.message}"</div>}
+      </div>
+      <svg className="w-4 h-4 text-stone-300 mt-2 hidden sm:block group-hover:text-indigo-500 group-hover:translate-x-0.5 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  );
+}
+
+function RequestDetailDrawer({ id, onClose, onChanged }) {
+  const { user } = useUser();
+  const navigate = useNavigate();
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy]       = useState(false);
+  const [declineMode, setDeclineMode] = useState(false);
+  const [reason, setReason]   = useState("");
+
+  useEffect(() => {
+    if (!user?.id || id == null) return;
+    setLoading(true);
+    fetchOwnerMemoRequest(user.id, id)
+      .then(setData)
+      .catch((e) => toast.error(e.message))
+      .finally(() => setLoading(false));
+  }, [user?.id, id]);
+
+  const convert = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const out = await convertMemoRequest(user.id, id);
+      toast.success(`Draft memo created${out?.memo?.memo_number ? `: ${out.memo.memo_number}` : ""}`);
+      if (out?.memo?.id) navigate(`/crm/memos/${out.memo.id}`);
+      onChanged?.();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decline = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await declineMemoRequest(user.id, id, reason.trim() || null);
+      toast.success("Request declined");
+      onChanged?.();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-stone-900/60 backdrop-blur-sm">
+      <div className="w-full sm:max-w-xl bg-white shadow-2xl flex flex-col">
+        <div className="px-5 py-4 border-b border-stone-200 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400">Request #{id}</div>
+            <h3 className="text-lg font-bold text-stone-900 mt-0.5">{data?.company_name || "Loading…"}</h3>
+            {data && (
+              <div className="text-xs text-stone-500 mt-0.5">
+                Submitted {new Date(data.created_at).toLocaleString()}
+                {data.requester_name && <> · by {data.requester_name}</>}
+              </div>
+            )}
+          </div>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {loading || !data ? (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-3 w-1/3 bg-stone-200 rounded" />
+              <div className="h-32 bg-stone-100 rounded-xl" />
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${(REQUEST_STATUS[data.status] || REQUEST_STATUS.pending).color}`}>
+                  {(REQUEST_STATUS[data.status] || REQUEST_STATUS.pending).label}
+                </span>
+                {data.preferred_due_at && (
+                  <span className="text-xs text-stone-500">Wants by {new Date(data.preferred_due_at).toLocaleDateString()}</span>
+                )}
+              </div>
+              {data.message && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-stone-400 mb-1">Notes from store</div>
+                  <div className="rounded-xl bg-stone-50 border border-stone-200 p-3 text-sm text-stone-800 whitespace-pre-wrap">{data.message}</div>
+                </div>
+              )}
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-stone-400 mb-2">
+                  Items · {data.items?.length || 0}
+                </div>
+                <div className="rounded-xl border border-stone-200 divide-y divide-stone-100 overflow-hidden">
+                  {(data.items || []).map((it) => {
+                    const snap = it.snapshot || {};
+                    const title = it.item_type === "jewelry"
+                      ? (snap.name || it.item_sku)
+                      : `${snap.shape || ""} ${snap.weightCt ? `${snap.weightCt} ct` : ""}`.trim() || it.item_sku;
+                    const subBits = it.item_type === "jewelry"
+                      ? [snap.metalType, snap.category].filter(Boolean)
+                      : [snap.color, snap.clarity, snap.origin].filter(Boolean);
+                    return (
+                      <div key={it.id} className="flex items-start gap-3 px-3 py-3">
+                        <div className="w-14 h-14 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
+                          {snap.imageUrl ? <img src={snap.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${it.item_type === "jewelry" ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{it.item_type}</span>
+                            <span className="text-[11px] font-mono font-semibold text-stone-400">{it.item_sku}</span>
+                          </div>
+                          <div className="text-sm font-semibold text-stone-900 mt-1 truncate">{title}</div>
+                          {subBits.length > 0 && (
+                            <div className="text-[11px] text-stone-500 mt-0.5 truncate">{subBits.join(" · ")}</div>
+                          )}
+                          {it.notes && <div className="text-[11px] text-stone-500 mt-1 italic">"{it.notes}"</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {(!data.items || data.items.length === 0) && (
+                    <div className="px-3 py-4 text-xs text-stone-400 italic">Free-text request only — no specific items listed.</div>
+                  )}
+                </div>
+              </div>
+              {data.decline_reason && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-rose-500 mb-1">Decline reason</div>
+                  <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-sm text-rose-900 whitespace-pre-wrap">{data.decline_reason}</div>
+                </div>
+              )}
+              {data.converted_memo_id && (
+                <Link
+                  to={`/crm/memos/${data.converted_memo_id}`}
+                  className="block rounded-xl border border-emerald-200 bg-emerald-50 p-3 hover:bg-emerald-100 transition"
+                >
+                  <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-emerald-700">Resulting memo</div>
+                  <div className="text-sm font-bold text-emerald-900 mt-0.5">Open memo →</div>
+                </Link>
+              )}
+              {declineMode && data.status === "pending" && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-stone-400 mb-1.5">Reason (optional)</div>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={3}
+                    placeholder="Why is this declined? (Out of stock, customer mismatch, etc.)"
+                    className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400 placeholder-stone-400 resize-y"
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {data?.status === "pending" && (
+          <div className="px-5 py-3 border-t border-stone-200 flex items-center justify-between gap-2 bg-stone-50/70">
+            {!declineMode ? (
+              <>
+                <button
+                  onClick={() => setDeclineMode(true)}
+                  disabled={busy}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                >Decline</button>
+                <button
+                  onClick={convert}
+                  disabled={busy}
+                  className="px-5 py-2 rounded-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white text-sm font-bold disabled:opacity-50 hover:opacity-95"
+                >
+                  {busy ? "Working…" : "Convert to memo →"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setDeclineMode(false); setReason(""); }}
+                  disabled={busy}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-200"
+                >Back</button>
+                <button
+                  onClick={decline}
+                  disabled={busy}
+                  className="px-5 py-2 rounded-lg bg-rose-600 text-white text-sm font-bold disabled:opacity-50 hover:bg-rose-700"
+                >
+                  {busy ? "Declining…" : "Confirm decline"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
