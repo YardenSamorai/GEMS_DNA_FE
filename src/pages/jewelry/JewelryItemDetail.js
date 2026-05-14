@@ -27,6 +27,7 @@ import WhatsAppCustomerButton from "./components/WhatsAppCustomerButton";
 import { Skeleton, SkeletonText, SkeletonCard } from "../../components/ui/Skeleton";
 import AssigneePicker from "../../components/team/AssigneePicker";
 import { useTeam } from "../../context/TeamContext";
+import ItemTierManager from "../../components/catalog/ItemTierManager";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -462,6 +463,8 @@ const JewelryItemDetail = () => {
 
           {/* Right column - cost summary */}
           <div className="space-y-4">
+            {item.sku && <ItemTierManager type="jewelry" sku={item.sku} />}
+
             <div className="rounded-xl border border-stone-200 bg-white p-5">
               <h2 className="mb-3 text-base font-semibold text-stone-900">Pricing</h2>
               <dl className="space-y-2 text-sm">

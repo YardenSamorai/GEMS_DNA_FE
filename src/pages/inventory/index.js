@@ -14,6 +14,7 @@ import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
 import StoneUsagePanel from "../../components/StoneUsagePanel";
+import ItemTierManager from "../../components/catalog/ItemTierManager";
 import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL, fetchSoapStones, assignStone } from "../../services/stonesApi";
 import InternalExcelModal from "./components/InternalExcelModal";
 import MemberAvatar from "../../components/team/MemberAvatar";
@@ -2503,6 +2504,14 @@ const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel }) => {
                     {stone.weightCt}ct \u00d7 ${stone.pricePerCt?.toLocaleString()}/ct
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Catalog visibility — which catalog tiers (and therefore stores)
+                see this SKU. Loud red badge when the SKU is in zero tiers. */}
+            {stone.sku && activeTab === 'details' && (
+              <div className="mt-4">
+                <ItemTierManager type={isJewelry ? 'jewelry' : 'stone'} sku={stone.sku} />
               </div>
             )}
 

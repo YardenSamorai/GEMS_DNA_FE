@@ -19,6 +19,11 @@ import {
   declineMemoRequest,
   convertMemoRequest,
 } from "../../services/portalApi";
+import {
+  fetchCatalogTiers,
+  fetchCompanyTiers,
+  setCompanyTiers,
+} from "../../services/catalogTiersApi";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 import MemoWizard from "./components/MemoWizard";
 
@@ -185,6 +190,7 @@ export default function StoreProfile() {
             { id: "requests", label: "Requests", count: pendingRequestCount, accent: pendingRequestCount > 0 },
             { id: "memos",    label: `Memos (${memos.length})` },
             { id: "contacts", label: `Contacts (${(store.contacts || []).length})` },
+            { id: "catalog",  label: "Catalog" },
             { id: "settings", label: "Settings" },
           ].map((t) => (
             <button
@@ -214,6 +220,7 @@ export default function StoreProfile() {
       {tab === "requests" && <RequestsTab requests={memoRequests} onChanged={reload} />}
       {tab === "memos"    && <MemosTab memos={memos} storeId={store.id} onCreate={() => setCreateMemoOpen(true)} />}
       {tab === "contacts" && <ContactsTab contacts={store.contacts || []} storeId={store.id} storeName={store.name} onChanged={reload} />}
+      {tab === "catalog"  && <CatalogAccessTab storeId={store.id} storeName={store.name} />}
       {tab === "settings" && <SettingsTab store={store} onPatch={handlePatch} />}
 
       {createMemoOpen && (
@@ -1611,6 +1618,187 @@ function Field({ label, value, onChange, placeholder, type = "text", autoFocus =
         className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400 placeholder-stone-400"
       />
     </label>
+  );
+}
+
+/* ─────────────── Catalog access tab (which tiers this store sees) ─────────────── */
+
+function CatalogAccessTab({ storeId, storeName }) {
+  const { user } = useUser();
+  const [allTiers, setAllTiers] = useState([]);
+  const [storeTiers, setStoreTiers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const reload = async () => {
+    if (!user?.id || !storeId) return;
+    setLoading(true);
+    try {
+      const [tiers, mine] = await Promise.all([
+        fetchCatalogTiers(user.id),
+        fetchCompanyTiers(user.id, storeId),
+      ]);
+      setAllTiers(tiers || []);
+      setStoreTiers(mine || []);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [user?.id, storeId]);
+
+  const subscribed = useMemo(() => new Set(storeTiers.map((t) => t.id)), [storeTiers]);
+
+  const totalVisibleItems = useMemo(
+    () => storeTiers.reduce((acc, t) => acc + Number(t.item_count || 0), 0),
+    [storeTiers]
+  );
+
+  const toggle = async (tierId) => {
+    if (saving) return;
+    const next = subscribed.has(tierId)
+      ? Array.from(subscribed).filter((id) => id !== tierId)
+      : [...Array.from(subscribed), tierId];
+    setSaving(true);
+    try {
+      const updated = await setCompanyTiers(user.id, storeId, next);
+      setStoreTiers(updated || []);
+      toast.success(subscribed.has(tierId) ? "Removed from tier" : "Added to tier");
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-6 text-sm text-stone-500">Loading catalog access…</div>;
+  }
+
+  if (!allTiers.length) {
+    return (
+      <div className="p-6">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 max-w-2xl">
+          <div className="font-semibold text-amber-900">No catalog tiers exist yet</div>
+          <p className="mt-1 text-sm text-amber-800">
+            Catalog tiers control which inventory each store sees in the portal. Right now <strong>{storeName}</strong> can't see any items because no tiers have been created.
+          </p>
+          <Link
+            to="/crm/catalog"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-amber-900 hover:text-amber-700"
+          >
+            Open Catalog Tiers →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <SummaryCell
+          label="Subscribed tiers"
+          value={`${storeTiers.length} of ${allTiers.length}`}
+        />
+        <SummaryCell
+          label="Items visible to this store"
+          value={totalVisibleItems}
+          tone={totalVisibleItems === 0 ? "warn" : "ok"}
+        />
+        <SummaryCell
+          label="Hidden from this store"
+          value={storeTiers.length === allTiers.length ? "Nothing — full access" : "Items in unsubscribed tiers"}
+          mono
+        />
+      </div>
+
+      {totalVisibleItems === 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-900">
+          <strong>{storeName}</strong> currently sees an empty catalog in the portal. Subscribe at least one tier with items to fix this.
+        </div>
+      )}
+
+      {/* Tier picker */}
+      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-stone-900">Catalog tiers</div>
+            <div className="text-xs text-stone-500">Toggle to subscribe or unsubscribe this store from each tier.</div>
+          </div>
+          <Link
+            to="/crm/catalog"
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            Manage tiers →
+          </Link>
+        </div>
+        <div className="divide-y divide-stone-100">
+          {allTiers.map((t) => {
+            const on = subscribed.has(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => toggle(t.id)}
+                disabled={saving}
+                className={`w-full flex items-center gap-3 px-5 py-3 text-left transition ${
+                  on ? "bg-emerald-50/50" : "hover:bg-stone-50"
+                } disabled:opacity-50`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ background: t.color || "#94a3b8" }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-stone-900">{t.name}</span>
+                    {t.is_default && (
+                      <span className="text-[10px] uppercase tracking-wider bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-stone-500">
+                    {Number(t.item_count) || 0} items · {Number(t.stone_count) || 0} stones · {Number(t.jewelry_count) || 0} jewelry
+                  </div>
+                </div>
+                <div
+                  className={`relative w-11 h-6 rounded-full transition flex-shrink-0 ${
+                    on ? "bg-emerald-500" : "bg-stone-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      on ? "translate-x-5" : ""
+                    }`}
+                  />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryCell({ label, value, sub, tone, mono }) {
+  const toneClass =
+    tone === "warn" ? "text-amber-700" :
+    tone === "ok"   ? "text-emerald-700" :
+    "text-stone-900";
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
+      <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">{label}</div>
+      <div className={`mt-1 text-xl font-bold truncate ${toneClass} ${mono ? "font-mono text-sm font-medium" : ""}`}>
+        {value}
+      </div>
+      {sub && <div className="text-xs text-stone-500 truncate">{sub}</div>}
+    </div>
   );
 }
 

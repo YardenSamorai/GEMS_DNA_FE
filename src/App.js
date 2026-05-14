@@ -25,6 +25,7 @@ import CustomerProfile from "./pages/crm/CustomerProfile";
 import CrmDeals from "./pages/crm/CrmDeals";
 import CrmTasks from "./pages/crm/CrmTasks";
 import CrmSettings from "./pages/crm/CrmSettings";
+import CatalogTiers from "./pages/crm/CatalogTiers";
 import TeamSettings from "./pages/team/TeamSettings";
 import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
@@ -471,6 +472,7 @@ function AppContent() {
               <Route path="stores/:id" element={<StoreProfile />} />
               <Route path="memos" element={<CrmMemos />} />
               <Route path="memos/:id" element={<MemoDetail />} />
+              <Route path="catalog" element={<CatalogTiers />} />
               <Route path="settings" element={<CrmSettings />} />
             </Route>
           </Route>
