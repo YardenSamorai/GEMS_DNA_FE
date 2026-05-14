@@ -123,21 +123,54 @@ export default function CrmCompanies() {
 function CompanyCard({ company }) {
   const type = COMPANY_TYPES.find((t) => t.value === company.type) || COMPANY_TYPES[0];
   const hasOpenMemos = company.active_memos > 0;
+  const portalActive  = (company.portal_user_active || 0) > 0;
+  const portalPending = !portalActive && (company.portal_user_count || 0) > 0;
+  const portalNone    = !portalActive && !portalPending;
+
+  let portalPill = null;
+  if (portalActive) {
+    portalPill = (
+      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        Portal
+      </span>
+    );
+  } else if (portalPending) {
+    portalPill = (
+      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        Pending
+      </span>
+    );
+  } else {
+    portalPill = (
+      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border bg-rose-50 text-rose-700 border-rose-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+        No portal
+      </span>
+    );
+  }
+
   return (
     <Link
       to={`/crm/stores/${company.id}`}
-      className="bg-white border border-stone-200 rounded-xl p-4 hover:shadow-md hover:border-stone-300 transition-all flex flex-col group"
+      className={`bg-white border rounded-xl p-4 hover:shadow-md transition-all flex flex-col group ${
+        portalNone ? "border-stone-200 hover:border-rose-300" : "border-stone-200 hover:border-stone-300"
+      }`}
     >
       <div className="flex items-start gap-3 mb-3">
         {company.logo_url ? (
           <img src={company.logo_url} alt={company.name} className="w-12 h-12 rounded-xl object-cover bg-stone-100 shrink-0 ring-1 ring-stone-200" />
         ) : (
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-base shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-base shrink-0">
             {(company.name || "?").slice(0, 2).toUpperCase()}
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-stone-900 truncate group-hover:text-stone-950">{company.name}</h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold text-stone-900 truncate group-hover:text-stone-950">{company.name}</h3>
+            {portalPill}
+          </div>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border ${type.color}`}>
               {type.label}

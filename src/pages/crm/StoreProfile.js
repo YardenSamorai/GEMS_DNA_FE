@@ -116,7 +116,7 @@ export default function StoreProfile() {
       </div>
 
       {/* Hero card */}
-      <Hero store={store} type={type} onPatch={handlePatch} />
+      <Hero store={store} type={type} onPatch={handlePatch} onPortalChanged={reload} />
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
@@ -190,7 +190,7 @@ export default function StoreProfile() {
 
 /* ─────────────── Hero header (logo + cover + identity) ─────────────── */
 
-function Hero({ store, type, onPatch }) {
+function Hero({ store, type, onPatch, onPortalChanged }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(store.name);
   useEffect(() => setName(store.name), [store.name]);
@@ -201,18 +201,20 @@ function Hero({ store, type, onPatch }) {
   return (
     <div className="relative bg-white border border-stone-200 rounded-2xl overflow-hidden">
       {/* Cover banner — short enough that the logo can sit half-on /
-          half-off the boundary without colliding with the name. */}
+          half-off the boundary without colliding with the name.
+          Default gradient is brand blue → indigo so it matches the
+          consignment portal palette and reads as "store / partner". */}
       <div
         className="h-24 sm:h-32 w-full relative"
         style={
           cover
             ? { backgroundImage: `url(${cover})`, backgroundSize: "cover", backgroundPosition: "center" }
-            : { backgroundImage: "linear-gradient(135deg, #1c1917 0%, #44403c 100%)" }
+            : { backgroundImage: "linear-gradient(135deg, #2563eb 0%, #4f46e5 60%, #6366f1 100%)" }
         }
       >
         {!cover && (
-          <div className="absolute inset-0 opacity-20" style={{
-            backgroundImage: "radial-gradient(circle at 25% 30%, rgba(255,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 75% 70%, rgba(255,255,255,0.1) 0%, transparent 50%)",
+          <div className="absolute inset-0 opacity-30" style={{
+            backgroundImage: "radial-gradient(circle at 22% 28%, rgba(255,255,255,0.35) 0%, transparent 45%), radial-gradient(circle at 78% 75%, rgba(255,255,255,0.18) 0%, transparent 50%)",
           }} />
         )}
         <div className="absolute top-3 right-3 z-10">
@@ -222,7 +224,7 @@ function Hero({ store, type, onPatch }) {
 
       {/* Logo — pulled up so it floats over the cover/white boundary.
           Lives in its own row so the name strip below has full width
-          and is never visually cut by the dark cover behind it. */}
+          and is never visually cut by the cover behind it. */}
       <div className="px-4 sm:px-6 -mt-10 sm:-mt-12 mb-3">
         {store.logo_url ? (
           <img
@@ -231,49 +233,246 @@ function Hero({ store, type, onPatch }) {
             className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover bg-white ring-4 ring-white shadow-md"
           />
         ) : (
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-2xl sm:text-3xl ring-4 ring-white shadow-md">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-2xl sm:text-3xl ring-4 ring-white shadow-md">
             {initials || "?"}
           </div>
         )}
       </div>
 
       {/* Identity strip — entirely below the cover, full width. */}
-      <div className="px-4 sm:px-6 pb-5">
-        {editingName ? (
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={() => { setEditingName(false); if (name.trim() && name !== store.name) onPatch({ name: name.trim() }); else setName(store.name); }}
-            onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setName(store.name); setEditingName(false); } }}
-            className="text-xl sm:text-2xl font-bold text-stone-900 bg-stone-50 border-b-2 border-stone-300 focus:outline-none focus:border-stone-900 px-1 w-full"
-          />
-        ) : (
-          <h1
-            onClick={() => setEditingName(true)}
-            title="Click to rename"
-            className="text-xl sm:text-2xl font-bold text-stone-900 cursor-text hover:bg-stone-50 -mx-1 px-1 rounded inline-block max-w-full break-words"
-          >
-            {store.name}
-          </h1>
-        )}
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${type.color}`}>
-            {type.label}
-          </span>
-          {(store.city || store.country) && (
-            <span className="text-xs text-stone-500 inline-flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              {[store.city, store.country].filter(Boolean).join(", ")}
-            </span>
-          )}
-          {store.established_year && (
-            <span className="text-xs text-stone-500">est. {store.established_year}</span>
-          )}
+      <div className="px-4 sm:px-6 pb-4 sm:pb-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0 flex-1">
+            {editingName ? (
+              <input
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={() => { setEditingName(false); if (name.trim() && name !== store.name) onPatch({ name: name.trim() }); else setName(store.name); }}
+                onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") { setName(store.name); setEditingName(false); } }}
+                className="text-xl sm:text-2xl font-bold text-stone-900 bg-stone-50 border-b-2 border-stone-300 focus:outline-none focus:border-stone-900 px-1 w-full"
+              />
+            ) : (
+              <h1
+                onClick={() => setEditingName(true)}
+                title="Click to rename"
+                className="text-xl sm:text-2xl font-bold text-stone-900 cursor-text hover:bg-stone-50 -mx-1 px-1 rounded inline-block max-w-full break-words"
+              >
+                {store.name}
+              </h1>
+            )}
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${type.color}`}>
+                {type.label}
+              </span>
+              {(store.city || store.country) && (
+                <span className="text-xs text-stone-500 inline-flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  {[store.city, store.country].filter(Boolean).join(", ")}
+                </span>
+              )}
+              {store.established_year && (
+                <span className="text-xs text-stone-500">est. {store.established_year}</span>
+              )}
+            </div>
+          </div>
         </div>
+
         {store.description && (
           <p className="mt-3 text-sm text-stone-600 leading-relaxed">{store.description}</p>
         )}
+      </div>
+
+      {/* Portal access strip — sits at the bottom of the hero so it's
+          impossible to miss. Renders one of two states:
+          1. No active portal user → red CTA "Invite portal user".
+          2. Has portal user(s)    → green pill + "Manage" button. */}
+      <PortalAccessStrip store={store} onPortalChanged={onPortalChanged} />
+    </div>
+  );
+}
+
+/* ─────────────── Portal access strip (Hero footer) ─────────────── */
+
+function PortalAccessStrip({ store, onPortalChanged }) {
+  const { user } = useUser();
+  const [showInvite, setShowInvite] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const portalUsers = Array.isArray(store.portal_users) ? store.portal_users : [];
+  const activeUser  = portalUsers.find((u) => !u.pending) || null;
+  const pendingUser = !activeUser ? portalUsers.find((u) => u.pending) : null;
+  const primary     = activeUser || pendingUser;
+  const hasAny      = portalUsers.length > 0;
+
+  const handleRevoke = async () => {
+    if (!confirmRevoke) return;
+    setBusy(true);
+    try {
+      await removeTeamMember(
+        { id: user.id, email: user.primaryEmailAddress?.emailAddress },
+        confirmRevoke.id
+      );
+      toast.success("Portal access revoked");
+      setConfirmRevoke(null);
+      if (onPortalChanged) await onPortalChanged();
+    } catch (e) {
+      toast.error(e.message);
+    } finally { setBusy(false); }
+  };
+
+  // No portal user yet — bold red strip + Invite CTA.
+  if (!hasAny) {
+    return (
+      <>
+        <div className="flex items-center justify-between gap-3 flex-wrap px-4 sm:px-6 py-3 bg-rose-50 border-t border-rose-200">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <span className="w-7 h-7 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-rose-800">No portal access</div>
+              <div className="text-xs text-rose-700 mt-0.5">
+                This store can't see its memos online yet. Invite someone to give them portal access.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowInvite(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Invite portal user
+          </button>
+        </div>
+        {showInvite && (
+          <InvitePortalUserModal
+            storeId={store.id}
+            onClose={() => setShowInvite(false)}
+            onInvited={async () => {
+              setShowInvite(false);
+              if (onPortalChanged) await onPortalChanged();
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Portal user(s) exist — green/amber strip with primary user + Revoke.
+  const activeColor   = activeUser  ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200";
+  const pillColor     = activeUser  ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-amber-100 text-amber-800 border-amber-200";
+  const pillLabel     = activeUser  ? "Portal active" : "Pending sign-in";
+  const dotColor      = activeUser  ? "bg-emerald-500" : "bg-amber-500";
+
+  return (
+    <>
+      <div className={`flex items-center justify-between gap-3 flex-wrap px-4 sm:px-6 py-3 border-t ${activeColor}`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="w-9 h-9 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0"
+            style={{ backgroundColor: primary?.avatar_color || "#0ea5e9" }}
+          >
+            {(primary?.name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${pillColor}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                {pillLabel}
+              </span>
+              {portalUsers.length > 1 && (
+                <span className="text-[10px] uppercase tracking-wider font-bold text-stone-500">
+                  +{portalUsers.length - 1} more
+                </span>
+              )}
+            </div>
+            <div className="text-sm font-semibold text-stone-900 truncate mt-0.5">{primary?.name}</div>
+            <div className="text-[11px] text-stone-500 truncate">{primary?.email}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowInvite(true)}
+            title="Invite another portal user"
+            className="px-3 py-1.5 rounded-lg bg-white border border-stone-300 text-stone-700 text-xs font-semibold hover:border-stone-500"
+          >
+            Invite another
+          </button>
+          <button
+            onClick={() => setConfirmRevoke(primary)}
+            className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-600 text-xs font-semibold hover:bg-rose-50"
+          >
+            Revoke access
+          </button>
+        </div>
+      </div>
+
+      {showInvite && (
+        <InvitePortalUserModal
+          storeId={store.id}
+          onClose={() => setShowInvite(false)}
+          onInvited={async () => {
+            setShowInvite(false);
+            if (onPortalChanged) await onPortalChanged();
+          }}
+        />
+      )}
+
+      {confirmRevoke && (
+        <ConfirmDialog
+          title="Revoke portal access?"
+          body={
+            <>
+              <p className="text-sm text-stone-700">
+                <span className="font-semibold">{confirmRevoke.name}</span> ({confirmRevoke.email}) will lose access to the consignment portal immediately.
+              </p>
+              <p className="text-xs text-stone-500 mt-2">
+                Memos and history stay intact — you can re-invite them or someone else later.
+              </p>
+            </>
+          }
+          confirmLabel={busy ? "Revoking…" : "Revoke access"}
+          confirmTone="rose"
+          busy={busy}
+          onCancel={() => setConfirmRevoke(null)}
+          onConfirm={handleRevoke}
+        />
+      )}
+    </>
+  );
+}
+
+/* Reusable confirm dialog with backdrop, used for destructive actions. */
+function ConfirmDialog({ title, body, confirmLabel, confirmTone = "stone", busy, onCancel, onConfirm }) {
+  const tones = {
+    rose:  "bg-rose-600 hover:bg-rose-700",
+    stone: "bg-stone-900 hover:bg-stone-800",
+  };
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
+        <div className="p-5 sm:p-6">
+          <h3 className="font-bold text-stone-900 text-base">{title}</h3>
+          <div className="mt-2">{body}</div>
+        </div>
+        <div className="px-5 sm:px-6 py-3 bg-stone-50 border-t border-stone-100 flex justify-end gap-2 rounded-b-2xl">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-3 py-2 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className={`px-3 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50 ${tones[confirmTone] || tones.stone}`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
