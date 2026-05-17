@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 import { fetchJewelryItem } from "../../../services/jewelryApi";
 import { sanitizeText } from "../../../utils/helper";
 import StatusBadge from "./StatusBadge";
@@ -55,20 +56,22 @@ const KV = ({ label, value, mono }) => (
    Workshop view (jewelry_items)
    ========================================================= */
 const WorkshopBody = ({ baseItem }) => {
+  const { user } = useUser();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!user?.id) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchJewelryItem(baseItem.id)
+    fetchJewelryItem(baseItem.id, user.id)
       .then((res) => { if (!cancelled) setData(res); })
       .catch((e) => { if (!cancelled) setError(e.message || "Failed to load"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [baseItem.id]);
+  }, [baseItem.id, user?.id]);
 
   // Use the freshly fetched item if available, fall back to the card's data
   // so the dialog renders something useful before the network round-trip.
