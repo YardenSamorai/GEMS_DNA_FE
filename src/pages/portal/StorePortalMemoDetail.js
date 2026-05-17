@@ -149,6 +149,7 @@ export default function StorePortalMemoDetail() {
         title={signaturePrompt?.title}
         defaultName={user?.fullName || ""}
         actionLabel={signaturePrompt?.actionLabel || "Sign"}
+        portal
         onSigned={async () => {
           setSignaturePrompt(null);
           await reload();

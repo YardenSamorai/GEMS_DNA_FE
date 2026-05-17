@@ -75,6 +75,25 @@ export const submitMemoSignature = (userId, memoId, payload) =>
     }),
   }).then(json);
 
+/**
+ * Store-portal counterpart of submitMemoSignature.
+ *
+ * The store-user gate on the BE blocks `role='store_user'` from touching
+ * anything outside `/api/portal/*`, so portal pages must POST here. The
+ * BE locks signerRole to 'store' server-side regardless of what we send,
+ * but we keep the same payload shape for consistency.
+ */
+export const submitPortalMemoSignature = (userId, memoId, payload) =>
+  fetch(`${API_BASE}/api/portal/memos/${memoId}/signatures${qs({ userId })}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId,
+      consentText: CONSENT_TEXT,
+      ...payload,
+    }),
+  }).then(json);
+
 /* Map signer_role + event into a short human label for badges/headings. */
 export const signatureLabel = (sig) => {
   if (!sig) return "";

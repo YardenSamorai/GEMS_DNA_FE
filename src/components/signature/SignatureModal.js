@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import SignaturePad from "./SignaturePad";
-import { submitMemoSignature, CONSENT_TEXT } from "../../services/signaturesApi";
+import {
+  submitMemoSignature,
+  submitPortalMemoSignature,
+  CONSENT_TEXT,
+} from "../../services/signaturesApi";
 
 /**
  * SignatureModal — captures and submits one signature on a memo.
@@ -26,6 +30,10 @@ import { submitMemoSignature, CONSENT_TEXT } from "../../services/signaturesApi"
  *   title       - heading shown at the top of the modal (e.g. "Sign & issue memo")
  *   defaultName - pre-fill for the typed-name field (defaults to "")
  *   actionLabel - submit button label (e.g. "Sign & issue", "Acknowledge")
+ *   portal      - when true, POSTs to /api/portal/memos/:id/signatures
+ *                 instead of the supplier-facing /api/memos/:id/signatures.
+ *                 Required for store_user callers because the BE blocks
+ *                 that role from non-portal paths.
  *
  * Mobile note: the pad uses touch-action:none so drawing doesn't scroll
  * the page; the modal locks body scroll while open to match the existing
@@ -42,6 +50,7 @@ export default function SignatureModal({
   title,
   defaultName = "",
   actionLabel = "Sign",
+  portal = false,
 }) {
   const padRef = useRef(null);
   const [dataUrl, setDataUrl] = useState(null);
@@ -94,7 +103,8 @@ export default function SignatureModal({
     }
     setSubmitting(true);
     try {
-      const sig = await submitMemoSignature(userId, memoId, {
+      const submit = portal ? submitPortalMemoSignature : submitMemoSignature;
+      const sig = await submit(userId, memoId, {
         event,
         signerRole,
         signerName: trimmedName,
