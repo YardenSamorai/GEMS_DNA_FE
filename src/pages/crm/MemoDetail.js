@@ -18,10 +18,12 @@ import {
 } from "../../services/memosApi";
 import { approveMemoItemRequest, declineMemoItemRequest } from "../../services/portalApi";
 import { findSignature } from "../../services/signaturesApi";
+import { downloadMemoPdf, printMemoPdf } from "../../services/memoPdf";
 import StonePicker from "./components/StonePicker";
 import SignatureModal from "../../components/signature/SignatureModal";
 import SignatureBlock from "../../components/signature/SignatureBlock";
 import SendSigningLinkModal from "../../components/signature/SendSigningLinkModal";
+import SignatureRequiredBanner from "../../components/signature/SignatureRequiredBanner";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 
 /**
@@ -121,6 +123,13 @@ export default function MemoDetail() {
   const isDraft  = memo?.status === "draft";
   const isOpen   = memo?.status === "out" || memo?.status === "partially_returned";
 
+  // Whether the supplier-issuance signature exists. Mirrors the BE
+  // hard-gate: while this is false on a non-draft memo, downstream
+  // actions (close, approve, decline) are blocked server-side and
+  // disabled visually so the user gets a consistent story.
+  const hasSupplierIssueSig = !!findSignature(memo, "issue", "supplier");
+  const signatureGateActive = !!memo && !isDraft && !hasSupplierIssueSig;
+
   /* ── handlers ── */
 
   const handleAddItems = async (picked) => {
@@ -206,6 +215,20 @@ export default function MemoDetail() {
     });
   };
 
+  // Retroactive supplier signing entry point. Used when a memo was
+  // issued before the signature workflow existed (or via a code path
+  // that bypassed it). The status is already past draft so we don't
+  // chain an `issueNow` follow-up — we just collect the signature and
+  // reload, which clears the banner and unlocks the gated actions.
+  const handleSignIssuance = () => {
+    setSignaturePrompt({
+      event: "issue",
+      signerRole: "supplier",
+      title: `Sign issuance · memo ${memo.memo_number}`,
+      actionLabel: "Sign issuance",
+    });
+  };
+
   const handleClose = async () => {
     if (!window.confirm("Force-close this memo? Any items still out will be marked as returned.")) return;
     try { await closeMemo(user.id, id); toast.success("Memo closed"); reload(); }
@@ -265,12 +288,26 @@ export default function MemoDetail() {
         isDraft={isDraft}
         isOpen={isOpen}
         itemCount={totals.count}
-        hasSupplierIssueSig={!!findSignature(memo, "issue", "supplier")}
+        hasSupplierIssueSig={hasSupplierIssueSig}
+        signatureGateActive={signatureGateActive}
         onPrint={() => window.print()}
         onIssue={handleIssueAttempt}
         onClose={handleClose}
         onDelete={handleDelete}
       />
+
+      {/* Hard-gate banner: shown when a memo is past draft but the
+          supplier hasn't signed the issuance yet. The BE blocks
+          close / approve / decline in this state — the banner pairs
+          with that hard-gate and offers the supplier a one-tap CTA
+          to satisfy it. */}
+      {signatureGateActive && (
+        <SignatureRequiredBanner
+          memoNumber={memo.memo_number}
+          role="supplier"
+          onSign={handleSignIssuance}
+        />
+      )}
 
       {/* Document hero */}
       <Hero memo={memo} effectiveStatus={effectiveStatus} expired={expired} />
@@ -286,6 +323,7 @@ export default function MemoDetail() {
         memo={memo}
         isDraft={isDraft}
         isOpen={isOpen}
+        gateActive={signatureGateActive}
         onAddClick={() => setShowPicker(true)}
         onUpdate={updateItem}
         onRemove={removeItem}
@@ -299,6 +337,7 @@ export default function MemoDetail() {
         onRequestSignature={(event, signerRole) =>
           setTokenPrompt({ event, signerRole })
         }
+        onSignIssuance={signatureGateActive ? handleSignIssuance : null}
       />
 
       {/* Lower row: timeline + notes */}
@@ -350,7 +389,7 @@ export default function MemoDetail() {
 
 /* ─────────── Signatures card ─────────── */
 
-function SignaturesCard({ memo, onRequestSignature }) {
+function SignaturesCard({ memo, onRequestSignature, onSignIssuance }) {
   const sigs = memo?.signatures || [];
   // Hide entirely while the memo is still a draft (no signatures are
   // expected yet — they're captured at the issue handshake). Once the
@@ -375,17 +414,57 @@ function SignaturesCard({ memo, onRequestSignature }) {
   const canRequestStore =
     memo.status !== "draft" && typeof onRequestSignature === "function";
 
+  const handleDownload = async () => {
+    try { await downloadMemoPdf(memo); }
+    catch (e) { toast.error(e.message || "Failed to build PDF"); }
+  };
+  const handlePrint = async () => {
+    try { await printMemoPdf(memo); }
+    catch (e) { toast.error(e.message || "Failed to open print preview"); }
+  };
+  const canExport = sigs.length > 0;
+
   return (
     <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 print:rounded-none">
-      <div className="flex items-baseline justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h2 className="font-semibold text-stone-900">Signatures</h2>
-        <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold">Electronic signatures</span>
+        <div className="flex items-center gap-2 print:hidden">
+          {canExport && (
+            <>
+              <button
+                onClick={handlePrint}
+                title="Open a print-ready PDF of this memo with embedded signatures"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-stone-200 text-stone-700 text-[11px] font-semibold hover:bg-stone-50"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print
+              </button>
+              <button
+                onClick={handleDownload}
+                title="Download a signed-memo PDF"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-stone-900 text-white text-[11px] font-semibold hover:bg-stone-800"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Download PDF
+              </button>
+            </>
+          )}
+          <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold ml-1">Electronic signatures</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {issueSupplier
           ? <SignatureBlock signature={issueSupplier} accent="supplier" />
-          : <AwaitingSignatureSlot kind="Supplier" event="issuance" />}
+          : <AwaitingSignatureSlot
+              kind="Supplier"
+              event="issuance"
+              onSignNow={typeof onSignIssuance === "function" ? onSignIssuance : null}
+            />}
         {issueStore
           ? <SignatureBlock signature={issueStore} accent="store" />
           : <AwaitingSignatureSlot
@@ -413,10 +492,25 @@ function SignaturesCard({ memo, onRequestSignature }) {
   );
 }
 
-function AwaitingSignatureSlot({ kind, event, onSendLink }) {
+function AwaitingSignatureSlot({ kind, event, onSendLink, onSignNow }) {
   return (
     <div className="border border-dashed border-stone-200 rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-xs text-stone-400 min-h-[100px] print:hidden">
       <div>Awaiting {kind} signature ({event})</div>
+      {/* Inline retroactive CTA — used on the supplier-issuance slot
+          when the memo is past draft and the supplier hasn't signed yet.
+          Provides a second entry point next to the top banner. */}
+      {onSignNow && (
+        <button
+          type="button"
+          onClick={onSignNow}
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-md"
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Sign now
+        </button>
+      )}
       {onSendLink && (
         <button
           type="button"
@@ -435,7 +529,7 @@ function AwaitingSignatureSlot({ kind, event, onSendLink }) {
 
 /* ─────────── Toolbar ─────────── */
 
-function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, onPrint, onIssue, onClose, onDelete }) {
+function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, signatureGateActive, onPrint, onIssue, onClose, onDelete }) {
   // When a draft has no supplier-issue signature yet, the primary CTA
   // reads "Sign & issue" — clicking it opens the signature modal which
   // chains the issue call. Once a signature exists (e.g. after a failed
@@ -476,7 +570,12 @@ function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, onPrin
           </>
         )}
         {isOpen && (
-          <button onClick={onClose} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800">
+          <button
+            onClick={onClose}
+            disabled={signatureGateActive}
+            title={signatureGateActive ? "Sign the issuance first to enable closing" : "Close this memo"}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
+          >
             Close memo
           </button>
         )}
@@ -668,7 +767,7 @@ function Legend({ color, label }) {
 
 /* ─────────── Items card ─────────── */
 
-function ItemsCard({ memo, isDraft, isOpen, onAddClick, onUpdate, onRemove, onApprove, onDecline }) {
+function ItemsCard({ memo, isDraft, isOpen, gateActive, onAddClick, onUpdate, onRemove, onApprove, onDecline }) {
   const pendingCount = memo.items.filter((i) => i.pending_status).length;
   return (
     <div className="bg-white border border-stone-200 rounded-xl overflow-hidden print:rounded-none">
@@ -702,6 +801,7 @@ function ItemsCard({ memo, isDraft, isOpen, onAddClick, onUpdate, onRemove, onAp
               item={it}
               isDraft={isDraft}
               isOpen={isOpen}
+              gateActive={gateActive}
               onUpdate={onUpdate}
               onRemove={() => onRemove(it)}
               onApprove={onApprove}
@@ -714,7 +814,7 @@ function ItemsCard({ memo, isDraft, isOpen, onAddClick, onUpdate, onRemove, onAp
   );
 }
 
-function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove, onApprove, onDecline }) {
+function ItemRow({ item, isDraft, isOpen, gateActive, onUpdate, onRemove, onApprove, onDecline }) {
   const [price, setPrice] = useState(item.memo_price ?? "");
   const [notesOpen, setNotesOpen] = useState(false);
   const [notes, setNotes] = useState(item.notes || "");
@@ -815,13 +915,17 @@ function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove, onApprove, onDecli
               <>
                 <button
                   onClick={() => onUpdate(item, { status: "returned" }, "Marked returned")}
-                  className="px-2 py-1 rounded-md bg-stone-100 text-stone-700 text-[10px] font-semibold hover:bg-stone-200"
+                  disabled={gateActive}
+                  title={gateActive ? "Sign the issuance first to enable this action" : undefined}
+                  className="px-2 py-1 rounded-md bg-stone-100 text-stone-700 text-[10px] font-semibold hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-100"
                 >
                   Returned
                 </button>
                 <button
                   onClick={() => onUpdate(item, { status: "sold" }, "Marked as sold")}
-                  className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-semibold hover:bg-emerald-200"
+                  disabled={gateActive}
+                  title={gateActive ? "Sign the issuance first to enable this action" : undefined}
+                  className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-semibold hover:bg-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-emerald-100"
                 >
                   Sold
                 </button>
@@ -831,15 +935,17 @@ function ItemRow({ item, isDraft, isOpen, onUpdate, onRemove, onApprove, onDecli
               <>
                 <button
                   onClick={() => onDecline(item)}
-                  title="Decline store request"
-                  className="px-2 py-1 rounded-md bg-white border border-stone-300 text-stone-700 text-[10px] font-semibold hover:bg-stone-50"
+                  disabled={gateActive}
+                  title={gateActive ? "Sign the issuance first to enable approval/decline" : "Decline store request"}
+                  className="px-2 py-1 rounded-md bg-white border border-stone-300 text-stone-700 text-[10px] font-semibold hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Decline
                 </button>
                 <button
                   onClick={() => onApprove(item)}
-                  title={`Approve · mark ${item.item_sku} as ${item.pending_status}`}
-                  className={`px-2 py-1 rounded-md text-white text-[10px] font-semibold ${
+                  disabled={gateActive}
+                  title={gateActive ? "Sign the issuance first to enable approval/decline" : `Approve · mark ${item.item_sku} as ${item.pending_status}`}
+                  className={`px-2 py-1 rounded-md text-white text-[10px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed ${
                     item.pending_status === "sold"
                       ? "bg-emerald-600 hover:bg-emerald-700"
                       : "bg-stone-700 hover:bg-stone-800"

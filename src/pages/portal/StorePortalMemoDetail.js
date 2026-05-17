@@ -13,8 +13,10 @@ import {
   isMemoEffectivelyExpired,
 } from "../../services/memosApi";
 import { findSignature } from "../../services/signaturesApi";
+import { downloadMemoPdf, printMemoPdf } from "../../services/memoPdf";
 import SignatureModal from "../../components/signature/SignatureModal";
 import SignatureBlock from "../../components/signature/SignatureBlock";
+import SignatureRequiredBanner from "../../components/signature/SignatureRequiredBanner";
 
 /**
  * StorePortalMemoDetail — single-memo view for retail-store users.
@@ -89,8 +91,17 @@ export default function StorePortalMemoDetail() {
 
   const expired = isMemoEffectivelyExpired(memo);
   const effectiveStatus = expired ? "expired" : memo.status;
+  const hasSupplierIssueSig = !!findSignature(memo, "issue", "supplier");
+  const isDraftMemo = memo.status === "draft";
+  // Hard-gate banner mirrors the BE: when a memo is past draft but
+  // the supplier hasn't signed the issuance yet, item-level actions
+  // (mark sold / request return) are blocked server-side. We surface
+  // that visually so the store user isn't left wondering why their
+  // buttons fail.
+  const signatureGateActive = !isDraftMemo && !hasSupplierIssueSig;
   const needsAcknowledgment =
     (memo.status === "out" || memo.status === "partially_returned") &&
+    hasSupplierIssueSig &&
     !findSignature(memo, "issue", "store");
 
   return (
@@ -113,6 +124,17 @@ export default function StorePortalMemoDetail() {
         )}
       </div>
 
+      {/* Red hard-gate banner takes priority over the amber
+          acknowledgment banner: until the supplier signs, the store
+          can't even acknowledge — so it doesn't make sense to invite
+          them to. */}
+      {signatureGateActive && (
+        <SignatureRequiredBanner
+          memoNumber={memo.memo_number}
+          role="store"
+        />
+      )}
+
       {needsAcknowledgment && (
         <AwaitingSignatureBanner
           memoNumber={memo.memo_number}
@@ -128,7 +150,7 @@ export default function StorePortalMemoDetail() {
       <Hero memo={memo} effectiveStatus={effectiveStatus} expired={expired} />
       <FromToStrip memo={memo} />
       <FinancialSummary totals={totals} />
-      <ItemsCard memo={memo} reload={reload} userId={user?.id} />
+      <ItemsCard memo={memo} reload={reload} userId={user?.id} gateActive={signatureGateActive} />
 
       <SignaturesCard memo={memo} />
 
@@ -191,7 +213,11 @@ function AwaitingSignatureBanner({ memoNumber, onSign }) {
 
 function SignaturesCard({ memo }) {
   const sigs = memo?.signatures || [];
-  if (sigs.length === 0) return null;
+  // Hide while the memo is still a draft — no signatures are expected
+  // yet. Once issued (even if no signatures have been collected),
+  // render the card so the store has a reliable home for the Print /
+  // Download buttons and can see at-a-glance who has signed.
+  if (memo.status === "draft" && sigs.length === 0) return null;
   const find = (event, role) =>
     sigs.find((s) => s.event === event && s.signer_role === role) || null;
   const issueSupplier = find("issue", "supplier");
@@ -200,11 +226,42 @@ function SignaturesCard({ memo }) {
   const closeStore = find("close", "store");
   const showCloseRow = !!closeSupplier || !!closeStore || memo.status === "closed";
 
+  const handleDownload = async () => {
+    try { await downloadMemoPdf(memo); }
+    catch (e) { toast.error(e.message || "Failed to build PDF"); }
+  };
+  const handlePrint = async () => {
+    try { await printMemoPdf(memo); }
+    catch (e) { toast.error(e.message || "Failed to open print preview"); }
+  };
+
   return (
     <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5">
-      <div className="flex items-baseline justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h2 className="font-semibold text-stone-900">Signatures</h2>
-        <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold">Electronic signatures</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            title="Open a print-ready PDF of this memo"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-stone-200 text-stone-700 text-[11px] font-semibold hover:bg-stone-50"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print
+          </button>
+          <button
+            onClick={handleDownload}
+            title="Download a signed-memo PDF"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-stone-900 text-white text-[11px] font-semibold hover:bg-stone-800"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            Download PDF
+          </button>
+          <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold ml-1">Electronic signatures</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -393,19 +450,21 @@ function Legend({ color, label }) {
 
 /* ─────────── Items card ─────────── */
 
-function ItemsCard({ memo, reload, userId }) {
+function ItemsCard({ memo, reload, userId, gateActive }) {
   return (
     <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
         <h2 className="font-semibold text-stone-900">Items ({memo.items.length})</h2>
-        <div className="text-[11px] text-stone-400">Tap an item to mark sold or request return</div>
+        <div className="text-[11px] text-stone-400">
+          {gateActive ? "Actions disabled — awaiting supplier signature" : "Tap an item to mark sold or request return"}
+        </div>
       </div>
       {memo.items.length === 0 ? (
         <div className="p-8 text-center text-sm text-stone-400">No items in this memo</div>
       ) : (
         <div className="divide-y divide-stone-100">
           {memo.items.map((it) => (
-            <ItemRow key={it.id} item={it} memoId={memo.id} reload={reload} userId={userId} />
+            <ItemRow key={it.id} item={it} memoId={memo.id} reload={reload} userId={userId} gateActive={gateActive} />
           ))}
         </div>
       )}
@@ -413,7 +472,7 @@ function ItemsCard({ memo, reload, userId }) {
   );
 }
 
-function ItemRow({ item, memoId, reload, userId }) {
+function ItemRow({ item, memoId, reload, userId, gateActive }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -508,7 +567,9 @@ function ItemRow({ item, memoId, reload, userId }) {
           {(isOut || pendingByMe) && (
             <button
               onClick={() => setOpen((v) => !v)}
-              className="text-[11px] font-semibold text-stone-500 hover:text-stone-900 inline-flex items-center gap-0.5"
+              disabled={gateActive && !pendingByMe}
+              title={gateActive && !pendingByMe ? "Awaiting supplier signature" : undefined}
+              className="text-[11px] font-semibold text-stone-500 hover:text-stone-900 inline-flex items-center gap-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {open ? "Close" : (isPending ? "Manage" : "Action")}
               <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -551,15 +612,17 @@ function ItemRow({ item, memoId, reload, userId }) {
                 <div className="flex flex-col sm:flex-row gap-2 mt-3">
                   <button
                     onClick={() => submitRequest("sold")}
-                    disabled={busy}
-                    className="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
+                    disabled={busy || gateActive}
+                    title={gateActive ? "Awaiting supplier signature on this memo" : undefined}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Mark as sold
                   </button>
                   <button
                     onClick={() => submitRequest("returned")}
-                    disabled={busy}
-                    className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-stone-300 text-stone-700 text-sm font-semibold hover:border-stone-500 disabled:opacity-50"
+                    disabled={busy || gateActive}
+                    title={gateActive ? "Awaiting supplier signature on this memo" : undefined}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-stone-300 text-stone-700 text-sm font-semibold hover:border-stone-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Request return
                   </button>
