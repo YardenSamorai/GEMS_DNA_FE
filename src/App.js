@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet, useParams } from "react-router-dom";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
 import Dashboard from "./pages/Dashboard";
 import JewelryPage from "./pages/JewelryPage";
@@ -248,6 +248,7 @@ const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 const AppLayout = () => {
   const { theme } = useTheme();
   const team = useTeam();
+  const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
   });
@@ -264,6 +265,24 @@ const AppLayout = () => {
 
   // Close the mobile drawer on navigation
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  // Render gate. Two problems we're solving here:
+  //   1. UX flash. A `store_user` who lands at /dashboard would
+  //      briefly see the full admin shell (sidebar, KPI cards,
+  //      skeletons) for the few hundred ms it takes /api/team/me to
+  //      resolve, before the isStoreUser redirect below fires.
+  //   2. Privacy leak. That same flash exposes the admin navigation
+  //      structure (and any cached dashboard data from a previous
+  //      session) to a user who is not authorised to see it.
+  //
+  // The fix is to short-circuit to a neutral full-screen loader the
+  // moment Clerk says "this person is signed in" until TeamContext
+  // confirms what their role is. Signed-out / Clerk-still-loading
+  // states fall through so the existing <SignedOut> branch keeps
+  // working.
+  if (clerkLoaded && isSignedIn && !team?.ready) {
+    return <FullScreenLoader />;
+  }
 
   // Hard redirect: store-portal users have no business inside the
   // sidebar app at all. Send them to /store-portal the moment we
@@ -300,6 +319,40 @@ const AppLayout = () => {
         </div>
       </SignedOut>
     </>
+  );
+};
+
+/**
+ * FullScreenLoader — neutral splash shown while we're resolving who
+ * the user is (Clerk -> TeamContext.me). Deliberately minimal: just
+ * the brand mark and a subtle spinner. NO admin chrome (sidebar,
+ * topbar, dashboard widgets) and NO store-portal chrome — both could
+ * leak structure or stale data to a viewer whose role we don't yet
+ * know. Both AppLayout and StorePortalLayout render this during the
+ * pre-role window.
+ */
+const FullScreenLoader = () => {
+  const { theme } = useTheme();
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Loading workspace"
+      className={`min-h-screen w-full flex items-center justify-center ${theme === "dark" ? "bg-stone-950" : "bg-stone-50"}`}
+    >
+      <div className="flex flex-col items-center gap-5">
+        <div className="relative">
+          <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl" />
+          <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
+            <DiamondIcon />
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-stone-400 text-xs font-semibold uppercase tracking-[0.18em]">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Loading workspace
+        </div>
+      </div>
+    </div>
   );
 };
 
