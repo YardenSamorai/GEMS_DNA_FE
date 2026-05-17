@@ -12,6 +12,9 @@ import {
   ITEM_STATUSES,
   isMemoEffectivelyExpired,
 } from "../../services/memosApi";
+import { findSignature } from "../../services/signaturesApi";
+import SignatureModal from "../../components/signature/SignatureModal";
+import SignatureBlock from "../../components/signature/SignatureBlock";
 
 /**
  * StorePortalMemoDetail — single-memo view for retail-store users.
@@ -46,6 +49,10 @@ export default function StorePortalMemoDetail() {
   const navigate = useNavigate();
   const [memo, setMemo] = useState(null);
   const [loading, setLoading] = useState(true);
+  // signaturePrompt mirrors the supplier-side modal pattern. null when
+  // the modal is closed; an object describing the (event, signerRole)
+  // being captured otherwise.
+  const [signaturePrompt, setSignaturePrompt] = useState(null);
 
   const reload = async () => {
     if (!user?.id || !id) return;
@@ -82,6 +89,9 @@ export default function StorePortalMemoDetail() {
 
   const expired = isMemoEffectivelyExpired(memo);
   const effectiveStatus = expired ? "expired" : memo.status;
+  const needsAcknowledgment =
+    (memo.status === "out" || memo.status === "partially_returned") &&
+    !findSignature(memo, "issue", "store");
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -103,10 +113,24 @@ export default function StorePortalMemoDetail() {
         )}
       </div>
 
+      {needsAcknowledgment && (
+        <AwaitingSignatureBanner
+          memoNumber={memo.memo_number}
+          onSign={() => setSignaturePrompt({
+            event: "issue",
+            signerRole: "store",
+            title: `Acknowledge receipt of memo ${memo.memo_number}`,
+            actionLabel: "Sign acknowledgment",
+          })}
+        />
+      )}
+
       <Hero memo={memo} effectiveStatus={effectiveStatus} expired={expired} />
       <FromToStrip memo={memo} />
       <FinancialSummary totals={totals} />
       <ItemsCard memo={memo} reload={reload} userId={user?.id} />
+
+      <SignaturesCard memo={memo} />
 
       {memo.notes && (
         <div className="bg-white border border-stone-200 rounded-2xl p-4 sm:p-5">
@@ -114,6 +138,101 @@ export default function StorePortalMemoDetail() {
           <div className="text-sm text-stone-700 whitespace-pre-wrap break-words">{memo.notes}</div>
         </div>
       )}
+
+      <SignatureModal
+        open={!!signaturePrompt}
+        onClose={() => setSignaturePrompt(null)}
+        userId={user?.id}
+        memoId={id}
+        event={signaturePrompt?.event}
+        signerRole={signaturePrompt?.signerRole}
+        title={signaturePrompt?.title}
+        defaultName={user?.fullName || ""}
+        actionLabel={signaturePrompt?.actionLabel || "Sign"}
+        onSigned={async () => {
+          setSignaturePrompt(null);
+          await reload();
+        }}
+      />
+    </div>
+  );
+}
+
+/* ─────────── Awaiting-signature banner ─────────── */
+
+function AwaitingSignatureBanner({ memoNumber, onSign }) {
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 sm:px-5 py-3 sm:py-4">
+      <div className="flex items-start gap-3 flex-wrap">
+        <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-amber-900">Acknowledge receipt of memo {memoNumber}</div>
+          <div className="text-xs text-amber-800 mt-0.5">
+            Please confirm you have received the items above by adding your signature. This becomes part of the memo's audit trail.
+          </div>
+        </div>
+        <button
+          onClick={onSign}
+          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700"
+        >
+          Sign to acknowledge
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── Signatures card (portal view) ─────────── */
+
+function SignaturesCard({ memo }) {
+  const sigs = memo?.signatures || [];
+  if (sigs.length === 0) return null;
+  const find = (event, role) =>
+    sigs.find((s) => s.event === event && s.signer_role === role) || null;
+  const issueSupplier = find("issue", "supplier");
+  const issueStore = find("issue", "store");
+  const closeSupplier = find("close", "supplier");
+  const closeStore = find("close", "store");
+  const showCloseRow = !!closeSupplier || !!closeStore || memo.status === "closed";
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5">
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="font-semibold text-stone-900">Signatures</h2>
+        <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold">Electronic signatures</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        {issueSupplier
+          ? <SignatureBlock signature={issueSupplier} accent="supplier" />
+          : <AwaitingSlot kind="Supplier" event="issuance" />}
+        {issueStore
+          ? <SignatureBlock signature={issueStore} accent="store" />
+          : <AwaitingSlot kind="Store" event="issuance" />}
+      </div>
+
+      {showCloseRow && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
+          {closeSupplier
+            ? <SignatureBlock signature={closeSupplier} accent="supplier" />
+            : <AwaitingSlot kind="Supplier" event="close" />}
+          {closeStore
+            ? <SignatureBlock signature={closeStore} accent="store" />
+            : <AwaitingSlot kind="Store" event="close" />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AwaitingSlot({ kind, event }) {
+  return (
+    <div className="border border-dashed border-stone-200 rounded-xl p-4 flex items-center justify-center text-xs text-stone-400 min-h-[100px]">
+      Awaiting {kind} signature ({event})
     </div>
   );
 }

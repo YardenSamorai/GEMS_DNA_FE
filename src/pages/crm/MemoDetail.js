@@ -17,7 +17,10 @@ import {
   isMemoEffectivelyExpired,
 } from "../../services/memosApi";
 import { approveMemoItemRequest, declineMemoItemRequest } from "../../services/portalApi";
+import { findSignature } from "../../services/signaturesApi";
 import StonePicker from "./components/StonePicker";
+import SignatureModal from "../../components/signature/SignatureModal";
+import SignatureBlock from "../../components/signature/SignatureBlock";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 
 /**
@@ -73,6 +76,10 @@ export default function MemoDetail() {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
+  // signaturePrompt: null when the modal is closed; otherwise an object
+  // describing which (event, signerRole) is being signed and what to do
+  // after a successful signature submission.
+  const [signaturePrompt, setSignaturePrompt] = useState(null);
 
   const reload = async () => {
     if (!user?.id || !id) return;
@@ -155,10 +162,44 @@ export default function MemoDetail() {
     } catch (e) { toast.error(e.message); }
   };
 
-  const handleIssue = async () => {
-    if (!window.confirm("Issue this memo? After issuing, items can no longer be added/removed — only marked returned or sold.")) return;
-    try { await issueMemo(user.id, id); toast.success("Memo issued"); reload(); }
-    catch (e) { toast.error(e.message); }
+  // Push the actual draft→out transition on the BE. Kept private —
+  // callers should go through handleIssueAttempt so the signature gate
+  // is enforced from the FE side too.
+  const issueNow = async () => {
+    try {
+      await issueMemo(user.id, id);
+      toast.success("Memo issued");
+      await reload();
+    } catch (e) {
+      toast.error(e.message);
+      // Reload anyway so any partial state (e.g. a saved signature) is
+      // reflected in the UI even when the issue call fails.
+      await reload();
+    }
+  };
+
+  // Sign-and-issue entry point. If the supplier signature for `event=issue`
+  // already exists (rare — only if the previous issue call errored after
+  // the signature was recorded), bypass the modal and just flip the
+  // status. Otherwise open the modal; its `onSigned` callback chains the
+  // issue call so the two operations feel like one to the user.
+  const handleIssueAttempt = () => {
+    if (totals.count === 0) {
+      toast.error("Add at least one item before issuing");
+      return;
+    }
+    const already = findSignature(memo, "issue", "supplier");
+    if (already) {
+      issueNow();
+      return;
+    }
+    setSignaturePrompt({
+      event: "issue",
+      signerRole: "supplier",
+      title: `Sign & issue memo ${memo.memo_number}`,
+      actionLabel: "Sign & issue",
+      afterSubmit: issueNow,
+    });
   };
 
   const handleClose = async () => {
@@ -220,8 +261,9 @@ export default function MemoDetail() {
         isDraft={isDraft}
         isOpen={isOpen}
         itemCount={totals.count}
+        hasSupplierIssueSig={!!findSignature(memo, "issue", "supplier")}
         onPrint={() => window.print()}
-        onIssue={handleIssue}
+        onIssue={handleIssueAttempt}
         onClose={handleClose}
         onDelete={handleDelete}
       />
@@ -247,6 +289,9 @@ export default function MemoDetail() {
         onDecline={declineRequest}
       />
 
+      {/* Signatures (only visible once at least one signature exists) */}
+      <SignaturesCard memo={memo} />
+
       {/* Lower row: timeline + notes */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <div className="lg:col-span-2 space-y-3 sm:space-y-4">
@@ -258,13 +303,94 @@ export default function MemoDetail() {
       </div>
 
       {showPicker && <StonePicker onClose={() => setShowPicker(false)} onSelect={handleAddItems} />}
+
+      <SignatureModal
+        open={!!signaturePrompt}
+        onClose={() => setSignaturePrompt(null)}
+        userId={user?.id}
+        memoId={id}
+        event={signaturePrompt?.event}
+        signerRole={signaturePrompt?.signerRole}
+        title={signaturePrompt?.title}
+        defaultName={user?.fullName || ""}
+        actionLabel={signaturePrompt?.actionLabel || "Sign"}
+        onSigned={async () => {
+          // Capture the follow-up before clearing state so we can still
+          // run it after the modal closes.
+          const after = signaturePrompt?.afterSubmit;
+          setSignaturePrompt(null);
+          if (typeof after === "function") {
+            await after();
+          } else {
+            await reload();
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+/* ─────────── Signatures card ─────────── */
+
+function SignaturesCard({ memo }) {
+  const sigs = memo?.signatures || [];
+  if (sigs.length === 0) return null;
+  const find = (event, role) =>
+    sigs.find((s) => s.event === event && s.signer_role === role) || null;
+  const issueSupplier = find("issue", "supplier");
+  const issueStore = find("issue", "store");
+  const closeSupplier = find("close", "supplier");
+  const closeStore = find("close", "store");
+  // The close row only appears once a close-related signature exists or
+  // the memo has actually closed — keeps the layout tight for active memos.
+  const showCloseRow = !!closeSupplier || !!closeStore || memo.status === "closed";
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 print:rounded-none">
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="font-semibold text-stone-900">Signatures</h2>
+        <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold">Electronic signatures</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        {issueSupplier
+          ? <SignatureBlock signature={issueSupplier} accent="supplier" />
+          : <AwaitingSignatureSlot kind="Supplier" event="issuance" />}
+        {issueStore
+          ? <SignatureBlock signature={issueStore} accent="store" />
+          : <AwaitingSignatureSlot kind="Store" event="issuance" />}
+      </div>
+
+      {showCloseRow && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4">
+          {closeSupplier
+            ? <SignatureBlock signature={closeSupplier} accent="supplier" />
+            : <AwaitingSignatureSlot kind="Supplier" event="close" />}
+          {closeStore
+            ? <SignatureBlock signature={closeStore} accent="store" />
+            : <AwaitingSignatureSlot kind="Store" event="close" />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AwaitingSignatureSlot({ kind, event }) {
+  return (
+    <div className="border border-dashed border-stone-200 rounded-xl p-4 flex items-center justify-center text-xs text-stone-400 min-h-[100px] print:hidden">
+      Awaiting {kind} signature ({event})
     </div>
   );
 }
 
 /* ─────────── Toolbar ─────────── */
 
-function Toolbar({ memo, isDraft, isOpen, itemCount, onPrint, onIssue, onClose, onDelete }) {
+function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, onPrint, onIssue, onClose, onDelete }) {
+  // When a draft has no supplier-issue signature yet, the primary CTA
+  // reads "Sign & issue" — clicking it opens the signature modal which
+  // chains the issue call. Once a signature exists (e.g. after a failed
+  // prior issue call), the button becomes a plain "Issue memo".
+  const issueLabel = hasSupplierIssueSig ? "Issue memo" : "Sign & issue";
   return (
     <div className="flex items-center justify-between print:hidden">
       <Link
@@ -288,8 +414,14 @@ function Toolbar({ memo, isDraft, isOpen, itemCount, onPrint, onIssue, onClose, 
               onClick={onIssue}
               disabled={itemCount === 0}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
+              title={hasSupplierIssueSig ? "Issue this memo (already signed)" : "Capture supplier signature and issue this memo"}
             >
-              Issue memo
+              {!hasSupplierIssueSig && (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              )}
+              {issueLabel}
             </button>
           </>
         )}
