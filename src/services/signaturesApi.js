@@ -104,3 +104,65 @@ export const canSign = (memo, event, signerRole) => {
   }
   return false;
 };
+
+/* ─────────── Token-based public signing (Phase 2) ───────────
+ *
+ * Supplier mints an opaque single-use link for a specific
+ * (memo, event, signer_role) tuple. The link is delivered out-of-band
+ * (typically WhatsApp) to a counterparty who doesn't have a portal
+ * account, and lands on the public /sign/:token page.
+ */
+
+/**
+ * Mint a signing link. Authenticated as the supplier.
+ *
+ * @param {string} userId           - Clerk id of the supplier (owner/rep).
+ * @param {number|string} memoId
+ * @param {object} payload
+ *   event:          'issue' | 'close'
+ *   signerRole:     'supplier' | 'store'    (typically 'store')
+ *   signerEmail?:   optional pre-fill
+ *   expiresInDays?: 1-60, default 7
+ *
+ * Returns the new memo_signature_tokens row, including the raw `token`.
+ * The FE composes the public URL as `${origin}/sign/${row.token}`.
+ */
+export const createMemoSignatureToken = (userId, memoId, payload) =>
+  fetch(`${API_BASE}/api/memos/${memoId}/signature-tokens${qs({ userId })}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, ...payload }),
+  }).then(json);
+
+/* Public: fetch the memo + token metadata for the /sign/:token page.
+ * No auth headers. Returns:
+ *   { token: { event, signerRole, signerEmail, expiresAt },
+ *     memo:  { ...sanitised memo + items[] },
+ *     existingSignature: null | { signer_name, signed_at } }
+ */
+export const fetchSignTokenContext = (token) =>
+  fetch(`${API_BASE}/api/sign/${encodeURIComponent(token)}`).then(json);
+
+/* Public: submit a signature against the token. Body mirrors the
+ * authenticated POST /signatures, minus event/signerRole (those are
+ * fixed by the token on the BE). */
+export const submitTokenSignature = (token, payload) =>
+  fetch(`${API_BASE}/api/sign/${encodeURIComponent(token)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      consentText: CONSENT_TEXT,
+      ...payload,
+    }),
+  }).then(json);
+
+/* Compose a wa.me URL for nudging the recipient. `phone` is best-effort —
+ * if it doesn't look like a digit string we drop it and rely on the user
+ * to pick a contact inside WhatsApp. */
+export const buildWhatsAppShareUrl = (phone, message) => {
+  const cleaned = String(phone || "").replace(/[^\d]/g, "");
+  const text = encodeURIComponent(message || "");
+  return cleaned
+    ? `https://wa.me/${cleaned}?text=${text}`
+    : `https://wa.me/?text=${text}`;
+};

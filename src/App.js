@@ -9,6 +9,7 @@ import { Toaster } from "react-hot-toast";
 import InventoryHub from "./pages/InventoryHub";
 import JewelryItemDetail from "./pages/jewelry/JewelryItemDetail";
 import CustomerSharePage from "./pages/share/CustomerSharePage";
+import SignaturePage from "./pages/sign/SignaturePage";
 import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
 import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
@@ -501,6 +502,12 @@ function AppContent() {
               workshop sends to the buyer. Rendered outside <AppLayout> so
               the customer never sees our sidebar / TopBar / Clerk gates. */}
           <Route path="/share/:token" element={<CustomerSharePage />} />
+
+          {/* Public memo-signature endpoint — token URLs the supplier
+              sends to a store over WhatsApp/email when the store doesn't
+              have a portal account. Also outside <AppLayout> and outside
+              the Clerk gates so the recipient can sign without an account. */}
+          <Route path="/sign/:token" element={<SignaturePage />} />
 
           {/* Standalone auth pages — must be registered BEFORE the catch-all
               `/:stone_id` route below, otherwise Clerk's hosted SignIn/SignUp

@@ -21,6 +21,7 @@ import { findSignature } from "../../services/signaturesApi";
 import StonePicker from "./components/StonePicker";
 import SignatureModal from "../../components/signature/SignatureModal";
 import SignatureBlock from "../../components/signature/SignatureBlock";
+import SendSigningLinkModal from "../../components/signature/SendSigningLinkModal";
 import { Skeleton, SkeletonCard } from "../../components/ui/Skeleton";
 
 /**
@@ -80,6 +81,9 @@ export default function MemoDetail() {
   // describing which (event, signerRole) is being signed and what to do
   // after a successful signature submission.
   const [signaturePrompt, setSignaturePrompt] = useState(null);
+  // tokenPrompt: { event, signerRole } when the supplier is generating a
+  // public signing link to share with the counterparty over WhatsApp.
+  const [tokenPrompt, setTokenPrompt] = useState(null);
 
   const reload = async () => {
     if (!user?.id || !id) return;
@@ -290,7 +294,12 @@ export default function MemoDetail() {
       />
 
       {/* Signatures (only visible once at least one signature exists) */}
-      <SignaturesCard memo={memo} />
+      <SignaturesCard
+        memo={memo}
+        onRequestSignature={(event, signerRole) =>
+          setTokenPrompt({ event, signerRole })
+        }
+      />
 
       {/* Lower row: timeline + notes */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -326,15 +335,29 @@ export default function MemoDetail() {
           }
         }}
       />
+
+      <SendSigningLinkModal
+        open={!!tokenPrompt}
+        onClose={() => setTokenPrompt(null)}
+        userId={user?.id}
+        memo={memo}
+        event={tokenPrompt?.event}
+        signerRole={tokenPrompt?.signerRole}
+      />
     </div>
   );
 }
 
 /* ─────────── Signatures card ─────────── */
 
-function SignaturesCard({ memo }) {
+function SignaturesCard({ memo, onRequestSignature }) {
   const sigs = memo?.signatures || [];
-  if (sigs.length === 0) return null;
+  // Hide entirely while the memo is still a draft (no signatures are
+  // expected yet — they're captured at the issue handshake). Once the
+  // memo is issued we always render the card so the supplier has a
+  // reliable home for the "Send signing link" buttons, even on legacy
+  // memos that were issued before this feature existed.
+  if (sigs.length === 0 && memo.status === "draft") return null;
   const find = (event, role) =>
     sigs.find((s) => s.event === event && s.signer_role === role) || null;
   const issueSupplier = find("issue", "supplier");
@@ -344,6 +367,13 @@ function SignaturesCard({ memo }) {
   // The close row only appears once a close-related signature exists or
   // the memo has actually closed — keeps the layout tight for active memos.
   const showCloseRow = !!closeSupplier || !!closeStore || memo.status === "closed";
+
+  // Token-based public signing is only used to collect a STORE-side
+  // signature (the supplier signs in-app). Show the "Send signing link"
+  // button on store-side slots whenever the memo is past draft, since a
+  // store can't sign until the memo has actually been issued.
+  const canRequestStore =
+    memo.status !== "draft" && typeof onRequestSignature === "function";
 
   return (
     <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 print:rounded-none">
@@ -358,7 +388,11 @@ function SignaturesCard({ memo }) {
           : <AwaitingSignatureSlot kind="Supplier" event="issuance" />}
         {issueStore
           ? <SignatureBlock signature={issueStore} accent="store" />
-          : <AwaitingSignatureSlot kind="Store" event="issuance" />}
+          : <AwaitingSignatureSlot
+              kind="Store"
+              event="issuance"
+              onSendLink={canRequestStore ? () => onRequestSignature("issue", "store") : null}
+            />}
       </div>
 
       {showCloseRow && (
@@ -368,17 +402,33 @@ function SignaturesCard({ memo }) {
             : <AwaitingSignatureSlot kind="Supplier" event="close" />}
           {closeStore
             ? <SignatureBlock signature={closeStore} accent="store" />
-            : <AwaitingSignatureSlot kind="Store" event="close" />}
+            : <AwaitingSignatureSlot
+                kind="Store"
+                event="close"
+                onSendLink={canRequestStore ? () => onRequestSignature("close", "store") : null}
+              />}
         </div>
       )}
     </div>
   );
 }
 
-function AwaitingSignatureSlot({ kind, event }) {
+function AwaitingSignatureSlot({ kind, event, onSendLink }) {
   return (
-    <div className="border border-dashed border-stone-200 rounded-xl p-4 flex items-center justify-center text-xs text-stone-400 min-h-[100px] print:hidden">
-      Awaiting {kind} signature ({event})
+    <div className="border border-dashed border-stone-200 rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-xs text-stone-400 min-h-[100px] print:hidden">
+      <div>Awaiting {kind} signature ({event})</div>
+      {onSendLink && (
+        <button
+          type="button"
+          onClick={onSendLink}
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-700 hover:text-stone-900 hover:underline underline-offset-2"
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-2.828 2.828a4 4 0 01-5.656 0l-1.414-1.414m-2.828-7.07L7.05 10.172a4 4 0 010 5.656l-2.828 2.828" />
+          </svg>
+          Send signing link
+        </button>
+      )}
     </div>
   );
 }
