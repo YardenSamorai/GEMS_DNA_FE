@@ -63,12 +63,16 @@ export default function StorePortalCatalog() {
   }, [data.stones]);
 
   return (
-    <div className="space-y-5 sm:space-y-7 pb-32">
-      <CatalogHero />
+    <div className="space-y-10 sm:space-y-12 pb-32">
+      <CatalogHero
+        stoneCount={data.stones.length}
+        jewelryCount={data.jewelry.length}
+        loading={loading}
+      />
 
-      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        {/* Tabs */}
-        <div className="border-b border-stone-200 px-3 sm:px-5 flex items-center gap-1 overflow-x-auto">
+      <section className="bg-portal-canvas border border-portal-line">
+        {/* Tabs — letter-spaced labels, single champagne underbar on active. */}
+        <div className="border-b border-portal-line px-5 sm:px-8 flex items-center gap-7 sm:gap-9 overflow-x-auto scrollbar-hide">
           {[
             { id: "all",     label: "All",     count: data.stones.length + data.jewelry.length },
             { id: "stones",  label: "Stones",  count: data.stones.length },
@@ -79,31 +83,33 @@ export default function StorePortalCatalog() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`relative px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${active ? "text-stone-900" : "text-stone-500 hover:text-stone-800"}`}
+                className={`relative py-4 sm:py-5 text-[11px] sm:text-[12px] tracking-[0.24em] uppercase whitespace-nowrap transition-colors flex items-baseline gap-2 ${
+                  active ? "text-portal-ink" : "text-portal-muted hover:text-portal-ink"
+                }`}
               >
-                <span>{t.label}</span>
-                <span className="ml-1.5 text-[10px] font-bold text-stone-400">{t.count}</span>
-                {active && <span className="absolute left-3 right-3 sm:left-4 sm:right-4 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600" />}
+                <span className="font-medium">{t.label}</span>
+                <span className="text-[10px] tracking-normal tabular-nums text-portal-soft">{t.count}</span>
+                {active && <span className="absolute left-0 right-0 -bottom-px h-px bg-portal-champagne" />}
               </button>
             );
           })}
         </div>
 
-        {/* Search + filters */}
-        <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-stone-200 flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.85-5.65a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" />
+        {/* Search + shape filters — quiet hairline input, no rounded chips. */}
+        <div className="px-5 sm:px-8 py-5 border-b border-portal-line flex flex-col gap-4">
+          <div className="relative max-w-md">
+            <svg className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-portal-soft pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-4.35-4.35m1.85-5.65a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" />
             </svg>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search SKU, shape, color…"
-              className="w-full pl-9 pr-3 py-2.5 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400 bg-white placeholder-stone-400"
+              placeholder="Search by SKU, shape, colour"
+              className="w-full pl-6 pr-3 py-2.5 text-[13px] bg-transparent border-b border-portal-line2 focus:outline-none focus:border-portal-ink placeholder:text-portal-soft text-portal-ink tracking-wide"
             />
           </div>
           {(tab === "all" || tab === "stones") && allShapes.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1 scrollbar-hide">
+            <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 scrollbar-hide">
               <ShapePill label="All shapes" active={!shape} onClick={() => setShape("")} />
               {allShapes.map((s) => (
                 <ShapePill key={s} label={s} active={shape.toLowerCase() === s.toLowerCase()} onClick={() => setShape(s)} />
@@ -118,7 +124,7 @@ export default function StorePortalCatalog() {
         ) : all.length === 0 ? (
           <EmptyCatalog />
         ) : (
-          <div className="p-3 sm:p-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="p-5 sm:p-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 sm:gap-x-6 gap-y-8 sm:gap-y-10">
             {all.map((it) => (
               <CatalogCard
                 key={`${it.kind}-${it.sku || it.id}`}
@@ -129,7 +135,7 @@ export default function StorePortalCatalog() {
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Floating basket dock */}
       <BasketDock onOpen={() => setSubmitOpen(true)} />
@@ -155,32 +161,57 @@ export default function StorePortalCatalog() {
 }
 
 /* ============================================================
-   Hero
+   Hero — editorial, restrained. Champagne eyebrow, Cormorant
+   display title, live inventory counts to the right. Zero
+   gradients, zero saturated colour.
    ============================================================ */
-function CatalogHero() {
+function CatalogHero({ stoneCount = 0, jewelryCount = 0, loading = false }) {
   return (
-    <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 text-white px-5 sm:px-8 py-6 sm:py-9">
-      <div className="absolute inset-0 opacity-30 mix-blend-screen pointer-events-none">
-        <div className="absolute -top-16 -left-10 w-64 h-64 bg-indigo-400 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -right-10 w-72 h-72 bg-violet-400 rounded-full blur-3xl" />
-      </div>
-      <div className="relative max-w-2xl">
-        <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-indigo-200/90 mb-2">
-          Available inventory
+    <section className="border-t border-portal-champagne/60">
+      <div className="pt-8 sm:pt-12 pb-2 sm:pb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-8">
+        <div className="max-w-xl">
+          <div className="text-[10px] tracking-[0.32em] uppercase text-portal-champagne font-medium mb-4">
+            Inventory
+          </div>
+          <h1 className="font-serif-display text-[34px] sm:text-[44px] leading-[1.05] text-portal-ink tracking-tight">
+            Available pieces for memo
+          </h1>
+          <p className="mt-5 text-[13.5px] sm:text-[14px] leading-relaxed text-portal-graphite max-w-md">
+            Stones and finished jewellery currently free from prior commitment.
+            Mark a selection — your supplier reviews availability and issues
+            the memo on your behalf.
+          </p>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">
-          Hand-pick what you'd like to memo
-        </h1>
-        <p className="text-sm sm:text-base text-indigo-100/80 mt-2">
-          Browse pieces currently free in our stock. Add what catches your eye to your request — your supplier reviews it and issues the memo for you.
-        </p>
+        <dl className="hidden sm:flex items-end gap-7">
+          <InventoryCount label="Stones"  value={stoneCount}   loading={loading} />
+          <span className="h-12 w-px bg-portal-line2 mb-1.5" aria-hidden />
+          <InventoryCount label="Jewelry" value={jewelryCount} loading={loading} />
+        </dl>
       </div>
     </section>
   );
 }
 
+function InventoryCount({ label, value, loading }) {
+  return (
+    <div className="text-right">
+      <dd className="font-serif-display text-[34px] leading-none tabular-nums text-portal-ink">
+        {loading ? <span className="inline-block w-9 h-7 bg-portal-pearl" /> : value}
+      </dd>
+      <dt className="text-[10px] tracking-[0.28em] uppercase text-portal-soft mt-2 font-medium">
+        {label}
+      </dt>
+    </div>
+  );
+}
+
 /* ============================================================
-   Card
+   Card — image-led, restrained editorial treatment.
+     · Square image with a soft pearl placeholder backdrop.
+     · Plain text "Stone / Jewelry" eyebrow (no coloured chip).
+     · Hover reveals "View" affordance over a graphite scrim.
+     · Selected state: thin champagne hairline + corner mark.
+     · CTA: text-only outline button, ink-on-bone, no fill colour.
    ============================================================ */
 function CatalogCard({ item, basket, onPreview }) {
   const inBasket = basket.has(item);
@@ -192,73 +223,86 @@ function CatalogCard({ item, basket, onPreview }) {
     : [item.color, item.clarity, item.origin].filter(Boolean).join(" · ");
 
   return (
-    <div className={`group relative rounded-2xl overflow-hidden border bg-white transition-all ${inBasket ? "border-indigo-300 ring-2 ring-indigo-200" : "border-stone-200 hover:border-stone-300 hover:shadow-md"}`}>
-      {/* Image area is itself a button — clicking it opens the full
-          spec dialog. Everything below stays as static content / its
-          own action button so the two intents don't fight. */}
+    <article className={`group relative bg-portal-canvas transition-colors ${
+      inBasket
+        ? "outline outline-1 outline-portal-champagne -outline-offset-1"
+        : ""
+    }`}>
+      {/* Imagery — click target for full spec dialog. */}
       <button
         type="button"
         onClick={onPreview}
-        className="block w-full aspect-square bg-stone-100 relative overflow-hidden text-left focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        className="block w-full aspect-square bg-portal-pearl relative overflow-hidden text-left focus:outline-none focus:ring-1 focus:ring-portal-champagne"
         aria-label={`View details for ${title}`}
       >
         {item.imageUrl ? (
-          <img src={item.imageUrl} alt={title} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" loading="lazy" />
+          <img
+            src={item.imageUrl}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.04]"
+            loading="lazy"
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-stone-300">
+          <div className="w-full h-full flex items-center justify-center text-portal-soft/60">
             <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
         )}
-        <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold backdrop-blur ${item.kind === "jewelry" ? "bg-violet-500/90 text-white" : "bg-blue-500/90 text-white"}`}>
+
+        {/* Kind eyebrow — plain letter-spaced text, no coloured chip. */}
+        <span className="absolute top-3 left-3 text-[9px] tracking-[0.28em] uppercase text-portal-graphite bg-portal-bone/90 backdrop-blur-sm px-1.5 py-1 font-medium">
           {item.kind === "jewelry" ? "Jewelry" : "Stone"}
         </span>
-        {/* Hover hint that there's more behind a click */}
-        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold bg-stone-900/80 text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-          </svg>
-          Details
+
+        {/* Selected corner mark */}
+        {inBasket && (
+          <span className="absolute top-3 right-3 inline-flex items-center justify-center w-5 h-5 bg-portal-ink text-portal-bone">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+        )}
+
+        {/* Hover affordance — quiet graphite scrim + "View" tag. */}
+        <span className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-portal-ink/35 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <span className="absolute right-3 bottom-3 text-[9.5px] tracking-[0.28em] uppercase text-portal-bone opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-medium pointer-events-none">
+          View
         </span>
       </button>
-      <div className="p-3 sm:p-3.5">
+
+      {/* Meta */}
+      <div className="pt-4 pb-1">
         <button
           type="button"
           onClick={onPreview}
           className="block text-left w-full focus:outline-none"
         >
-          <div className="text-[11px] text-stone-400 font-semibold tracking-wide truncate">{item.sku}</div>
-          <div className="font-semibold text-stone-900 text-sm leading-tight truncate mt-0.5 group-hover:text-indigo-700 transition-colors">{title}</div>
-          {sub && <div className="text-[11px] text-stone-500 mt-0.5 truncate">{sub}</div>}
-        </button>
-        <button
-          onClick={() => basket.toggle(item)}
-          className={`mt-3 w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-            inBasket
-              ? "bg-indigo-600 text-white hover:bg-indigo-700"
-              : "bg-stone-100 text-stone-700 hover:bg-stone-900 hover:text-white"
-          }`}
-        >
-          {inBasket ? (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-              Added
-            </>
-          ) : (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add to request
-            </>
+          <div className="text-[10px] tracking-[0.22em] uppercase text-portal-soft tabular-nums truncate">
+            {item.sku}
+          </div>
+          <h3 className="font-serif-display text-[18px] leading-tight text-portal-ink truncate mt-1.5">
+            {title}
+          </h3>
+          {sub && (
+            <div className="text-[11.5px] text-portal-muted mt-1.5 truncate tracking-wide">
+              {sub}
+            </div>
           )}
         </button>
+
+        <button
+          onClick={() => basket.toggle(item)}
+          className={`mt-4 w-full inline-flex items-center justify-center gap-2 py-2.5 text-[10px] tracking-[0.24em] uppercase border transition-colors font-medium ${
+            inBasket
+              ? "border-portal-ink bg-portal-ink text-portal-bone hover:bg-portal-graphite hover:border-portal-graphite"
+              : "border-portal-line2 text-portal-ink hover:border-portal-ink"
+          }`}
+        >
+          {inBasket ? "Selected" : "Mark for memo"}
+        </button>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -266,64 +310,79 @@ function ShapePill({ label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition whitespace-nowrap ${
+      className={`shrink-0 px-3 py-1.5 text-[10px] tracking-[0.22em] uppercase whitespace-nowrap transition-colors border font-medium ${
         active
-          ? "bg-stone-900 text-white border-stone-900"
-          : "bg-white text-stone-600 border-stone-200 hover:border-stone-400"
+          ? "border-portal-ink text-portal-ink bg-portal-bone"
+          : "border-portal-line text-portal-muted hover:border-portal-line2 hover:text-portal-ink bg-transparent"
       }`}
     >{label}</button>
   );
 }
 
 /* ============================================================
-   Floating basket dock
+   Floating selection dock — quiet graphite ink pill that
+   expands into a neutral panel. Replaces the previous gradient
+   "items ready to request" badge.
    ============================================================ */
 function BasketDock({ onOpen }) {
   const { items, count, remove } = useRequestBasket();
   const [expanded, setExpanded] = useState(false);
   if (count === 0) return null;
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 max-w-[calc(100vw-2rem)]">
+    <div className="fixed bottom-5 right-5 sm:bottom-8 sm:right-8 z-40 max-w-[calc(100vw-2rem)]">
       {!expanded ? (
         <button
           onClick={() => setExpanded(true)}
-          className="flex items-center gap-2 pl-3 pr-4 py-3 rounded-full bg-stone-900 text-white shadow-2xl shadow-stone-900/20 hover:bg-stone-800 transition-all"
+          className="flex items-center gap-4 pl-5 pr-6 py-3.5 bg-portal-ink text-portal-bone border border-portal-ink hover:bg-portal-graphite transition-colors shadow-[0_10px_28px_rgba(20,18,15,0.18)]"
         >
-          <span className="relative flex w-8 h-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-600">
-            <span className="text-[11px] font-bold">{count}</span>
+          <span className="flex items-baseline gap-2.5">
+            <span className="text-[9px] tracking-[0.32em] uppercase text-portal-bone/65 font-medium">Selection</span>
+            <span className="font-serif-display text-[20px] leading-none tabular-nums">{count}</span>
           </span>
-          <span className="text-sm font-semibold">{count} item{count === 1 ? "" : "s"} ready to request</span>
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-          </svg>
+          <span className="h-px w-4 bg-portal-bone/40" aria-hidden />
+          <span className="text-[10px] tracking-[0.28em] uppercase font-medium">Review</span>
         </button>
       ) : (
-        <div className="bg-white border border-stone-200 rounded-2xl shadow-2xl shadow-stone-900/15 w-[360px] max-w-full overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
-            <div className="text-sm font-semibold text-stone-900">Request basket · {count}</div>
-            <button onClick={() => setExpanded(false)} className="text-stone-400 hover:text-stone-700">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        <div className="bg-portal-canvas border border-portal-line2 w-[380px] max-w-full overflow-hidden shadow-[0_24px_56px_rgba(20,18,15,0.18)]">
+          <div className="flex items-start justify-between px-5 py-4 border-b border-portal-line">
+            <div>
+              <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium">Selection</div>
+              <div className="font-serif-display text-[20px] text-portal-ink leading-tight mt-1">
+                {count} {count === 1 ? "piece" : "pieces"}
+              </div>
+            </div>
+            <button
+              onClick={() => setExpanded(false)}
+              className="text-portal-muted hover:text-portal-ink transition-colors"
+              aria-label="Collapse selection"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-          <div className="max-h-72 overflow-y-auto divide-y divide-stone-100">
+          <div className="max-h-80 overflow-y-auto divide-y divide-portal-line">
             {items.map((it) => (
-              <div key={`${it.kind}-${it.sku}`} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
+              <div key={`${it.kind}-${it.sku}`} className="flex items-center gap-4 px-5 py-3">
+                <div className="w-11 h-11 bg-portal-pearl border border-portal-line shrink-0 overflow-hidden">
                   {it.imageUrl ? <img src={it.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-stone-900 truncate">{it.kind === "jewelry" ? (it.name || it.sku) : `${it.shape || ""} ${it.weightCt ? `${it.weightCt} ct` : ""}`.trim()}</div>
-                  <div className="text-[10px] text-stone-400">{it.sku}</div>
+                  <div className="text-[12.5px] text-portal-ink truncate">{it.kind === "jewelry" ? (it.name || it.sku) : `${it.shape || ""} ${it.weightCt ? `${it.weightCt} ct` : ""}`.trim()}</div>
+                  <div className="text-[9.5px] tracking-[0.22em] uppercase text-portal-soft mt-0.5 tabular-nums">{it.sku}</div>
                 </div>
-                <button onClick={() => remove(it)} className="text-stone-400 hover:text-rose-600 text-xs font-semibold">Remove</button>
+                <button
+                  onClick={() => remove(it)}
+                  className="text-[9.5px] tracking-[0.22em] uppercase text-portal-muted hover:text-portal-ink transition-colors font-medium"
+                >
+                  Remove
+                </button>
               </div>
             ))}
           </div>
           <button
             onClick={() => { setExpanded(false); onOpen(); }}
-            className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white text-sm font-bold hover:opacity-95"
+            className="w-full px-5 py-4 bg-portal-ink text-portal-bone text-[11px] tracking-[0.28em] uppercase hover:bg-portal-graphite transition-colors font-medium"
           >
-            Continue to request →
+            Compose request
           </button>
         </div>
       )}
@@ -381,71 +440,89 @@ function SubmitRequestModal({ onClose, onSubmitted }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-        <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-portal-ink/55 backdrop-blur-sm p-0 sm:p-4">
+      <div className="bg-portal-canvas w-full sm:max-w-xl border-0 sm:border border-portal-line2 shadow-[0_30px_60px_rgba(20,18,15,0.25)] overflow-hidden max-h-[92vh] flex flex-col">
+        <div className="px-6 py-5 border-b border-portal-line flex items-start justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400">New memo request</div>
-            <h3 className="text-lg font-bold text-stone-900 mt-0.5">Review &amp; send</h3>
+            <div className="text-[10px] tracking-[0.32em] uppercase text-portal-champagne font-medium">
+              New memo request
+            </div>
+            <h3 className="font-serif-display text-[24px] leading-tight text-portal-ink mt-2">
+              Review &amp; send
+            </h3>
           </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button
+            onClick={onClose}
+            className="text-portal-muted hover:text-portal-ink transition-colors -mt-1 -mr-1 p-1"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="px-5 py-4 overflow-y-auto space-y-4">
+        <div className="px-6 py-5 overflow-y-auto space-y-6">
           {items.length > 0 && (
             <div>
-              <div className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Items in this request · {items.length}</div>
-              <div className="rounded-xl border border-stone-200 divide-y divide-stone-100 max-h-56 overflow-y-auto">
+              <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-3">
+                In this request · {items.length}
+              </div>
+              <div className="border border-portal-line divide-y divide-portal-line max-h-56 overflow-y-auto">
                 {items.map((it) => (
-                  <div key={`${it.kind}-${it.sku}`} className="flex items-center gap-3 px-3 py-2">
-                    <div className="w-9 h-9 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
+                  <div key={`${it.kind}-${it.sku}`} className="flex items-center gap-3 px-3.5 py-2.5">
+                    <div className="w-9 h-9 bg-portal-pearl border border-portal-line overflow-hidden shrink-0">
                       {it.imageUrl ? <img src={it.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-stone-900 truncate">{it.kind === "jewelry" ? (it.name || it.sku) : `${it.shape || ""} ${it.weightCt ? `${it.weightCt} ct` : ""}`.trim()}</div>
-                      <div className="text-[10px] text-stone-400 truncate">{it.sku}</div>
+                      <div className="text-[12.5px] text-portal-ink truncate">{it.kind === "jewelry" ? (it.name || it.sku) : `${it.shape || ""} ${it.weightCt ? `${it.weightCt} ct` : ""}`.trim()}</div>
+                      <div className="text-[9.5px] tracking-[0.22em] uppercase text-portal-soft mt-0.5">{it.sku}</div>
                     </div>
-                    <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${it.kind === "jewelry" ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{it.kind}</span>
+                    <span className="text-[9px] tracking-[0.28em] uppercase text-portal-muted font-medium">
+                      {it.kind}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           )}
           <div>
-            <label className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5 block">Notes for your supplier (optional)</label>
+            <label className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-2 block">
+              Notes for your supplier <span className="text-portal-soft/70 normal-case tracking-normal">(optional)</span>
+            </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
-              placeholder={items.length ? "Anything specific about these pieces? Customer in mind, deadline, preferred sizes…" : "Describe what you're looking for. Shape, carat range, metal, deadline…"}
-              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400 placeholder-stone-400 resize-y"
+              placeholder={items.length ? "Anything specific — customer in mind, deadline, preferred sizes…" : "Describe what you're looking for — shape, carat range, metal, deadline…"}
+              className="w-full px-3 py-2.5 text-[13px] bg-transparent border border-portal-line2 focus:outline-none focus:border-portal-ink placeholder:text-portal-soft resize-y text-portal-ink leading-relaxed"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5 block">Preferred receive date (optional)</label>
+            <label className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-2 block">
+              Preferred receive date <span className="text-portal-soft/70 normal-case tracking-normal">(optional)</span>
+            </label>
             <input
               type="date"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400"
+              className="w-full px-3 py-2.5 text-[13px] bg-transparent border border-portal-line2 focus:outline-none focus:border-portal-ink text-portal-ink"
             />
           </div>
-          <div className="rounded-xl bg-blue-50/60 border border-blue-100 p-3 text-[12px] text-blue-900 leading-relaxed flex gap-2">
-            <svg className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>This is a request, not a confirmed memo. Your supplier reviews availability &amp; pricing and replies with the official memo. You can cancel any time before they convert it.</span>
+          <div className="border-l-2 border-portal-champagne pl-4 py-1 text-[12px] text-portal-graphite leading-relaxed">
+            This is a request, not a confirmed memo. Your supplier reviews availability and pricing and replies with the official memo. You may cancel any time before it is converted.
           </div>
         </div>
-        <div className="px-5 py-3 border-t border-stone-200 flex items-center justify-end gap-2 bg-stone-50/70">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-200">Cancel</button>
+        <div className="px-6 py-4 border-t border-portal-line flex items-center justify-end gap-4 bg-portal-bone">
+          <button
+            onClick={onClose}
+            className="text-[10px] tracking-[0.28em] uppercase text-portal-muted hover:text-portal-ink font-medium transition-colors px-2 py-2"
+          >
+            Cancel
+          </button>
           <button
             onClick={submit}
             disabled={submitting || (items.length === 0 && !message.trim())}
-            className="px-5 py-2 rounded-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95"
+            className="px-7 py-2.5 bg-portal-ink text-portal-bone text-[11px] tracking-[0.28em] uppercase font-medium hover:bg-portal-graphite transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {submitting ? "Sending…" : "Send request"}
+            {submitting ? "Sending" : "Send request"}
           </button>
         </div>
       </div>
@@ -547,21 +624,29 @@ function CatalogItemDialog({ item, basket, onClose }) {
     : (detail?.images || []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-4xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-portal-ink/55 backdrop-blur-sm p-0 sm:p-4">
+      <div className="bg-portal-canvas w-full sm:max-w-4xl border-0 sm:border border-portal-line2 shadow-[0_30px_60px_rgba(20,18,15,0.25)] overflow-hidden max-h-[94vh] flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-stone-200 flex items-start justify-between gap-3">
+        <div className="px-6 py-5 border-b border-portal-line flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold ${isJewelry ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}`}>
+            <div className="flex items-center gap-4">
+              <span className="text-[9px] tracking-[0.32em] uppercase text-portal-champagne font-medium">
                 {isJewelry ? "Jewelry" : "Stone"}
               </span>
-              <span className="text-[11px] font-mono font-semibold text-stone-400">{detail?.sku || item.sku}</span>
+              <span className="text-[10px] tracking-[0.22em] uppercase text-portal-soft tabular-nums">
+                {detail?.sku || item.sku}
+              </span>
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-stone-900 mt-1 truncate">{title}</h3>
+            <h3 className="font-serif-display text-[24px] sm:text-[28px] leading-tight text-portal-ink mt-2 truncate">
+              {title}
+            </h3>
           </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700 shrink-0">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button
+            onClick={onClose}
+            className="text-portal-muted hover:text-portal-ink transition-colors shrink-0 -mt-1 -mr-1 p-1"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
@@ -569,30 +654,30 @@ function CatalogItemDialog({ item, basket, onClose }) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="p-6 grid sm:grid-cols-2 gap-6 animate-pulse">
-              <div className="aspect-square bg-stone-100 rounded-xl" />
+              <div className="aspect-square bg-portal-pearl" />
               <div className="space-y-3">
-                <div className="h-4 w-1/2 bg-stone-100 rounded" />
-                <div className="h-3 w-full bg-stone-100 rounded" />
-                <div className="h-3 w-5/6 bg-stone-100 rounded" />
-                <div className="h-3 w-3/4 bg-stone-100 rounded" />
-                <div className="h-32 bg-stone-100 rounded" />
+                <div className="h-4 w-1/2 bg-portal-pearl" />
+                <div className="h-3 w-full bg-portal-pearl" />
+                <div className="h-3 w-5/6 bg-portal-pearl" />
+                <div className="h-3 w-3/4 bg-portal-pearl" />
+                <div className="h-32 bg-portal-pearl" />
               </div>
             </div>
           ) : error ? (
-            <div className="px-6 py-12 text-center">
-              <div className="text-sm text-rose-600 font-semibold">{error}</div>
-              <div className="text-xs text-stone-400 mt-1">Try closing the dialog and re-opening it.</div>
+            <div className="px-6 py-16 text-center">
+              <div className="text-[13px] text-portal-ink">{error}</div>
+              <div className="text-[11px] text-portal-soft mt-2 tracking-wide">Try closing the dialog and re-opening it.</div>
             </div>
           ) : !detail ? null : (
             <div className="grid sm:grid-cols-2 gap-0">
               {/* Gallery column */}
-              <div className="bg-stone-50 sm:border-r border-stone-200 p-4 sm:p-5">
-                <div className="aspect-square w-full rounded-xl overflow-hidden bg-stone-100 ring-1 ring-stone-200 flex items-center justify-center">
+              <div className="bg-portal-bone sm:border-r border-portal-line p-5 sm:p-6">
+                <div className="aspect-square w-full overflow-hidden bg-portal-canvas border border-portal-line flex items-center justify-center">
                   {activeImg ? (
                     <img src={activeImg} alt={title} className="w-full h-full object-contain" />
                   ) : (
-                    <svg className="w-14 h-14 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <svg className="w-14 h-14 text-portal-soft/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   )}
                 </div>
@@ -602,76 +687,84 @@ function CatalogItemDialog({ item, basket, onClose }) {
                       <button
                         key={src}
                         onClick={() => setActiveImg(src)}
-                        className={`aspect-square rounded-lg overflow-hidden ring-1 transition ${activeImg === src ? "ring-2 ring-indigo-500" : "ring-stone-200 hover:ring-stone-400"}`}
+                        className={`aspect-square overflow-hidden border transition-colors ${
+                          activeImg === src
+                            ? "border-portal-ink"
+                            : "border-portal-line hover:border-portal-line2"
+                        }`}
                       >
                         <img src={src} alt="" className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>
                 )}
-                {!isJewelry && Array.isArray(detail.videos) && detail.videos.length > 0 && (
-                  <a
-                    href={detail.videos[0]}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Watch 360° video
-                  </a>
-                )}
-                {!isJewelry && (detail.certificateUrl || detail.certificateImageJpg) && (
-                  <a
-                    href={detail.certificateUrl || detail.certificateImageJpg}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-stone-200 text-stone-700 text-xs font-semibold hover:border-stone-400"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    View certificate
-                  </a>
-                )}
+                <div className="mt-4 flex flex-col gap-2">
+                  {!isJewelry && Array.isArray(detail.videos) && detail.videos.length > 0 && (
+                    <a
+                      href={detail.videos[0]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-portal-ink text-portal-bone text-[10px] tracking-[0.24em] uppercase font-medium hover:bg-portal-graphite transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Watch 360° video
+                    </a>
+                  )}
+                  {!isJewelry && (detail.certificateUrl || detail.certificateImageJpg) && (
+                    <a
+                      href={detail.certificateUrl || detail.certificateImageJpg}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-transparent border border-portal-line2 text-portal-ink text-[10px] tracking-[0.24em] uppercase font-medium hover:border-portal-ink transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      View certificate
+                    </a>
+                  )}
+                </div>
               </div>
 
               {/* Spec column */}
-              <div className="p-4 sm:p-5 space-y-4">
+              <div className="p-5 sm:p-6 space-y-7">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400 mb-2">Specifications</div>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[13px]">
+                  <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-4">
+                    Specifications
+                  </div>
+                  <dl className="text-[13px] divide-y divide-portal-line">
                     {specs.map((row) => (
-                      <React.Fragment key={row.label}>
-                        <dt className="text-stone-500">{row.label}</dt>
-                        <dd className="font-semibold text-stone-900 truncate" title={String(row.value)}>{String(row.value)}</dd>
-                      </React.Fragment>
+                      <div key={row.label} className="grid grid-cols-[120px_1fr] gap-4 py-2.5">
+                        <dt className="text-portal-muted tracking-wide">{row.label}</dt>
+                        <dd className="text-portal-ink truncate" title={String(row.value)}>{String(row.value)}</dd>
+                      </div>
                     ))}
                     {specs.length === 0 && (
-                      <dd className="col-span-2 text-stone-400 italic">No specifications recorded.</dd>
+                      <div className="text-portal-soft italic py-2 text-[12.5px]">No specifications recorded.</div>
                     )}
                   </dl>
                 </div>
 
                 {!isJewelry && detail.certComments && (
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400 mb-1">Cert comments</div>
-                    <p className="text-[13px] text-stone-700 whitespace-pre-wrap">{detail.certComments}</p>
+                    <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-2">Cert comments</div>
+                    <p className="text-[13px] text-portal-graphite whitespace-pre-wrap leading-relaxed">{detail.certComments}</p>
                   </div>
                 )}
 
                 {isJewelry && (detail.metals?.length > 0 || detail.stones?.length > 0) && (
-                  <div className="space-y-3">
+                  <div className="space-y-5">
                     {detail.metals?.length > 0 && (
                       <div>
-                        <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400 mb-1.5">Metals</div>
-                        <div className="rounded-xl border border-stone-200 divide-y divide-stone-100">
+                        <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-2">Metals</div>
+                        <div className="border border-portal-line divide-y divide-portal-line">
                           {detail.metals.map((m) => (
-                            <div key={m.id} className="flex items-center justify-between px-3 py-2 text-[13px]">
-                              <span className="text-stone-700">{[m.metalType, m.purity, m.color].filter(Boolean).join(" · ") || "—"}</span>
-                              <span className="font-semibold text-stone-900">{m.weightGrams != null ? `${m.weightGrams} g` : "—"}</span>
+                            <div key={m.id} className="flex items-center justify-between px-3.5 py-2.5 text-[13px]">
+                              <span className="text-portal-graphite">{[m.metalType, m.purity, m.color].filter(Boolean).join(" · ") || "—"}</span>
+                              <span className="text-portal-ink tabular-nums">{m.weightGrams != null ? `${m.weightGrams} g` : "—"}</span>
                             </div>
                           ))}
                         </div>
@@ -679,21 +772,21 @@ function CatalogItemDialog({ item, basket, onClose }) {
                     )}
                     {detail.stones?.length > 0 && (
                       <div>
-                        <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400 mb-1.5">Stones</div>
-                        <div className="rounded-xl border border-stone-200 divide-y divide-stone-100">
+                        <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-2">Stones</div>
+                        <div className="border border-portal-line divide-y divide-portal-line">
                           {detail.stones.map((s) => {
                             const snap = s.snapshot || {};
                             const stoneTitle = `${snap.shape || snap.category || "Stone"}${snap.weightCt ? ` · ${snap.weightCt} ct` : ""}`;
                             const stoneSub = [snap.color, snap.clarity, snap.origin].filter(Boolean).join(" · ");
                             return (
-                              <div key={s.id} className="flex items-start gap-3 px-3 py-2.5">
-                                <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
+                              <div key={s.id} className="flex items-start gap-3 px-3.5 py-3">
+                                <div className="w-10 h-10 bg-portal-pearl border border-portal-line overflow-hidden shrink-0">
                                   {snap.imageUrl && <img src={snap.imageUrl} alt="" className="w-full h-full object-cover" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[13px] font-semibold text-stone-900 truncate">{stoneTitle}</div>
-                                  {stoneSub && <div className="text-[11px] text-stone-500 truncate">{stoneSub}</div>}
-                                  <div className="text-[10px] text-stone-400">{s.role}{s.quantity > 1 ? ` · ×${s.quantity}` : ""}</div>
+                                  <div className="text-[13px] text-portal-ink truncate">{stoneTitle}</div>
+                                  {stoneSub && <div className="text-[11px] text-portal-muted truncate mt-0.5">{stoneSub}</div>}
+                                  <div className="text-[9.5px] tracking-[0.22em] uppercase text-portal-soft mt-1">{s.role}{s.quantity > 1 ? ` · ×${s.quantity}` : ""}</div>
                                 </div>
                               </div>
                             );
@@ -706,8 +799,8 @@ function CatalogItemDialog({ item, basket, onClose }) {
 
                 {isJewelry && detail.description && (
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400 mb-1">Description</div>
-                    <p className="text-[13px] text-stone-700 whitespace-pre-wrap">{detail.description}</p>
+                    <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-2">Description</div>
+                    <p className="text-[13px] text-portal-graphite whitespace-pre-wrap leading-relaxed">{detail.description}</p>
                   </div>
                 )}
               </div>
@@ -716,17 +809,19 @@ function CatalogItemDialog({ item, basket, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-stone-200 flex items-center justify-between gap-2 bg-stone-50/70">
-          <div className="text-[11px] text-stone-400">Pricing is established when your supplier issues the memo.</div>
+        <div className="px-6 py-4 border-t border-portal-line flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-portal-bone">
+          <div className="text-[10.5px] tracking-[0.22em] uppercase text-portal-soft leading-relaxed">
+            Pricing is established when your supplier issues the memo
+          </div>
           <button
             onClick={() => { basket?.toggle(item); }}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition ${
+            className={`px-7 py-2.5 text-[10.5px] tracking-[0.28em] uppercase font-medium transition-colors border ${
               inBasket
-                ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                : "bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white hover:opacity-95"
+                ? "bg-portal-ink text-portal-bone border-portal-ink hover:bg-portal-graphite hover:border-portal-graphite"
+                : "bg-transparent text-portal-ink border-portal-line2 hover:border-portal-ink"
             }`}
           >
-            {inBasket ? "✓ In your request" : "+ Add to request"}
+            {inBasket ? "Selected" : "Mark for memo"}
           </button>
         </div>
       </div>
@@ -739,14 +834,10 @@ function CatalogItemDialog({ item, basket, onClose }) {
    ============================================================ */
 function EmptyCatalog() {
   return (
-    <div className="px-6 py-16 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-stone-100 mx-auto flex items-center justify-center mb-3">
-        <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35m1.85-5.65a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" />
-        </svg>
-      </div>
-      <div className="font-semibold text-stone-700 text-sm">Nothing matches that</div>
-      <div className="text-xs text-stone-400 mt-1 max-w-xs mx-auto">
+    <div className="px-6 py-20 text-center">
+      <div className="h-px w-12 bg-portal-champagne mx-auto mb-6" />
+      <div className="font-serif-display text-[20px] text-portal-ink">Nothing matches your filters</div>
+      <div className="text-[12.5px] text-portal-muted mt-3 max-w-sm mx-auto leading-relaxed">
         Try clearing the filters, or send your supplier a free-text request describing what you're looking for.
       </div>
     </div>
@@ -755,15 +846,15 @@ function EmptyCatalog() {
 
 function SkeletonGrid() {
   return (
-    <div className="p-3 sm:p-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="p-5 sm:p-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 sm:gap-x-6 gap-y-8 sm:gap-y-10">
       {[...Array(8)].map((_, i) => (
-        <div key={i} className="rounded-2xl border border-stone-200 overflow-hidden">
-          <div className="aspect-square bg-stone-100 animate-pulse" />
-          <div className="p-3 space-y-2">
-            <div className="h-3 w-1/2 bg-stone-100 rounded animate-pulse" />
-            <div className="h-4 w-3/4 bg-stone-200 rounded animate-pulse" />
-            <div className="h-3 w-1/3 bg-stone-100 rounded animate-pulse" />
-            <div className="h-7 w-full bg-stone-100 rounded animate-pulse mt-2" />
+        <div key={i} className="bg-portal-canvas">
+          <div className="aspect-square bg-portal-pearl animate-pulse" />
+          <div className="pt-4 pb-1 space-y-2.5">
+            <div className="h-2.5 w-1/3 bg-portal-pearl animate-pulse" />
+            <div className="h-4 w-3/4 bg-portal-pearl animate-pulse" />
+            <div className="h-3 w-1/2 bg-portal-pearl animate-pulse" />
+            <div className="h-8 w-full bg-portal-pearl animate-pulse mt-3" />
           </div>
         </div>
       ))}

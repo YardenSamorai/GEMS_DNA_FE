@@ -7,8 +7,32 @@ module.exports = {
     extend: {
       fontFamily: {
         'outfit': ['Outfit', 'sans-serif'],
+        // Portal editorial display face — used for headings and inventory
+        // counts in the store-portal "luxury trade" surface. Already loaded
+        // from Google Fonts in public/index.html, so this is purely additive.
+        'serif-display': ['Cormorant', 'Cormorant Garamond', 'Garamond', 'serif'],
       },
       colors: {
+        // ============================================================
+        //  Portal design tokens — used by the store-portal surface.
+        //  Restrained "luxury trade tool" palette: bone backgrounds,
+        //  graphite ink, hairline stones, and a single antique
+        //  champagne accent applied sparingly (active states only).
+        //  Pure additions — does not affect any existing class usage.
+        // ============================================================
+        portal: {
+          bone:       '#FAF8F2', // page background — warm off-white
+          canvas:     '#FFFFFF', // card surfaces
+          pearl:      '#F2EFE6', // subtle bands / hovers / placeholder fills
+          line:       '#E5E1D6', // hairline dividers
+          line2:      '#D5CFC0', // emphasised hairlines, active borders
+          ink:        '#1A1815', // primary text + primary surfaces
+          graphite:   '#3A3631', // secondary text / hover-primary
+          muted:      '#7A7368', // tertiary text / inactive nav
+          soft:       '#A39A8B', // quiet labels / SKU lines
+          champagne:  '#A8874E', // antique gold accent — sparing use only
+          champagne2: '#8E7140', // hover/active accent
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
