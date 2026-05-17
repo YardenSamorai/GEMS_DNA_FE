@@ -56,17 +56,18 @@ const JewelryItemDetail = () => {
   const [showSellModal, setShowSellModal] = useState(false);
 
   const load = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchJewelryItem(id);
+      const res = await fetchJewelryItem(id, user.id);
       setData(res);
     } catch (err) {
       setError(err.message || "Failed to load item");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, user?.id]);
 
   useEffect(() => {
     load();

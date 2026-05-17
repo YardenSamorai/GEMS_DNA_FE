@@ -30,8 +30,8 @@ const jsonHeaders = { "Content-Type": "application/json" };
 export const fetchJewelryItems = (userId, filters = {}) =>
   fetch(`${API_BASE}/api/jewelry-items${qs({ userId, ...filters })}`).then(json);
 
-export const fetchJewelryItem = (id) =>
-  fetch(`${API_BASE}/api/jewelry-items/${id}`).then(json);
+export const fetchJewelryItem = (id, userId) =>
+  fetch(`${API_BASE}/api/jewelry-items/${id}${qs({ userId })}`).then(json);
 
 export const createJewelryItem = (payload) =>
   fetch(`${API_BASE}/api/jewelry-items`, {

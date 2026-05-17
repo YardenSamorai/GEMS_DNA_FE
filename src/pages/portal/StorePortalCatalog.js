@@ -40,7 +40,11 @@ export default function StorePortalCatalog() {
     let alive = true;
     setLoading(true);
     fetchPortalCatalog(user.id, { type: tab, search, shape })
-      .then((d) => alive && setData({ stones: d.stones || [], jewelry: d.jewelry || [] }))
+      .then((d) => alive && setData({
+        stones: d.stones || [],
+        jewelry: d.jewelry || [],
+        diagnostic: d._diagnostic || null,
+      }))
       .catch((e) => alive && toast.error(e.message))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
