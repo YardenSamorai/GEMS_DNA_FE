@@ -22,6 +22,7 @@ import CrmCompanies from "./pages/crm/CrmCompanies";
 import StoreProfile from "./pages/crm/StoreProfile";
 import CrmMemos from "./pages/crm/CrmMemos";
 import MemoDetail from "./pages/crm/MemoDetail";
+import CrmDocuments from "./pages/crm/CrmDocuments";
 import CustomerProfile from "./pages/crm/CustomerProfile";
 import CrmDeals from "./pages/crm/CrmDeals";
 import CrmTasks from "./pages/crm/CrmTasks";
@@ -38,6 +39,7 @@ import StorePortalMemoDetail from "./pages/portal/StorePortalMemoDetail";
 import StorePortalAccount from "./pages/portal/StorePortalAccount";
 import StorePortalCatalog from "./pages/portal/StorePortalCatalog";
 import StorePortalRequests from "./pages/portal/StorePortalRequests";
+import StorePortalDocuments from "./pages/portal/StorePortalDocuments";
 
 // ---------- Theme Context ----------
 const ThemeContext = createContext();
@@ -473,6 +475,7 @@ function AppContent() {
               <Route path="stores/:id" element={<StoreProfile />} />
               <Route path="memos" element={<CrmMemos />} />
               <Route path="memos/:id" element={<MemoDetail />} />
+              <Route path="documents" element={<CrmDocuments />} />
               <Route path="catalog" element={<CatalogTiers />} />
               <Route path="settings" element={<CrmSettings />} />
             </Route>
@@ -489,6 +492,7 @@ function AppContent() {
             <Route path="/store-portal/catalog" element={<StorePortalCatalog />} />
             <Route path="/store-portal/requests" element={<StorePortalRequests />} />
             <Route path="/store-portal/history" element={<StorePortalMemos historyMode={true} />} />
+            <Route path="/store-portal/documents" element={<StorePortalDocuments />} />
             <Route path="/store-portal/account" element={<StorePortalAccount />} />
             <Route path="/store-portal/memos/:id" element={<StorePortalMemoDetail />} />
           </Route>

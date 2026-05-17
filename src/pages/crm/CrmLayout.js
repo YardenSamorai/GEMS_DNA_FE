@@ -59,6 +59,15 @@ const NAV = [
     ),
   },
   {
+    to: "/crm/documents",
+    label: "Documents",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17v-2a4 4 0 014-4h0a4 4 0 014 4v2m-8 0h8m-8 0H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2" />
+      </svg>
+    ),
+  },
+  {
     to: "/crm/catalog",
     label: "Catalog",
     icon: (

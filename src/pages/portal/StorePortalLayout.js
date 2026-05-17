@@ -131,6 +131,7 @@ function PortalSubNav() {
         <PortalTab to="/store-portal" end label="Memos" />
         <PortalTab to="/store-portal/catalog" label="Catalog" badge={basketCount > 0 ? basketCount : null} accent />
         <PortalTab to="/store-portal/requests" label="My requests" />
+        <PortalTab to="/store-portal/documents" label="Documents" />
         <PortalTab to="/store-portal/history" label="History" />
         <PortalTab to="/store-portal/account" label="Account" />
       </div>

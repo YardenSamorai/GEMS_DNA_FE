@@ -229,10 +229,32 @@ export default function MemoDetail() {
     });
   };
 
-  const handleClose = async () => {
+  // Push the close transition on the BE. Kept private — callers go
+  // through handleCloseAttempt so the close-signature gate is
+  // enforced from the FE side too.
+  const closeNow = async () => {
+    try { await closeMemo(user.id, id); toast.success("Memo closed"); await reload(); }
+    catch (e) { toast.error(e.message); await reload(); }
+  };
+
+  // Sign-and-close entry point. Mirrors handleIssueAttempt: if the
+  // supplier close signature already exists (rare — only on retry
+  // after a failed close call), bypass the modal. Otherwise open the
+  // signature modal and chain `closeNow` so the user feels one action.
+  const handleCloseAttempt = () => {
     if (!window.confirm("Force-close this memo? Any items still out will be marked as returned.")) return;
-    try { await closeMemo(user.id, id); toast.success("Memo closed"); reload(); }
-    catch (e) { toast.error(e.message); }
+    const already = findSignature(memo, "close", "supplier");
+    if (already) {
+      closeNow();
+      return;
+    }
+    setSignaturePrompt({
+      event: "close",
+      signerRole: "supplier",
+      title: `Sign & close memo ${memo.memo_number}`,
+      actionLabel: "Sign & close",
+      afterSubmit: closeNow,
+    });
   };
 
   const handleDelete = async () => {
@@ -289,10 +311,11 @@ export default function MemoDetail() {
         isOpen={isOpen}
         itemCount={totals.count}
         hasSupplierIssueSig={hasSupplierIssueSig}
+        hasSupplierCloseSig={!!findSignature(memo, "close", "supplier")}
         signatureGateActive={signatureGateActive}
         onPrint={() => window.print()}
         onIssue={handleIssueAttempt}
-        onClose={handleClose}
+        onClose={handleCloseAttempt}
         onDelete={handleDelete}
       />
 
@@ -529,12 +552,14 @@ function AwaitingSignatureSlot({ kind, event, onSendLink, onSignNow }) {
 
 /* ─────────── Toolbar ─────────── */
 
-function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, signatureGateActive, onPrint, onIssue, onClose, onDelete }) {
+function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, hasSupplierCloseSig, signatureGateActive, onPrint, onIssue, onClose, onDelete }) {
   // When a draft has no supplier-issue signature yet, the primary CTA
   // reads "Sign & issue" — clicking it opens the signature modal which
   // chains the issue call. Once a signature exists (e.g. after a failed
   // prior issue call), the button becomes a plain "Issue memo".
   const issueLabel = hasSupplierIssueSig ? "Issue memo" : "Sign & issue";
+  // Same dance for close — close requires a separate `close` signature.
+  const closeLabel = hasSupplierCloseSig ? "Close memo" : "Sign & close";
   return (
     <div className="flex items-center justify-between print:hidden">
       <Link
@@ -573,10 +598,15 @@ function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, signat
           <button
             onClick={onClose}
             disabled={signatureGateActive}
-            title={signatureGateActive ? "Sign the issuance first to enable closing" : "Close this memo"}
+            title={signatureGateActive ? "Sign the issuance first to enable closing" : (hasSupplierCloseSig ? "Close this memo (already signed)" : "Capture supplier close signature and close this memo")}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
           >
-            Close memo
+            {!hasSupplierCloseSig && (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            )}
+            {closeLabel}
           </button>
         )}
       </div>
