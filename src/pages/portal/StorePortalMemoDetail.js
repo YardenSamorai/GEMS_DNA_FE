@@ -390,7 +390,7 @@ function Party({ kind, name, email, phone, address, logoUrl, accent }) {
         {logoUrl ? (
           <img src={logoUrl} alt={name} className="w-10 h-10 rounded-lg object-cover bg-stone-100 ring-1 ring-stone-200 shrink-0" />
         ) : (
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-stone-800 text-white flex items-center justify-center font-bold text-sm shrink-0">
             {initials(name)}
           </div>
         )}

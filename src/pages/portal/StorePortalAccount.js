@@ -33,82 +33,103 @@ export default function StorePortalAccount() {
   const { user: me, store, supplier } = data;
   const address = [store?.address, store?.city, store?.country].filter(Boolean).join(", ");
 
+  const storeInitials    = (store?.name    || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase();
+  const supplierInitials = (supplier?.name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase();
+
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <div className="bg-white border border-stone-200 rounded-2xl px-4 sm:px-6 py-4 sm:py-5">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-stone-400 font-bold">Account</div>
-        <h1 className="text-xl sm:text-2xl font-bold text-stone-900 mt-0.5 truncate">{me?.name || "Store user"}</h1>
-        <div className="text-xs sm:text-sm text-stone-500 mt-0.5 break-all">{me?.email}</div>
-      </div>
+    <div className="space-y-10 sm:space-y-12">
+      <section className="border-t border-portal-champagne/60 pt-8 sm:pt-12 pb-6">
+        <div className="text-[10px] tracking-[0.32em] uppercase text-portal-champagne font-medium mb-4">
+          Account
+        </div>
+        <h1 className="font-serif-display text-[32px] sm:text-[40px] leading-[1.05] text-portal-ink tracking-tight truncate">
+          {me?.name || "Store user"}
+        </h1>
+        <div className="text-[13px] text-portal-muted mt-4 break-all tracking-wide">{me?.email}</div>
+      </section>
 
-      {/* Store card */}
-      <div className="bg-white border-l-4 border-stone-900 border border-stone-200 rounded-xl p-4 sm:p-5">
-        <div className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-bold mb-2">Your store</div>
-        <div className="flex items-start gap-3">
-          {store?.logo_url ? (
-            <img src={store.logo_url} alt={store.name} className="w-12 h-12 rounded-lg object-cover bg-stone-100 ring-1 ring-stone-200 shrink-0" />
-          ) : (
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold shrink-0">
-              {(store?.name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase()}
-            </div>
-          )}
-          <div className="min-w-0 flex-1 text-sm">
-            <div className="font-semibold text-stone-900 truncate">{store?.name}</div>
-            {address && <div className="text-xs text-stone-500 break-words">{address}</div>}
-            <div className="mt-1.5 space-y-0.5 text-xs text-stone-600">
-              {store?.email   && <div className="break-all">✉ {store.email}</div>}
-              {store?.phone   && <div>☎ {store.phone}</div>}
-              {store?.website && (
-                <a href={store.website} target="_blank" rel="noopener noreferrer" className="text-stone-700 hover:text-stone-900 break-all block">
-                  ◷ {store.website.replace(/^https?:\/\//, "")}
-                </a>
-              )}
+      <div className="grid sm:grid-cols-2 gap-5">
+        {/* Store card */}
+        <section className="bg-portal-canvas border border-portal-line p-6">
+          <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-5">
+            Your store
+          </div>
+          <div className="flex items-start gap-4">
+            {store?.logo_url ? (
+              <img src={store.logo_url} alt={store.name} className="w-12 h-12 object-cover bg-portal-pearl border border-portal-line shrink-0" />
+            ) : (
+              <div className="w-12 h-12 bg-portal-ink text-portal-bone flex items-center justify-center shrink-0 font-serif-display italic text-[18px] leading-none">
+                {storeInitials}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="font-serif-display text-[20px] text-portal-ink truncate leading-tight">
+                {store?.name}
+              </div>
+              {address && <div className="text-[12px] text-portal-muted break-words mt-1.5 leading-relaxed">{address}</div>}
+              <div className="mt-3 space-y-1 text-[12px] text-portal-graphite">
+                {store?.email   && <div className="break-all">{store.email}</div>}
+                {store?.phone   && <div className="tabular-nums">{store.phone}</div>}
+                {store?.website && (
+                  <a href={store.website} target="_blank" rel="noopener noreferrer" className="text-portal-ink hover:text-portal-champagne transition-colors break-all block underline decoration-portal-line2 underline-offset-2">
+                    {store.website.replace(/^https?:\/\//, "")}
+                  </a>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="text-[11px] text-stone-400 mt-3 pt-3 border-t border-stone-100">
-          To update store details, contact your supplier — they manage the master record.
-        </div>
-      </div>
+          <div className="text-[10.5px] tracking-[0.22em] uppercase text-portal-soft mt-6 pt-5 border-t border-portal-line leading-relaxed">
+            Store details are managed by your supplier
+          </div>
+        </section>
 
-      {/* Supplier card */}
-      <div className="bg-white border-l-4 border-stone-300 border border-stone-200 rounded-xl p-4 sm:p-5">
-        <div className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-bold mb-2">Supplier</div>
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold shrink-0">
-            {(supplier?.name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase()}
+        {/* Supplier card */}
+        <section className="bg-portal-canvas border border-portal-line p-6">
+          <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-5">
+            Supplier
           </div>
-          <div className="min-w-0 flex-1 text-sm">
-            <div className="font-semibold text-stone-900 truncate">{supplier?.name || "Supplier"}</div>
-            {supplier?.email && <div className="text-xs text-stone-500 break-all mt-0.5">{supplier.email}</div>}
-            <div className="text-[11px] text-stone-400 mt-2">
-              Reach out by email if you need a memo extension or have questions about an item.
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-portal-ink text-portal-bone flex items-center justify-center shrink-0 font-serif-display italic text-[18px] leading-none">
+              {supplierInitials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-serif-display text-[20px] text-portal-ink truncate leading-tight">
+                {supplier?.name || "Supplier"}
+              </div>
+              {supplier?.email && <div className="text-[12px] text-portal-graphite break-all mt-1.5">{supplier.email}</div>}
+              <div className="text-[11.5px] text-portal-muted mt-3 leading-relaxed">
+                Reach out by email for a memo extension, or with questions about a specific piece.
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Help / how it works */}
-      <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-stone-400 font-bold mb-2">How the portal works</div>
-        <ul className="text-sm text-stone-700 space-y-2 list-disc pl-5">
-          <li><span className="font-semibold">Memos</span> shows every active consignment from your supplier.</li>
-          <li>Tap an item, then choose <span className="font-semibold">Mark as sold</span> or <span className="font-semibold">Request return</span>.</li>
-          <li>Your request goes to the supplier for approval — until it's confirmed, the item is shown as <span className="text-amber-700 font-semibold">pending</span>.</li>
-          <li><span className="font-semibold">History</span> keeps a record of every memo that's been closed.</li>
+      <section className="bg-portal-canvas border border-portal-line p-6 sm:p-7">
+        <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-5">
+          How the portal works
+        </div>
+        <ul className="text-[13px] text-portal-graphite space-y-3 leading-relaxed">
+          <li className="flex gap-3"><span className="text-portal-champagne mt-1.5">·</span><span><span className="text-portal-ink">Memos</span> lists every active consignment from your supplier.</span></li>
+          <li className="flex gap-3"><span className="text-portal-champagne mt-1.5">·</span><span>Open an item, then choose <span className="text-portal-ink">Mark as sold</span> or <span className="text-portal-ink">Request return</span>.</span></li>
+          <li className="flex gap-3"><span className="text-portal-champagne mt-1.5">·</span><span>Your action goes to the supplier for approval — until confirmed, the item is shown as <span className="text-portal-champagne2">pending</span>.</span></li>
+          <li className="flex gap-3"><span className="text-portal-champagne mt-1.5">·</span><span><span className="text-portal-ink">History</span> keeps a record of every memo that's been closed.</span></li>
         </ul>
-      </div>
+      </section>
     </div>
   );
 }
 
 function AccountSkeleton() {
   return (
-    <div className="space-y-4 animate-pulse">
-      <div className="h-24 bg-white border border-stone-200 rounded-2xl" />
-      <div className="h-28 bg-white border border-stone-200 rounded-xl" />
-      <div className="h-28 bg-white border border-stone-200 rounded-xl" />
-      <div className="h-44 bg-white border border-stone-200 rounded-xl" />
+    <div className="space-y-10 animate-pulse">
+      <div className="h-24 bg-portal-pearl" />
+      <div className="grid sm:grid-cols-2 gap-5">
+        <div className="h-44 bg-portal-pearl" />
+        <div className="h-44 bg-portal-pearl" />
+      </div>
+      <div className="h-44 bg-portal-pearl" />
     </div>
   );
 }

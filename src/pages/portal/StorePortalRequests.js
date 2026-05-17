@@ -45,29 +45,34 @@ export default function StorePortalRequests() {
   }, [list]);
 
   return (
-    <div className="space-y-5 sm:space-y-7">
+    <div className="space-y-10 sm:space-y-12">
       <Hero stats={stats} />
-      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-stone-200 flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-stone-900 text-sm sm:text-base">My memo requests</h2>
-          <Link to="/store-portal/catalog" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
-            + New request
+      <section className="bg-portal-canvas border border-portal-line">
+        <div className="px-5 sm:px-7 py-5 border-b border-portal-line flex items-center justify-between gap-3">
+          <h2 className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium">
+            My memo requests
+          </h2>
+          <Link
+            to="/store-portal/catalog"
+            className="text-[10px] tracking-[0.28em] uppercase font-medium text-portal-ink hover:text-portal-champagne transition-colors border-b border-portal-line2 hover:border-portal-champagne pb-0.5"
+          >
+            New request
           </Link>
         </div>
         {loading ? (
-          <div className="divide-y divide-stone-100">
+          <div className="divide-y divide-portal-line">
             {[1,2,3].map((i) => <SkeletonRow key={i} />)}
           </div>
         ) : list.length === 0 ? (
           <Empty />
         ) : (
-          <div className="divide-y divide-stone-100">
+          <div className="divide-y divide-portal-line">
             {list.map((r) => (
               <RequestRow key={r.id} req={r} onOpen={() => setOpen(r.id)} />
             ))}
           </div>
         )}
-      </div>
+      </section>
       {open != null && (
         <RequestDrawer
           id={open}
@@ -79,37 +84,42 @@ export default function StorePortalRequests() {
   );
 }
 
-/* --- Hero --- */
+/* --- Hero — editorial section, champagne eyebrow, Cormorant
+       headline, three quiet stat tiles separated by hairlines. --- */
 function Hero({ stats }) {
   return (
-    <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-violet-900 to-indigo-900 text-white px-5 sm:px-8 py-6 sm:py-8">
-      <div className="absolute inset-0 opacity-30 mix-blend-screen pointer-events-none">
-        <div className="absolute -top-16 -left-10 w-64 h-64 bg-violet-400 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -right-10 w-72 h-72 bg-indigo-400 rounded-full blur-3xl" />
-      </div>
-      <div className="relative">
-        <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-indigo-200/90 mb-2">
+    <section className="border-t border-portal-champagne/60">
+      <div className="pt-8 sm:pt-12 pb-8 sm:pb-10">
+        <div className="text-[10px] tracking-[0.32em] uppercase text-portal-champagne font-medium mb-4">
           Memo requests
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Your request inbox</h1>
-        <p className="text-sm text-indigo-100/80 mt-2 max-w-xl">
-          Track which requests are awaiting your supplier's review and which have already become memos.
+        <h1 className="font-serif-display text-[32px] sm:text-[44px] leading-[1.05] text-portal-ink tracking-tight">
+          Your request inbox
+        </h1>
+        <p className="text-[13.5px] sm:text-[14px] text-portal-graphite mt-5 max-w-xl leading-relaxed">
+          Track which requests are awaiting your supplier's review and which have already been converted into formal memos.
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Stat label="Total" value={stats.total} />
-          <Stat label="Pending" value={stats.pending} accent="bg-amber-400/15 text-amber-200 border-amber-400/30" />
-          <Stat label="Converted" value={stats.converted} accent="bg-emerald-400/15 text-emerald-200 border-emerald-400/30" />
+      </div>
+      <div className="border-t border-portal-line">
+        <div className="grid grid-cols-3 divide-x divide-portal-line">
+          <Stat label="Total"     value={stats.total} />
+          <Stat label="Pending"   value={stats.pending}   highlight={stats.pending > 0} />
+          <Stat label="Converted" value={stats.converted} />
         </div>
       </div>
     </section>
   );
 }
 
-function Stat({ label, value, accent = "bg-white/10 text-white border-white/20" }) {
+function Stat({ label, value, highlight = false }) {
   return (
-    <div className={`px-3 py-1.5 rounded-full border ${accent} backdrop-blur flex items-center gap-1.5 text-xs font-semibold`}>
-      <span className="opacity-70 text-[10px] uppercase tracking-[0.16em] font-bold">{label}</span>
-      <span className="text-sm font-bold">{value}</span>
+    <div className="px-5 sm:px-7 py-5 sm:py-6">
+      <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium">{label}</div>
+      <div className={`font-serif-display text-[28px] sm:text-[32px] mt-2 leading-none tabular-nums ${
+        highlight ? "text-portal-champagne2" : "text-portal-ink"
+      }`}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -121,35 +131,41 @@ function RequestRow({ req, onOpen }) {
   return (
     <button
       onClick={onOpen}
-      className="group w-full text-left flex items-start gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 hover:bg-stone-50/70 transition-colors"
+      className="group w-full text-left flex items-start gap-4 sm:gap-5 px-5 sm:px-7 py-5 hover:bg-portal-bone/60 transition-colors"
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${status.color}`}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className={`inline-block text-[10px] uppercase tracking-[0.22em] font-medium px-2 py-0.5 border ${status.color}`}>
             {status.label}
           </span>
-          <span className="text-[11px] text-stone-400">#{req.id}</span>
+          <span className="text-[10px] tracking-[0.22em] uppercase text-portal-soft tabular-nums">#{req.id}</span>
           {created && (
-            <span className="text-[11px] text-stone-400">· {created.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+            <span className="text-[10px] tracking-[0.22em] uppercase text-portal-soft">
+              {created.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </span>
           )}
         </div>
-        <div className="font-bold text-stone-900 text-base mt-1 group-hover:text-indigo-700 transition-colors">
-          {req.item_count} item{req.item_count === 1 ? "" : "s"} {req.message ? "+ note" : ""}
+        <div className="font-serif-display text-[20px] sm:text-[22px] text-portal-ink mt-2 group-hover:text-portal-champagne2 transition-colors leading-tight">
+          {req.item_count} item{req.item_count === 1 ? "" : "s"}{req.message ? " · with note" : ""}
         </div>
-        {req.message && <div className="text-xs text-stone-500 truncate mt-0.5">{req.message}</div>}
+        {req.message && <div className="text-[12px] text-portal-muted truncate mt-1.5 leading-relaxed">{req.message}</div>}
       </div>
-      <svg className="w-4 h-4 text-stone-300 mt-2 hidden sm:block group-hover:text-indigo-500 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      <svg className="w-3.5 h-3.5 text-portal-soft mt-3 hidden sm:block group-hover:text-portal-champagne group-hover:translate-x-1 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5l7 7-7 7" />
       </svg>
     </button>
   );
 }
 
+// Status metadata — uses the portal palette so requests don't break the
+// editorial mood with saturated amber/emerald/rose state pills. Champagne
+// signals positive resolution (converted); muted ink covers pending and
+// cancelled; declined uses a restrained warm tone instead of bright rose.
 const STATUS_META = {
-  pending:   { label: "Pending review", color: "bg-amber-50 text-amber-700 border-amber-200" },
-  converted: { label: "Converted to memo", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  declined:  { label: "Declined", color: "bg-rose-50 text-rose-700 border-rose-200" },
-  cancelled: { label: "Cancelled", color: "bg-stone-100 text-stone-600 border-stone-200" },
+  pending:   { label: "Pending review",     color: "bg-transparent text-portal-muted border-portal-line2" },
+  converted: { label: "Converted to memo",  color: "bg-transparent text-portal-champagne2 border-portal-champagne/70" },
+  declined:  { label: "Declined",           color: "bg-transparent text-[#7a3f3f] border-[#cdb0a8]" },
+  cancelled: { label: "Cancelled",          color: "bg-transparent text-portal-soft border-portal-line" },
 };
 
 /* --- Drawer --- */
@@ -189,76 +205,93 @@ function RequestDrawer({ id, onClose, onChanged }) {
   // (z-30 at the document level) and the close button would be hidden
   // behind the sticky header / sub-nav strip.
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex justify-end bg-stone-900/50 backdrop-blur-sm">
-      <div className="w-full sm:max-w-lg bg-white shadow-2xl flex flex-col animate-in slide-in-from-right">
-        <div className="px-5 py-4 border-b border-stone-200 flex items-start justify-between gap-3">
+    <div className="fixed inset-0 z-[100] flex justify-end bg-portal-ink/55 backdrop-blur-sm">
+      <div className="w-full sm:max-w-lg bg-portal-canvas border-l border-portal-line2 shadow-[0_0_60px_rgba(20,18,15,0.25)] flex flex-col animate-in slide-in-from-right">
+        <div className="px-6 py-5 border-b border-portal-line flex items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-stone-400">Request #{id}</div>
-            <h3 className="text-lg font-bold text-stone-900 mt-0.5">Memo request details</h3>
+            <div className="text-[10px] tracking-[0.32em] uppercase text-portal-champagne font-medium">
+              Request #{id}
+            </div>
+            <h3 className="font-serif-display text-[24px] leading-tight text-portal-ink mt-2">
+              Request details
+            </h3>
           </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button
+            onClick={onClose}
+            className="text-portal-muted hover:text-portal-ink transition-colors -mt-1 -mr-1 p-1"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {loading || !data ? (
             <div className="space-y-3 animate-pulse">
-              <div className="h-4 w-1/3 bg-stone-200 rounded" />
-              <div className="h-3 w-2/3 bg-stone-100 rounded" />
-              <div className="h-32 bg-stone-100 rounded-xl" />
+              <div className="h-4 w-1/3 bg-portal-pearl" />
+              <div className="h-3 w-2/3 bg-portal-pearl" />
+              <div className="h-32 bg-portal-pearl" />
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${(STATUS_META[data.status] || STATUS_META.pending).color}`}>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className={`inline-block text-[10px] uppercase tracking-[0.22em] font-medium px-2 py-0.5 border ${(STATUS_META[data.status] || STATUS_META.pending).color}`}>
                   {(STATUS_META[data.status] || STATUS_META.pending).label}
                 </span>
-                <span className="text-xs text-stone-500">{new Date(data.created_at).toLocaleString()}</span>
+                <span className="text-[11px] text-portal-soft tracking-wide">{new Date(data.created_at).toLocaleString()}</span>
               </div>
               {data.preferred_due_at && (
-                <div className="text-xs text-stone-500">
-                  Preferred receive date: <span className="font-semibold text-stone-800">{new Date(data.preferred_due_at).toLocaleDateString()}</span>
+                <div className="text-[12px] text-portal-graphite">
+                  <span className="text-[10px] tracking-[0.22em] uppercase text-portal-soft mr-2">Preferred receive date</span>
+                  <span className="text-portal-ink">{new Date(data.preferred_due_at).toLocaleDateString()}</span>
                 </div>
               )}
               {data.message && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-stone-400 mb-1">Notes</div>
-                  <div className="rounded-xl bg-stone-50 border border-stone-200 p-3 text-sm text-stone-800 whitespace-pre-wrap">{data.message}</div>
+                  <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-2">Notes</div>
+                  <div className="border-l-2 border-portal-line2 pl-4 py-1 text-[13px] text-portal-graphite whitespace-pre-wrap leading-relaxed">
+                    {data.message}
+                  </div>
                 </div>
               )}
               {data.decline_reason && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-rose-500 mb-1">Decline reason</div>
-                  <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-sm text-rose-900 whitespace-pre-wrap">{data.decline_reason}</div>
+                  <div className="text-[10px] tracking-[0.28em] uppercase text-[#7a3f3f] font-medium mb-2">Decline reason</div>
+                  <div className="border border-[#cdb0a8] bg-[#f7eeea] p-4 text-[13px] text-[#5d2d2d] whitespace-pre-wrap leading-relaxed">
+                    {data.decline_reason}
+                  </div>
                 </div>
               )}
               {data.converted_memo_id && (
                 <Link
                   to={`/store-portal/memos/${data.converted_memo_id}`}
-                  className="block rounded-xl border border-emerald-200 bg-emerald-50 p-3 hover:bg-emerald-100 transition"
+                  className="block border border-portal-champagne/70 p-4 hover:bg-portal-bone transition-colors"
                 >
-                  <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-emerald-700">View resulting memo</div>
-                  <div className="text-sm font-bold text-emerald-900 mt-0.5">Open memo →</div>
+                  <div className="text-[10px] tracking-[0.28em] uppercase text-portal-champagne font-medium">View resulting memo</div>
+                  <div className="font-serif-display text-[18px] text-portal-ink mt-1.5">Open memo →</div>
                 </Link>
               )}
               <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] font-bold text-stone-400 mb-2">Items · {data.items?.length || 0}</div>
-                <div className="rounded-xl border border-stone-200 divide-y divide-stone-100 overflow-hidden">
+                <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium mb-3">
+                  Items · {data.items?.length || 0}
+                </div>
+                <div className="border border-portal-line divide-y divide-portal-line">
                   {(data.items || []).map((it) => {
                     const snap = it.snapshot || {};
                     const title = it.item_type === "jewelry"
                       ? (snap.name || it.item_sku)
                       : `${snap.shape || ""} ${snap.weightCt ? `${snap.weightCt} ct` : ""}`.trim() || it.item_sku;
                     return (
-                      <div key={it.id} className="flex items-center gap-3 px-3 py-2.5">
-                        <div className="w-10 h-10 rounded-lg bg-stone-100 overflow-hidden ring-1 ring-stone-200 shrink-0">
+                      <div key={it.id} className="flex items-center gap-3 px-3.5 py-2.5">
+                        <div className="w-10 h-10 bg-portal-pearl border border-portal-line overflow-hidden shrink-0">
                           {snap.imageUrl ? <img src={snap.imageUrl} alt="" className="w-full h-full object-cover" /> : null}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-stone-900 truncate">{title}</div>
-                          <div className="text-[10px] text-stone-400">{it.item_sku}</div>
+                          <div className="text-[12.5px] text-portal-ink truncate">{title}</div>
+                          <div className="text-[9.5px] tracking-[0.22em] uppercase text-portal-soft mt-0.5">{it.item_sku}</div>
                         </div>
-                        <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${it.item_type === "jewelry" ? "bg-violet-50 text-violet-700" : "bg-blue-50 text-blue-700"}`}>{it.item_type}</span>
+                        <span className="text-[9px] tracking-[0.28em] uppercase text-portal-muted font-medium">
+                          {it.item_type}
+                        </span>
                       </div>
                     );
                   })}
@@ -268,11 +301,11 @@ function RequestDrawer({ id, onClose, onChanged }) {
           )}
         </div>
         {data?.status === "pending" && (
-          <div className="px-5 py-3 border-t border-stone-200 flex justify-end bg-stone-50/70">
+          <div className="px-6 py-4 border-t border-portal-line flex justify-end bg-portal-bone">
             <button
               onClick={cancel}
               disabled={busy}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              className="text-[10px] tracking-[0.28em] uppercase text-[#7a3f3f] hover:text-[#5d2d2d] font-medium transition-colors disabled:opacity-40 px-2 py-2"
             >
               Cancel request
             </button>
@@ -286,21 +319,17 @@ function RequestDrawer({ id, onClose, onChanged }) {
 
 function Empty() {
   return (
-    <div className="px-6 py-16 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-stone-100 mx-auto flex items-center justify-center mb-3">
-        <svg className="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      </div>
-      <div className="font-semibold text-stone-700 text-sm">No requests yet</div>
-      <div className="text-xs text-stone-400 mt-1 max-w-xs mx-auto">
-        Browse the catalog to pick pieces, or write a free-text request describing what you need.
+    <div className="px-6 py-16 sm:py-20 text-center">
+      <div className="h-px w-12 bg-portal-champagne mx-auto mb-6" />
+      <div className="font-serif-display text-[22px] text-portal-ink">No requests yet</div>
+      <div className="text-[12.5px] text-portal-muted mt-3 max-w-sm mx-auto leading-relaxed">
+        Browse the inventory to mark pieces, or write a free-text request describing what you need.
       </div>
       <Link
         to="/store-portal/catalog"
-        className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800"
+        className="inline-flex items-center mt-8 px-7 py-3 bg-portal-ink text-portal-bone text-[11px] tracking-[0.28em] uppercase font-medium hover:bg-portal-graphite transition-colors"
       >
-        Browse catalog
+        Browse inventory
       </Link>
     </div>
   );
@@ -308,11 +337,11 @@ function Empty() {
 
 function SkeletonRow() {
   return (
-    <div className="flex items-start gap-4 px-4 sm:px-5 py-4 animate-pulse">
-      <div className="flex-1 min-w-0 space-y-2">
-        <div className="h-3 w-24 bg-stone-200 rounded" />
-        <div className="h-5 w-40 bg-stone-200 rounded" />
-        <div className="h-3 w-56 bg-stone-100 rounded" />
+    <div className="flex items-start gap-5 px-5 sm:px-7 py-5 animate-pulse">
+      <div className="flex-1 min-w-0 space-y-3">
+        <div className="h-3 w-32 bg-portal-pearl" />
+        <div className="h-6 w-48 bg-portal-pearl" />
+        <div className="h-3 w-64 bg-portal-pearl" />
       </div>
     </div>
   );
