@@ -127,7 +127,11 @@ function PortalSubNav() {
   const { count: basketCount } = useRequestBasket();
   return (
     <nav className="bg-portal-bone/80 backdrop-blur border-b border-portal-line sticky top-16 sm:top-[72px] z-20">
-      <div className="max-w-6xl mx-auto px-1 sm:px-6 flex items-center gap-1 sm:gap-3 overflow-x-auto scrollbar-hide">
+      {/* overflow-y is explicitly clipped: the absolute-positioned
+          champagne under-bar on the active tab sits at -bottom-px, and
+          Tailwind's `overflow-x-auto` implicitly enables overflow-y,
+          which would surface that 1px sliver as a vertical scrollbar. */}
+      <div className="max-w-6xl mx-auto px-1 sm:px-6 flex items-center gap-1 sm:gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
         <PortalTab to="/store-portal" end label="Memos" />
         <PortalTab to="/store-portal/catalog" label="Inventory" badge={basketCount > 0 ? basketCount : null} />
         <PortalTab to="/store-portal/requests" label="Requests" />

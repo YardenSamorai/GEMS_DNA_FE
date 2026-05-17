@@ -170,6 +170,19 @@ body[data-theme="dark"] {
   background: var(--color-neutral-400);
 }
 
+/* `scrollbar-hide` — used throughout the codebase (catalog tab strip,
+   portal sub-nav, CRM components, etc.) to suppress visible scrollbars
+   on horizontally scrollable rows without losing the scroll behaviour.
+   Without this rule the class is silently dropped by Tailwind and the
+   webkit scrollbar above bleeds through. */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE / Edge legacy */
+  scrollbar-width: none;     /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;             /* Chromium, Safari */
+}
+
 /* Utility classes */
 .glass {
   background: var(--bg-glass);

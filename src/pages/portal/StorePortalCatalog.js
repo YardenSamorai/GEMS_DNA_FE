@@ -71,8 +71,11 @@ export default function StorePortalCatalog() {
       />
 
       <section className="bg-portal-canvas border border-portal-line">
-        {/* Tabs — letter-spaced labels, single champagne underbar on active. */}
-        <div className="border-b border-portal-line px-5 sm:px-8 flex items-center gap-7 sm:gap-9 overflow-x-auto scrollbar-hide">
+        {/* Tabs — letter-spaced labels, single champagne underbar on active.
+            overflow-y is explicitly clipped to prevent the active tab's
+            -bottom-px underbar from triggering a 1px vertical scrollbar
+            (overflow-x-auto implicitly enables overflow-y). */}
+        <div className="border-b border-portal-line px-5 sm:px-8 flex items-center gap-7 sm:gap-9 overflow-x-auto overflow-y-hidden scrollbar-hide">
           {[
             { id: "all",     label: "All",     count: data.stones.length + data.jewelry.length },
             { id: "stones",  label: "Stones",  count: data.stones.length },
