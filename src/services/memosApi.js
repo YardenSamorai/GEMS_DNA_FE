@@ -99,9 +99,23 @@ export const fetchActiveMemoSkus = (userId) =>
 export const fetchMemoActivity = (userId, memoId) =>
   fetch(`${API_BASE}/api/memos/${memoId}/activity${qs({ userId })}`).then(json);
 
+/**
+ * Memo statuses, with an optional `portalLabel` override.
+ *
+ * The DB stores a canonical, supplier-perspective value (`out`) — this
+ * is what cron jobs, queries, and the supplier UI rely on. But "Out"
+ * is the wrong word from the store's perspective: from the store's
+ * point of view the items came IN to their consignment shelf, they
+ * didn't go anywhere. So the store portal renders `portalLabel` when
+ * defined, falling back to `label` otherwise.
+ *
+ * Only `out` gets re-labeled — the other states (`partial`, `closed`,
+ * `expired`) describe what happened to the memo, not its direction,
+ * and read identically from either side.
+ */
 export const MEMO_STATUSES = [
   { value: "draft",               label: "Draft",                color: "bg-stone-100 text-stone-700 border-stone-200" },
-  { value: "out",                 label: "Out",                  color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { value: "out",                 label: "Out",     portalLabel: "In", color: "bg-blue-100 text-blue-700 border-blue-200" },
   { value: "partially_returned",  label: "Partial",              color: "bg-amber-100 text-amber-700 border-amber-200" },
   { value: "closed",              label: "Closed",               color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
   { value: "expired",             label: "Expired",              color: "bg-rose-100 text-rose-700 border-rose-200" },

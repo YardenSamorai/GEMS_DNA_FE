@@ -223,6 +223,10 @@ function MemoRow({ memo }) {
   const expired = isMemoEffectivelyExpired(memo);
   const effectiveStatus = expired ? "expired" : memo.status;
   const status = MEMO_STATUSES.find((s) => s.value === effectiveStatus) || MEMO_STATUSES[0];
+  // Portal-specific label override — see MEMO_STATUSES doc-comment.
+  // From the store's perspective `out` means "in our shop on memo",
+  // so the pill reads "IN" instead of "OUT".
+  const statusLabel = status.portalLabel || status.label;
 
   const days = memo.due_at
     ? Math.ceil((new Date(memo.due_at).getTime() - Date.now()) / 86400_000)
@@ -243,7 +247,7 @@ function MemoRow({ memo }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${status.color}`}>
-            {status.label}
+            {statusLabel}
           </span>
           {countdown && <span className={`text-[11px] font-semibold ${countdown.tone}`}>· {countdown.label}</span>}
           {memo.items_pending > 0 && (

@@ -299,6 +299,11 @@ function AwaitingSlot({ kind, event }) {
 
 function Hero({ memo, effectiveStatus, expired }) {
   const status = MEMO_STATUSES.find((s) => s.value === effectiveStatus) || MEMO_STATUSES[0];
+  // The store's perspective on this memo is the inverse of the supplier's
+  // (items came IN to their shop on memo, they didn't go OUT). The
+  // status object carries an optional `portalLabel` for exactly this;
+  // when defined we use it, otherwise we fall back to `label`.
+  const statusLabel = status.portalLabel || status.label;
   const days = daysFromNow(memo.due_at);
 
   let countdown = null;
@@ -319,7 +324,7 @@ function Hero({ memo, effectiveStatus, expired }) {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="text-[10px] uppercase tracking-[0.18em] text-stone-400 font-bold">Memo</div>
             <span className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${status.color}`}>
-              {status.label}
+              {statusLabel}
             </span>
             {countdown && (
               <span className={`text-[11px] font-semibold ${countdown.tone}`}>· {countdown.label}</span>
