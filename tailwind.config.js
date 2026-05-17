@@ -15,23 +15,46 @@ module.exports = {
       colors: {
         // ============================================================
         //  Portal design tokens — used by the store-portal surface.
-        //  Restrained "luxury trade tool" palette: bone backgrounds,
-        //  graphite ink, hairline stones, and a single antique
-        //  champagne accent applied sparingly (active states only).
+        //  Restrained "luxury trade tool" palette kept around so the
+        //  semantic champagne tones can still be used for positive
+        //  state indicators (completed signatures, converted requests).
+        //  The primary surface treatment is now `glass.*` below.
         //  Pure additions — does not affect any existing class usage.
         // ============================================================
         portal: {
-          bone:       '#FAF8F2', // page background — warm off-white
-          canvas:     '#FFFFFF', // card surfaces
-          pearl:      '#F2EFE6', // subtle bands / hovers / placeholder fills
-          line:       '#E5E1D6', // hairline dividers
-          line2:      '#D5CFC0', // emphasised hairlines, active borders
-          ink:        '#1A1815', // primary text + primary surfaces
-          graphite:   '#3A3631', // secondary text / hover-primary
-          muted:      '#7A7368', // tertiary text / inactive nav
-          soft:       '#A39A8B', // quiet labels / SKU lines
-          champagne:  '#A8874E', // antique gold accent — sparing use only
-          champagne2: '#8E7140', // hover/active accent
+          bone:       '#FAF8F2',
+          canvas:     '#FFFFFF',
+          pearl:      '#F2EFE6',
+          line:       '#E5E1D6',
+          line2:      '#D5CFC0',
+          ink:        '#1A1815',
+          graphite:   '#3A3631',
+          muted:      '#7A7368',
+          soft:       '#A39A8B',
+          champagne:  '#A8874E',
+          champagne2: '#8E7140',
+        },
+        // ============================================================
+        //  Glass design tokens — Apple Liquid-Glass-inspired language
+        //  for the store-portal surface. The canvas is a soft cool
+        //  sand with a subtle tonal gradient (driven from index.css);
+        //  glass surfaces sit on top with backdrop-blur + a thin lit
+        //  inner edge. Text scale mirrors Apple's typographic ramp
+        //  (#1D1D1F → #6E6E73 → #A1A1A6) so the result reads like a
+        //  native macOS / iPadOS app, not a SaaS dashboard.
+        // ============================================================
+        glass: {
+          canvas:   '#F2F2F5', // page background base — cool light sand
+          canvas2:  '#E9E9EE', // secondary stop / sticky-element fill
+          surface:  '#FFFFFF', // resolved opaque equivalent for glass
+          ink:      '#1D1D1F', // primary text + primary surfaces
+          graphite: '#3A3A3C', // secondary text / hover-primary
+          muted:    '#6E6E73', // tertiary text / inactive nav
+          soft:     '#A1A1A6', // quiet labels / placeholders
+          line:     '#E5E5EA', // separator (Apple system)
+          line2:    '#D1D1D6', // stronger separator
+          tintWarm: '#F5EFE6', // very soft warm wash for lit zones
+          tintCool: '#EAF0F6', // very soft cool wash for lit zones
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

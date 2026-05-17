@@ -64,39 +64,39 @@ export default function StorePortalMemos({ historyMode = false }) {
   }, [memos]);
 
   return (
-    <div className="space-y-10 sm:space-y-12">
+    <div className="space-y-6 sm:space-y-8">
       {!historyMode && <PortalEditorialHero me={me} loading={loading} kpis={kpis} />}
       {historyMode && <PortalHistoryHero me={me} loading={loading} memoCount={memos.length} />}
 
-      <section className="bg-portal-canvas border border-portal-line">
-        <div className="px-5 sm:px-7 py-5 border-b border-portal-line flex items-center justify-between gap-3">
+      <section className="glass-surface rounded-2xl sm:rounded-[28px] overflow-hidden">
+        <div className="px-5 sm:px-7 py-4 sm:py-5 border-b border-glass-line/70 flex items-center justify-between gap-3">
           <h2 className="flex items-baseline gap-2.5">
-            <span className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium">
+            <span className="text-[15px] sm:text-[16px] font-semibold text-glass-ink tracking-tight">
               {historyMode ? "Past memos" : "Active memos"}
             </span>
-            <span className="text-[10px] text-portal-soft tabular-nums">{filtered.length}</span>
+            <span className="text-[12px] text-glass-soft tabular-nums">{filtered.length}</span>
           </h2>
           <div className="relative w-44 sm:w-72">
-            <svg className="w-3.5 h-3.5 absolute left-0 top-1/2 -translate-y-1/2 text-portal-soft pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-glass-soft pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-4.35-4.35m1.85-5.65a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" />
             </svg>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search memo number or notes"
-              className="w-full pl-6 pr-3 py-2 text-[12.5px] bg-transparent border-b border-portal-line2 focus:outline-none focus:border-portal-ink placeholder:text-portal-soft text-portal-ink tracking-wide"
+              className="w-full pl-9 pr-3 py-2 rounded-full text-[13px] bg-white/55 border border-white/60 focus:outline-none focus:border-glass-line2 placeholder:text-glass-soft text-glass-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]"
             />
           </div>
         </div>
 
         {loading ? (
-          <div className="divide-y divide-portal-line">
+          <div className="divide-y divide-glass-line/70">
             {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState historyMode={historyMode} hasMemos={memos.length > 0} />
         ) : (
-          <div className="divide-y divide-portal-line">
+          <div className="divide-y divide-glass-line/70">
             {filtered.map((m) => <MemoRow key={m.id} memo={m} />)}
           </div>
         )}
@@ -106,50 +106,52 @@ export default function StorePortalMemos({ historyMode = false }) {
 }
 
 /* ============================================================
-   Editorial hero (active mode) — restrained "command centre".
-     · Champagne hairline + eyebrow up top.
-     · Cormorant display title with the store name in italic.
-     · Quiet supplier line in graphite.
-     · Two text-only CTAs: primary ink-on-bone, secondary underline.
-     · KPI strip below in a single hairline-separated row, no
-       coloured accent bars, value rendered in Cormorant.
+   Glass hero (active mode) — Apple-style command centre.
+     · Translucent glass card on the tonal canvas, soft inner edge.
+     · Mid-weight Inter headline (no serif), tracking-tight.
+     · Two pill CTAs: ink primary, glass secondary.
+     · KPI strip lives inside the same glass surface; the values use
+       Inter at a heavy weight with tabular-nums so the row reads as
+       a single, calm dashboard.
    ============================================================ */
 function PortalEditorialHero({ me, loading, kpis }) {
   const supplierName = me?.supplier?.name || "your supplier";
   const storeName    = me?.store?.name    || "your store";
 
   return (
-    <section className="border-t border-portal-champagne/60">
-      <div className="pt-8 sm:pt-12 pb-8 sm:pb-10">
-        <div className="text-[10px] tracking-[0.32em] uppercase text-portal-champagne font-medium mb-4">
+    <section className="glass-surface rounded-2xl sm:rounded-[28px] overflow-hidden">
+      <div className="px-6 sm:px-9 pt-7 sm:pt-10 pb-8 sm:pb-10">
+        <div className="text-[10.5px] tracking-[0.14em] uppercase text-glass-muted font-medium mb-3">
           Active consignment
         </div>
-        <h1 className="font-serif-display text-[32px] sm:text-[44px] leading-[1.05] text-portal-ink tracking-tight max-w-2xl">
-          Welcome back,{" "}
-          <span className="italic">{storeName}</span>
+        <h1 className="text-[28px] sm:text-[36px] leading-[1.1] text-glass-ink font-semibold tracking-tight max-w-2xl">
+          Welcome back, {storeName}.
         </h1>
-        <p className="text-[13.5px] sm:text-[14px] text-portal-graphite mt-5 max-w-xl leading-relaxed">
-          On consignment from <span className="text-portal-ink">{supplierName}</span>. Track every memo, attend to pending action items, and request new pieces — all from one secure surface.
+        <p className="text-[14px] sm:text-[15px] text-glass-muted mt-4 max-w-xl leading-relaxed">
+          On consignment from <span className="text-glass-ink font-medium">{supplierName}</span>. Track every memo, attend to pending action items, and request new pieces — all from one secure surface.
         </p>
-        <div className="mt-7 sm:mt-9 flex flex-wrap items-center gap-5">
+        <div className="mt-7 flex flex-wrap items-center gap-3">
           <Link
             to="/store-portal/catalog"
-            className="inline-flex items-center px-7 py-3 bg-portal-ink text-portal-bone text-[11px] tracking-[0.28em] uppercase font-medium hover:bg-portal-graphite transition-colors"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-glass-ink text-white text-[13.5px] font-medium hover:bg-glass-graphite transition-colors shadow-[0_6px_18px_-8px_rgba(20,22,28,0.45)]"
           >
             Request a memo
+            <svg className="w-3.5 h-3.5 -mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </Link>
           <Link
             to="/store-portal/requests"
-            className="inline-flex items-center text-[11px] tracking-[0.28em] uppercase font-medium text-portal-ink hover:text-portal-champagne transition-colors border-b border-portal-line2 hover:border-portal-champagne pb-1"
+            className="inline-flex items-center px-5 py-2.5 rounded-full bg-white/55 backdrop-blur-md border border-white/65 text-glass-ink text-[13.5px] font-medium hover:bg-white/75 transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]"
           >
             View my requests
           </Link>
         </div>
       </div>
 
-      {/* KPI strip — single horizontal row with hairline dividers. */}
-      <div className="border-t border-portal-line">
-        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-portal-line">
+      {/* KPI strip — same glass card, separated by a soft hairline. */}
+      <div className="border-t border-glass-line/70">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-glass-line/70">
           <KpiStat label="Active memos"    value={loading ? null : kpis.activeCount} />
           <KpiStat label="Items on memo"   value={loading ? null : kpis.totalItemsOut} />
           <KpiStat
@@ -167,22 +169,22 @@ function PortalEditorialHero({ me, loading, kpis }) {
   );
 }
 
-/* History hero — quieter records view. */
+/* History hero — quieter records view, same glass language. */
 function PortalHistoryHero({ me, loading, memoCount }) {
   const storeName    = me?.store?.name    || "your store";
   const supplierName = me?.supplier?.name || "your supplier";
   return (
-    <section className="border-t border-portal-champagne/60 pt-8 sm:pt-12 pb-6">
-      <div className="text-[10px] tracking-[0.32em] uppercase text-portal-champagne font-medium mb-4">
+    <section className="glass-surface rounded-2xl sm:rounded-[28px] px-6 sm:px-9 py-7 sm:py-9">
+      <div className="text-[10.5px] tracking-[0.14em] uppercase text-glass-muted font-medium mb-3">
         Memo history
       </div>
-      <h1 className="font-serif-display text-[30px] sm:text-[38px] leading-[1.1] text-portal-ink tracking-tight">
-        <span className="italic">{storeName}</span>
+      <h1 className="text-[26px] sm:text-[32px] leading-[1.12] text-glass-ink font-semibold tracking-tight">
+        {storeName}
       </h1>
-      <div className="text-[13px] text-portal-graphite mt-4 leading-relaxed">
+      <div className="text-[14px] text-glass-muted mt-3 leading-relaxed">
         {loading
-          ? "Loading"
-          : <>Records from <span className="text-portal-ink">{supplierName}</span> · <span className="text-portal-ink tabular-nums">{memoCount}</span> memo{memoCount === 1 ? "" : "s"} on file.</>
+          ? "Loading…"
+          : <>Records from <span className="text-glass-ink font-medium">{supplierName}</span> · <span className="text-glass-ink tabular-nums font-medium">{memoCount}</span> memo{memoCount === 1 ? "" : "s"} on file.</>
         }
       </div>
     </section>
@@ -191,13 +193,19 @@ function PortalHistoryHero({ me, loading, memoCount }) {
 
 function KpiStat({ label, value, highlight = false }) {
   return (
-    <div className="px-5 sm:px-7 py-5 sm:py-6">
-      <div className="text-[10px] tracking-[0.28em] uppercase text-portal-soft font-medium">{label}</div>
-      <div className={`font-serif-display text-[28px] sm:text-[32px] mt-2 leading-none tabular-nums truncate ${
-        highlight ? "text-portal-champagne2" : "text-portal-ink"
+    <div className="px-5 sm:px-7 py-5">
+      <div className="text-[10.5px] tracking-[0.14em] uppercase text-glass-muted font-medium">{label}</div>
+      <div className={`text-[26px] sm:text-[30px] font-semibold tracking-tight mt-1.5 leading-none tabular-nums truncate ${
+        highlight ? "text-glass-ink" : "text-glass-ink"
       }`}>
-        {value === null ? <span className="inline-block w-10 h-7 bg-portal-pearl align-bottom" /> : value}
+        {value === null ? <span className="inline-block w-10 h-7 rounded bg-glass-canvas2 align-bottom" /> : value}
       </div>
+      {highlight && value > 0 && (
+        <div className="mt-1.5 inline-flex items-center gap-1.5 text-[10.5px] text-portal-champagne2 font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-portal-champagne" />
+          Action required
+        </div>
+      )}
     </div>
   );
 }
@@ -218,50 +226,48 @@ function MemoRow({ memo }) {
     : null;
   let countdown = null;
   if (memo.status === "out" || memo.status === "partially_returned") {
-    // Tones use the portal palette so countdown urgency is signalled
-    // without saturated rose/amber breaking the mood.
     if (days != null && days < 0)        countdown = { label: `Expired ${Math.abs(days)}d ago`, tone: "text-portal-champagne2" };
-    else if (days === 0)                  countdown = { label: "Due today",                       tone: "text-portal-champagne2" };
-    else if (days != null && days <= 7)   countdown = { label: `${days}d left`,                   tone: "text-portal-champagne" };
-    else if (days != null)                countdown = { label: `${days}d left`,                   tone: "text-portal-muted" };
+    else if (days === 0)                 countdown = { label: "Due today",                       tone: "text-portal-champagne2" };
+    else if (days != null && days <= 7)  countdown = { label: `${days}d left`,                   tone: "text-portal-champagne" };
+    else if (days != null)               countdown = { label: `${days}d left`,                   tone: "text-glass-muted" };
   }
 
   return (
     <Link
       to={`/store-portal/memos/${memo.id}`}
-      className="group flex items-start gap-4 sm:gap-5 px-5 sm:px-7 py-5 hover:bg-portal-bone/60 transition-colors"
+      className="group flex items-start gap-4 sm:gap-5 px-5 sm:px-7 py-5 hover:bg-white/45 transition-colors"
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className={`inline-block text-[10px] uppercase tracking-[0.22em] font-medium px-2 py-0.5 border ${status.color}`}>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <span className={`inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full border ${status.color}`}>
             {statusLabel}
           </span>
-          {countdown && <span className={`text-[10.5px] tracking-[0.18em] uppercase font-medium ${countdown.tone}`}>{countdown.label}</span>}
+          {countdown && <span className={`text-[11.5px] font-medium ${countdown.tone}`}>{countdown.label}</span>}
           {memo.items_pending > 0 && (
-            <span className="text-[10px] uppercase tracking-[0.22em] font-medium px-2 py-0.5 border border-portal-champagne/60 text-portal-champagne2">
+            <span className="inline-flex items-center text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-portal-champagne/12 text-portal-champagne2">
               {memo.items_pending} pending
             </span>
           )}
         </div>
-        <div className="font-serif-display text-portal-ink text-[20px] sm:text-[22px] mt-2 break-all group-hover:text-portal-champagne2 transition-colors leading-tight">
+        <div className="text-glass-ink text-[16px] sm:text-[17px] font-semibold mt-2 break-all group-hover:text-black transition-colors tracking-tight">
           {memo.memo_number}
         </div>
-        <div className="text-[11.5px] text-portal-muted mt-2 truncate tracking-wide">
+        <div className="text-[12.5px] text-glass-muted mt-1 truncate">
           {memo.item_count} {memo.item_count === 1 ? "item" : "items"}
           {memo.items_out > 0 && <> · {memo.items_out} on memo</>}
           {memo.supplier_name && <> · from {memo.supplier_name}</>}
         </div>
       </div>
       <div className="text-right shrink-0">
-        <div className="font-serif-display text-[22px] sm:text-[24px] text-portal-ink whitespace-nowrap leading-none tabular-nums">
+        <div className="text-[18px] sm:text-[20px] text-glass-ink font-semibold whitespace-nowrap leading-none tabular-nums tracking-tight">
           ${Number(memo.total_value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
-        <div className="text-[10px] tracking-[0.22em] uppercase text-portal-soft mt-2">
+        <div className="text-[11.5px] text-glass-soft mt-2">
           {memo.issued_at ? new Date(memo.issued_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Not issued"}
         </div>
       </div>
-      <svg className="w-3.5 h-3.5 text-portal-soft shrink-0 mt-3 hidden sm:block group-hover:text-portal-champagne group-hover:translate-x-1 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5l7 7-7 7" />
+      <svg className="w-4 h-4 text-glass-soft shrink-0 mt-2 hidden sm:block group-hover:text-glass-ink group-hover:translate-x-1 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
       </svg>
     </Link>
   );
@@ -272,11 +278,15 @@ function MemoRow({ memo }) {
 function EmptyState({ historyMode, hasMemos }) {
   return (
     <div className="px-6 py-16 sm:py-20 text-center">
-      <div className="h-px w-12 bg-portal-champagne mx-auto mb-6" />
-      <div className="font-serif-display text-[22px] text-portal-ink">
+      <div className="w-12 h-12 mx-auto rounded-2xl bg-white/60 border border-white/65 backdrop-blur-md flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+        <svg className="w-5 h-5 text-glass-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      </div>
+      <div className="text-[18px] font-semibold tracking-tight text-glass-ink mt-5">
         {historyMode ? "No past memos yet" : "No active memos"}
       </div>
-      <div className="text-[12.5px] text-portal-muted mt-3 max-w-sm mx-auto leading-relaxed">
+      <div className="text-[13px] text-glass-muted mt-2 max-w-sm mx-auto leading-relaxed">
         {historyMode
           ? "Closed memos will show up here for your records."
           : hasMemos
@@ -286,7 +296,7 @@ function EmptyState({ historyMode, hasMemos }) {
       {!historyMode && !hasMemos && (
         <Link
           to="/store-portal/catalog"
-          className="inline-flex items-center mt-8 px-7 py-3 bg-portal-ink text-portal-bone text-[11px] tracking-[0.28em] uppercase font-medium hover:bg-portal-graphite transition-colors"
+          className="inline-flex items-center mt-6 px-5 py-2.5 rounded-full bg-glass-ink text-white text-[13.5px] font-medium hover:bg-glass-graphite transition-colors shadow-[0_6px_18px_-8px_rgba(20,22,28,0.45)]"
         >
           Browse inventory
         </Link>
@@ -298,14 +308,14 @@ function EmptyState({ historyMode, hasMemos }) {
 function SkeletonRow() {
   return (
     <div className="flex items-start gap-5 px-5 sm:px-7 py-5 animate-pulse">
-      <div className="flex-1 min-w-0 space-y-3">
-        <div className="h-3 w-20 bg-portal-pearl" />
-        <div className="h-6 w-40 bg-portal-pearl" />
-        <div className="h-3 w-48 bg-portal-pearl" />
+      <div className="flex-1 min-w-0 space-y-2.5">
+        <div className="h-3 w-20 rounded bg-glass-canvas2" />
+        <div className="h-5 w-40 rounded bg-glass-canvas2" />
+        <div className="h-3 w-48 rounded bg-glass-canvas2" />
       </div>
-      <div className="text-right space-y-3">
-        <div className="h-6 w-20 bg-portal-pearl ml-auto" />
-        <div className="h-3 w-14 bg-portal-pearl ml-auto" />
+      <div className="text-right space-y-2.5">
+        <div className="h-5 w-20 rounded bg-glass-canvas2 ml-auto" />
+        <div className="h-3 w-14 rounded bg-glass-canvas2 ml-auto" />
       </div>
     </div>
   );

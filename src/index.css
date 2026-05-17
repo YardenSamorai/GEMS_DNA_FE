@@ -183,6 +183,59 @@ body[data-theme="dark"] {
   display: none;             /* Chromium, Safari */
 }
 
+/* ============================================================
+   Portal "Liquid Glass" canvas + helpers
+   ------------------------------------------------------------
+   `.portal-canvas` paints a very soft, layered tonal backdrop
+   that glass surfaces sit on top of. Without something subtle
+   behind them, `backdrop-filter: blur(...)` produces a result
+   indistinguishable from a flat fill. The two radial washes
+   (warm + cool) are positioned far apart and held at ~40%
+   strength, so they read as ambient light, not decoration —
+   the user explicitly asked for "not childish, not decorated".
+   The helpers below standardise the glass surface and hairline
+   recipes used by every page in src/pages/portal/*.
+   ============================================================ */
+.portal-canvas {
+  background-color: #F2F2F5;
+  background-image:
+    radial-gradient(900px 600px at 0% -10%,  rgba(216, 196, 168, 0.18), transparent 60%),
+    radial-gradient(900px 600px at 100% 8%,  rgba(180, 200, 224, 0.18), transparent 60%),
+    radial-gradient(1200px 800px at 50% 110%, rgba(0, 0, 0, 0.025),     transparent 60%);
+  background-attachment: fixed;
+}
+
+.glass-surface {
+  background-color: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 1px 0 rgba(0, 0, 0, 0.02),
+    0 12px 32px -16px rgba(20, 22, 28, 0.10);
+}
+
+.glass-surface-strong {
+  background-color: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 16px 40px -18px rgba(20, 22, 28, 0.14);
+}
+
+.glass-bar {
+  background-color: rgba(242, 242, 245, 0.72);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Hairline divider — defaults to the Apple system separator. */
+.glass-hairline { background-color: #E5E5EA; }
+
 /* Utility classes */
 .glass {
   background: var(--bg-glass);
