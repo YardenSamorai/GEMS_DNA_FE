@@ -33,6 +33,7 @@ import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
+import MobileDock from "./components/MobileDock";
 import StorePortalLayout from "./pages/portal/StorePortalLayout";
 import StorePortalMemos from "./pages/portal/StorePortalMemos";
 import StorePortalMemoDetail from "./pages/portal/StorePortalMemoDetail";
@@ -254,8 +255,6 @@ const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
   });
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
 
   const toggleCollapse = () => {
     setCollapsed((c) => {
@@ -264,9 +263,6 @@ const AppLayout = () => {
       return next;
     });
   };
-
-  // Close the mobile drawer on navigation
-  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   // Render gate. Two problems we're solving here:
   //   1. UX flash. A `store_user` who lands at /dashboard would
@@ -301,15 +297,18 @@ const AppLayout = () => {
             navSections={NAV_SECTIONS}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
-            mobileOpen={mobileOpen}
-            onMobileClose={() => setMobileOpen(false)}
           />
           <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar navItems={NAV_ITEMS} onOpenMobileMenu={() => setMobileOpen(true)} />
-            <main className="flex-1 min-w-0">
+            <TopBar navItems={NAV_ITEMS} />
+            {/* Bottom padding on mobile makes room for the fixed
+                MobileDock. Desktop falls through to the regular flow. */}
+            <main className="flex-1 min-w-0 pb-20 md:pb-0">
               <Outlet />
             </main>
           </div>
+          {/* v1.0.5 mobile nav — bottom dock replaces the legacy mobile
+              sidebar drawer. Hidden on md+. */}
+          <MobileDock navSections={NAV_SECTIONS} />
         </div>
       </SignedIn>
       <SignedOut>

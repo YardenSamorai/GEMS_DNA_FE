@@ -67,7 +67,7 @@ const getPageTitle = (pathname, navItems) => {
   return "";
 };
 
-const TopBar = ({ navItems, onOpenMobileMenu }) => {
+const TopBar = ({ navItems }) => {
   const location = useLocation();
   const team = useTeam();
   const title = getPageTitle(location.pathname, navItems);
@@ -76,16 +76,9 @@ const TopBar = ({ navItems, onOpenMobileMenu }) => {
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center justify-between glass-bar px-3 sm:px-5">
       <div className="flex items-center gap-2 min-w-0">
-        {/* Mobile hamburger */}
-        <button
-          onClick={onOpenMobileMenu}
-          aria-label="Open menu"
-          className="md:hidden -ml-1 rounded-lg p-1.5 transition text-app-graphite hover:bg-app-surface/55"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+        {/* On mobile the bottom dock owns navigation, so the TopBar no
+            longer carries a hamburger — it now just renders the page
+            title. Desktop is unchanged. */}
         <h1 className="truncate text-[13.5px] font-medium tracking-tight text-app-ink">
           {title}
         </h1>
