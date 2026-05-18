@@ -11,29 +11,29 @@ import { SignIn, SignUp, SignedIn, SignedOut } from "@clerk/clerk-react";
  *   2. They must NOT be eaten by the catch-all `/:stone_id` route at the
  *      bottom of App.js — sign-in is registered before that wildcard.
  */
+/**
+ * v1.0.5 — Ink monogram shared with the marketing header and sidebar.
+ */
 const DiamondMark = () => (
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="url(#auth-diamond)" />
-    <path d="M2 9H22" stroke="white" strokeWidth="0.5" strokeOpacity="0.5" />
-    <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.2" />
-    <defs>
-      <linearGradient id="auth-diamond" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#34d399" />
-        <stop offset="1" stopColor="#059669" />
-      </linearGradient>
-    </defs>
-  </svg>
+  <span className="relative inline-flex w-9 h-9 rounded-[10px] bg-app-ink items-center justify-center shadow-[0_4px_12px_-4px_rgba(0,0,0,0.30)]">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
+      <path d="M2 9H22" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" />
+      <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.25" />
+    </svg>
+    <span className="absolute inset-0 rounded-[10px] ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
+  </span>
 );
 
 const AuthShell = ({ title, subtitle, children, footer }) => (
-  <div className="min-h-screen flex flex-col bg-stone-50">
-    <header className="border-b border-stone-200/70 bg-white/80 backdrop-blur">
+  <div className="min-h-screen flex flex-col app-canvas">
+    <header className="glass-bar">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group">
           <DiamondMark />
           <div className="flex flex-col leading-tight">
-            <span className="text-lg font-bold tracking-tight text-stone-900">GEMS DNA</span>
-            <span className="text-[10px] font-medium tracking-widest uppercase text-stone-400">
+            <span className="text-[17px] font-semibold tracking-tight text-app-ink">GEMS DNA</span>
+            <span className="text-[10px] font-medium tracking-[0.14em] uppercase text-app-muted">
               Diamond Network
             </span>
           </div>
@@ -43,29 +43,32 @@ const AuthShell = ({ title, subtitle, children, footer }) => (
     <main className="flex-1 flex items-start justify-center px-4 py-10 sm:py-14">
       <div className="w-full max-w-[440px]">
         <div className="text-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight">{title}</h1>
+          <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-tight text-app-ink">{title}</h1>
           {subtitle ? (
-            <p className="mt-2 text-sm text-stone-500 leading-relaxed">{subtitle}</p>
+            <p className="mt-2 text-[14px] text-app-muted leading-relaxed">{subtitle}</p>
           ) : null}
         </div>
-        <div className="flex justify-center">{children}</div>
+        <div className="glass-surface-strong rounded-2xl p-3 sm:p-4 flex justify-center">
+          {children}
+        </div>
         {footer ? (
-          <div className="mt-6 text-center text-sm text-stone-500">{footer}</div>
+          <div className="mt-6 text-center text-[13px] text-app-muted">{footer}</div>
         ) : null}
       </div>
     </main>
   </div>
 );
 
-// Clerk's SignIn / SignUp components ship with their own theme. We just
-// soften the rounding to match the GEMS DNA shell. Keeping the rest of the
-// styling default keeps the auth flow stable across Clerk version bumps.
+// Clerk's SignIn / SignUp components ship with their own theme. We strip
+// their default card so they sit cleanly inside our glass shell, and lock
+// the primary button to the v1.0.5 ink pill — matching the rest of the
+// system's call-to-action buttons.
 const clerkAppearance = {
   elements: {
     rootBox: "w-full",
-    card: "shadow-md rounded-2xl border border-stone-200/60",
+    card: "shadow-none border-0 bg-transparent",
     formButtonPrimary:
-      "bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold tracking-wide",
+      "bg-app-ink hover:bg-app-graphite text-app-canvas text-[13px] font-medium tracking-tight rounded-full px-5 py-2.5",
     headerTitle: "hidden",
     headerSubtitle: "hidden",
   },
@@ -102,7 +105,7 @@ export const SignInPage = () => {
               New here?{" "}
               <Link
                 to={`/sign-up${search}`}
-                className="font-semibold text-emerald-700 hover:text-emerald-800"
+                className="font-medium text-app-ink hover:underline"
               >
                 Create an account
               </Link>
@@ -145,7 +148,7 @@ export const SignUpPage = () => {
               Already have an account?{" "}
               <Link
                 to={`/sign-in${search}`}
-                className="font-semibold text-emerald-700 hover:text-emerald-800"
+                className="font-medium text-app-ink hover:underline"
               >
                 Sign in
               </Link>

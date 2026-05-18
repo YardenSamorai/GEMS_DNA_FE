@@ -4,8 +4,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   v1.0.5 SYSTEM DESIGN TOKENS — theme-aware via CSS variables.
+   ------------------------------------------------------------
+   A single `data-theme="light|dark"` flip on the <html> root
+   retints every glass surface, hairline, and label across the
+   application via the `--app-*` variables defined below.
+
+   Naming model:
+     --app-canvas      — page backdrop fill
+     --app-canvas-2    — secondary backdrop / sticky bar fill
+     --app-surface     — base RGB for glass surfaces (white in
+                          light, near-charcoal in dark)
+     --app-ink         — primary text + primary surfaces
+     --app-graphite    — secondary text
+     --app-muted       — tertiary text / inactive nav
+     --app-soft        — quiet labels / placeholders
+     --app-line        — hairline divider
+     --app-line-2      — emphasised divider / hover border
+     --brand-emerald   — locked brand emerald, used ONLY for
+                          positive-state semantics (Ready,
+                          Approved, Sold, success toast, etc.)
+
+   The values match Apple's macOS / iPadOS light + dark system
+   colours so the resulting surface reads like a native client.
+   Tailwind colour aliases (`bg-app-surface`, `text-app-ink`,
+   etc.) are defined in tailwind.config.js using
+   `rgb(var(--…) / <alpha-value>)`.
+   ============================================================ */
+
 :root {
-  /* shadcn CSS variables - Light Mode */
+  /* === shadcn (legacy) — kept for any remaining shadcn-aware code === */
   --background: 60 9% 98%;
   --foreground: 24 10% 10%;
   --card: 0 0% 100%;
@@ -27,8 +56,36 @@
   --ring: 160 84% 39%;
   --radius: 0.5rem;
 
-  /* Primary - Emerald/Jade Green */
-  --color-primary-50: #ecfdf5;
+  /* === v1.0.5 system tokens — LIGHT === */
+  --app-canvas:        242 242 245;   /* #F2F2F5 */
+  --app-canvas-2:      233 233 238;   /* #E9E9EE */
+  --app-surface:       255 255 255;   /* #FFFFFF (base RGB for glass) */
+  --app-ink:            29  29  31;   /* #1D1D1F */
+  --app-graphite:       58  58  60;   /* #3A3A3C */
+  --app-muted:         110 110 115;   /* #6E6E73 */
+  --app-soft:          161 161 166;   /* #A1A1A6 */
+  --app-line:          229 229 234;   /* #E5E5EA */
+  --app-line-2:        209 209 214;   /* #D1D1D6 */
+  --brand-emerald:      16 185 129;   /* #10B981 */
+
+  /* Glass surface composition (light) */
+  --glass-surface-alpha:           0.62;
+  --glass-surface-strong-alpha:    0.78;
+  --glass-border-alpha:            0.55;
+  --glass-inner-highlight-alpha:   0.55;
+  --glass-blur:                    28px;
+  --glass-blur-strong:             36px;
+
+  /* Canvas tonal washes (light) — soft warm + cool radial pools */
+  --canvas-wash-warm:  rgba(216, 196, 168, 0.18);
+  --canvas-wash-cool:  rgba(180, 200, 224, 0.18);
+  --canvas-wash-pool:  rgba(0, 0, 0, 0.025);
+
+  /* === Legacy compat tokens — rebound to v1.0.5 values ===
+     Existing usages of var(--color-primary-*) etc. across the
+     codebase keep working but now resolve to the muted /
+     neutral palette instead of the original green ramp. */
+  --color-primary-50:  #ecfdf5;
   --color-primary-100: #d1fae5;
   --color-primary-200: #a7f3d0;
   --color-primary-300: #6ee7b7;
@@ -39,8 +96,7 @@
   --color-primary-800: #065f46;
   --color-primary-900: #064e3b;
 
-  /* Accent - Gold */
-  --color-accent-50: #fffbeb;
+  --color-accent-50:  #fffbeb;
   --color-accent-100: #fef3c7;
   --color-accent-200: #fde68a;
   --color-accent-300: #fcd34d;
@@ -49,8 +105,7 @@
   --color-accent-600: #d97706;
   --color-accent-700: #b45309;
 
-  /* Neutral - Warm Gray */
-  --color-neutral-50: #fafaf9;
+  --color-neutral-50:  #fafaf9;
   --color-neutral-100: #f5f5f4;
   --color-neutral-200: #e7e5e4;
   --color-neutral-300: #d6d3d1;
@@ -61,29 +116,29 @@
   --color-neutral-800: #292524;
   --color-neutral-900: #1c1917;
 
-  /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-glow: 0 0 40px -10px rgb(16 185 129 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 16px 40px -18px rgb(0 0 0 / 0.14);
+  --shadow-xl: 0 24px 56px -20px rgb(0 0 0 / 0.18);
 
-  /* Theme colors - Light Mode */
-  --bg-primary: #fafaf9;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f5f5f4;
-  --bg-glass: rgba(255, 255, 255, 0.8);
-  --bg-glass-border: rgba(255, 255, 255, 0.5);
-  --text-primary: #1c1917;
-  --text-secondary: #57534e;
-  --text-tertiary: #78716c;
-  --text-muted: #a8a29e;
-  --border-primary: #e7e5e4;
-  --border-secondary: #d6d3d1;
+  /* Theme alias variables consumed by the legacy `.glass`, `.btn-primary`,
+     `.input-modern` etc. component classes (defined below). Rebound to the
+     v1.0.5 system tokens so legacy call-sites auto-upgrade. */
+  --bg-primary:        rgb(var(--app-canvas));
+  --bg-secondary:      rgb(var(--app-surface));
+  --bg-tertiary:       rgb(var(--app-canvas-2));
+  --bg-glass:          rgba(255, 255, 255, var(--glass-surface-alpha));
+  --bg-glass-border:   rgba(255, 255, 255, var(--glass-border-alpha));
+  --text-primary:      rgb(var(--app-ink));
+  --text-secondary:    rgb(var(--app-graphite));
+  --text-tertiary:     rgb(var(--app-muted));
+  --text-muted:        rgb(var(--app-soft));
+  --border-primary:    rgb(var(--app-line));
+  --border-secondary:  rgb(var(--app-line-2));
 }
 
 [data-theme="dark"] {
-  /* shadcn CSS variables - Dark Mode */
+  /* shadcn dark */
   --background: 20 14% 4%;
   --foreground: 60 9% 98%;
   --card: 24 10% 10%;
@@ -104,97 +159,97 @@
   --input: 12 6% 15%;
   --ring: 160 84% 39%;
 
-  /* Theme colors - Dark Mode */
-  --bg-primary: #0c0a09;
-  --bg-secondary: #1c1917;
-  --bg-tertiary: #292524;
-  --bg-glass: rgba(28, 25, 23, 0.9);
-  --bg-glass-border: rgba(68, 64, 60, 0.5);
-  --text-primary: #fafaf9;
-  --text-secondary: #d6d3d1;
-  --text-tertiary: #a8a29e;
-  --text-muted: #78716c;
-  --border-primary: #44403c;
-  --border-secondary: #57534e;
+  /* === v1.0.5 system tokens — DARK (Apple macOS Dark) === */
+  --app-canvas:         28  28  30;   /* #1C1C1E */
+  --app-canvas-2:       44  44  46;   /* #2C2C2E */
+  --app-surface:        58  58  60;   /* #3A3A3C (base RGB for translucent dark glass) */
+  --app-ink:           242 242 247;   /* #F2F2F7 */
+  --app-graphite:      209 209 214;   /* #D1D1D6 */
+  --app-muted:         152 152 157;   /* #98989D */
+  --app-soft:           99  99 102;   /* #636366 */
+  --app-line:           56  56  58;   /* #38383A */
+  --app-line-2:         72  72  74;   /* #48484A */
+  /* Brand emerald — same hue in dark; usage tints provide contrast */
+  --brand-emerald:      16 185 129;
 
-  /* Dark mode specific overrides */
-  --color-primary-50: #064e3b;
-  --color-primary-100: #065f46;
-  --color-accent-50: #78350f;
-  --color-accent-100: #92400e;
+  /* Glass composition (dark) — lower opacity, fainter highlight */
+  --glass-surface-alpha:           0.50;
+  --glass-surface-strong-alpha:    0.65;
+  --glass-border-alpha:            0.08;
+  --glass-inner-highlight-alpha:   0.05;
+
+  --canvas-wash-warm:  rgba(120,  90,  60, 0.12);
+  --canvas-wash-cool:  rgba( 70,  90, 120, 0.12);
+  --canvas-wash-pool:  rgba(255, 255, 255, 0.02);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.40);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.30);
+  --shadow-lg: 0 16px 40px -18px rgb(0 0 0 / 0.55);
+  --shadow-xl: 0 24px 56px -20px rgb(0 0 0 / 0.65);
+
+  /* Theme aliases flip via --app-* automatically */
+  --bg-primary:        rgb(var(--app-canvas));
+  --bg-secondary:      rgb(var(--app-canvas-2));
+  --bg-tertiary:       rgb(var(--app-line));
+  --bg-glass:          rgba(var(--app-surface), var(--glass-surface-alpha));
+  --bg-glass-border:   rgba(255, 255, 255, var(--glass-border-alpha));
+  --text-primary:      rgb(var(--app-ink));
+  --text-secondary:    rgb(var(--app-graphite));
+  --text-tertiary:     rgb(var(--app-muted));
+  --text-muted:        rgb(var(--app-soft));
+  --border-primary:    rgb(var(--app-line));
+  --border-secondary:  rgb(var(--app-line-2));
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
+/* ============================================================
+   Body backdrop — v1.0.5 tonal Liquid-Glass canvas.
+   Replaces the legacy green-tinted gradient. The radial washes
+   give the glass surfaces something subtle to refract over so
+   `backdrop-filter: blur(...)` actually reads as glass and not
+   as a flat fill. Held at low strength so the canvas is calm,
+   not decorative.
+   ============================================================ */
 body {
   margin: 0;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background-color: rgb(var(--app-canvas));
+  background-image:
+    radial-gradient(900px 600px at 0% -10%,  var(--canvas-wash-warm), transparent 60%),
+    radial-gradient(900px 600px at 100% 8%,  var(--canvas-wash-cool), transparent 60%),
+    radial-gradient(1200px 800px at 50% 110%, var(--canvas-wash-pool), transparent 60%);
+  background-attachment: fixed;
+  color: rgb(var(--app-ink));
   min-height: 100vh;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Light mode background */
-body:not([data-theme="dark"]) {
-  background: linear-gradient(135deg, #fafaf9 0%, #f0fdf4 50%, #fafaf9 100%);
-}
-
-/* Dark mode background */
-[data-theme="dark"] body,
-body[data-theme="dark"] {
-  background: linear-gradient(135deg, #0c0a09 0%, #052e16 50%, #0c0a09 100%);
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--color-neutral-100);
-  border-radius: 4px;
-}
-
+/* Custom scrollbar — neutralised, theme-aware */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-neutral-300);
+  background: rgb(var(--app-line-2));
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-neutral-400);
+  background: rgb(var(--app-soft));
 }
 
-/* `scrollbar-hide` — used throughout the codebase (catalog tab strip,
-   portal sub-nav, CRM components, etc.) to suppress visible scrollbars
-   on horizontally scrollable rows without losing the scroll behaviour.
-   Without this rule the class is silently dropped by Tailwind and the
-   webkit scrollbar above bleeds through. */
+/* `scrollbar-hide` — suppress visible scrollbars on horizontally-
+   scrolling rows (catalog tab strip, portal sub-nav, CRM tab strips). */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE / Edge legacy */
-  scrollbar-width: none;     /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;             /* Chromium, Safari */
-}
+.scrollbar-hide::-webkit-scrollbar { display: none; }
 
 /* ============================================================
-   Portal "Liquid Glass" canvas + helpers
-   ------------------------------------------------------------
-   `.portal-canvas` paints a very soft, layered tonal backdrop
-   that glass surfaces sit on top of. Without something subtle
-   behind them, `backdrop-filter: blur(...)` produces a result
-   indistinguishable from a flat fill. The two radial washes
-   (warm + cool) are positioned far apart and held at ~40%
-   strength, so they read as ambient light, not decoration —
-   the user explicitly asked for "not childish, not decorated".
-   The helpers below standardise the glass surface and hairline
-   recipes used by every page in src/pages/portal/*.
+   Portal Liquid Glass canvas (light-only, hardcoded).
+   The portal explicitly opted into the warm bone surface and
+   should NOT track the admin's dark-mode toggle. Kept verbatim.
    ============================================================ */
 .portal-canvas {
   background-color: #F2F2F5;
@@ -205,359 +260,360 @@ body[data-theme="dark"] {
   background-attachment: fixed;
 }
 
+/* ============================================================
+   Theme-aware glass surfaces.
+   Used by both portal and admin. Composition pivots on theme:
+   light = white over canvas, dark = charcoal over deep canvas.
+   The lit inner edge (1px white inset) shrinks to a barely-there
+   highlight in dark mode — mirroring Apple's Liquid Glass.
+   ============================================================ */
 .glass-surface {
-  background-color: rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  background-color: rgba(var(--app-surface), var(--glass-surface-alpha));
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, var(--glass-border-alpha));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, var(--glass-inner-highlight-alpha)),
     0 1px 0 rgba(0, 0, 0, 0.02),
-    0 12px 32px -16px rgba(20, 22, 28, 0.10);
+    var(--shadow-lg);
 }
 
 .glass-surface-strong {
-  background-color: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(36px) saturate(180%);
-  -webkit-backdrop-filter: blur(36px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  background-color: rgba(var(--app-surface), var(--glass-surface-strong-alpha));
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, var(--glass-border-alpha));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 16px 40px -18px rgba(20, 22, 28, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, var(--glass-inner-highlight-alpha)),
+    var(--shadow-xl);
 }
 
 .glass-bar {
-  background-color: rgba(242, 242, 245, 0.72);
+  background-color: rgba(var(--app-canvas), 0.72);
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
+[data-theme="dark"] .glass-bar {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
 
-/* Hairline divider — defaults to the Apple system separator. */
-.glass-hairline { background-color: #E5E5EA; }
+.glass-hairline { background-color: rgb(var(--app-line)); }
 
-/* Utility classes */
+/* App canvas helper — full-screen pages can opt into the tonal
+   canvas explicitly (e.g. locked screens, public landing). */
+.app-canvas {
+  background-color: rgb(var(--app-canvas));
+  background-image:
+    radial-gradient(900px 600px at 0% -10%,  var(--canvas-wash-warm), transparent 60%),
+    radial-gradient(900px 600px at 100% 8%,  var(--canvas-wash-cool), transparent 60%),
+    radial-gradient(1200px 800px at 50% 110%, var(--canvas-wash-pool), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* ============================================================
+   Legacy global utility classes — rewritten in v1.0.5 language
+   ------------------------------------------------------------
+   These class names are referenced from dozens of admin files.
+   Rather than touch every call-site, we redefine them here so
+   the entire app inherits the new aesthetic automatically.
+
+     .text-gradient        → solid ink (no green gradient)
+     .text-gradient-gold   → solid ink (no gold gradient)
+     .btn-primary          → ink pill button (no green chrome)
+     .btn-secondary        → glass pill button
+     .glass / .glass-dark  → standard glass recipe
+     .input-modern         → glass-pill input
+     .badge / .badge-*     → quiet tinted pill (emerald = success)
+     .gradient-*           → solid ink
+     .gem-decoration       → restrained ink shape
+   ============================================================ */
+
+.text-gradient {
+  background: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: rgb(var(--app-ink));
+  background-clip: initial;
+  color: rgb(var(--app-ink));
+}
+
+.text-gradient-gold {
+  background: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: rgb(var(--app-ink));
+  background-clip: initial;
+  color: rgb(var(--app-ink));
+}
+
 .glass {
-  background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-color: var(--bg-glass-border);
+  background: rgba(var(--app-surface), var(--glass-surface-alpha));
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-color: rgba(255, 255, 255, var(--glass-border-alpha));
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .glass-dark {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
 
-/* Dark mode text colors */
-[data-theme="dark"] .text-stone-800,
-[data-theme="dark"] .text-stone-900 {
-  color: var(--text-primary);
-}
-
-[data-theme="dark"] .text-stone-600,
-[data-theme="dark"] .text-stone-700 {
-  color: var(--text-secondary);
-}
-
-[data-theme="dark"] .text-stone-500 {
-  color: var(--text-tertiary);
-}
-
-[data-theme="dark"] .text-stone-400 {
-  color: var(--text-muted);
-}
-
-/* Dark mode backgrounds */
-[data-theme="dark"] .bg-white {
-  background-color: var(--bg-secondary);
-}
-
-[data-theme="dark"] .bg-stone-50 {
-  background-color: var(--bg-tertiary);
-}
-
-[data-theme="dark"] .bg-stone-100 {
-  background-color: #292524;
-}
-
-[data-theme="dark"] .bg-stone-200 {
-  background-color: #44403c;
-}
-
-/* Dark mode borders */
-[data-theme="dark"] .border-stone-100,
-[data-theme="dark"] .border-stone-200 {
-  border-color: var(--border-primary);
-}
-
-[data-theme="dark"] .border-stone-300 {
-  border-color: var(--border-secondary);
-}
-
-[data-theme="dark"] .border-white\/50 {
-  border-color: rgba(68, 64, 60, 0.5);
-}
-
-/* Dark mode hover states */
-[data-theme="dark"] .hover\:bg-stone-50:hover {
-  background-color: var(--bg-tertiary);
-}
-
-[data-theme="dark"] .hover\:bg-stone-100:hover {
-  background-color: #292524;
-}
-
-/* Dark mode dividers */
-[data-theme="dark"] .divide-stone-100 > * + * {
-  border-color: var(--border-primary);
-}
-
-.gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
-}
-
-.gradient-gold {
-  background: linear-gradient(135deg, var(--color-accent-400) 0%, var(--color-accent-500) 100%);
-}
-
-.gradient-dark {
-  background: linear-gradient(135deg, var(--color-neutral-800) 0%, var(--color-neutral-900) 100%);
-}
-
-.text-gradient {
-  background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-400) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.text-gradient-gold {
-  background: linear-gradient(135deg, var(--color-accent-500) 0%, var(--color-accent-600) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px -5px rgb(16 185 129 / 0.3); }
-  50% { box-shadow: 0 0 30px -5px rgb(16 185 129 / 0.5); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.6s ease-out forwards;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Stagger animations */
-.stagger-1 { animation-delay: 0.1s; }
-.stagger-2 { animation-delay: 0.2s; }
-.stagger-3 { animation-delay: 0.3s; }
-.stagger-4 { animation-delay: 0.4s; }
-.stagger-5 { animation-delay: 0.5s; }
-
-/* Card hover effects */
-.card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.card-hover:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-xl);
-}
-
-/* Button styles */
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgb(var(--app-ink));
+  color: rgb(var(--app-canvas));
+  padding: 0.625rem 1.25rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  transition: background-color 0.2s ease, transform 0.15s ease;
   border: none;
   cursor: pointer;
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.45);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px -5px rgb(16 185 129 / 0.4);
+  background: rgb(var(--app-graphite));
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--color-primary-600);
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  border: 2px solid var(--color-primary-500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(var(--app-surface), 0.65);
+  color: rgb(var(--app-ink));
+  padding: 0.625rem 1.25rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, var(--glass-border-alpha));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, var(--glass-inner-highlight-alpha));
+  transition: background-color 0.2s ease;
 }
 
 .btn-secondary:hover {
-  background: var(--color-primary-50);
-  transform: translateY(-2px);
+  background: rgba(var(--app-surface), 0.85);
 }
 
-[data-theme="dark"] .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--color-primary-400);
-}
-
-[data-theme="dark"] .btn-secondary:hover {
-  background: #065f46;
-}
-
-/* Input styles */
 .input-modern {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 12px;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(255, 255, 255, var(--glass-border-alpha));
+  border-radius: 9999px;
   font-size: 0.875rem;
-  transition: all 0.2s ease;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  background: rgba(var(--app-surface), 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgb(var(--app-ink));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, var(--glass-inner-highlight-alpha));
 }
 
 .input-modern:focus {
   outline: none;
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 2px rgb(16 185 129 / 0.08);
+  border-color: rgb(var(--app-line-2));
+  background: rgba(var(--app-surface), 0.85);
 }
 
 .input-modern::placeholder {
-  color: var(--text-muted);
+  color: rgb(var(--app-soft));
 }
 
 [data-theme="dark"] .input-modern {
-  background: var(--bg-tertiary);
+  background: rgba(var(--app-surface), 0.40);
 }
-
-[data-theme="dark"] select.input-modern {
-  background: var(--bg-tertiary);
-}
-
 [data-theme="dark"] select.input-modern option {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: rgb(var(--app-canvas-2));
+  color: rgb(var(--app-ink));
 }
 
-/* Loading skeleton */
-.skeleton {
-  background: linear-gradient(90deg, var(--color-neutral-200) 25%, var(--color-neutral-100) 50%, var(--color-neutral-200) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-/* Badge styles */
 .badge {
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .badge-success {
-  background: var(--color-primary-100);
-  color: var(--color-primary-700);
+  background: rgba(var(--brand-emerald), 0.12);
+  color: rgb(var(--brand-emerald));
 }
 
 .badge-gold {
-  background: var(--color-accent-100);
-  color: var(--color-accent-700);
+  background: rgba(168, 135, 78, 0.12);
+  color: #8E7140;
 }
 
 .badge-neutral {
-  background: var(--color-neutral-100);
-  color: var(--color-neutral-700);
+  background: rgba(var(--app-soft), 0.18);
+  color: rgb(var(--app-graphite));
 }
 
 [data-theme="dark"] .badge-success {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+  background: rgba(var(--brand-emerald), 0.20);
+  color: #34D399;
 }
-
 [data-theme="dark"] .badge-gold {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
+  background: rgba(216, 188, 138, 0.18);
+  color: #D9C896;
 }
-
 [data-theme="dark"] .badge-neutral {
-  background: rgba(168, 162, 158, 0.2);
-  color: #d6d3d1;
+  background: rgba(var(--app-soft), 0.22);
+  color: rgb(var(--app-ink));
 }
 
-/* Theme toggle button */
+/* OLD green gradient utilities → solid ink. Anywhere in the app
+   that still says `bg-gradient-primary` / `gradient-gold` /
+   `gradient-dark` quietly becomes a calm ink fill. */
+.gradient-primary,
+.gradient-gold,
+.gradient-dark {
+  background: rgb(var(--app-ink));
+  color: rgb(var(--app-canvas));
+}
+
+/* ============================================================
+   Dark-mode shims for the `stone-*` Tailwind colour family.
+   Many admin pages were authored with `bg-stone-50` / `text-stone-*`
+   etc. (the legacy palette). Rather than touch every file in
+   sweeps B + C we re-map a handful of the most common classes here
+   so dark mode is coherent. The new `app-*` Tailwind aliases
+   (added in tailwind.config.js) are the preferred path going
+   forward; these shims keep already-written admin pages legible.
+   ============================================================ */
+[data-theme="dark"] .text-stone-900,
+[data-theme="dark"] .text-stone-800 { color: rgb(var(--app-ink)); }
+[data-theme="dark"] .text-stone-700,
+[data-theme="dark"] .text-stone-600 { color: rgb(var(--app-graphite)); }
+[data-theme="dark"] .text-stone-500 { color: rgb(var(--app-muted)); }
+[data-theme="dark"] .text-stone-400,
+[data-theme="dark"] .text-stone-300 { color: rgb(var(--app-soft)); }
+
+[data-theme="dark"] .bg-white      { background-color: rgb(var(--app-canvas-2)); }
+[data-theme="dark"] .bg-stone-50   { background-color: rgb(var(--app-canvas)); }
+[data-theme="dark"] .bg-stone-100  { background-color: rgb(var(--app-canvas-2)); }
+[data-theme="dark"] .bg-stone-200  { background-color: rgb(var(--app-line)); }
+
+[data-theme="dark"] .border-stone-100,
+[data-theme="dark"] .border-stone-200 { border-color: rgb(var(--app-line)); }
+[data-theme="dark"] .border-stone-300 { border-color: rgb(var(--app-line-2)); }
+[data-theme="dark"] .border-white\/50 { border-color: rgba(255, 255, 255, 0.08); }
+
+[data-theme="dark"] .hover\:bg-stone-50:hover  { background-color: rgb(var(--app-canvas-2)); }
+[data-theme="dark"] .hover\:bg-stone-100:hover { background-color: rgb(var(--app-line)); }
+
+[data-theme="dark"] .divide-stone-100 > * + *,
+[data-theme="dark"] .divide-stone-200 > * + * { border-color: rgb(var(--app-line)); }
+
+/* Animations */
+@keyframes fadeIn   { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp  { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--brand-emerald), 0); }
+  50%      { box-shadow: 0 0 16px 0 rgba(var(--brand-emerald), 0.25); }
+}
+@keyframes shimmer  { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+.animate-fade-in   { animation: fadeIn 0.5s ease-out forwards; }
+.animate-slide-up  { animation: slideUp 0.6s ease-out forwards; }
+.animate-pulse-glow{ animation: pulse-glow 2s ease-in-out infinite; }
+
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+
+/* Card hover — restrained lift */
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Loading skeleton — neutralised */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--app-canvas-2)) 25%,
+    rgb(var(--app-line)) 50%,
+    rgb(var(--app-canvas-2)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ============================================================
+   Theme toggle — neutralised pill. Sun/moon knob behaviour kept,
+   but the chrome no longer uses gold ↔ indigo gradients. The
+   knob slides between two glass positions.
+   ============================================================ */
 .theme-toggle {
   position: relative;
-  width: 56px;
-  height: 28px;
+  width: 50px;
+  height: 26px;
   border-radius: 9999px;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  background: rgba(var(--app-surface), 0.55);
+  border: 1px solid rgba(255, 255, 255, var(--glass-border-alpha));
   cursor: pointer;
-  transition: all 0.3s ease;
-  border: none;
+  transition: background-color 0.25s ease;
   padding: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, var(--glass-inner-highlight-alpha));
 }
 
 [data-theme="dark"] .theme-toggle {
-  background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+  background: rgba(var(--app-surface), 0.30);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .theme-toggle-knob {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 9999px;
   background: white;
-  transition: all 0.3s ease;
+  transition: left 0.25s ease, background-color 0.25s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 [data-theme="dark"] .theme-toggle-knob {
-  left: 30px;
-  background: #1e1b4b;
+  left: 26px;
+  background: rgb(var(--app-canvas-2));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
-/* Diamond/gem shape decorations */
+/* gem-decoration — neutralised */
 .gem-decoration {
   position: absolute;
   width: 20px;
   height: 20px;
-  background: linear-gradient(135deg, var(--color-primary-400), var(--color-primary-600));
+  background: rgb(var(--app-ink));
   transform: rotate(45deg);
-  opacity: 0.1;
+  opacity: 0.05;
 }

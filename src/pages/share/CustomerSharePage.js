@@ -24,18 +24,25 @@ import { fetchPublicShare, respondToShare } from "../../services/jewelryApi";
  *      the customer doesn't think the link is broken.
  * ========================================================================= */
 
+// v1.0.5 — Status tones neutralised. Emerald is reserved for "ready"
+// and "delivered" (positive terminal states). Everything else is a quiet
+// graphite pill so the piece itself stays the focal point.
 const STATUS_BADGES = {
-  draft: { label: "In design", tone: "bg-stone-100 text-stone-700" },
-  design: { label: "In design", tone: "bg-amber-100 text-amber-800" },
-  cad: { label: "CAD modeling", tone: "bg-amber-100 text-amber-800" },
-  wax: { label: "Wax / mold", tone: "bg-blue-100 text-blue-800" },
-  casting: { label: "In casting", tone: "bg-blue-100 text-blue-800" },
-  setting: { label: "Stone setting", tone: "bg-purple-100 text-purple-800" },
-  polishing: { label: "Polishing", tone: "bg-purple-100 text-purple-800" },
-  qc: { label: "Final QC", tone: "bg-purple-100 text-purple-800" },
-  ready: { label: "Ready for delivery", tone: "bg-emerald-100 text-emerald-800" },
-  sold: { label: "Delivered", tone: "bg-emerald-100 text-emerald-800" },
+  draft:     { label: "In design",          tone: "neutral" },
+  design:    { label: "In design",          tone: "neutral" },
+  cad:       { label: "CAD modeling",       tone: "neutral" },
+  wax:       { label: "Wax / mold",         tone: "neutral" },
+  casting:   { label: "In casting",         tone: "neutral" },
+  setting:   { label: "Stone setting",      tone: "neutral" },
+  polishing: { label: "Polishing",          tone: "neutral" },
+  qc:        { label: "Final QC",           tone: "neutral" },
+  ready:     { label: "Ready for delivery", tone: "positive" },
+  sold:      { label: "Delivered",          tone: "positive" },
 };
+const statusPill = (tone) =>
+  tone === "positive"
+    ? "bg-brand-emerald/12 text-brand-emerald"
+    : "glass-surface text-app-graphite";
 
 const KIND_LABEL = {
   sketch: "Sketch",
@@ -121,24 +128,24 @@ const CustomerSharePage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center px-6">
-        <div className="text-sm text-stone-500">Loading preview…</div>
+      <div className="min-h-screen app-canvas flex items-center justify-center px-6">
+        <div className="text-[13px] text-app-muted">Loading preview…</div>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center px-6">
-        <div className="max-w-md rounded-xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <div className="min-h-screen app-canvas flex items-center justify-center px-6">
+        <div className="glass-surface-strong rounded-3xl p-8 max-w-md w-full text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-app-surface/60 border border-white/55 backdrop-blur-md text-app-graphite">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 8v5M12 16h.01" />
             </svg>
           </div>
-          <h1 className="text-lg font-semibold text-stone-900">Preview unavailable</h1>
-          <p className="mt-2 text-sm text-stone-600">
+          <h1 className="text-[18px] font-semibold tracking-tight text-app-ink">Preview unavailable</h1>
+          <p className="mt-2 text-[13px] leading-relaxed text-app-muted">
             {error || "This preview link is no longer active. Please ask your designer for a new link."}
           </p>
         </div>
@@ -147,28 +154,32 @@ const CustomerSharePage = () => {
   }
 
   const { item, stoneSummary } = data;
-  const status = STATUS_BADGES[item.status] || { label: item.status, tone: "bg-stone-100 text-stone-700" };
+  const status = STATUS_BADGES[item.status] || { label: item.status, tone: "neutral" };
   const totalCarats = Number(stoneSummary?.totalCarats || 0);
 
   return (
-    <div className="min-h-screen bg-stone-50 pb-24 sm:pb-12">
-      {/* Brand bar — kept tiny so the piece is the hero, not us. */}
-      <div className="border-b border-stone-200 bg-white">
+    <div className="min-h-screen app-canvas pb-24 sm:pb-12">
+      {/* Brand bar — quiet glass, ink monogram. The piece must dominate. */}
+      <div className="glass-bar">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-stone-900 to-stone-600" />
-            <span className="text-sm font-semibold tracking-tight text-stone-900">GEMS DNA</span>
+            <span className="relative inline-flex w-7 h-7 rounded-lg bg-app-ink items-center justify-center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
+              </svg>
+            </span>
+            <span className="text-[14px] font-semibold tracking-tight text-app-ink">GEMS DNA</span>
           </div>
-          <span className="text-[11px] uppercase tracking-wide text-stone-500">Design preview</span>
+          <span className="text-[10.5px] uppercase tracking-[0.14em] font-medium text-app-muted">Design preview</span>
         </div>
       </div>
 
       <main className="mx-auto max-w-3xl px-5 pt-6">
         {/* Hero gallery */}
-        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-3xl glass-surface-strong">
           {galleryImages.length ? (
             <>
-              <div className="relative aspect-square w-full bg-stone-100">
+              <div className="relative aspect-square w-full bg-app-canvas-2">
                 <img
                   src={galleryImages[activeImageIdx]?.url}
                   alt={item.name}
@@ -176,20 +187,20 @@ const CustomerSharePage = () => {
                   onError={(e) => { e.currentTarget.style.opacity = "0.3"; }}
                 />
                 {galleryImages[activeImageIdx]?.kind && KIND_LABEL[galleryImages[activeImageIdx].kind] && (
-                  <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                  <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[10.5px] font-medium tracking-[0.08em] uppercase text-white backdrop-blur-md">
                     {KIND_LABEL[galleryImages[activeImageIdx].kind]}
                   </span>
                 )}
               </div>
               {galleryImages.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto p-3">
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide p-3">
                   {galleryImages.map((img, idx) => (
                     <button
                       key={img.id || idx}
                       type="button"
                       onClick={() => setActiveImageIdx(idx)}
-                      className={`flex-shrink-0 overflow-hidden rounded-lg border-2 transition ${
-                        idx === activeImageIdx ? "border-stone-900" : "border-transparent hover:border-stone-300"
+                      className={`flex-shrink-0 overflow-hidden rounded-xl ring-2 transition ${
+                        idx === activeImageIdx ? "ring-app-ink" : "ring-transparent hover:ring-app-line2"
                       }`}
                     >
                       <img src={img.url} alt="" className="h-16 w-16 object-cover" />
@@ -199,39 +210,39 @@ const CustomerSharePage = () => {
               )}
             </>
           ) : (
-            <div className="flex aspect-square items-center justify-center bg-stone-100 text-sm text-stone-400">
+            <div className="flex aspect-square items-center justify-center bg-app-canvas-2 text-[13px] text-app-soft">
               Photos coming soon
             </div>
           )}
         </div>
 
         {/* Title + status + price */}
-        <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
+        <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[28px] font-semibold tracking-tight text-app-ink leading-tight">
               {item.name || "Custom piece"}
             </h1>
             {item.category && (
-              <p className="mt-0.5 text-sm text-stone-500">{item.category}</p>
+              <p className="mt-1 text-[13px] text-app-muted">{item.category}</p>
             )}
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${status.tone}`}>
+          <span className={`rounded-full px-3 py-1 text-[11px] font-medium tracking-[0.04em] ${statusPill(status.tone)}`}>
             {status.label}
           </span>
         </div>
 
         {item.salePrice && (
-          <div className="mt-3 inline-flex items-baseline gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 shadow-sm">
-            <span className="text-[11px] uppercase tracking-wide text-stone-500">Price</span>
-            <span className="text-xl font-semibold text-stone-900">
+          <div className="mt-4 inline-flex items-baseline gap-2 rounded-full glass-surface px-4 py-1.5">
+            <span className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">Price</span>
+            <span className="text-[18px] font-semibold tracking-tight text-app-ink">
               ${Number(item.salePrice).toLocaleString("en-US", { maximumFractionDigits: 0 })}
             </span>
           </div>
         )}
 
         {/* Specs */}
-        <section className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Specs</h2>
+        <section className="mt-6 rounded-3xl glass-surface p-5 sm:p-6">
+          <h2 className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">Specs</h2>
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
             <SpecRow label="Metal" value={item.metalSummary} />
             <SpecRow label="Size" value={item.size} />
@@ -253,26 +264,26 @@ const CustomerSharePage = () => {
 
         {/* Designer notes */}
         {item.description && (
-          <section className="mt-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+          <section className="mt-4 rounded-3xl glass-surface p-5 sm:p-6">
+            <h2 className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">
               From your designer
             </h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-stone-700">
+            <p className="mt-2 whitespace-pre-wrap text-[13.5px] leading-relaxed text-app-ink">
               {item.description}
             </p>
           </section>
         )}
 
         {/* Approval surface */}
-        <section className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="mt-6 rounded-3xl glass-surface-strong p-5 sm:p-6">
           {submitted ? (
             <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
                 submitted.action === "approved"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-amber-100 text-amber-700"
+                  ? "bg-brand-emerald/12 text-brand-emerald"
+                  : "bg-app-surface/65 border border-white/55 text-app-graphite backdrop-blur-md"
               }`}>
-                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   {submitted.action === "approved" ? (
                     <path d="M5 13l4 4L19 7" />
                   ) : (
@@ -280,22 +291,22 @@ const CustomerSharePage = () => {
                   )}
                 </svg>
               </div>
-              <p className="text-base font-medium text-stone-900">Thank you</p>
-              <p className="max-w-sm text-sm text-stone-600">{submitted.message}</p>
+              <p className="text-[15px] font-medium text-app-ink">Thank you</p>
+              <p className="max-w-sm text-[13px] text-app-muted leading-relaxed">{submitted.message}</p>
               <button
                 type="button"
                 onClick={() => setSubmitted(null)}
-                className="mt-2 text-xs font-medium text-stone-500 underline hover:text-stone-800"
+                className="mt-2 text-[11.5px] font-medium text-app-muted underline hover:text-app-ink"
               >
                 Send another response
               </button>
             </div>
           ) : (
             <>
-              <h2 className="text-base font-semibold text-stone-900">
+              <h2 className="text-[16px] font-semibold tracking-tight text-app-ink">
                 What do you think?
               </h2>
-              <p className="mt-1 text-xs text-stone-500">
+              <p className="mt-1 text-[12px] text-app-muted">
                 Your response goes straight to your designer. You can come back here any time.
               </p>
 
@@ -305,7 +316,7 @@ const CustomerSharePage = () => {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Your name (optional)"
-                  className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:ring-stone-500"
+                  className="input-modern"
                   disabled={submitting}
                 />
                 <textarea
@@ -313,18 +324,18 @@ const CustomerSharePage = () => {
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Notes, questions or change requests…"
                   rows={3}
-                  className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:ring-stone-500"
+                  className="input-modern !rounded-2xl !py-3"
                   disabled={submitting}
                 />
               </div>
 
-              {/* Action row — wraps on tiny screens so the buttons stack readably. */}
+              {/* Action row — primary ink CTA + glass secondaries */}
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => submit("approved")}
                   disabled={submitting}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary w-full"
                 >
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="M5 13l4 4L19 7" />
@@ -336,7 +347,7 @@ const CustomerSharePage = () => {
                   onClick={() => submit("changes_requested")}
                   disabled={submitting || !comment.trim()}
                   title={!comment.trim() ? "Add a note describing the changes" : undefined}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-500 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-secondary w-full disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   Request changes
                 </button>
@@ -345,7 +356,7 @@ const CustomerSharePage = () => {
                   onClick={() => submit("comment")}
                   disabled={submitting || !comment.trim()}
                   title={!comment.trim() ? "Type your message first" : undefined}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-secondary w-full disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   Send a message
                 </button>
@@ -354,7 +365,7 @@ const CustomerSharePage = () => {
           )}
         </section>
 
-        <p className="mt-6 text-center text-[11px] text-stone-400">
+        <p className="mt-6 text-center text-[10.5px] text-app-soft tracking-[0.04em]">
           Powered by GEMS DNA · {item.sku || `Item #${item.id}`}
         </p>
       </main>
@@ -366,8 +377,8 @@ const SpecRow = ({ label, value, mono }) => {
   if (!value) return null;
   return (
     <div>
-      <dt className="text-[11px] uppercase tracking-wide text-stone-500">{label}</dt>
-      <dd className={`mt-0.5 text-sm text-stone-900 ${mono ? "font-mono" : ""}`}>{value}</dd>
+      <dt className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">{label}</dt>
+      <dd className={`mt-1 text-[13.5px] text-app-ink ${mono ? "font-mono" : ""}`}>{value}</dd>
     </div>
   );
 };

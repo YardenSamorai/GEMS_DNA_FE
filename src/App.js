@@ -62,18 +62,20 @@ const ThemeProvider = ({ children }) => {
 };
 
 // ---------- Logo (used on marketing/landing) ----------
+//
+// Switched from the legacy emerald-gradient diamond to a calm, ink-on-canvas
+// monogram in v1.0.5. The brand emerald is still locked in as a quiet
+// hairline at the bottom of the tile — the same visual idiom as the portal's
+// "GD" monogram, so the public landing and the trade portal share a face.
 const DiamondIcon = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="url(#diamond-gradient)" />
-    <path d="M2 9H22" stroke="white" strokeWidth="0.5" strokeOpacity="0.5" />
-    <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.2" />
-    <defs>
-      <linearGradient id="diamond-gradient" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#34d399" />
-        <stop offset="1" stopColor="#059669" />
-      </linearGradient>
-    </defs>
-  </svg>
+  <span className="relative inline-flex w-8 h-8 rounded-[10px] bg-app-ink items-center justify-center shadow-[0_4px_12px_-4px_rgba(0,0,0,0.30)]">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
+      <path d="M2 9H22" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" />
+      <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.25" />
+    </svg>
+    <span className="absolute inset-0 rounded-[10px] ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
+  </span>
 );
 
 const ThemeToggle = () => {
@@ -294,7 +296,7 @@ const AppLayout = () => {
   return (
     <>
       <SignedIn>
-        <div className={`flex min-h-screen ${theme === "dark" ? "bg-stone-950" : "bg-stone-50"}`}>
+        <div className="flex min-h-screen">
           <Sidebar
             navSections={NAV_SECTIONS}
             collapsed={collapsed}
@@ -331,72 +333,60 @@ const AppLayout = () => {
  * know. Both AppLayout and StorePortalLayout render this during the
  * pre-role window.
  */
-const FullScreenLoader = () => {
-  const { theme } = useTheme();
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-label="Loading workspace"
-      className={`min-h-screen w-full flex items-center justify-center ${theme === "dark" ? "bg-stone-950" : "bg-stone-50"}`}
-    >
-      <div className="flex flex-col items-center gap-5">
-        <div className="relative">
-          <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl" />
-          <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
-            <DiamondIcon />
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-stone-400 text-xs font-semibold uppercase tracking-[0.18em]">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Loading workspace
-        </div>
+const FullScreenLoader = () => (
+  <div
+    role="status"
+    aria-live="polite"
+    aria-label="Loading workspace"
+    className="min-h-screen w-full flex items-center justify-center"
+  >
+    <div className="flex flex-col items-center gap-5">
+      <div className="relative w-14 h-14 rounded-2xl bg-app-ink flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(0,0,0,0.45)]">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
+          <path d="M2 9H22" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" />
+          <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.25" />
+        </svg>
+        <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
+      </div>
+      <div className="flex items-center gap-2 text-app-muted text-[11px] font-medium tracking-[0.14em] uppercase">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-emerald animate-pulse" />
+        Loading workspace
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-const AuthPrompt = ({ message }) => {
-  const { theme } = useTheme();
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-      <div className="relative">
-        <div className="absolute inset-0 bg-primary-500/20 rounded-full blur-3xl"></div>
-        <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-glow">
-          <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </div>
+const AuthPrompt = ({ message }) => (
+  <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
+    <div className="glass-surface-strong rounded-3xl px-8 py-10 max-w-md w-full text-center">
+      <div className="relative w-16 h-16 mx-auto rounded-2xl bg-app-ink flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(0,0,0,0.45)]">
+        <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
       </div>
-      <div className="text-center">
-        <h2 className={`text-2xl font-bold mb-2 ${theme === "dark" ? "text-stone-100" : "text-stone-800"}`}>Access Required</h2>
-        <p className={`mb-6 ${theme === "dark" ? "text-stone-400" : "text-stone-500"}`}>{message}</p>
-        <SignInButton mode="modal">
-          <button className="btn-primary text-base">Sign In to Continue</button>
-        </SignInButton>
-      </div>
+      <h2 className="text-[24px] font-semibold tracking-tight text-app-ink mt-6">Access Required</h2>
+      <p className="text-[14px] text-app-muted mt-2 leading-relaxed">{message}</p>
+      <SignInButton mode="modal">
+        <button className="btn-primary mt-6">Sign In to Continue</button>
+      </SignInButton>
     </div>
-  );
-};
+  </div>
+);
 
 // ---------- Marketing/landing layout (used by `/`, public pages) ----------
 const MarketingHeader = () => {
   const location = useLocation();
-  const { theme } = useTheme();
   return (
-    <header className="sticky top-0 z-40 glass border-b border-stone-200/50">
+    <header className="sticky top-0 z-40 glass-bar">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary-500/20 rounded-xl blur-lg group-hover:bg-primary-500/30 transition-all duration-300"></div>
-              <div className="relative">
-                <DiamondIcon />
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-bold text-gradient tracking-tight">GEMS DNA</span>
-              <span className={`text-[10px] font-medium tracking-widest uppercase ${theme === "dark" ? "text-stone-500" : "text-stone-400"}`}>
+            <DiamondIcon />
+            <div className="flex flex-col leading-tight">
+              <span className="text-[17px] font-semibold tracking-tight text-app-ink">GEMS DNA</span>
+              <span className="text-[10px] font-medium tracking-[0.14em] uppercase text-app-muted">
                 Diamond Network
               </span>
             </div>
@@ -405,7 +395,7 @@ const MarketingHeader = () => {
             <ThemeToggle />
             <SignedOut>
               <SignInButton mode="modal">
-                <button className="btn-primary flex items-center gap-2 text-sm py-2 px-4">
+                <button className="btn-primary">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                   </svg>
@@ -414,7 +404,7 @@ const MarketingHeader = () => {
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl={location.pathname} appearance={{ elements: { avatarBox: "w-9 h-9 ring-2 ring-primary-500/20 ring-offset-2" } }} />
+              <UserButton afterSignOutUrl={location.pathname} appearance={{ elements: { avatarBox: "w-9 h-9 ring-1 ring-app-line ring-offset-2 ring-offset-transparent" } }} />
             </SignedIn>
           </div>
         </div>
@@ -592,10 +582,9 @@ const HomeShortcut = ({ to }) => <Navigate to={to} replace />;
 // rendering the page (and confusing them with admin-only data).
 const OwnerOnly = ({ children }) => {
   const team = useTeam();
-  const { theme } = useTheme();
   if (team.loading) {
     return (
-      <div className={`flex min-h-[60vh] items-center justify-center ${theme === "dark" ? "text-stone-400" : "text-stone-500"}`}>
+      <div className="flex min-h-[60vh] items-center justify-center text-app-muted text-[13px]">
         Loading…
       </div>
     );
@@ -603,19 +592,21 @@ const OwnerOnly = ({ children }) => {
   if (team.isOwner) return children;
   return (
     <div className="max-w-2xl mx-auto p-8 text-center">
-      <div className="inline-flex w-16 h-16 items-center justify-center rounded-full bg-amber-50 mb-4">
-        <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                d="M12 9v3m0 4h.01M5 19h14a2 2 0 001.7-3L13.7 5a2 2 0 00-3.4 0L3.3 16A2 2 0 005 19z" />
-        </svg>
+      <div className="glass-surface rounded-3xl px-8 py-10">
+        <div className="inline-flex w-14 h-14 items-center justify-center rounded-2xl bg-white/65 border border-white/70 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+          <svg className="w-6 h-6 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                  d="M12 9v3m0 4h.01M5 19h14a2 2 0 001.7-3L13.7 5a2 2 0 00-3.4 0L3.3 16A2 2 0 005 19z" />
+          </svg>
+        </div>
+        <h2 className="text-[22px] font-semibold tracking-tight text-app-ink mt-4">Workshop admins only</h2>
+        <p className="text-[14px] text-app-muted mt-2 leading-relaxed">
+          This page manages production / inventory tooling. Your sales workspace lives in
+          <Link to="/crm/contacts" className="ml-1 font-medium text-app-ink hover:underline">CRM</Link>
+          {" — "}or jump straight to your{" "}
+          <Link to="/dashboard?tab=crm" className="font-medium text-app-ink hover:underline">CRM dashboard</Link>.
+        </p>
       </div>
-      <h2 className="text-xl font-bold text-stone-800">Workshop admins only</h2>
-      <p className="text-stone-500 mt-2">
-        This page manages production / inventory tooling. Your sales workspace lives in
-        <Link to="/crm/contacts" className="ml-1 font-semibold text-emerald-700 hover:text-emerald-800">CRM</Link>
-        {" — "}or jump straight to your{" "}
-        <Link to="/dashboard?tab=crm" className="font-semibold text-emerald-700 hover:text-emerald-800">CRM dashboard</Link>.
-      </p>
     </div>
   );
 };

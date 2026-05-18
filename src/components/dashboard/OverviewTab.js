@@ -47,67 +47,73 @@ const fmtCount = (n) => Number(n || 0).toLocaleString();
 /* ─────────────────────────────────────────────────────────────────────────────
  * Card primitives
  * ───────────────────────────────────────────────────────────────────────── */
+// v1.0.5 — KPI cards become quiet glass tiles. We retain the per-card
+// `tone` prop on the API surface so callers don't have to change, but
+// every tone now resolves to a neutral graphite chip — the only colour
+// we let escape is emerald for positive states (success / done) and a
+// muted rose tint for severity-overdue badges. Anything else is ink.
 const KpiCard = ({ to, label, value, sub, tone, icon, badge }) => {
-  const toneClasses = {
-    emerald: "text-emerald-700 bg-emerald-50",
-    violet:  "text-violet-700 bg-violet-50",
-    amber:   "text-amber-700 bg-amber-50",
-    sky:     "text-sky-700 bg-sky-50",
-    rose:    "text-rose-700 bg-rose-50",
-    indigo:  "text-indigo-700 bg-indigo-50",
-    pink:    "text-pink-700 bg-pink-50",
-    slate:   "text-slate-700 bg-slate-100",
-  };
+  const isPositive = tone === "emerald";
   return (
     <Link
       to={to}
-      className="group relative flex flex-col gap-1 rounded-xl border border-stone-200 bg-white p-3 transition hover:border-stone-300 hover:shadow-md"
+      className="group relative flex flex-col gap-1 rounded-2xl glass-surface p-3.5 transition hover:bg-app-surface/80"
     >
       <div className="flex items-center justify-between">
-        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${toneClasses[tone] || toneClasses.slate}`}>
+        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-xl ${
+          isPositive
+            ? "bg-brand-emerald/12 text-brand-emerald"
+            : "bg-app-surface/60 border border-white/55 text-app-graphite"
+        }`}>
           {icon}
         </span>
         {badge ? (
-          <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+          <span className="rounded-full bg-app-ink/8 px-1.5 py-0.5 text-[10px] font-semibold text-app-ink">
             {badge}
           </span>
         ) : (
           <svg
-            className="h-3.5 w-3.5 text-stone-400 opacity-0 transition-opacity group-hover:opacity-100"
+            className="h-3.5 w-3.5 text-app-soft opacity-0 transition-opacity group-hover:opacity-100"
             fill="none" viewBox="0 0 24 24" stroke="currentColor"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         )}
       </div>
-      <div className="text-2xl font-bold leading-tight text-stone-900">{value}</div>
-      <div className="text-[11px] font-medium text-stone-500">{label}</div>
-      <div className="text-[10px] text-stone-400">{sub}</div>
+      <div className="text-[22px] font-semibold leading-tight tracking-tight text-app-ink">{value}</div>
+      <div className="text-[11px] font-medium text-app-muted">{label}</div>
+      <div className="text-[10px] text-app-soft">{sub}</div>
     </Link>
   );
 };
 
 const SectionHeader = ({ title, hint, action }) => (
-  <div className="flex items-end justify-between mb-2">
+  <div className="flex items-end justify-between mb-3">
     <div>
-      <h2 className="text-sm font-semibold text-stone-900">{title}</h2>
-      {hint && <p className="text-[11px] text-stone-500">{hint}</p>}
+      <h2 className="text-[13px] font-semibold tracking-tight text-app-ink">{title}</h2>
+      {hint && <p className="text-[11px] text-app-muted">{hint}</p>}
     </div>
     {action}
   </div>
 );
 
+// v1.0.5 — Queue icons are neutralised. Emerald reserved for `ready_item`
+// (positive state). Everything else is a graphite chip.
 const QueueIcon = ({ type }) => {
   const map = {
-    task: { color: "text-amber-600 bg-amber-50",  d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
-    occasion: { color: "text-pink-600 bg-pink-50",  d: "M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0A2.704 2.704 0 003 15.546V19a2 2 0 002 2h14a2 2 0 002-2v-3.454zM3 7.5l1.5 1.5L9 4.5 13.5 9 18 4.5l3 3v4L18 14.5l-4.5-4.5L9 14.5 4.5 10 3 11.5v-4z" },
-    ready_item: { color: "text-emerald-600 bg-emerald-50", d: "M5 13l4 4L19 7" },
-    stale_deal: { color: "text-rose-600 bg-rose-50",  d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
-    new_lead: { color: "text-sky-600 bg-sky-50",   d: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
+    task:       { positive: false, d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
+    occasion:   { positive: false, d: "M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0A2.704 2.704 0 003 15.546V19a2 2 0 002 2h14a2 2 0 002-2v-3.454zM3 7.5l1.5 1.5L9 4.5 13.5 9 18 4.5l3 3v4L18 14.5l-4.5-4.5L9 14.5 4.5 10 3 11.5v-4z" },
+    ready_item: { positive: true,  d: "M5 13l4 4L19 7" },
+    stale_deal: { positive: false, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
+    new_lead:   { positive: false, d: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
   };
   const cfg = map[type] || map.task;
   return (
-    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${cfg.color}`}>
+    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-xl ${
+      cfg.positive
+        ? "bg-brand-emerald/12 text-brand-emerald"
+        : "bg-app-surface/60 border border-white/55 text-app-graphite"
+    }`}>
       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cfg.d} />
       </svg>
@@ -240,10 +246,10 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
       {/* ─── Greeting ─── */}
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">
+        <h1 className="text-[28px] font-semibold tracking-tight text-app-ink">
           {greeting()}{user?.firstName ? `, ${user.firstName}` : ""}
         </h1>
-        <p className="mt-0.5 text-sm text-stone-500">
+        <p className="mt-1 text-[13.5px] text-app-muted">
           {isRep
             ? "Your open deals, today's tasks, and the customers waiting to hear from you."
             : "A live snapshot across CRM, workshop, stones, DNA leads, and customer occasions."}
@@ -252,12 +258,12 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
 
       {/* ─── Error banner (non-blocking) ─── */}
       {err && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        <div className="rounded-2xl glass-surface p-3 text-[12px] text-app-graphite">
           Couldn't load company summary: {err}. Try again in a moment.
         </div>
       )}
 
-      {/* ─── KPI strip (8 cards for owners, 5 for reps) ─── */}
+      {/* ─── KPI strip ─── */}
       <section>
         <SectionHeader
           title={isRep ? "Your day at a glance" : "Today across the company"}
@@ -266,7 +272,7 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
           {loading
             ? Array.from({ length: kpiCards.length }).map((_, i) => (
-                <div key={i} className="h-[112px] rounded-xl border border-stone-200 bg-white animate-pulse" />
+                <div key={i} className="h-[112px] rounded-2xl glass-surface animate-pulse" />
               ))
             : kpiCards.map((c) => <KpiCard key={c.label} {...c} />)}
         </div>
@@ -275,29 +281,29 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
       {/* ─── Two columns: Today's queue + Live activity ─── */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Today's queue */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+        <div className="rounded-3xl glass-surface p-5 sm:p-6">
           <SectionHeader
             title="Today's queue"
             hint="What needs you in the next few hours."
             action={
-              <Link to="/crm/tasks" className="text-[11px] font-medium text-emerald-700 hover:underline">
+              <Link to="/crm/tasks" className="text-[11px] font-medium text-app-ink hover:underline">
                 Open tasks →
               </Link>
             }
           />
           {loading ? (
             <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 rounded-lg bg-stone-100 animate-pulse" />
+              <div key={i} className="h-12 rounded-xl bg-app-surface/40 animate-pulse" />
             ))}</div>
           ) : (data?.queue?.length || 0) === 0 ? (
             <div className="py-8 text-center">
-              <div className="mx-auto h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
-                <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="mx-auto h-10 w-10 rounded-2xl bg-brand-emerald/12 flex items-center justify-center mb-2">
+                <svg className="h-5 w-5 text-brand-emerald" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-emerald-800">Inbox zero</p>
-              <p className="text-xs text-stone-500 mt-0.5">No tasks, occasions, or stale deals need attention right now.</p>
+              <p className="text-[13.5px] font-medium text-app-ink">Inbox zero</p>
+              <p className="text-[12px] text-app-muted mt-0.5">No tasks, occasions, or stale deals need attention right now.</p>
             </div>
           ) : (
             <ul className="space-y-1">
@@ -305,28 +311,28 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
                 <li key={q.id}>
                   <Link
                     to={q.link}
-                    className="flex items-start gap-3 rounded-lg p-2 hover:bg-stone-50 transition-colors group"
+                    className="flex items-start gap-3 rounded-xl p-2 hover:bg-app-surface/55 transition-colors group"
                   >
                     <QueueIcon type={q.type} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-stone-900 truncate group-hover:text-emerald-700">
+                        <p className="text-[13.5px] font-medium text-app-ink truncate">
                           {q.title}
                         </p>
                         {q.severity === "overdue" && (
-                          <span className="rounded-full bg-rose-100 px-1.5 py-0 text-[9px] font-bold uppercase text-rose-700">
+                          <span className="rounded-full bg-app-ink/10 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-app-ink">
                             Overdue
                           </span>
                         )}
                         {q.severity === "today" && q.type === "task" && (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-bold uppercase text-amber-700">
+                          <span className="rounded-full bg-app-surface/70 border border-white/55 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-app-graphite">
                             Today
                           </span>
                         )}
                       </div>
-                      {q.sub && <p className="text-[11px] text-stone-500 truncate">{q.sub}</p>}
+                      {q.sub && <p className="text-[11px] text-app-muted truncate">{q.sub}</p>}
                     </div>
-                    <svg className="h-4 w-4 text-stone-300 group-hover:text-stone-500 mt-1.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-app-soft group-hover:text-app-graphite mt-1.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>
@@ -337,14 +343,14 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
         </div>
 
         {/* Live activity — backed by activity_log (Sprint 2 / Phase 1) */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+        <div className="rounded-3xl glass-surface p-5 sm:p-6">
           <SectionHeader
             title="What just happened"
             hint="Mutations across CRM and the workshop in the last 14 days."
             action={
               <Link
                 to="/dashboard?tab=overview"
-                className="text-[11px] font-medium text-emerald-700 hover:underline"
+                className="text-[11px] font-medium text-app-ink hover:underline"
                 title="Real-time updates land in Sprint 3 (SSE)"
               >
                 Refresh ↻
@@ -353,38 +359,36 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
           />
           {loading ? (
             <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-10 rounded-lg bg-stone-100 animate-pulse" />
+              <div key={i} className="h-10 rounded-xl bg-app-surface/40 animate-pulse" />
             ))}</div>
           ) : (data?.activity?.length || 0) === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-stone-500">No recent activity in the last 14 days.</p>
+              <p className="text-[13px] text-app-muted">No recent activity in the last 14 days.</p>
             </div>
           ) : (
             <ol className="space-y-1">
               {data.activity.map((a) => {
                 const link = activityRowLink(a);
-                // Inert rows when we can't resolve a target (e.g. bulk
-                // synthetic ids with no related entity). Render as <div>.
                 const Inner = (
                   <>
                     <ActivityIcon entityType={a.entity_type} action={a.action} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-stone-900 truncate group-hover:text-emerald-700">
+                      <p className="text-[13.5px] text-app-ink truncate">
                         {a.label}
                       </p>
-                      {a.sub && <p className="text-[11px] text-stone-500 truncate">{a.sub}</p>}
+                      {a.sub && <p className="text-[11px] text-app-muted truncate">{a.sub}</p>}
                     </div>
-                    <span className="text-[10px] text-stone-400 mt-1.5 shrink-0">{timeAgo(a.ts)}</span>
+                    <span className="text-[10px] text-app-soft mt-1.5 shrink-0">{timeAgo(a.ts)}</span>
                   </>
                 );
                 return (
                   <li key={a.id}>
                     {link ? (
-                      <Link to={link} className="flex items-start gap-3 rounded-lg p-2 hover:bg-stone-50 transition-colors group">
+                      <Link to={link} className="flex items-start gap-3 rounded-xl p-2 hover:bg-app-surface/55 transition-colors group">
                         {Inner}
                       </Link>
                     ) : (
-                      <div className="flex items-start gap-3 rounded-lg p-2 group">
+                      <div className="flex items-start gap-3 rounded-xl p-2 group">
                         {Inner}
                       </div>
                     )}
@@ -405,15 +409,15 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
               <button
                 key={t.id}
                 onClick={() => onJumpTab && onJumpTab(t.id)}
-                className="text-left rounded-xl border border-stone-200 bg-white p-4 hover:border-emerald-400 hover:shadow-sm transition group"
+                className="text-left rounded-2xl glass-surface p-4 hover:bg-app-surface/80 transition group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-stone-900">{t.label}</span>
-                  <svg className="h-4 w-4 text-stone-400 group-hover:text-emerald-600 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <span className="text-[13.5px] font-semibold tracking-tight text-app-ink">{t.label}</span>
+                  <svg className="h-4 w-4 text-app-soft group-hover:text-app-ink transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <p className="mt-1 text-xs text-stone-500">{t.description}</p>
+                <p className="mt-1 text-[12px] text-app-muted">{t.description}</p>
               </button>
             ))}
           </div>

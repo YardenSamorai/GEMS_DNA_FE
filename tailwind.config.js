@@ -42,6 +42,11 @@ module.exports = {
         //  inner edge. Text scale mirrors Apple's typographic ramp
         //  (#1D1D1F → #6E6E73 → #A1A1A6) so the result reads like a
         //  native macOS / iPadOS app, not a SaaS dashboard.
+        //  These tokens are LIGHT-ONLY (hardcoded) — they describe
+        //  the store-portal opt-in palette. The system-wide tokens
+        //  that flip with dark mode live under the `app.*` namespace
+        //  below and resolve to the `--app-*` CSS variables defined
+        //  in src/index.css.
         // ============================================================
         glass: {
           canvas:   '#F2F2F5', // page background base — cool light sand
@@ -55,6 +60,31 @@ module.exports = {
           line2:    '#D1D1D6', // stronger separator
           tintWarm: '#F5EFE6', // very soft warm wash for lit zones
           tintCool: '#EAF0F6', // very soft cool wash for lit zones
+        },
+        // ============================================================
+        //  v1.0.5 System tokens — theme-aware via CSS variables.
+        //  Bound to the `--app-*` variable set in src/index.css. A
+        //  single `data-theme="dark|light"` flip on <html> retints
+        //  every `bg-app-*`, `text-app-*`, `border-app-*` usage
+        //  across the codebase. Use these (not `glass.*`) for any
+        //  surface that should follow the user's theme preference.
+        // ============================================================
+        app: {
+          canvas:   'rgb(var(--app-canvas)   / <alpha-value>)',
+          canvas2:  'rgb(var(--app-canvas-2) / <alpha-value>)',
+          surface:  'rgb(var(--app-surface)  / <alpha-value>)',
+          ink:      'rgb(var(--app-ink)      / <alpha-value>)',
+          graphite: 'rgb(var(--app-graphite) / <alpha-value>)',
+          muted:    'rgb(var(--app-muted)    / <alpha-value>)',
+          soft:     'rgb(var(--app-soft)     / <alpha-value>)',
+          line:     'rgb(var(--app-line)     / <alpha-value>)',
+          line2:    'rgb(var(--app-line-2)   / <alpha-value>)',
+        },
+        // Locked brand emerald. Used ONLY for positive-state
+        // semantics (Ready / Approved / Sold / success toast /
+        // active-rep ring / live-encryption dot). Never in chrome.
+        brand: {
+          emerald: 'rgb(var(--brand-emerald) / <alpha-value>)',
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

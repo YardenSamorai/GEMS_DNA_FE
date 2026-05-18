@@ -113,35 +113,38 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* Tab strip — sticky so that long pages still let the user switch
-          tabs without scrolling back to the top. Sits just under the global
-          TopBar (which is also sticky), so we offset by its height. */}
-      <div className="sticky top-0 z-20 border-b border-stone-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-1 overflow-x-auto" aria-label="Dashboard sections">
+    <div className="min-h-screen">
+      {/* Tab strip — segmented glass control, sticky so long pages can still
+          switch tabs without scrolling back up. Inactive items are quiet
+          glass; the active tab gets the ink fill (same idiom as the portal
+          sub-nav). The bookmark hint sits to the right at md+. */}
+      <div className="sticky top-12 z-20 glass-bar">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3">
+          <nav
+            className="flex gap-1 overflow-x-auto scrollbar-hide rounded-full glass-surface px-1.5 py-1"
+            aria-label="Dashboard sections"
+          >
             {visibleTabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
                 aria-current={tabId === t.id ? "page" : undefined}
-                className={`relative px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
+                className={`relative px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap rounded-full transition-colors ${
                   tabId === t.id
-                    ? "border-emerald-600 text-stone-900"
-                    : "border-transparent text-stone-500 hover:text-stone-800"
+                    ? "bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]"
+                    : "text-app-graphite hover:text-app-ink"
                 }`}
               >
                 {t.label}
               </button>
             ))}
-            {/* Right-side hint: how to deep-link */}
-            <span className="ml-auto self-center hidden md:inline text-[11px] text-stone-400 pr-1">
-              <Link to="/dashboard" className="hover:text-stone-600">
-                Bookmark any tab — URL updates as you switch
-              </Link>
-            </span>
           </nav>
+          <span className="ml-auto self-center hidden md:inline text-[10.5px] text-app-soft">
+            <Link to="/dashboard" className="hover:text-app-graphite">
+              Bookmark any tab — URL updates as you switch
+            </Link>
+          </span>
         </div>
       </div>
 

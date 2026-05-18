@@ -54,26 +54,31 @@ const InventoryHub = () => {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* Tab strip — same visual language as the merged Dashboard so the
-          two unified hubs feel like siblings. Sticks under the global TopBar. */}
-      <div className="sticky top-0 z-20 border-b border-stone-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-1 overflow-x-auto" aria-label="Inventory sections">
+    <div className="min-h-screen">
+      {/* Tab strip — segmented glass control, matches the unified Dashboard
+          so the two hubs feel like siblings. Sticks under the global TopBar. */}
+      <div className="sticky top-12 z-20 glass-bar">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-2.5">
+          <nav
+            className="inline-flex gap-1 overflow-x-auto scrollbar-hide rounded-full glass-surface px-1.5 py-1"
+            aria-label="Inventory sections"
+          >
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
                 aria-current={tabId === t.id ? "page" : undefined}
-                className={`relative px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
+                className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap rounded-full transition-colors ${
                   tabId === t.id
-                    ? "border-emerald-600 text-stone-900"
-                    : "border-transparent text-stone-500 hover:text-stone-800"
+                    ? "bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]"
+                    : "text-app-graphite hover:text-app-ink"
                 }`}
               >
                 {t.label}
-                <span className="ml-2 hidden sm:inline text-[11px] font-normal text-stone-400">
+                <span className={`hidden sm:inline text-[10.5px] font-normal ${
+                  tabId === t.id ? "text-app-canvas/65" : "text-app-soft"
+                }`}>
                   {t.description}
                 </span>
               </button>

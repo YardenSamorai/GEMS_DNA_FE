@@ -3,6 +3,9 @@ import { Link, useLocation } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
 import { useTheme } from "../App";
 import { useTeam } from "../context/TeamContext";
+// ThemeToggle still uses `useTheme` (light/dark switcher). All other
+// chrome (header bar, page title, rep badge, dividers) is now driven
+// by the theme-aware `app-*` tokens so we no longer branch on theme.
 import MemberAvatar from "./team/MemberAvatar";
 
 const ThemeToggle = () => {
@@ -66,32 +69,24 @@ const getPageTitle = (pathname, navItems) => {
 
 const TopBar = ({ navItems, onOpenMobileMenu }) => {
   const location = useLocation();
-  const { theme } = useTheme();
   const team = useTeam();
-  const isDark = theme === "dark";
   const title = getPageTitle(location.pathname, navItems);
   const showActorBadge = team.ready && team.me && (team.members || []).length > 1;
 
   return (
-    <header
-      className={`sticky top-0 z-30 flex h-12 items-center justify-between border-b px-3 sm:px-5 ${
-        isDark ? "bg-stone-950/80 border-stone-800" : "bg-white/80 border-stone-200"
-      } backdrop-blur`}
-    >
+    <header className="sticky top-0 z-30 flex h-12 items-center justify-between glass-bar px-3 sm:px-5">
       <div className="flex items-center gap-2 min-w-0">
         {/* Mobile hamburger */}
         <button
           onClick={onOpenMobileMenu}
           aria-label="Open menu"
-          className={`md:hidden -ml-1 rounded-lg p-1.5 transition ${
-            isDark ? "text-stone-300 hover:bg-stone-800" : "text-stone-700 hover:bg-stone-100"
-          }`}
+          className="md:hidden -ml-1 rounded-lg p-1.5 transition text-app-graphite hover:bg-app-surface/55"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className={`truncate text-sm font-semibold ${isDark ? "text-stone-100" : "text-stone-800"}`}>
+        <h1 className="truncate text-[13.5px] font-medium tracking-tight text-app-ink">
           {title}
         </h1>
       </div>
@@ -101,28 +96,22 @@ const TopBar = ({ navItems, onOpenMobileMenu }) => {
           <Link
             to="/team"
             title={team.isOwner ? "Manage team" : "View team"}
-            className={`hidden sm:inline-flex items-center gap-2 rounded-full pl-1 pr-2.5 py-0.5 text-xs font-medium transition ${
-              isDark
-                ? "bg-stone-900 hover:bg-stone-800 text-stone-200 ring-1 ring-stone-800"
-                : "bg-stone-100 hover:bg-stone-200 text-stone-700 ring-1 ring-stone-200"
-            }`}
+            className="hidden sm:inline-flex items-center gap-2 rounded-full pl-1 pr-2.5 py-0.5 text-[11.5px] font-medium transition bg-app-surface/55 hover:bg-app-surface/80 text-app-graphite border border-white/55 backdrop-blur-md"
           >
             <MemberAvatar member={team.me} size="xs" ring={false} />
-            <span className="truncate max-w-[120px]">{team.me?.name || "You"}</span>
-            <span className={`text-[9px] uppercase tracking-wider ${
-              team.isOwner ? "text-amber-600" : "text-emerald-600"
-            }`}>
+            <span className="truncate max-w-[120px] text-app-ink">{team.me?.name || "You"}</span>
+            <span className="text-[9px] uppercase tracking-[0.14em] text-app-muted">
               {team.isOwner ? "Admin" : "Rep"}
             </span>
           </Link>
         )}
         <ThemeToggle />
-        <div className={`h-6 w-px hidden sm:block ${isDark ? "bg-stone-700" : "bg-stone-200"}`} />
+        <div className="h-6 w-px hidden sm:block bg-app-line" />
         <UserButton
           afterSignOutUrl={location.pathname}
           appearance={{
             elements: {
-              avatarBox: "w-8 h-8 ring-2 ring-emerald-500/20 ring-offset-2",
+              avatarBox: "w-8 h-8 ring-1 ring-app-line ring-offset-2 ring-offset-transparent",
             },
           }}
         />

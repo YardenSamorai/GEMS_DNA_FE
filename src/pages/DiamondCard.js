@@ -113,14 +113,16 @@ const DiamondCard = () => {
   if (!details) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
-        <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
-            <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <div className="glass-surface rounded-3xl px-8 py-10 max-w-md w-full text-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-app-surface/60 border border-white/55 backdrop-blur-md flex items-center justify-center">
+            <svg className="w-6 h-6 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-stone-800 mb-2">Stone Not Found</h2>
-          <p className="text-stone-500">The stone you're looking for doesn't exist or has been removed.</p>
+          <h2 className="text-[22px] font-semibold tracking-tight text-app-ink">Stone not found</h2>
+          <p className="text-[13.5px] text-app-muted mt-2 leading-relaxed">
+            The stone you're looking for doesn't exist or has been removed.
+          </p>
         </div>
       </div>
     );
@@ -133,59 +135,64 @@ const DiamondCard = () => {
 
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
-      <motion.div 
+      <motion.div
         className="max-w-6xl mx-auto"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* Header Card */}
-        <div className="glass rounded-3xl shadow-xl border border-white/50 overflow-hidden mb-6">
-          {/* Title Bar */}
-          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-5 sm:px-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="badge badge-gold">
-                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
+        {/* Header Card — v1.0.5 glass shell. The legacy emerald-gradient title
+            bar is replaced by an ink-tone editorial header: lab badge, copyable
+            SKU, large display title, and a discreet price slot for signed-in
+            staff. No saturated chrome — the flagship public surface for the
+            brand. */}
+        <div className="rounded-3xl glass-surface-strong overflow-hidden mb-6">
+          <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-app-line">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full glass-surface text-[11px] font-medium tracking-[0.08em] uppercase text-app-graphite">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-emerald" />
                     {details.lab}
                   </span>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(details.stone_id);
-                      toast.success('SKU copied!', { duration: 1500, style: { fontSize: '14px' } });
+                      toast.success('SKU copied!', { duration: 1500, style: { fontSize: '13px' } });
                     }}
-                    className="flex items-center gap-1.5 text-stone-400 text-sm hover:text-white transition-colors group cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-app-muted text-[11.5px] hover:text-app-ink transition-colors group cursor-pointer"
                     title="Click to copy SKU"
                   >
-                    <span>ID: {details.stone_id}</span>
+                    <span className="tracking-[0.04em]">ID · {details.stone_id}</span>
                     <svg className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </button>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                  {details.shape} • {details.carat} ct {(isDiamond() || isFancy()) && details.clarity ? `• ${details.clarity}` : ''}
+                <h1 className="text-[28px] sm:text-[38px] font-semibold tracking-tight text-app-ink leading-tight">
+                  {details.shape} · {details.carat} ct
+                  {(isDiamond() || isFancy()) && details.clarity ? (
+                    <span className="text-app-graphite"> · {details.clarity}</span>
+                  ) : null}
                 </h1>
               </div>
               {isSignedIn && (
-                <div className="flex flex-col items-start sm:items-end">
-                  <span className="text-stone-400 text-sm mb-1">Total Price</span>
-                  <span className="text-3xl font-bold text-gradient-gold">{encryptPrice(halfTotalPrice)}</span>
+                <div className="flex flex-col items-start sm:items-end shrink-0">
+                  <span className="text-app-soft text-[10.5px] font-medium uppercase tracking-[0.14em] mb-1">
+                    Total price
+                  </span>
+                  <span className="text-[26px] sm:text-[28px] font-semibold tracking-tight text-app-ink">
+                    {encryptPrice(halfTotalPrice)}
+                  </span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Content */}
-          <div className="p-6 sm:p-8">
+          <div className="p-6 sm:p-10">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left - Media */}
               <div className="space-y-6">
-                {/* Main Video/Image */}
-                <div className="relative rounded-2xl overflow-hidden bg-stone-100 aspect-square shadow-lg">
+                <div className="relative rounded-2xl overflow-hidden bg-app-canvas-2 aspect-square">
                   {details.video ? (
                     <iframe 
                       className="w-full h-full absolute inset-0" 
@@ -202,18 +209,17 @@ const DiamondCard = () => {
                   )}
                 </div>
 
-                {/* Thumbnails */}
                 <div className="grid grid-cols-2 gap-4">
                   {details.picture && (
                     <div className="relative group">
-                      <div className="rounded-xl overflow-hidden bg-stone-100 aspect-square shadow-md card-hover">
-                        <img 
-                          src={details.picture} 
-                          alt="Stone" 
+                      <div className="rounded-xl overflow-hidden bg-app-canvas-2 aspect-square">
+                        <img
+                          src={details.picture}
+                          alt="Stone"
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <span className="absolute bottom-2 left-2 text-xs font-medium text-white bg-black/50 px-2 py-1 rounded-lg">
+                      <span className="absolute bottom-2 left-2 text-[10.5px] font-medium tracking-[0.08em] uppercase text-white bg-black/55 backdrop-blur-md px-2 py-0.5 rounded-full">
                         Photo
                       </span>
                     </div>
@@ -225,18 +231,18 @@ const DiamondCard = () => {
                       rel="noopener noreferrer"
                       className="relative group"
                     >
-                      <div className="rounded-xl overflow-hidden bg-stone-100 aspect-square shadow-md card-hover border-2 border-transparent hover:border-primary-500">
+                      <div className="rounded-xl overflow-hidden bg-app-canvas-2 aspect-square ring-1 ring-app-line group-hover:ring-app-line2 transition">
                         <embed
                           src={certUrl}
                           type="application/pdf"
                           className="w-full h-full pointer-events-none"
                         />
                       </div>
-                      <span className="absolute bottom-2 left-2 text-xs font-medium text-white bg-black/50 px-2 py-1 rounded-lg">
+                      <span className="absolute bottom-2 left-2 text-[10.5px] font-medium tracking-[0.08em] uppercase text-white bg-black/55 backdrop-blur-md px-2 py-0.5 rounded-full">
                         Certificate
                       </span>
-                      <div className="absolute inset-0 bg-primary-500/0 group-hover:bg-primary-500/10 transition-colors rounded-xl flex items-center justify-center">
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-primary-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                      <div className="absolute inset-0 bg-app-ink/0 group-hover:bg-app-ink/10 transition-colors rounded-xl flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity btn-primary">
                           View PDF
                         </span>
                       </div>
@@ -247,8 +253,8 @@ const DiamondCard = () => {
 
               {/* Right - Details */}
               <div className="space-y-6">
-                {/* Tabs */}
-                <div className="flex gap-2 p-1 bg-stone-100 rounded-xl">
+                {/* Tabs — segmented glass control */}
+                <div className="inline-flex gap-1 p-1 rounded-full glass-surface w-full">
                   <TabButton active={activeTab === 'details'} onClick={() => setActiveTab('details')}>
                     Details
                   </TabButton>
@@ -329,19 +335,18 @@ const DiamondCard = () => {
                       </>
                     )}
                     
-                    {/* Pair Stone */}
                     {details.pair_stone && (
-                      <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 hover:border-indigo-300 transition-colors">
+                      <div className="flex items-center justify-between p-4 rounded-2xl glass-surface">
                         <div className="flex items-center gap-3">
-                          <span className="text-xl">💎</span>
-                          <span className="text-stone-600 font-medium">Pair Stone</span>
+                          <span className="w-2 h-2 rounded-full bg-app-line2" />
+                          <span className="text-app-graphite font-medium text-[13.5px]">Pair stone</span>
                         </div>
                         <Link
                           to={`/${details.pair_stone}`}
-                          className="text-indigo-600 hover:text-indigo-700 font-semibold underline decoration-indigo-300 underline-offset-2 hover:decoration-indigo-500 transition-colors flex items-center gap-1"
+                          className="text-app-ink hover:underline font-medium text-[13.5px] flex items-center gap-1"
                         >
                           {details.pair_stone}
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                         </Link>
@@ -349,10 +354,10 @@ const DiamondCard = () => {
                     )}
 
                     {isSignedIn && (
-                      <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-primary-50 to-accent-50 border border-primary-200">
+                      <div className="mt-6 p-4 rounded-2xl glass-surface">
                         <div className="flex items-center justify-between">
-                          <span className="text-stone-600 font-medium">Price per Carat</span>
-                          <span className="text-lg font-bold text-primary-700">
+                          <span className="text-app-muted font-medium text-[12.5px]">Price per carat</span>
+                          <span className="text-[16px] font-semibold tracking-tight text-app-ink">
                             B{encryptPrice(decryptPrice(details.price_per_carat))}
                           </span>
                         </div>
@@ -370,21 +375,21 @@ const DiamondCard = () => {
                   >
                     <DetailCard icon="🔢" title="Stone ID" value={details.stone_id} />
                     {details.category && <DetailCard icon="📁" title="Category" value={getMappedCategories(details.category).join(', ')} />}
-                    <DetailCard 
-                      icon="📜" 
-                      title="Certificate #" 
+                    <DetailCard
+                      icon="📜"
+                      title="Certificate #"
                       value={
                         details.certificate_number ? (
-                          <a 
-                            href={certUrl || '#'} 
-                            className="text-primary-600 hover:text-primary-700 underline decoration-primary-300 underline-offset-2"
+                          <a
+                            href={certUrl || '#'}
+                            className="text-app-ink hover:underline"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
                             {details.certificate_number}
                           </a>
                         ) : 'N/A'
-                      } 
+                      }
                     />
                     <DetailCard icon="📏" title="Measurements" value={changeMeasurementsFormat(details.measurements1)} />
                     
@@ -419,37 +424,31 @@ const DiamondCard = () => {
                   </motion.div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="pt-6 border-t border-stone-200 space-y-3">
+                {/* Action buttons — primary ink CTA, glass secondaries */}
+                <div className="pt-6 border-t border-app-line space-y-3">
                   <button
                     type="button"
                     onClick={() => setInterestedOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition-colors"
+                    className="btn-primary w-full py-3 text-[14px]"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
                     </svg>
                     I'm interested
                   </button>
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      onClick={handleShare}
-                      className="btn-secondary flex items-center justify-center gap-2 py-2.5"
-                    >
+                    <button onClick={handleShare} className="btn-secondary">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                       </svg>
                       Share DNA
                     </button>
-                    <button 
-                      onClick={handleShareVideo}
-                      className="btn-secondary flex items-center justify-center gap-2 py-2.5"
-                    >
+                    <button onClick={handleShareVideo} className="btn-secondary">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
-                      Share Video
+                      Share video
                     </button>
                   </div>
                 </div>
@@ -490,10 +489,10 @@ const DiamondCard = () => {
 const TabButton = ({ active, onClick, children }) => (
   <button
     onClick={onClick}
-    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+    className={`flex-1 py-1.5 px-4 rounded-full text-[12.5px] font-medium transition-colors ${
       active
-        ? 'bg-white text-stone-900 shadow-md'
-        : 'text-stone-500 hover:text-stone-700'
+        ? 'bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]'
+        : 'text-app-graphite hover:text-app-ink'
     }`}
   >
     {children}
@@ -501,12 +500,12 @@ const TabButton = ({ active, onClick, children }) => (
 );
 
 const DetailCard = ({ icon, title, value }) => (
-  <div className="flex items-center justify-between p-4 rounded-xl bg-stone-50 hover:bg-stone-100 transition-colors">
-    <div className="flex items-center gap-3">
-      <span className="text-xl">{icon}</span>
-      <span className="text-stone-600 font-medium">{title}</span>
+  <div className="flex items-center justify-between p-4 rounded-2xl bg-app-surface/55 border border-white/55 backdrop-blur-md hover:bg-app-surface/75 transition-colors">
+    <div className="flex items-center gap-3 min-w-0">
+      <span className="text-[16px] opacity-70">{icon}</span>
+      <span className="text-app-muted font-medium text-[12.5px] truncate">{title}</span>
     </div>
-    <span className="text-stone-900 font-semibold">{value || 'N/A'}</span>
+    <span className="text-app-ink font-medium text-[13px] truncate ml-3 text-right">{value || 'N/A'}</span>
   </div>
 );
 
