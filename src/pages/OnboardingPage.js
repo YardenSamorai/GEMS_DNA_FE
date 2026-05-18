@@ -63,7 +63,6 @@ const StoneImage = ({ kind = "emerald", className = "" }) => (
     alt=""
     loading="lazy"
     className={`object-contain ${className}`}
-    style={{ mixBlendMode: "multiply" }}
   />
 );
 
@@ -85,8 +84,8 @@ const PassportMockup = () => (
       <div className="text-[10px] uppercase tracking-[0.14em] text-app-muted">DNA passport</div>
     </div>
 
-    <div className="aspect-[4/3] rounded-2xl bg-app-canvas-2/70 flex items-center justify-center overflow-hidden relative">
-      <StoneImage kind="emerald" className="w-[70%] h-[70%]" />
+    <div className="aspect-[4/3] rounded-2xl bg-white flex items-center justify-center overflow-hidden relative">
+      <StoneImage kind="emerald" className="w-[78%] h-[78%]" />
       <div className="absolute bottom-2 left-2 text-[9.5px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/55 text-white backdrop-blur">Photo</div>
     </div>
 
@@ -255,8 +254,8 @@ const CrmMockup = () => {
 
 const CatalogTile = ({ name, ct, color, price, stone }) => (
   <div className="glass-surface rounded-xl overflow-hidden">
-    <div className="aspect-square bg-app-canvas-2/70 flex items-center justify-center overflow-hidden">
-      <StoneImage kind={stone} className="w-[78%] h-[78%]" />
+    <div className="aspect-square bg-white flex items-center justify-center overflow-hidden">
+      <StoneImage kind={stone} className="w-[82%] h-[82%]" />
     </div>
     <div className="p-2.5">
       <div className="text-[11px] font-semibold text-app-ink truncate">{name}</div>
