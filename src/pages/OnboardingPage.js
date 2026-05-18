@@ -426,7 +426,7 @@ const OnboardingPage = () => {
           >
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-surface text-[11px] font-medium tracking-[0.14em] uppercase text-app-graphite">
               <StatusDot tone="positive" className="animate-pulse" />
-              v1.0.5 · Liquid Glass · live
+              v1.0.5 · live
             </div>
 
             <h1 className="mt-7 text-[40px] sm:text-[56px] md:text-[72px] font-semibold leading-[1.04] tracking-tight text-app-ink">

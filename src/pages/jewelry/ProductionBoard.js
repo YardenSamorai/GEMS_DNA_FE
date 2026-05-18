@@ -17,39 +17,45 @@ import { useTeam } from "../../context/TeamContext";
  *   - icon:  inline SVG element
  */
 const PencilIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
 );
 const MonitorIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
 );
 const DropletIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.5l5.5 7a7 7 0 11-11 0L12 2.5z" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.5l5.5 7a7 7 0 11-11 0L12 2.5z" /></svg>
 );
 const FlameIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.24 17 7.5c.5 1.5.5 3-.5 4.5C20 13 21 17 17.657 18.657z" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.24 17 7.5c.5 1.5.5 3-.5 4.5C20 13 21 17 17.657 18.657z" /></svg>
 );
 const GemIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 3l3.057-3 4.886 0L16 3l4 5-8 13L4 8l1-5z" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 3l3.057-3 4.886 0L16 3l4 5-8 13L4 8l1-5z" /></svg>
 );
 const SparkleIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
 );
 const ShieldCheckIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
 );
 const PackageIcon = (
-  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
 );
 
+/*
+ * Each stage carries a soft tinted pill (used in the column header), the
+ * stage label, and the icon glyph. Saturated chrome backgrounds were
+ * dropped in v1.0.5 — the stage colour is a meaning cue now, not a
+ * visual signal of weight.
+ */
 const STAGES = [
-  { value: "design",    label: "Design",    hex: "#a855f7", bg: "bg-violet-500",  icon: PencilIcon },
-  { value: "cad",       label: "CAD",       hex: "#0ea5e9", bg: "bg-sky-500",     icon: MonitorIcon },
-  { value: "wax",       label: "Wax",       hex: "#f59e0b", bg: "bg-amber-500",   icon: DropletIcon },
-  { value: "casting",   label: "Casting",   hex: "#f97316", bg: "bg-orange-500",  icon: FlameIcon },
-  { value: "setting",   label: "Setting",   hex: "#ec4899", bg: "bg-pink-500",    icon: GemIcon },
-  { value: "polishing", label: "Polishing", hex: "#06b6d4", bg: "bg-cyan-500",    icon: SparkleIcon },
-  { value: "qc",        label: "QC",        hex: "#10b981", bg: "bg-emerald-500", icon: ShieldCheckIcon },
-  { value: "ready",     label: "Ready",     hex: "#eab308", bg: "bg-yellow-500",  icon: PackageIcon },
+  { value: "design",    label: "Design",    pill: "bg-violet-100 text-violet-700",   icon: PencilIcon },
+  { value: "cad",       label: "CAD",       pill: "bg-sky-100 text-sky-700",         icon: MonitorIcon },
+  { value: "wax",       label: "Wax",       pill: "bg-amber-100 text-amber-700",     icon: DropletIcon },
+  { value: "casting",   label: "Casting",   pill: "bg-orange-100 text-orange-700",   icon: FlameIcon },
+  { value: "setting",   label: "Setting",   pill: "bg-pink-100 text-pink-700",       icon: GemIcon },
+  { value: "polishing", label: "Polishing", pill: "bg-cyan-100 text-cyan-700",       icon: SparkleIcon },
+  { value: "qc",        label: "QC",        pill: "bg-emerald-100 text-emerald-700", icon: ShieldCheckIcon },
+  { value: "ready",     label: "Ready",     pill: "bg-emerald-100 text-emerald-700", icon: PackageIcon },
 ];
 const STAGE_VALUES = STAGES.map((s) => s.value);
 
@@ -84,7 +90,7 @@ const WarningIcon = (cls) => (
 );
 
 const PRIORITY_STYLES = {
-  low:    "bg-stone-100 text-stone-600",
+  low:    "bg-app-ink/8 text-app-graphite",
   high:   "bg-amber-100 text-amber-700",
   urgent: "bg-rose-100 text-rose-700",
 };
@@ -103,17 +109,16 @@ const ProductionCard = ({ item, stage, draggedId, onDragStart, onDragEnd }) => {
       draggable
       onDragStart={() => onDragStart(item.id)}
       onDragEnd={onDragEnd}
-      className={`group block cursor-grab select-none rounded-xl glass-surface p-3 transition hover:-translate-y-0.5 active:cursor-grabbing ${
+      className={`group block cursor-grab select-none rounded-xl glass-surface p-2.5 transition hover:-translate-y-0.5 active:cursor-grabbing ${
         draggedId === item.id ? "opacity-40" : ""
       }`}
-      style={{ borderLeft: `3px solid ${stage.hex}` }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-bold leading-tight text-stone-900">
+          <div className="text-[12.5px] font-semibold leading-tight text-app-ink truncate">
             {item.sku || "—"}
           </div>
-          <div className="mt-0.5 truncate text-xs text-stone-500" title={item.name}>
+          <div className="mt-0.5 truncate text-[11px] text-app-muted" title={item.name}>
             {item.name || "Untitled"}
           </div>
         </div>
@@ -122,14 +127,14 @@ const ProductionCard = ({ item, stage, draggedId, onDragStart, onDragEnd }) => {
         )}
       </div>
 
-      <div className="mt-2.5 flex items-center gap-2 text-[11px]">
+      <div className="mt-2 flex items-center gap-2 text-[10.5px]">
         {priority !== "normal" && (
-          <span className={`rounded px-1.5 py-0.5 font-semibold capitalize ${PRIORITY_STYLES[priority]}`}>
+          <span className={`rounded-full px-1.5 py-0.5 font-semibold capitalize ${PRIORITY_STYLES[priority]}`}>
             {priority}
           </span>
         )}
         {dateStr && (
-          <span className={`flex items-center gap-1 ${overdue ? "text-rose-600" : "text-stone-500"}`}>
+          <span className={`flex items-center gap-1 ${overdue ? "text-rose-600" : "text-app-soft"}`}>
             {overdue ? WarningIcon("h-3 w-3") : ClockIcon("h-3 w-3")}
             {dateStr}
           </span>
@@ -152,30 +157,30 @@ const ProductionCard = ({ item, stage, draggedId, onDragStart, onDragEnd }) => {
  *     row wider than the viewport. */
 const Column = ({ stage, items, onDrop, isOver, onDragOver, onDragLeave, draggedId, onDragStart, onDragEnd }) => (
   <div
-    className="flex w-60 shrink-0 flex-col xl:w-auto xl:min-w-0 xl:flex-1"
+    className={`flex w-60 shrink-0 flex-col rounded-2xl p-2 transition xl:w-auto xl:min-w-0 xl:flex-1 ${
+      isOver
+        ? "bg-brand-emerald/10 ring-1 ring-brand-emerald/40"
+        : "bg-app-canvas/40"
+    }`}
     onDragOver={onDragOver}
     onDragLeave={onDragLeave}
     onDrop={() => onDrop(stage.value)}
   >
     {/* Header */}
-    <div className={`flex items-center justify-between gap-2 rounded-xl border px-2.5 py-2.5 transition ${
-      isOver ? "border-brand-emerald bg-brand-emerald/8" : "glass-surface"
-    }`}>
-      <div className="flex min-w-0 items-center gap-2">
-        <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${stage.bg}`}>
-          {stage.icon}
-        </div>
-        <span className="truncate text-sm font-semibold text-stone-900">{stage.label}</span>
+    <div className="px-1.5 pt-1 pb-2.5 flex items-center justify-between gap-2">
+      <div className={`inline-flex min-w-0 items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${stage.pill}`}>
+        <span className="shrink-0">{stage.icon}</span>
+        <span className="truncate">{stage.label}</span>
       </div>
-      <span className="shrink-0 rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-stone-700">
+      <span className="shrink-0 text-[11px] font-semibold tabular-nums text-app-soft">
         {items.length}
       </span>
     </div>
 
     {/* Cards */}
-    <div className="mt-2 flex-1 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: "calc(100vh - 240px)" }}>
+    <div className="flex-1 space-y-1.5 overflow-y-auto pr-0.5" style={{ maxHeight: "calc(100vh - 240px)" }}>
       {items.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-stone-200 bg-stone-50/60 py-10 text-center text-xs text-stone-400">
+        <div className="rounded-xl border border-dashed border-app-line py-10 text-center text-[11px] text-app-soft">
           Drop items here
         </div>
       ) : (
@@ -269,23 +274,16 @@ const ProductionBoard = () => {
     <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 ring-1 ring-emerald-100">
-            <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
-            </svg>
+        <div>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <h1 className="text-2xl font-semibold tracking-tight text-app-ink">Production</h1>
+            <span className="text-sm text-app-muted">Jobs &amp; workflow</span>
           </div>
-          <div>
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <h1 className="text-2xl font-bold tracking-tight text-stone-900">Production</h1>
-              <span className="text-sm text-stone-500">Jobs &amp; workflow</span>
+          {!loading && (
+            <div className="mt-1 text-xs text-app-soft">
+              {totalActive} {totalActive === 1 ? "active job" : "active jobs"} across {STAGES.length} stages
             </div>
-            {!loading && (
-              <div className="mt-0.5 text-xs text-stone-500">
-                {totalActive} {totalActive === 1 ? "active job" : "active jobs"} across {STAGES.length} stages
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -293,7 +291,7 @@ const ProductionBoard = () => {
           <button
             type="button"
             onClick={() => toast("Production workflow docs are coming soon", { icon: "📘" })}
-            className="shrink-0 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+            className="shrink-0 text-sm font-medium text-app-graphite hover:text-app-ink transition-colors"
           >
             Learn more →
           </button>
@@ -308,11 +306,11 @@ const ProductionBoard = () => {
       >
         {loading ? (
           STAGES.map((s) => (
-            <div key={s.value} className="flex w-60 shrink-0 flex-col gap-2 xl:w-auto xl:min-w-0 xl:flex-1">
-              <div className="h-12 animate-pulse rounded-xl bg-stone-100" />
-              <div className="h-20 animate-pulse rounded-lg bg-stone-100" />
-              <div className="h-20 animate-pulse rounded-lg bg-stone-100" />
-              <div className="h-20 animate-pulse rounded-lg bg-stone-100" />
+            <div key={s.value} className="flex w-60 shrink-0 flex-col gap-2 rounded-2xl bg-app-canvas/40 p-2 xl:w-auto xl:min-w-0 xl:flex-1">
+              <div className="h-6 w-20 animate-pulse rounded-full bg-app-line" />
+              <div className="h-20 animate-pulse rounded-xl bg-app-surface/60" />
+              <div className="h-20 animate-pulse rounded-xl bg-app-surface/60" />
+              <div className="h-20 animate-pulse rounded-xl bg-app-surface/60" />
             </div>
           ))
         ) : (
