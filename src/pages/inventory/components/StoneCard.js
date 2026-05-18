@@ -188,7 +188,7 @@ const StoneCard = ({
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          className="border-t border-stone-200 bg-stone-50"
+          className="border-t border-app-line bg-app-canvas/40"
         >
           <StoneDetails stone={stone} onViewDNA={onViewDNA} onVideoClick={onVideoClick} />
         </motion.div>
@@ -239,7 +239,7 @@ const StoneDetails = ({ stone, onViewDNA, onVideoClick }) => {
       {/* Links */}
       <div className="flex flex-wrap gap-2 mb-5">
         {stone.imageUrl && (
-          <a href={stone.imageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-100 text-primary-700 text-xs font-medium hover:bg-primary-200 transition-colors">
+          <a href={stone.imageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full glass-surface text-app-graphite text-xs font-medium hover:bg-app-surface/85 transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
@@ -247,7 +247,7 @@ const StoneDetails = ({ stone, onViewDNA, onVideoClick }) => {
           </a>
         )}
         {stone.videoUrl && (
-          <button onClick={(e) => { e.stopPropagation(); if (onVideoClick) onVideoClick(stone.videoUrl); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-100 text-accent-700 text-xs font-medium hover:bg-accent-200 transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); if (onVideoClick) onVideoClick(stone.videoUrl); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full glass-surface text-app-graphite text-xs font-medium hover:bg-app-surface/85 transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
@@ -255,7 +255,7 @@ const StoneDetails = ({ stone, onViewDNA, onVideoClick }) => {
           </button>
         )}
         {stone.certificateUrl && (
-          <a href={stone.certificateUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 text-xs font-medium hover:bg-stone-200 transition-colors">
+          <a href={stone.certificateUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full glass-surface text-app-graphite text-xs font-medium hover:bg-app-surface/85 transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -313,9 +313,9 @@ const StoneDetails = ({ stone, onViewDNA, onVideoClick }) => {
 };
 
 const DetailItem = ({ label, value }) => (
-  <div className="p-2 rounded-lg bg-white">
-    <span className="text-[10px] uppercase tracking-wider text-stone-400">{label}</span>
-    <p className="text-sm font-medium text-stone-800 truncate">{value || '-'}</p>
+  <div className="rounded-xl glass-surface px-3 py-2">
+    <span className="text-[10px] uppercase tracking-[0.12em] text-app-soft">{label}</span>
+    <p className="text-sm font-medium text-app-ink truncate">{value || '-'}</p>
   </div>
 );
 

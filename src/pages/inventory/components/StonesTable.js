@@ -531,10 +531,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         </button>
                         <button
                           onClick={() => onToggle(stone)}
-                          className={`inline-flex items-center justify-center h-7 px-3 rounded-md text-xs font-medium transition-colors ${
+                          className={`inline-flex items-center justify-center h-7 px-3 rounded-full text-xs font-medium transition-colors ${
                             isExpanded
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:text-foreground'
+                              ? 'bg-app-ink text-app-canvas'
+                              : 'glass-surface text-app-graphite hover:bg-app-surface/85'
                           }`}
                         >
                           {isExpanded ? 'Hide' : 'Details'}
@@ -549,7 +549,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                          <td colSpan={15} className="bg-muted/30 border-t border-border">
+                          <td colSpan={15} className="bg-app-canvas/40 border-t border-app-line">
                           <StoneDetails stone={stone} onViewDNA={onViewDNA} onVideoClick={onVideoClick} />
                         </td>
                       </motion.tr>
