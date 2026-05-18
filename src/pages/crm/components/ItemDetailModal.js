@@ -193,7 +193,7 @@ export default function ItemDetailModal({ item, onClose }) {
             {(stoneSpecs.length > 0 || jewelrySpecs.length > 0) && (
               <div>
                 <h3 className="text-[11px] uppercase tracking-wider font-semibold text-stone-500 mb-2">Specifications</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 bg-white border border-stone-200 rounded-xl p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 glass-surface rounded-xl p-4">
                   {(isJewelry ? jewelrySpecs : stoneSpecs).map((f) => (
                     <SpecCell key={f.label} label={f.label} value={f.value} />
                   ))}
@@ -205,7 +205,7 @@ export default function ItemDetailModal({ item, onClose }) {
             {isJewelry && (description || fullDescription) && (
               <div>
                 <h3 className="text-[11px] uppercase tracking-wider font-semibold text-stone-500 mb-2">Description</h3>
-                <div className="bg-white border border-stone-200 rounded-xl p-4 text-sm text-stone-700 leading-relaxed whitespace-pre-line">
+                <div className="glass-surface rounded-xl p-4 text-sm text-stone-700 leading-relaxed whitespace-pre-line">
                   {fullDescription || description}
                 </div>
               </div>
@@ -217,13 +217,13 @@ export default function ItemDetailModal({ item, onClose }) {
                 <h3 className="text-[11px] uppercase tracking-wider font-semibold text-stone-500 mb-2">Resources</h3>
                 <div className="flex flex-wrap gap-2">
                   {certUrl && (
-                    <a href={certUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-stone-200 hover:border-stone-900 text-sm text-stone-700 hover:text-stone-900">
+                    <a href={certUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg glass-surface hover:border-stone-900 text-sm text-stone-700 hover:text-stone-900">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                       Certificate
                     </a>
                   )}
                   {videoUrl && (
-                    <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-stone-200 hover:border-stone-900 text-sm text-stone-700 hover:text-stone-900">
+                    <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg glass-surface hover:border-stone-900 text-sm text-stone-700 hover:text-stone-900">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                       Video
                     </a>

@@ -306,7 +306,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
                         key={j.id}
                         to={`/jewelry/items/${j.id}`}
                         onClick={onClose}
-                        className="flex items-center gap-3 bg-white border border-stone-200 rounded-lg p-3 hover:border-violet-300 hover:shadow-sm transition group"
+                        className="flex items-center gap-3 glass-surface rounded-lg p-3 hover:border-violet-300 hover:shadow-sm transition group"
                       >
                         {j.cover_image_url ? (
                           <img src={j.cover_image_url} alt="" className="w-12 h-12 rounded-md object-cover bg-stone-100 shrink-0" />
@@ -342,7 +342,7 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
                   <h3 className="text-sm font-semibold text-stone-900 mb-2">Activity</h3>
                   <ul className="space-y-2">
                     {deal.interactions.map((i) => (
-                      <li key={i.id} className="bg-white border border-stone-200 rounded-lg p-3 text-sm">
+                      <li key={i.id} className="glass-surface rounded-lg p-3 text-sm">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] uppercase font-bold tracking-wider text-stone-500">{i.type}</span>
                           <span className="text-[11px] text-stone-400">{timeAgo(i.occurred_at)}</span>
@@ -376,7 +376,7 @@ function DealItemRow({ item, onPriceChange, onRemove, onOpen }) {
   const neto = bruto / 2;
 
   return (
-    <div className="group flex items-center gap-3 bg-white border border-stone-200 rounded-lg p-3 hover:border-stone-400 hover:shadow-sm transition">
+    <div className="group flex items-center gap-3 glass-surface rounded-lg p-3 hover:border-stone-400 hover:shadow-sm transition">
       <button
         type="button"
         onClick={onOpen}

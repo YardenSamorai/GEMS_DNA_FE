@@ -156,38 +156,39 @@ export default function CrmLayout() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-stone-50 pb-20 sm:pb-12">
+    <div className="min-h-[calc(100vh-4rem)] pb-20 sm:pb-12">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         {/* Header */}
-        <div className="mb-4 sm:mb-6 flex items-center justify-between gap-3">
+        <div className="mb-5 sm:mb-7 flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold text-stone-900 tracking-tight">CRM</h1>
-            <p className="hidden sm:block text-sm text-stone-500">
+            <h1 className="text-[24px] sm:text-[32px] font-semibold tracking-tight text-app-ink">CRM</h1>
+            <p className="hidden sm:block text-[13.5px] text-app-muted mt-0.5">
               Manage contacts, deals and follow-ups
             </p>
           </div>
         </div>
 
-        {/* Tabs - Desktop */}
-        <div className="hidden sm:block border-b border-stone-200 mb-6 overflow-x-auto">
-          <nav className="flex gap-1 min-w-max">
+        {/* Desktop tabs — segmented glass control. Active gets the ink fill;
+            DNA-lead unread badge stays emerald (positive/new arrival). */}
+        <div className="hidden sm:block mb-6">
+          <nav className="inline-flex gap-1 overflow-x-auto scrollbar-hide rounded-full glass-surface px-1.5 py-1 min-w-max">
             {navWithBadges.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  `relative inline-flex items-center gap-2 px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap rounded-full transition-colors ${
                     isActive
-                      ? "border-stone-900 text-stone-900"
-                      : "border-transparent text-stone-500 hover:text-stone-800 hover:border-stone-300"
+                      ? "bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]"
+                      : "text-app-graphite hover:text-app-ink"
                   }`
                 }
               >
-                {item.icon}
+                <span className="w-4 h-4">{item.icon}</span>
                 {item.label}
                 {item.badge > 0 && (
-                  <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                  <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-brand-emerald text-white text-[10px] font-semibold">
                     {item.badge > 99 ? "99+" : item.badge}
                   </span>
                 )}
@@ -200,12 +201,11 @@ export default function CrmLayout() {
         <Outlet key={location.pathname} />
       </div>
 
-      {/* Mobile bottom tab bar — uses CSS grid with `repeat(N,1fr)` so it
-          stays balanced as we add tabs (Stores + Memos pushed us from 4
-          to 6 items). On very narrow screens this still fits because
-          each cell is just an icon + tiny label. */}
+      {/* Mobile bottom tab bar — glass-bar floating dock. Six+ items stay
+          readable because each cell is an icon + tiny label; the active
+          item gets an ink pill behind the icon. */}
       <nav
-        className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 grid"
+        className="sm:hidden fixed bottom-0 inset-x-0 z-30 glass-bar grid"
         style={{
           paddingBottom: "max(env(safe-area-inset-bottom), 0px)",
           gridTemplateColumns: `repeat(${navWithBadges.length}, minmax(0, 1fr))`,
@@ -218,16 +218,16 @@ export default function CrmLayout() {
             end={item.end}
             className={({ isActive }) =>
               `relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
-                isActive ? "text-stone-900" : "text-stone-400 hover:text-stone-700"
+                isActive ? "text-app-ink" : "text-app-soft hover:text-app-graphite"
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <div className={`relative p-1 rounded-lg ${isActive ? "bg-stone-900 text-white" : ""}`}>
+                <div className={`relative p-1 rounded-xl ${isActive ? "bg-app-ink text-app-canvas" : ""}`}>
                   {item.icon}
                   {item.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-emerald-500 text-white text-[9px] font-bold">
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-brand-emerald text-white text-[9px] font-semibold">
                       {item.badge > 9 ? "9+" : item.badge}
                     </span>
                   )}

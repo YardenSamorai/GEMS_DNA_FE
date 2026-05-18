@@ -298,7 +298,7 @@ export default function CrmContacts() {
     <div className="flex gap-4 sm:gap-5">
       {/* Folder sidebar - desktop only */}
       <aside className="hidden lg:block w-64 shrink-0 self-start sticky top-4">
-        <div className="bg-white rounded-xl border border-stone-200 p-3">
+        <div className="glass-surface rounded-2xl p-3">
           <FolderTree
             folders={folders}
             contacts={contacts}
@@ -361,7 +361,7 @@ export default function CrmContacts() {
               {showActionsMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowActionsMenu(false)} />
-                  <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg bg-white border border-stone-200 z-20 overflow-hidden">
+                  <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg glass-surface z-20 overflow-hidden">
                     <MenuItem icon="upload" onClick={() => { setShowImport(true); setShowActionsMenu(false); }}>Import contacts</MenuItem>
                     <MenuItem icon="mail" onClick={() => { setShowBroadcast(true); setShowActionsMenu(false); }}>
                       Email broadcast
@@ -384,7 +384,7 @@ export default function CrmContacts() {
             </button>
             <button
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800 transition-colors"
+              className="btn-primary"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               <span>New</span>

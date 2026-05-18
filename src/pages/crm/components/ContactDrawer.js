@@ -497,7 +497,7 @@ function ActivityTab({ contact, onChanged, userId }) {
             <button
               key={t.value} type="button" onClick={() => setType(t.value)}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
-                type === t.value ? "bg-stone-900 text-white" : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-100"
+                type === t.value ? "bg-stone-900 text-white" : "glass-surface text-stone-700 hover:bg-stone-100"
               }`}
             >{t.label}</button>
           ))}
@@ -526,7 +526,7 @@ function ActivityTab({ contact, onChanged, userId }) {
           {contact.interactions.map((i) => (
             <li key={i.id} className="relative">
               <div className="absolute -left-[22px] top-1 w-3 h-3 rounded-full bg-stone-300 ring-4 ring-white" />
-              <div className="bg-white border border-stone-200 rounded-lg p-3">
+              <div className="glass-surface rounded-lg p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500">{i.type}</span>
                   <span className="text-[11px] text-stone-400">{timeAgo(i.occurred_at)}</span>
@@ -554,7 +554,7 @@ function DealsTab({ contact }) {
       {contact.deals.map((d) => {
         const s = stageOf(d.stage);
         return (
-          <a key={d.id} href={`/crm/deals?focus=${d.id}`} className="block bg-white border border-stone-200 rounded-lg p-3 hover:border-stone-400">
+          <a key={d.id} href={`/crm/deals?focus=${d.id}`} className="block glass-surface rounded-lg p-3 hover:border-stone-400">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="font-medium text-stone-900 truncate">{d.title}</div>
@@ -836,7 +836,7 @@ function VerifyTab({ contact, onUpdate }) {
           )}
 
           {result.discoveredFields && Object.keys(result.discoveredFields).length > 0 && (
-            <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
+            <div className="glass-surface rounded-lg overflow-hidden">
               <div className="px-3 py-2 text-xs uppercase tracking-wider text-stone-500 font-semibold border-b border-stone-200 bg-stone-50">
                 Discovered details
               </div>

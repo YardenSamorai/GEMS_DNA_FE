@@ -156,7 +156,7 @@ export default function CrmMemos() {
             className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${
               statusFilter === s.value
                 ? "bg-stone-900 text-white"
-                : "bg-white border border-stone-200 text-stone-600 hover:border-stone-300"
+                : "glass-surface text-stone-600 hover:border-stone-300"
             }`}
           >
             {s.label}
@@ -560,7 +560,7 @@ function MemoCard({ memo }) {
   return (
     <Link
       to={`/crm/memos/${memo.id}`}
-      className="bg-white border border-stone-200 rounded-xl p-4 hover:shadow-md transition-shadow flex flex-col"
+      className="glass-surface rounded-xl p-4 hover:shadow-md transition-shadow flex flex-col"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">

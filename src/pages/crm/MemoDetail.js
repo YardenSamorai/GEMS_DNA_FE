@@ -448,7 +448,7 @@ function SignaturesCard({ memo, onRequestSignature, onSignIssuance }) {
   const canExport = sigs.length > 0;
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 print:rounded-none">
+    <div className="glass-surface rounded-xl p-4 sm:p-5 print:rounded-none">
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h2 className="font-semibold text-stone-900">Signatures</h2>
         <div className="flex items-center gap-2 print:hidden">
@@ -457,7 +457,7 @@ function SignaturesCard({ memo, onRequestSignature, onSignIssuance }) {
               <button
                 onClick={handlePrint}
                 title="Open a print-ready PDF of this memo with embedded signatures"
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-stone-200 text-stone-700 text-[11px] font-semibold hover:bg-stone-50"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md glass-surface text-stone-700 text-[11px] font-semibold hover:bg-stone-50"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -570,19 +570,19 @@ function Toolbar({ memo, isDraft, isOpen, itemCount, hasSupplierIssueSig, hasSup
         Back to memos
       </Link>
       <div className="flex items-center gap-2 flex-wrap justify-end">
-        <button onClick={onPrint} title="Print / save as PDF" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-stone-200 text-stone-700 text-xs font-semibold hover:bg-stone-50">
+        <button onClick={onPrint} title="Print / save as PDF" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg glass-surface text-stone-700 text-xs font-semibold hover:bg-stone-50">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
           Print / PDF
         </button>
         {isDraft && (
           <>
-            <button onClick={onDelete} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-stone-200 text-rose-600 text-xs font-semibold hover:bg-rose-50">
+            <button onClick={onDelete} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg glass-surface text-rose-600 text-xs font-semibold hover:bg-rose-50">
               Delete draft
             </button>
             <button
               onClick={onIssue}
               disabled={itemCount === 0}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
+              className="btn-primary !text-[12px] !py-1.5 !px-3"
               title={hasSupplierIssueSig ? "Issue this memo (already signed)" : "Capture supplier signature and issue this memo"}
             >
               {!hasSupplierIssueSig && (
@@ -631,7 +631,7 @@ function Hero({ memo, effectiveStatus, expired }) {
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl px-4 sm:px-6 py-4 sm:py-5 print:rounded-none print:border-0 print:px-0 print:py-2">
+    <div className="glass-surface rounded-2xl px-4 sm:px-6 py-4 sm:py-5 print:rounded-none print:border-0 print:px-0 print:py-2">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 flex-wrap">
@@ -755,7 +755,7 @@ function FinancialSummary({ memo, totals }) {
   const pct = (v) => total > 0 ? (v / total) * 100 : 0;
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5 print:rounded-none">
+    <div className="glass-surface rounded-xl p-4 sm:p-5 print:rounded-none">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Stat label="Total" value={fmtMoney(total)} sub={`${totals.count} item${totals.count !== 1 ? "s" : ""}`} />
         <Stat label="Out"      value={fmtMoney(totals.outValue)}      sub={`${totals.out} item${totals.out !== 1 ? "s" : ""}`}      tone="text-blue-600" />
@@ -800,7 +800,7 @@ function Legend({ color, label }) {
 function ItemsCard({ memo, isDraft, isOpen, gateActive, onAddClick, onUpdate, onRemove, onApprove, onDecline }) {
   const pendingCount = memo.items.filter((i) => i.pending_status).length;
   return (
-    <div className="bg-white border border-stone-200 rounded-xl overflow-hidden print:rounded-none">
+    <div className="glass-surface rounded-xl overflow-hidden print:rounded-none">
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="font-semibold text-stone-900">Items ({memo.items.length})</h2>
@@ -1033,7 +1033,7 @@ function NotesCard({ memo, onPatch, disabled }) {
   }, [memo]);
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl print:rounded-none">
+    <div className="glass-surface rounded-xl print:rounded-none">
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100">
         <h3 className="font-semibold text-stone-900 text-sm">Notes</h3>
         {!editing && !disabled && (
@@ -1117,7 +1117,7 @@ function TimelineCard({ activity, memo }) {
   merged.sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl print:hidden">
+    <div className="glass-surface rounded-xl print:hidden">
       <div className="px-4 py-3 border-b border-stone-100">
         <h3 className="font-semibold text-stone-900 text-sm">Timeline</h3>
       </div>

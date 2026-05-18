@@ -118,7 +118,7 @@ export default function CrmDocuments() {
 
 function Header({ total }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl px-4 sm:px-6 py-4 sm:py-5">
+    <div className="glass-surface rounded-2xl px-4 sm:px-6 py-4 sm:py-5">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-stone-400 font-bold">Documents</div>
@@ -152,7 +152,7 @@ function Toolbar({ search, onSearch, statusFilter, onStatusFilter }) {
     </button>
   );
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-3 sm:p-4 flex items-center gap-3 flex-wrap">
+    <div className="glass-surface rounded-xl p-3 sm:p-4 flex items-center gap-3 flex-wrap">
       <div className="flex-1 min-w-[180px]">
         <input
           value={search}
@@ -174,7 +174,7 @@ function Toolbar({ search, onSearch, statusFilter, onStatusFilter }) {
 
 function DocumentList({ memos, busyId, onDownload, onPrint }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100 overflow-hidden">
+    <div className="glass-surface rounded-xl divide-y divide-stone-100 overflow-hidden">
       {memos.map((memo) => (
         <DocumentRow
           key={memo.id}
@@ -231,7 +231,7 @@ function DocumentRow({ memo, busy, onDownload, onPrint }) {
           onClick={onPrint}
           disabled={busy}
           title="Open a print-ready PDF in a new tab"
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-stone-200 text-stone-700 text-[11px] font-semibold hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md glass-surface text-stone-700 text-[11px] font-semibold hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -288,7 +288,7 @@ function EmptyState({ hasIssued }) {
 
 function ListSkeleton() {
   return (
-    <div className="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100 overflow-hidden animate-pulse">
+    <div className="glass-surface rounded-xl divide-y divide-stone-100 overflow-hidden animate-pulse">
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="px-5 py-4 flex items-center gap-4">
           <div className="flex-1 space-y-2">

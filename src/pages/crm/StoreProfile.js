@@ -144,7 +144,7 @@ export default function StoreProfile() {
           </button>
           <button
             onClick={handleDelete}
-            className="px-3 py-1.5 rounded-lg bg-white border border-stone-200 text-rose-600 text-xs font-semibold hover:bg-rose-50"
+            className="px-3 py-1.5 rounded-lg glass-surface text-rose-600 text-xs font-semibold hover:bg-rose-50"
           >
             Delete
           </button>
@@ -246,7 +246,7 @@ function Hero({ store, type, onPatch, onPortalChanged }) {
   const cover = store.cover_image_url;
 
   return (
-    <div className="relative bg-white border border-stone-200 rounded-2xl overflow-hidden">
+    <div className="relative glass-surface rounded-2xl overflow-hidden">
       {/* Thin top accent — just enough to brand the card without
           stealing space from the identity row. If the owner uploaded
           a cover image we render that as a shorter banner instead. */}
@@ -606,7 +606,7 @@ function CoverEditButton({ store, onPatch }) {
 
 function Kpi({ label, value, accent = "text-stone-900", icon }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-3 sm:p-4">
+    <div className="glass-surface rounded-xl p-3 sm:p-4">
       <div className="flex items-center gap-2 text-stone-500">
         {icon && (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -630,7 +630,7 @@ function OverviewTab({ store, memos, onPatch }) {
         {/* About / description */}
         <DescriptionCard description={store.description} onPatch={onPatch} />
         {/* Recent memos preview */}
-        <div className="bg-white border border-stone-200 rounded-xl">
+        <div className="glass-surface rounded-xl">
           <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
             <h3 className="font-semibold text-stone-900 text-sm">Recent memos</h3>
             {memos.length > 5 && (
@@ -665,7 +665,7 @@ function DescriptionCard({ description, onPatch }) {
   useEffect(() => setVal(description || ""), [description]);
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4">
+    <div className="glass-surface rounded-xl p-4">
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold text-stone-900 text-sm">About this store</h3>
         {!editing && (
@@ -730,7 +730,7 @@ function ContactBlock({ store, onPatch }) {
   ];
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4">
+    <div className="glass-surface rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-stone-900 text-sm">Contact</h3>
         {!editing && (
@@ -803,7 +803,7 @@ function SocialBlock({ store, onPatch }) {
   const hasAny = links.some((l) => l.value);
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4">
+    <div className="glass-surface rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-stone-900 text-sm">Social</h3>
         {!editing && (
@@ -862,7 +862,7 @@ function BusinessHoursBlock({ store, onPatch }) {
   const hasAny = Object.values(initial || {}).some((v) => v && v.trim());
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4">
+    <div className="glass-surface rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-stone-900 text-sm">Business hours</h3>
         {!editing && (
@@ -960,7 +960,7 @@ function RequestsTab({ requests, onChanged }) {
       )}
 
       {past.length > 0 && (
-        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+        <div className="glass-surface rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-200">
             <h3 className="font-semibold text-stone-900 text-sm">Past requests</h3>
           </div>
@@ -1274,7 +1274,7 @@ function MemosTab({ memos, storeId, onCreate }) {
     );
   }
   return (
-    <div className="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100">
+    <div className="glass-surface rounded-xl divide-y divide-stone-100">
       {memos.map((m) => <MemoListRow key={m.id} memo={m} />)}
     </div>
   );
@@ -1326,7 +1326,7 @@ function ContactsTab({ contacts, storeId, storeName, onChanged }) {
   };
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl">
+    <div className="glass-surface rounded-xl">
       <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
         <h3 className="font-semibold text-stone-900 text-sm">People at this store</h3>
         <button
@@ -1723,7 +1723,7 @@ function CatalogAccessTab({ storeId, storeName }) {
       )}
 
       {/* Tier picker */}
-      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+      <div className="glass-surface rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
           <div>
             <div className="text-sm font-semibold text-stone-900">Catalog tiers</div>
@@ -1792,7 +1792,7 @@ function SummaryCell({ label, value, sub, tone, mono }) {
     tone === "ok"   ? "text-emerald-700" :
     "text-stone-900";
   return (
-    <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
+    <div className="glass-surface rounded-xl px-4 py-3">
       <div className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">{label}</div>
       <div className={`mt-1 text-xl font-bold truncate ${toneClass} ${mono ? "font-mono text-sm font-medium" : ""}`}>
         {value}
@@ -1829,14 +1829,14 @@ function SettingsTab({ store, onPatch }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-      <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
+      <div className="glass-surface rounded-xl p-4 space-y-3">
         <h3 className="font-semibold text-stone-900 text-sm">Classification</h3>
         <Select label="Type" value={data.type} onChange={(v) => setData({ ...data, type: v })} options={COMPANY_TYPES.map((t) => ({ value: t.value, label: t.label }))} />
         <Input label="Tax ID / VAT" value={data.taxId} onChange={(v) => setData({ ...data, taxId: v })} />
         <Input label="Established year" value={data.establishedYear} onChange={(v) => setData({ ...data, establishedYear: v })} type="number" />
       </div>
 
-      <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
+      <div className="glass-surface rounded-xl p-4 space-y-3">
         <h3 className="font-semibold text-stone-900 text-sm">Memo defaults</h3>
         <p className="text-xs text-stone-500 -mt-2">These values pre-fill when issuing a new memo to this store.</p>
         <Input label="Default memo length (days)" value={data.defaultMemoDays} onChange={(v) => setData({ ...data, defaultMemoDays: v })} type="number" />
@@ -1845,7 +1845,7 @@ function SettingsTab({ store, onPatch }) {
         <Select label="Currency" value={data.currency} onChange={(v) => setData({ ...data, currency: v })} options={CURRENCIES} />
       </div>
 
-      <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3 lg:col-span-2">
+      <div className="glass-surface rounded-xl p-4 space-y-3 lg:col-span-2">
         <h3 className="font-semibold text-stone-900 text-sm">Internal notes</h3>
         <textarea
           value={data.notes}
@@ -1859,7 +1859,7 @@ function SettingsTab({ store, onPatch }) {
       <PortalAccessCard storeId={store.id} />
 
       {dirty && (
-        <div className="lg:col-span-2 sticky bottom-4 z-10 bg-white border border-stone-200 rounded-xl p-3 flex items-center justify-between shadow-lg">
+        <div className="lg:col-span-2 sticky bottom-4 z-10 glass-surface rounded-xl p-3 flex items-center justify-between shadow-lg">
           <span className="text-xs text-stone-500">Unsaved changes</span>
           <div className="flex gap-2">
             <button
@@ -1933,7 +1933,7 @@ function PortalAccessCard({ storeId }) {
   };
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3 lg:col-span-2">
+    <div className="glass-surface rounded-xl p-4 space-y-3 lg:col-span-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h3 className="font-semibold text-stone-900 text-sm">Portal access</h3>
@@ -1990,7 +1990,7 @@ function PortalAccessCard({ storeId }) {
                 <button
                   onClick={() => remove(m)}
                   disabled={busyId === m.id}
-                  className="px-2.5 py-1 rounded-md bg-white border border-stone-200 text-rose-600 text-[11px] font-semibold hover:bg-rose-50 disabled:opacity-50"
+                  className="px-2.5 py-1 rounded-md glass-surface text-rose-600 text-[11px] font-semibold hover:bg-rose-50 disabled:opacity-50"
                 >
                   Revoke
                 </button>

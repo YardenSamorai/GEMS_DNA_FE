@@ -87,7 +87,7 @@ export default function CrmTasks() {
   return (
     <div className="space-y-3 sm:space-y-4">
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5 text-xs">
+        <div className="inline-flex rounded-full glass-surface p-0.5 text-xs">
           {[
             { v: "all", l: "All" },
             { v: "pending", l: "Open" },

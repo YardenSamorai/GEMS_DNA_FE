@@ -130,7 +130,7 @@ const KpiCard = ({ label, value, icon, accent = "emerald" }) => {
   };
   const a = accentMap[accent] || accentMap.emerald;
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-3.5">
+    <div className="rounded-xl glass-surface p-3.5">
       <div className="flex items-center gap-3">
         <div className={`shrink-0 w-9 h-9 rounded-lg ${a.bg} flex items-center justify-center ${a.icon}`}>
           {icon}
@@ -163,7 +163,7 @@ const TabPill = ({ active, onClick, label, icon, count }) => (
 );
 
 const SectionCard = ({ title, action, children, padded = true }) => (
-  <div className="rounded-xl border border-stone-200 bg-white">
+  <div className="rounded-xl glass-surface">
     {(title || action) && (
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
         {title && <h3 className="text-sm font-semibold text-stone-900">{title}</h3>}
@@ -209,8 +209,8 @@ const ActivityTab = ({ items, filter, setFilter, counts }) => {
               onClick={() => setFilter(f.value)}
               className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors whitespace-nowrap ${
                 filter === f.value
-                  ? "bg-emerald-600 text-white"
-                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                  ? "bg-app-ink text-app-canvas"
+                  : "bg-app-surface/55 text-app-graphite hover:bg-app-surface/80 border border-white/55 backdrop-blur"
               }`}
             >
               {f.label}
@@ -444,7 +444,7 @@ const NotesTab = ({ contact, notes, onSaveNotes }) => {
       <SectionCard title="Customer Notes" action={
         dirty ? (
           <button type="button" onClick={save} disabled={saving}
-            className="px-3 py-1 text-xs font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50">
+            className="btn-primary !text-[11px] !py-1 !px-3 !rounded-md">
             {saving ? "Saving…" : "Save"}
           </button>
         ) : null
@@ -814,7 +814,7 @@ const AddOccasionModal = ({ onClose, onSubmit }) => {
         footer={
           <>
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded-lg">Cancel</button>
-            <button type="submit" disabled={saving || !date} className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
+            <button type="submit" disabled={saving || !date} className="btn-primary">{saving ? "Saving…" : "Save"}</button>
           </>
         }
       >
@@ -871,7 +871,7 @@ const LogCallModal = ({ onClose, onSubmit }) => {
         footer={
           <>
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 rounded-lg">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
+            <button type="submit" disabled={saving} className="btn-primary">{saving ? "Saving…" : "Save"}</button>
           </>
         }
       >
@@ -1085,7 +1085,7 @@ export default function CustomerProfile() {
         <Skeleton className="h-3 w-40" />
 
         {/* Hero */}
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6">
+        <div className="rounded-2xl glass-surface p-5 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-4">
               <SkeletonAvatar size={64} />
@@ -1141,7 +1141,7 @@ export default function CustomerProfile() {
   if (!contact) {
     return (
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center">
+        <div className="rounded-2xl glass-surface p-10 text-center">
           <div className="text-stone-900 font-medium">Customer not found</div>
           <Link to="/crm/contacts" className="mt-3 inline-flex text-sm text-emerald-600 hover:underline">← Back to Customers</Link>
         </div>
@@ -1156,7 +1156,7 @@ export default function CustomerProfile() {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header card */}
-      <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl glass-surface overflow-hidden">
         <div className="p-5 sm:p-6">
           {/* Top row: back link + actions */}
           <div className="flex items-start justify-between gap-3 mb-5">
@@ -1180,7 +1180,7 @@ export default function CustomerProfile() {
               <button
                 type="button"
                 onClick={() => navigate(`/crm/deals?new=1&contactId=${id}`)}
-                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 shadow-sm"
+                className="btn-primary h-9 !py-0"
               >
                 <Cart className="w-4 h-4" /> Create Order
               </button>

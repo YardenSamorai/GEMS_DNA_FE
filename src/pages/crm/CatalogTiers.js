@@ -396,7 +396,7 @@ function EmptyState({ onCreate }) {
       </p>
       <button
         onClick={onCreate}
-        className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm"
+        className="btn-primary mt-5"
       >
         Create first tier
       </button>

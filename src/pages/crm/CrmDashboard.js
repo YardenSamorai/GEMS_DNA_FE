@@ -4,7 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import { fetchCrmStats, CONTACT_TYPES } from "../../services/crmApi";
 
 const StatCard = ({ label, value, sub, accent = "stone", icon }) => (
-  <div className="bg-white rounded-xl border border-stone-200 p-3 sm:p-4 hover:shadow-md transition-shadow">
+  <div className="glass-surface rounded-xl p-3 sm:p-4 hover:shadow-md transition-shadow">
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0 flex-1">
         <div className="text-[10px] sm:text-xs uppercase tracking-wider text-stone-500 font-medium truncate">{label}</div>
@@ -49,7 +49,7 @@ export default function CrmDashboard() {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="h-28 bg-white rounded-xl border border-stone-200 animate-pulse" />
+          <div key={i} className="h-28 glass-surface rounded-xl animate-pulse" />
         ))}
       </div>
     );
@@ -101,7 +101,7 @@ export default function CrmDashboard() {
 
       {/* Tasks bar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5">
+        <div className="glass-surface rounded-xl p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-stone-900">Tasks</h3>
             <Link to="/crm/tasks" className="text-xs text-stone-500 hover:text-stone-800">View all →</Link>
@@ -114,7 +114,7 @@ export default function CrmDashboard() {
         </div>
 
         {/* Contact mix */}
-        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5 lg:col-span-2">
+        <div className="glass-surface rounded-xl p-4 sm:p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h3 className="font-semibold text-stone-900">Contact mix</h3>
             <Link to="/crm/contacts" className="text-xs text-stone-500 hover:text-stone-800">Manage →</Link>
@@ -132,7 +132,7 @@ export default function CrmDashboard() {
 
       {/* Monthly won + Recent activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5 lg:col-span-2">
+        <div className="glass-surface rounded-xl p-4 sm:p-5 lg:col-span-2">
           <h3 className="font-semibold text-stone-900 mb-4">Won deals — last 12 months</h3>
           {monthly.length === 0 ? (
             <div className="text-sm text-stone-500 py-8 text-center">No closed deals yet</div>
@@ -152,7 +152,7 @@ export default function CrmDashboard() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5">
+        <div className="glass-surface rounded-xl p-4 sm:p-5">
           <h3 className="font-semibold text-stone-900 mb-3 sm:mb-4">Recent activity</h3>
           {(stats?.recentInteractions || []).length === 0 ? (
             <div className="text-sm text-stone-500 py-8 text-center">No activity yet</div>
@@ -176,7 +176,7 @@ export default function CrmDashboard() {
       </div>
 
       {/* Top contacts */}
-      <div className="bg-white rounded-xl border border-stone-200 p-4 sm:p-5">
+      <div className="glass-surface rounded-xl p-4 sm:p-5">
         <h3 className="font-semibold text-stone-900 mb-3 sm:mb-4">Top contacts by revenue</h3>
         {(stats?.topContacts || []).length === 0 ? (
           <div className="text-sm text-stone-500 py-8 text-center">No closed deals to rank yet</div>

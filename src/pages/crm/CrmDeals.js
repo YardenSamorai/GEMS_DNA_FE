@@ -128,7 +128,7 @@ export default function CrmDeals() {
     <div className="space-y-3 sm:space-y-4">
       {/* Toolbar */}
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="hidden sm:inline-flex rounded-lg border border-stone-200 bg-white p-0.5 text-xs">
+        <div className="hidden sm:inline-flex rounded-full glass-surface p-0.5 text-xs">
           <ToggleBtn active={view === "kanban"} onClick={() => setView("kanban")}>Pipeline</ToggleBtn>
           <ToggleBtn active={view === "list"} onClick={() => setView("list")}>List</ToggleBtn>
         </div>
