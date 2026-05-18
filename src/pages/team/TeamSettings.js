@@ -277,7 +277,7 @@ const TeamSettings = () => {
         ) : (
           <form
             onSubmit={handleInvite}
-            className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+            className="rounded-xl glass-surface p-4"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <Field label="Full name" required>
@@ -329,7 +329,7 @@ const TeamSettings = () => {
           return (
             <div
               key={m.id}
-              className="rounded-xl border border-stone-200 bg-white shadow-sm p-4"
+              className="rounded-xl glass-surface p-4"
             >
               <div className="flex items-start gap-3">
                 <MemberAvatar member={m} size="md" />
@@ -471,7 +471,7 @@ const TeamSettings = () => {
         )}
       </section>
 
-      <section className="hidden md:block rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+      <section className="hidden md:block rounded-xl glass-surface overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-stone-200">
             <thead className="bg-stone-50">

@@ -430,7 +430,7 @@ const JewelryItemsList = () => {
       {loading ? (
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+            <div key={i} className="overflow-hidden rounded-2xl glass-surface">
               <div className="aspect-square w-full animate-pulse bg-stone-100" />
               <div className="space-y-2 p-3">
                 <div className="h-3 w-3/4 animate-pulse rounded bg-stone-100" />

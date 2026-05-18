@@ -67,7 +67,7 @@ const JewelryKanban = ({ items, onStatusChanged }) => {
                     draggable
                     onDragStart={() => setDraggedId(item.id)}
                     onDragEnd={() => setDraggedId(null)}
-                    className={`group cursor-grab rounded-lg border border-stone-200 bg-white shadow-sm hover:shadow ${
+                    className={`group cursor-grab rounded-xl glass-surface hover:shadow ${
                       draggedId === item.id ? "opacity-40" : ""
                     }`}
                   >

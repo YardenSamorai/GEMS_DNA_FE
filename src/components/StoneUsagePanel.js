@@ -41,7 +41,7 @@ const StoneUsagePanel = ({ sku, compact = false }) => {
 
   if (loading) {
     return (
-      <div className={`rounded-xl border border-stone-200 bg-white ${pad}`}>
+      <div className={`rounded-xl glass-surface ${pad}`}>
         <div className="text-xs text-stone-500">Loading stone usage…</div>
       </div>
     );
@@ -65,7 +65,7 @@ const StoneUsagePanel = ({ sku, compact = false }) => {
     jewelry.length === 0 && inquiries.length === 0 && deals.length === 0;
 
   return (
-    <div className={`rounded-xl border border-stone-200 bg-white ${pad}`}>
+    <div className={`rounded-xl glass-surface ${pad}`}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className={`${title} text-stone-900`}>Cross-system usage</h3>
         <span
@@ -259,7 +259,7 @@ const Section = ({ title, count, children }) => (
         {count}
       </span>
     </div>
-    <div className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
+    <div className="divide-y divide-app-line rounded-xl glass-surface">
       {children}
     </div>
   </div>

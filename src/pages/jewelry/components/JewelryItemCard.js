@@ -37,7 +37,7 @@ const InventoryCard = ({ item, onSelect }) => {
     <Link
       to={href}
       onClick={handleClick}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-2xl glass-surface transition hover:-translate-y-0.5"
     >
       <div className="relative aspect-square w-full overflow-hidden bg-stone-100">
         {cover ? (

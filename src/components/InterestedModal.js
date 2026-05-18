@@ -133,7 +133,7 @@ export default function InterestedModal({ open, onClose, sku, snapshot }) {
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 40, opacity: 0, scale: 0.98 }}
           transition={{ type: "spring", stiffness: 320, damping: 28 }}
-          className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+          className="relative w-full sm:max-w-md glass-surface-strong rounded-t-2xl sm:rounded-2xl overflow-hidden"
         >
           {success ? (
             <SuccessView sku={sku} onClose={onClose} />

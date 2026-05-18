@@ -183,7 +183,7 @@ const WorkshopBody = ({ baseItem }) => {
         ) : stones.length === 0 ? (
           <div className="rounded-md bg-stone-50 px-3 py-2 text-xs text-stone-400">No stones added yet.</div>
         ) : (
-          <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white text-xs">
+          <ul className="divide-y divide-app-line rounded-xl glass-surface text-xs">
             {stones.slice(0, 6).map((s) => {
               const snap = s.snapshot || {};
               const carat = snap.weightCt || snap.weight_ct;

@@ -577,7 +577,7 @@ const InternalExcelModal = ({
                 return (
                   <div
                     key={group.id}
-                    className="rounded-xl border border-stone-200 bg-white"
+                    className="rounded-xl glass-surface"
                   >
                     <div className="flex items-center justify-between border-b border-stone-100 px-3 py-2">
                       <div className="flex items-center gap-2">

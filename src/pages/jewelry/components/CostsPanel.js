@@ -65,7 +65,7 @@ const CostsPanel = ({ itemId, costs, item, onChanged }) => {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-5">
+        <div className="rounded-xl glass-surface p-5">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Add cost entry</h2>
           <form onSubmit={handleAdd} className="grid gap-3 sm:grid-cols-4">
             <div className="sm:col-span-2">
@@ -99,7 +99,7 @@ const CostsPanel = ({ itemId, costs, item, onChanged }) => {
           </form>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-5">
+        <div className="rounded-xl glass-surface p-5">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Cost entries</h2>
           {costs.length === 0 ? (
             <div className="py-6 text-center text-sm text-stone-500">No costs added yet.</div>
@@ -140,7 +140,7 @@ const CostsPanel = ({ itemId, costs, item, onChanged }) => {
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-5">
+        <div className="rounded-xl glass-surface p-5">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Pricing</h2>
           <dl className="space-y-2 text-sm">
             <Row label="Total cost" value={item?.total_cost} bold />

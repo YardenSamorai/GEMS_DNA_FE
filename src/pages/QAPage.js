@@ -398,7 +398,7 @@ const QAPage = () => {
             <Skeleton key={i} className="h-9 w-28" />
           ))}
         </div>
-        <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+        <div className="rounded-xl glass-surface overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-stone-50 border-b border-stone-200">

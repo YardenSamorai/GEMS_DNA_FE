@@ -11,7 +11,7 @@ const HistoryTimeline = ({ history = [] }) => {
   }
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-5">
+    <div className="rounded-xl glass-surface p-5">
       <ol className="space-y-4">
         {history.map((h) => (
           <li key={h.id} className="relative flex gap-3 pl-2">

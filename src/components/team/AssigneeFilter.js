@@ -108,7 +108,7 @@ const AssigneeFilter = ({ value = "all", onChange, align = "left" }) => {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50 transition shadow-sm"
+        className="inline-flex items-center gap-1.5 rounded-full glass-surface px-2.5 py-1 text-xs font-medium text-app-graphite hover:bg-app-surface/80 transition"
         title={`Filter by team member · ${labelFor(value)}`}
       >
         {renderTrigger()}
@@ -119,7 +119,7 @@ const AssigneeFilter = ({ value = "all", onChange, align = "left" }) => {
 
       {open && (
         <div
-          className={`absolute z-30 mt-1.5 w-56 max-h-80 overflow-y-auto rounded-lg border border-stone-200 bg-white p-1 shadow-lg ${
+          className={`absolute z-30 mt-1.5 w-56 max-h-80 overflow-y-auto rounded-xl glass-surface-strong p-1 ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >

@@ -155,7 +155,7 @@ const CustomerPreviewPanel = ({ item, files = [], onItemUpdated, currentUserId }
   return (
     <div className="space-y-5">
       {/* ============ AI Mockups ============ */}
-      <section className="rounded-xl border border-stone-200 bg-white p-5">
+      <section className="rounded-xl glass-surface p-5">
         <div className="mb-3">
           <h2 className="text-base font-semibold text-stone-900">AI mockup</h2>
           <p className="mt-0.5 text-xs text-stone-500">
@@ -253,7 +253,7 @@ const CustomerPreviewPanel = ({ item, files = [], onItemUpdated, currentUserId }
       </section>
 
       {/* ============ Share links ============ */}
-      <section className="rounded-xl border border-stone-200 bg-white p-5">
+      <section className="rounded-xl glass-surface p-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-stone-900">Customer share links</h2>

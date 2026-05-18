@@ -83,7 +83,7 @@ const MakeFromTemplateModal = ({ open, onClose, template }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
       <div
-        className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+        className="w-full max-w-lg rounded-2xl glass-surface-strong"
         onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={handleSubmit}>

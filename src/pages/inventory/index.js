@@ -1396,7 +1396,7 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
                 {tags.map((tag) => (
                   <div
                     key={tag.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-stone-200 hover:border-stone-300 hover:shadow-sm transition-all"
+                    className="flex items-center gap-3 p-3 rounded-xl glass-surface hover:bg-app-surface/80 transition-all"
                   >
                     {editingTag?.id === tag.id ? (
                       <div className="flex-1 space-y-3">
@@ -3502,7 +3502,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
         Filters {activeCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-800 text-white">{activeCount}</span>}
       </button>
       {isOpen && (
-        <div className="rounded-lg border border-stone-200 bg-white p-4 space-y-3">
+        <div className="rounded-xl glass-surface p-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1">Min Price</label>
@@ -3636,7 +3636,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
   ].filter(Boolean).length;
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4 mb-4">
+    <div className="rounded-xl glass-surface p-4 mb-4">
       {/* Clickable Header */}
       <div 
         className="flex items-center justify-between cursor-pointer select-none"
@@ -7743,7 +7743,7 @@ const StoneSearchPage = () => {
           {/* Saved Filters Bar */}
           <div className="flex items-center gap-2 flex-wrap mb-3">
             {savedFilters.map(preset => (
-              <div key={preset.id} className="group flex items-center gap-1 px-3 py-1.5 rounded-lg border border-stone-200 bg-white hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer">
+              <div key={preset.id} className="group flex items-center gap-1 px-3 py-1.5 rounded-full glass-surface hover:bg-app-surface/80 transition-all cursor-pointer">
                 <button
                   onClick={() => handleLoadFilter(preset)}
                   className="text-xs font-medium text-stone-700 group-hover:text-primary-700 transition-colors"

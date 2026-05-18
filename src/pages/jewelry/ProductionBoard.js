@@ -103,7 +103,7 @@ const ProductionCard = ({ item, stage, draggedId, onDragStart, onDragEnd }) => {
       draggable
       onDragStart={() => onDragStart(item.id)}
       onDragEnd={onDragEnd}
-      className={`group block cursor-grab select-none rounded-lg border border-stone-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md active:cursor-grabbing ${
+      className={`group block cursor-grab select-none rounded-xl glass-surface p-3 transition hover:-translate-y-0.5 active:cursor-grabbing ${
         draggedId === item.id ? "opacity-40" : ""
       }`}
       style={{ borderLeft: `3px solid ${stage.hex}` }}
@@ -159,7 +159,7 @@ const Column = ({ stage, items, onDrop, isOver, onDragOver, onDragLeave, dragged
   >
     {/* Header */}
     <div className={`flex items-center justify-between gap-2 rounded-xl border px-2.5 py-2.5 transition ${
-      isOver ? "border-emerald-400 bg-emerald-50" : "border-stone-200 bg-white shadow-sm"
+      isOver ? "border-brand-emerald bg-brand-emerald/8" : "glass-surface"
     }`}>
       <div className="flex min-w-0 items-center gap-2">
         <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${stage.bg}`}>

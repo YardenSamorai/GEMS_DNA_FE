@@ -80,8 +80,8 @@ const Reports = () => {
               onClick={() => setMonths(n)}
               className={`rounded-lg px-2.5 py-1 font-medium transition ${
                 months === n
-                  ? "bg-emerald-600 text-white"
-                  : "border border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+                  ? "bg-app-ink text-app-canvas"
+                  : "glass-surface text-app-graphite hover:bg-app-surface/80"
               }`}
             >
               {n}m
@@ -130,7 +130,7 @@ const Reports = () => {
       </div>
 
       {/* Revenue chart */}
-      <section className="rounded-xl border border-stone-200 bg-white p-5">
+      <section className="rounded-xl glass-surface p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-stone-900">Revenue trend</h2>
           <span className="text-xs text-stone-500">paid invoices · last {months} months</span>
@@ -146,7 +146,7 @@ const Reports = () => {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Workshop pipeline */}
-        <section className="rounded-xl border border-stone-200 bg-white p-5">
+        <section className="rounded-xl glass-surface p-5">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Workshop pipeline</h2>
           {loading ? (
             <div className="h-40 animate-pulse rounded-lg bg-stone-100" />
@@ -163,7 +163,7 @@ const Reports = () => {
         </section>
 
         {/* Sales pipeline */}
-        <section className="rounded-xl border border-stone-200 bg-white p-5">
+        <section className="rounded-xl glass-surface p-5">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Sales pipeline</h2>
           {loading ? (
             <div className="h-40 animate-pulse rounded-lg bg-stone-100" />
@@ -182,7 +182,7 @@ const Reports = () => {
       </div>
 
       {/* Top customers */}
-      <section className="rounded-xl border border-stone-200 bg-white p-5">
+      <section className="rounded-xl glass-surface p-5">
         <h2 className="mb-3 text-base font-semibold text-stone-900">Top customers</h2>
         {loading ? (
           <div className="h-40 animate-pulse rounded-lg bg-stone-100" />
@@ -228,7 +228,7 @@ const Reports = () => {
       </section>
 
       {/* Recent sold pieces with margins */}
-      <section className="rounded-xl border border-stone-200 bg-white p-5">
+      <section className="rounded-xl glass-surface p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-stone-900">Recent sold pieces · profit margin</h2>
           <Link to="/jewelry/sold" className="text-xs font-medium text-emerald-700 hover:underline">
@@ -295,7 +295,7 @@ const Reports = () => {
 
       {/* Stone activity */}
       {data?.stoneActivity && (
-        <section className="rounded-xl border border-stone-200 bg-white p-5">
+        <section className="rounded-xl glass-surface p-5">
           <h2 className="mb-3 text-base font-semibold text-stone-900">Stone consumption</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <MiniStat label="Currently reserved" value={data.stoneActivity.reserved} tone="amber" />
@@ -310,7 +310,7 @@ const Reports = () => {
 };
 
 const KpiCard = ({ label, value, sub, loading, tone = "stone" }) => (
-  <div className="rounded-xl border border-stone-200 bg-white p-4">
+  <div className="rounded-xl glass-surface p-4">
     <div className="text-[11px] font-medium uppercase tracking-wide text-stone-500">{label}</div>
     <div
       className={`mt-1 text-2xl font-bold ${

@@ -238,7 +238,7 @@ const StonesPanel = ({ itemId, stones, onChanged }) => {
   };
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-5">
+    <div className="rounded-xl glass-surface p-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold text-stone-900">Stones in this piece</h2>
         {!showAdd && (
@@ -420,7 +420,7 @@ const DraftRow = ({ draft, hint, onUpdate, onSplit, onRemove }) => {
   const overAllocated = hint && hint.allocated > hint.cap;
 
   return (
-    <li className="rounded-md border border-stone-200 bg-white p-2.5">
+    <li className="rounded-lg glass-surface p-2.5">
       <div className="flex items-start gap-3">
         {isInventory && (p.imageUrl ? (
           <img

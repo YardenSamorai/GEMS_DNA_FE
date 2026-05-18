@@ -36,7 +36,7 @@ export default function SignatureBlock({ signature, accent = "store" }) {
       : "border-emerald-500";
 
   return (
-    <div className={`bg-white border-l-4 ${accentClass} border border-stone-200 rounded-xl p-4 print:rounded-none`}>
+    <div className={`glass-surface border-l-4 ${accentClass} rounded-xl p-4 print:rounded-none`}>
       <div className="flex items-center justify-between mb-2">
         <div className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-bold">
           {isSupplier ? "Supplier signature" : "Store signature"} · {isClose ? "Close" : "Issuance"}

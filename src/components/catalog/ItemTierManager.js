@@ -139,7 +139,7 @@ export default function ItemTierManager({ type, sku, compact = false }) {
 
   /* ── Full editor ── */
   return (
-    <div className={`rounded-xl border ${isHidden ? "border-rose-200 bg-rose-50/40" : "border-stone-200 bg-white"} ${compact ? "p-3" : "p-4"}`}>
+    <div className={`rounded-xl ${isHidden ? "border border-rose-200 bg-rose-50/40" : "glass-surface"} ${compact ? "p-3" : "p-4"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">

@@ -32,8 +32,8 @@ const FilesGallery = ({ files = [], onDelete, onSetCover, coverUrl }) => {
           return (
             <div
               key={file.id}
-              className={`group relative overflow-hidden rounded-lg border bg-white shadow-sm transition hover:shadow-md ${
-                isCover ? "border-emerald-500 ring-2 ring-emerald-200" : "border-stone-200"
+              className={`group relative overflow-hidden rounded-xl glass-surface transition hover:bg-app-surface/80 ${
+                isCover ? "ring-2 ring-brand-emerald/60" : ""
               }`}
             >
               <div

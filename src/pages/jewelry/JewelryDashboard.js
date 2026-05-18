@@ -56,7 +56,7 @@ const pctChange = (prev, curr) => {
 
 /* ---------- Reusable card shell ---------- */
 const Card = ({ className = "", children }) => (
-  <div className={`rounded-2xl border border-stone-200 bg-white p-5 shadow-sm ${className}`}>
+  <div className={`rounded-2xl glass-surface p-5 ${className}`}>
     {children}
   </div>
 );

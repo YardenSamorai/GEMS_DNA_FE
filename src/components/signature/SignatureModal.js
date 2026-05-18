@@ -219,7 +219,7 @@ export default function SignatureModal({
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="btn-primary disabled:opacity-50"
           >
             {submitting ? "Saving…" : actionLabel}
           </button>

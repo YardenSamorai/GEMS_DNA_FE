@@ -94,7 +94,7 @@ const AssigneePicker = ({ value, onChange, disabled = false, compact = false }) 
     <div ref={popRef} className="relative inline-block">
       {trigger}
       {open && (
-        <div className="absolute z-40 mt-1.5 w-60 max-h-80 overflow-y-auto rounded-lg border border-stone-200 bg-white p-1 shadow-lg">
+        <div className="absolute z-40 mt-1.5 w-60 max-h-80 overflow-y-auto rounded-xl glass-surface-strong p-1">
           {canPickAny && (
             <button
               type="button"

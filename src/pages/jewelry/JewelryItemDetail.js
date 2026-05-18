@@ -194,7 +194,7 @@ const JewelryItemDetail = () => {
           <div className="space-y-4 lg:col-span-2">
             <SkeletonCard lines={4} />
             <SkeletonCard lines={3} />
-            <div className="rounded-xl border border-stone-200 bg-white p-4">
+            <div className="rounded-xl glass-surface p-4">
               <Skeleton className="mb-3 h-4 w-32" />
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -239,7 +239,7 @@ const JewelryItemDetail = () => {
       </Link>
 
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 mb-6 -mx-4 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:border-stone-200 sm:px-5 sm:shadow-sm">
+      <div className="sticky top-0 z-10 mb-6 -mx-4 glass-bar px-4 py-3 sm:mx-0 sm:rounded-2xl sm:glass-surface sm:px-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -345,7 +345,7 @@ const JewelryItemDetail = () => {
             )}
 
             {/* Details card */}
-            <div className="rounded-xl border border-stone-200 bg-white p-5">
+            <div className="rounded-xl glass-surface p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-base font-semibold text-stone-900">Details</h2>
                 {!editing ? (
@@ -466,7 +466,7 @@ const JewelryItemDetail = () => {
           <div className="space-y-4">
             {item.sku && <ItemTierManager type="jewelry" sku={item.sku} />}
 
-            <div className="rounded-xl border border-stone-200 bg-white p-5">
+            <div className="rounded-xl glass-surface p-5">
               <h2 className="mb-3 text-base font-semibold text-stone-900">Pricing</h2>
               <dl className="space-y-2 text-sm">
                 <PriceRow label="Total cost" value={item.total_cost} bold />
@@ -480,7 +480,7 @@ const JewelryItemDetail = () => {
               )}
             </div>
 
-            <div className="rounded-xl border border-stone-200 bg-white p-5">
+            <div className="rounded-xl glass-surface p-5">
               <h2 className="mb-3 text-base font-semibold text-stone-900">Counts</h2>
               <ul className="space-y-1.5 text-sm text-stone-600">
                 <li className="flex justify-between"><span>Files</span><span className="font-medium text-stone-900">{files.length}</span></li>
@@ -502,7 +502,7 @@ const JewelryItemDetail = () => {
 
       {tab === "files" && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-stone-200 bg-white p-5">
+          <div className="rounded-xl glass-surface p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-stone-900">Upload files</h2>
               <select
@@ -515,7 +515,7 @@ const JewelryItemDetail = () => {
             </div>
             <FileUploader onUploaded={handleFileUploaded} />
           </div>
-          <div className="rounded-xl border border-stone-200 bg-white p-5">
+          <div className="rounded-xl glass-surface p-5">
             <h2 className="mb-3 text-base font-semibold text-stone-900">Gallery</h2>
             <FilesGallery
               files={files}
