@@ -70,15 +70,17 @@ module.exports = {
         //  surface that should follow the user's theme preference.
         // ============================================================
         app: {
-          canvas:   'rgb(var(--app-canvas)   / <alpha-value>)',
-          canvas2:  'rgb(var(--app-canvas-2) / <alpha-value>)',
-          surface:  'rgb(var(--app-surface)  / <alpha-value>)',
-          ink:      'rgb(var(--app-ink)      / <alpha-value>)',
-          graphite: 'rgb(var(--app-graphite) / <alpha-value>)',
-          muted:    'rgb(var(--app-muted)    / <alpha-value>)',
-          soft:     'rgb(var(--app-soft)     / <alpha-value>)',
-          line:     'rgb(var(--app-line)     / <alpha-value>)',
-          line2:    'rgb(var(--app-line-2)   / <alpha-value>)',
+          canvas:     'rgb(var(--app-canvas)   / <alpha-value>)',
+          canvas2:    'rgb(var(--app-canvas-2) / <alpha-value>)',
+          'canvas-2': 'rgb(var(--app-canvas-2) / <alpha-value>)',
+          surface:    'rgb(var(--app-surface)  / <alpha-value>)',
+          ink:        'rgb(var(--app-ink)      / <alpha-value>)',
+          graphite:   'rgb(var(--app-graphite) / <alpha-value>)',
+          muted:      'rgb(var(--app-muted)    / <alpha-value>)',
+          soft:       'rgb(var(--app-soft)     / <alpha-value>)',
+          line:       'rgb(var(--app-line)     / <alpha-value>)',
+          line2:      'rgb(var(--app-line-2)   / <alpha-value>)',
+          'line-2':   'rgb(var(--app-line-2)   / <alpha-value>)',
         },
         // Locked brand emerald. Used ONLY for positive-state
         // semantics (Ready / Approved / Sold / success toast /
