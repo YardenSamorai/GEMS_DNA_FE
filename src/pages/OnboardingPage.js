@@ -44,16 +44,27 @@ const Pill = ({ children, tone = "neutral" }) => {
   );
 };
 
-/* A stone-shaped SVG silhouette used in mockup tiles where we'd normally
-   have a photograph. Calm, ink-on-canvas — never decorative. */
-const StoneSilhouette = ({ tone = "ink" }) => (
-  <svg viewBox="0 0 64 64" className={`w-12 h-12 ${tone === "ink" ? "text-app-ink" : "text-app-graphite"}`} fill="none" aria-hidden>
-    <path d="M32 6 L54 22 L40 56 L24 56 L10 22 Z" stroke="currentColor" strokeWidth="1.25" />
-    <path d="M10 22 L54 22" stroke="currentColor" strokeWidth="0.75" opacity="0.6" />
-    <path d="M32 6 L24 22 L24 56" stroke="currentColor" strokeWidth="0.6" opacity="0.4" />
-    <path d="M32 6 L40 22 L40 56" stroke="currentColor" strokeWidth="0.6" opacity="0.4" />
-    <path d="M10 22 L24 22 M40 22 L54 22" stroke="currentColor" strokeWidth="0.4" opacity="0.3" />
-  </svg>
+/* Stone image — served from /public/stones. Six premium macro shots,
+   each on the same cool grey backdrop (#F2F2F5) so they sit on the
+   glass tiles without a visible seam. The default emerald is used in
+   the hero passport. */
+const STONE_IMAGES = {
+  emerald:        "/stones/stone-emerald.png",
+  diamondRound:   "/stones/stone-diamond-round.png",
+  sapphirePear:   "/stones/stone-sapphire-pear.png",
+  rubyCushion:    "/stones/stone-ruby-cushion.png",
+  diamondPair:    "/stones/stone-diamond-pair.png",
+  emeraldOval:    "/stones/stone-emerald-oval.png",
+};
+
+const StoneImage = ({ kind = "emerald", className = "" }) => (
+  <img
+    src={STONE_IMAGES[kind] || STONE_IMAGES.emerald}
+    alt=""
+    loading="lazy"
+    className={`object-contain ${className}`}
+    style={{ mixBlendMode: "multiply" }}
+  />
 );
 
 const Spec = ({ label, value }) => (
@@ -75,7 +86,7 @@ const PassportMockup = () => (
     </div>
 
     <div className="aspect-[4/3] rounded-2xl bg-app-canvas-2/70 flex items-center justify-center overflow-hidden relative">
-      <StoneSilhouette />
+      <StoneImage kind="emerald" className="w-[70%] h-[70%]" />
       <div className="absolute bottom-2 left-2 text-[9.5px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/55 text-white backdrop-blur">Photo</div>
     </div>
 
@@ -242,10 +253,10 @@ const CrmMockup = () => {
 /*  Mockup #5 — Trade portal (store catalog grid)                              */
 /* -------------------------------------------------------------------------- */
 
-const CatalogTile = ({ name, ct, color, price }) => (
+const CatalogTile = ({ name, ct, color, price, stone }) => (
   <div className="glass-surface rounded-xl overflow-hidden">
-    <div className="aspect-square bg-app-canvas-2/70 flex items-center justify-center">
-      <StoneSilhouette tone="graphite" />
+    <div className="aspect-square bg-app-canvas-2/70 flex items-center justify-center overflow-hidden">
+      <StoneImage kind={stone} className="w-[78%] h-[78%]" />
     </div>
     <div className="p-2.5">
       <div className="text-[11px] font-semibold text-app-ink truncate">{name}</div>
@@ -265,12 +276,12 @@ const PortalMockup = () => (
       <Pill tone="positive">Live · Encrypted</Pill>
     </div>
     <div className="grid grid-cols-3 gap-2">
-      <CatalogTile name="Round D-IF"      ct="3.02 ct" color="D · IF"  price="$184,000" />
-      <CatalogTile name="Emerald cut"     ct="2.18 ct" color="Vivid G" price="$48,200"  />
-      <CatalogTile name="Pear sapphire"   ct="4.40 ct" color="Royal B" price="$96,000"  />
-      <CatalogTile name="Pair earrings"   ct="1.01+1.02" color="E · VS1" price="$28,400" />
-      <CatalogTile name="Cushion ruby"    ct="2.62 ct" color="Pigeon"   price="$210,000" />
-      <CatalogTile name="Oval emerald"    ct="3.51 ct" color="Vivid"    price="$72,500"  />
+      <CatalogTile stone="diamondRound" name="Round D-IF"      ct="3.02 ct" color="D · IF"  price="$184,000" />
+      <CatalogTile stone="emerald"      name="Emerald cut"     ct="2.18 ct" color="Vivid G" price="$48,200"  />
+      <CatalogTile stone="sapphirePear" name="Pear sapphire"   ct="4.40 ct" color="Royal B" price="$96,000"  />
+      <CatalogTile stone="diamondPair"  name="Pair earrings"   ct="1.01+1.02" color="E · VS1" price="$28,400" />
+      <CatalogTile stone="rubyCushion"  name="Cushion ruby"    ct="2.62 ct" color="Pigeon"   price="$210,000" />
+      <CatalogTile stone="emeraldOval"  name="Oval emerald"    ct="3.51 ct" color="Vivid"    price="$72,500"  />
     </div>
   </div>
 );
