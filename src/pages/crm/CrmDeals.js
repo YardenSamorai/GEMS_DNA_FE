@@ -261,15 +261,15 @@ export default function CrmDeals() {
                         handleDrop(stage.value, id);
                         setDraggingId(null);
                       }}
-                      className={`min-w-0 rounded-xl border-2 ${stage.accent} bg-stone-50/50`}
+                      className="min-w-0 rounded-2xl bg-app-canvas/40 p-2 min-h-[260px]"
                     >
-                      <div className="p-3 border-b border-stone-200/70 flex items-center justify-between">
+                      <div className="px-2 pt-1 pb-3 flex items-center justify-between">
                         <div>
-                          <div className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${stage.color}`}>{stage.label}</div>
-                          <div className="text-xs text-stone-500 mt-1">{grouped[stage.value]?.length || 0} · {fmt(stageTotals[stage.value])}</div>
+                          <div className={`inline-flex px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${stage.color}`}>{stage.label}</div>
+                          <div className="text-[11px] text-app-muted mt-1.5">{grouped[stage.value]?.length || 0} · {fmt(stageTotals[stage.value])}</div>
                         </div>
                       </div>
-                      <div className="p-2 space-y-2 min-h-[200px]">
+                      <div className="space-y-1.5">
                         {grouped[stage.value]?.map((d) => (
                           <div
                             key={d.id}
@@ -277,12 +277,12 @@ export default function CrmDeals() {
                             onDragStart={(e) => { e.dataTransfer.setData("text/plain", d.id); setDraggingId(d.id); }}
                             onDragEnd={() => setDraggingId(null)}
                             onClick={() => setDrawerId(String(d.id))}
-                            className={`bg-white rounded-lg border border-stone-200 p-3 cursor-pointer hover:border-stone-400 hover:shadow-sm ${
+                            className={`glass-surface rounded-xl p-2.5 cursor-pointer transition-all hover:-translate-y-0.5 ${
                               draggingId === d.id ? "opacity-50" : ""
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <div className="font-medium text-sm text-stone-900 truncate flex-1">{d.title}</div>
+                              <div className="font-semibold text-[12.5px] text-app-ink truncate flex-1">{d.title}</div>
                               {team.ready && team.members.length > 1 && (
                                 <MemberAvatar
                                   member={d.assigned_to ? team.membersByClerkId[d.assigned_to] : null}
@@ -291,17 +291,17 @@ export default function CrmDeals() {
                                 />
                               )}
                             </div>
-                            <div className="text-xs text-stone-500 truncate mt-0.5">{d.contact_name || "No contact"}</div>
+                            <div className="text-[11px] text-app-muted truncate mt-0.5">{d.contact_name || "No contact"}</div>
                             <div className="flex items-center justify-between mt-2">
-                              <span className="text-sm font-semibold text-stone-900">{fmt(d.value)}</span>
+                              <span className="text-[12.5px] font-semibold text-app-ink">{fmt(d.value)}</span>
                               {d.items_count > 0 && (
-                                <span className="text-[10px] text-stone-500">{d.items_count} items</span>
+                                <span className="text-[10px] text-app-soft">{d.items_count} items</span>
                               )}
                             </div>
                           </div>
                         ))}
                         {grouped[stage.value]?.length === 0 && (
-                          <div className="text-center text-xs text-stone-400 py-6">No deals</div>
+                          <div className="text-center text-[11px] text-app-soft py-8">No deals</div>
                         )}
                       </div>
                     </div>
