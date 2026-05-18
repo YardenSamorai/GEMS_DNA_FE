@@ -22,9 +22,9 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
   };
 
   const DetailRow = ({ label, value }) => (
-    <div className="flex justify-between items-center py-2 border-b border-stone-100 last:border-0">
-      <span className="text-stone-500 text-sm">{label}</span>
-      <span className="text-stone-800 font-medium text-sm">{value || '-'}</span>
+    <div className="flex justify-between items-center py-2 border-b border-app-line last:border-0">
+      <span className="text-app-muted text-sm">{label}</span>
+      <span className="text-app-ink font-medium text-sm">{value || '-'}</span>
     </div>
   );
 
@@ -45,34 +45,34 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
         animate={{ y: 0, x: 0 }}
         exit={{ y: "100%", x: 0 }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[92vh] overflow-hidden
+        className="fixed inset-x-0 bottom-0 z-50 glass-surface-strong rounded-t-3xl max-h-[92vh] overflow-hidden
                    sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[480px] sm:max-w-full sm:rounded-t-none sm:rounded-l-3xl sm:max-h-full"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drag Handle (Mobile) */}
         <div className="sm:hidden flex justify-center pt-3 pb-2">
-          <div className="w-12 h-1.5 bg-stone-300 rounded-full" />
+          <div className="w-12 h-1.5 bg-app-line-2 rounded-full" />
         </div>
 
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-border bg-card px-4 py-4 sm:px-6">
+        <div className="sticky top-0 z-10 glass-bar px-4 py-4 sm:px-6">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 {stone.lab && (
-                <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
+                <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-graphite bg-app-ink/8 px-2 py-0.5 rounded-full">
                   {stone.lab}
                 </span>
                 )}
-                <span className="text-muted-foreground text-xs">SKU: {stone.sku}</span>
+                <span className="text-app-muted text-xs">SKU: {stone.sku}</span>
               </div>
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold tracking-tight text-app-ink">
                 {getDisplayShape(stone.shape)} · {stone.weightCt}ct
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted transition-colors text-muted-foreground"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-full glass-surface hover:bg-app-surface/85 transition-colors text-app-graphite"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -140,19 +140,19 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 p-1 bg-stone-100 rounded-xl mb-4">
+            <div className="flex gap-1 p-1 glass-surface rounded-full mb-4">
               <button
                 onClick={() => setActiveTab('details')}
-                className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-all ${
-                  activeTab === 'details' ? 'bg-white text-stone-900 shadow' : 'text-stone-500'
+                className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-full transition-all ${
+                  activeTab === 'details' ? 'bg-app-ink text-app-canvas' : 'text-app-graphite hover:text-app-ink'
                 }`}
               >
                 Details
               </button>
               <button
                 onClick={() => setActiveTab('pricing')}
-                className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-all ${
-                  activeTab === 'pricing' ? 'bg-white text-stone-900 shadow' : 'text-stone-500'
+                className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-full transition-all ${
+                  activeTab === 'pricing' ? 'bg-app-ink text-app-canvas' : 'text-app-graphite hover:text-app-ink'
                 }`}
               >
                 Pricing
@@ -161,12 +161,12 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
             {/* Tab Content */}
             {activeTab === 'details' && (
-              <div className="bg-stone-50 rounded-xl p-4 space-y-0">
+              <div className="glass-surface rounded-xl p-4 space-y-0">
                 <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
                 <DetailRow label="Weight" value={`${stone.weightCt} ct`} />
                 <DetailRow label="Color" value={getDisplayColor(stone)} />
                 <DetailRow label="Clarity" value={stone.clarity} />
-                <DetailRow label="Clarity" value={stone.treatment} />
+                <DetailRow label="Treatment" value={stone.treatment} />
                 <DetailRow label="Origin" value={stone.origin} />
                 <DetailRow label="Lab" value={stone.lab} />
                 <DetailRow label="Measurements" value={stone.measurements} />
@@ -178,21 +178,21 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
 
             {activeTab === 'pricing' && (
               <div className="space-y-3">
-                <div className="bg-muted rounded-md p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-stone-600">Price per Carat</span>
-                    <span className="text-xl font-bold text-emerald-700">
+                <div className="glass-surface rounded-xl p-4">
+                  <div className="flex justify-between items-center mb-3 pb-3 border-b border-app-line">
+                    <span className="text-app-muted text-sm">Price per Carat</span>
+                    <span className="text-lg font-semibold tracking-tight text-app-ink">
                       ${stone.pricePerCt?.toLocaleString() || 'N/A'}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-emerald-200">
-                    <span className="text-stone-600">Total Price</span>
-                    <span className="text-2xl font-bold text-emerald-800">
+                  <div className="flex justify-between items-center">
+                    <span className="text-app-muted text-sm">Total Price</span>
+                    <span className="text-2xl font-semibold tracking-tight text-app-ink">
                       ${stone.priceTotal?.toLocaleString() || 'N/A'}
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-stone-400 text-center">
+                <p className="text-xs text-app-soft text-center">
                   {stone.weightCt}ct × ${stone.pricePerCt?.toLocaleString()}/ct
                 </p>
               </div>
@@ -201,11 +201,11 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
         </div>
 
         {/* Fixed Footer Actions */}
-        <div className="sticky bottom-0 bg-white border-t border-stone-200 p-4 sm:p-6 space-y-3">
+        <div className="sticky bottom-0 glass-bar p-4 sm:p-6 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleShare}
-              className="py-2.5 px-4 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-stone-200 transition-colors"
+              className="py-2 px-4 rounded-full glass-surface text-app-graphite font-medium flex items-center justify-center gap-2 hover:bg-app-surface/85 transition-colors text-sm"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -216,7 +216,7 @@ const DNADrawer = ({ isOpen, onClose, stone }) => {
               href={`https://gems-dna.com/${stone.sku}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="py-2.5 px-4 bg-stone-100 text-stone-700 font-medium rounded-xl flex items-center justify-center gap-2 hover:bg-stone-200 transition-colors"
+              className="py-2 px-4 rounded-full bg-app-ink text-app-canvas font-medium flex items-center justify-center gap-2 hover:bg-app-graphite transition-colors text-sm"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
