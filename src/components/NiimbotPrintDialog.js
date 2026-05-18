@@ -829,7 +829,15 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
       const status = await connect();
       setPrinterStatus(status);
       toast.success("Printer connected!");
-    } catch (err) { toast.error(err.message || "Failed to connect"); }
+    } catch (err) {
+      // niimbotPrint.connect() returns guidance text that's a few lines
+      // long when the chooser can't find the device. Give it real estate
+      // and time on screen so the user can act on it.
+      toast.error(err.message || "Failed to connect", {
+        duration: 12000,
+        style: { maxWidth: 480, whiteSpace: "pre-line", lineHeight: 1.4 },
+      });
+    }
     finally { setConnecting(false); }
   };
 
