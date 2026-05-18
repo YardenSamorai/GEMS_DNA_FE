@@ -250,9 +250,8 @@ export default function CrmDeals() {
           {/* Desktop: Kanban / list */}
           <div className="hidden sm:block">
             {view === "kanban" ? (
-              <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                <div className="flex gap-3 min-w-max pb-2">
-                  {DEAL_STAGES.map((stage) => (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pb-2">
+                {DEAL_STAGES.map((stage) => (
                     <div
                       key={stage.value}
                       onDragOver={(e) => e.preventDefault()}
@@ -262,7 +261,7 @@ export default function CrmDeals() {
                         handleDrop(stage.value, id);
                         setDraggingId(null);
                       }}
-                      className={`w-72 shrink-0 rounded-xl border-2 ${stage.accent} bg-stone-50/50`}
+                      className={`min-w-0 rounded-xl border-2 ${stage.accent} bg-stone-50/50`}
                     >
                       <div className="p-3 border-b border-stone-200/70 flex items-center justify-between">
                         <div>
@@ -307,7 +306,6 @@ export default function CrmDeals() {
                       </div>
                     </div>
                   ))}
-                </div>
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
