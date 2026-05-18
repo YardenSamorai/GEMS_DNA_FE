@@ -134,7 +134,7 @@ const MemoMockup = () => (
     <div className="flex items-center justify-between mb-3">
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-app-muted">Memo</div>
-        <div className="text-[14px] font-semibold text-app-ink mt-0.5">2026-0142 · Tiffany &amp; Co. NYC</div>
+        <div className="text-[14px] font-semibold text-app-ink mt-0.5">2026-0142 · Maison Solène · NY</div>
       </div>
       <Pill tone="positive">Issued</Pill>
     </div>
@@ -215,10 +215,10 @@ const ProductionMockup = () => (
 
 const CrmMockup = () => {
   const stages = [
-    { label: "Lead",        count: 8,  total: "$214k", tone: "neutral", deals: [{ t: "House of Renard", v: "$48k" }, { t: "Atelier Vogel",   v: "$26k" }] },
-    { label: "Qualified",   count: 5,  total: "$182k", tone: "info",    deals: [{ t: "Tiffany NYC",    v: "$72k" }, { t: "Hermès Paris",    v: "$45k" }] },
-    { label: "Proposal",    count: 4,  total: "$310k", tone: "warning", deals: [{ t: "Cartier MX",     v: "$120k" }, { t: "Mikimoto Tokyo", v: "$98k" }] },
-    { label: "Won",         count: 2,  total: "$540k", tone: "positive",deals: [{ t: "Graff London",   v: "$320k" }] },
+    { label: "Lead",        count: 8,  total: "$214k", tone: "neutral", deals: [{ t: "Maison Solène",      v: "$48k" }, { t: "Roselund Atelier",   v: "$26k" }] },
+    { label: "Qualified",   count: 5,  total: "$182k", tone: "info",    deals: [{ t: "Atelier Marbach",    v: "$72k" }, { t: "Beaufort Frères",    v: "$45k" }] },
+    { label: "Proposal",    count: 4,  total: "$310k", tone: "warning", deals: [{ t: "House of Vaulx",     v: "$120k" }, { t: "Verrière Tokyo",    v: "$98k" }] },
+    { label: "Won",         count: 2,  total: "$540k", tone: "positive",deals: [{ t: "Lindemann London",   v: "$320k" }] },
   ];
   return (
     <div className="glass-surface-strong rounded-[20px] p-3 sm:p-4 w-full max-w-[640px]">
@@ -269,7 +269,7 @@ const PortalMockup = () => (
   <div className="glass-surface-strong rounded-[20px] p-3 sm:p-4 w-full max-w-[560px]">
     <div className="flex items-center justify-between mb-3 px-1">
       <div>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-app-muted">Tiffany &amp; Co. · Private portal</div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-app-muted">Maison Solène · Private portal</div>
         <div className="text-[14px] font-semibold tracking-tight text-app-ink mt-0.5">Catalogue</div>
       </div>
       <Pill tone="positive">Live · Encrypted</Pill>
@@ -291,10 +291,10 @@ const PortalMockup = () => (
 
 const DocumentsMockup = () => {
   const rows = [
-    { id: "2026-0142", store: "Tiffany NYC",    issued: "May 18", items: 4, status: "Closed",  tone: "neutral" },
-    { id: "2026-0141", store: "Hermès Paris",   issued: "May 17", items: 7, status: "Issued",  tone: "info" },
-    { id: "2026-0140", store: "Cartier MX",     issued: "May 14", items: 2, status: "Awaiting",tone: "warning" },
-    { id: "2026-0139", store: "Graff London",   issued: "May 12", items: 9, status: "Signed",  tone: "positive" },
+    { id: "2026-0142", store: "Maison Solène",      issued: "May 18", items: 4, status: "Closed",  tone: "neutral" },
+    { id: "2026-0141", store: "Atelier Marbach",    issued: "May 17", items: 7, status: "Issued",  tone: "info" },
+    { id: "2026-0140", store: "House of Vaulx",     issued: "May 14", items: 2, status: "Awaiting",tone: "warning" },
+    { id: "2026-0139", store: "Lindemann London",   issued: "May 12", items: 9, status: "Signed",  tone: "positive" },
   ];
   return (
     <div className="glass-surface-strong rounded-[20px] p-4 sm:p-5 w-full max-w-[520px]">
