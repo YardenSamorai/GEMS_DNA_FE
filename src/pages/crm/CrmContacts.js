@@ -15,6 +15,7 @@ import {
   CONTACT_TYPES,
 } from "../../services/crmApi";
 import { makeThumbnail } from "./utils/cardImage";
+import { useRouteLoading } from "../../components/RouteLoadingContext";
 import ContactDrawer from "./components/ContactDrawer";
 import ContactFormModal from "./components/ContactFormModal";
 import ScanCardModal from "./components/ScanCardModal";
@@ -83,6 +84,10 @@ export default function CrmContacts() {
   const [tags, setTags] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Hold the route-transition overlay open while the contacts list is
+  // still on its initial fetch. Subsequent stale-while-revalidate
+  // refreshes don't gate the page (we already paint cached rows).
+  useRouteLoading(loading);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState(null);

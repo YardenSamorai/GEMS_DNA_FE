@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
+import { useRouteLoading } from "../../components/RouteLoadingContext";
 import {
   fetchJewelryItems,
   fetchJewelryCatalog,
@@ -137,6 +138,8 @@ const JewelryItemsList = () => {
   const [items, setItems] = useState([]);          // workshop jobs (jewelry_items)
   const [catalogItems, setCatalogItems] = useState([]); // catalog (jewelry_products)
   const [loading, setLoading] = useState(true);
+  // Keep the route-transition gem visible until the workshop list lands.
+  useRouteLoading(loading);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [showNewModal, setShowNewModal] = useState(false);

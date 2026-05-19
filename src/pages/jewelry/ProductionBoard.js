@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
+import { useRouteLoading } from "../../components/RouteLoadingContext";
 import toast from "react-hot-toast";
 import { fetchJewelryItems, changeJewelryStatus } from "../../services/jewelryApi";
 import AssigneeFilter from "../../components/team/AssigneeFilter";
@@ -205,6 +206,7 @@ const ProductionBoard = () => {
   const userId = user?.id;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  useRouteLoading(loading);
   const [updating, setUpdating] = useState(false);
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);

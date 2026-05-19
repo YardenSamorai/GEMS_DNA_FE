@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
+import { useRouteLoading } from "../../components/RouteLoadingContext";
 import {
   changeJewelryStatus,
   deleteJewelryFile,
@@ -47,6 +48,9 @@ const JewelryItemDetail = () => {
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Keep the route-transition gem visible until the item lands. Faster
+  // than a blank shell or a 1-line "Loading…" placeholder.
+  useRouteLoading(loading);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
   const [editing, setEditing] = useState(false);

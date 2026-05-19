@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
+import { useRouteLoading } from "../../components/RouteLoadingContext";
 import { motion, AnimatePresence } from "framer-motion";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -5448,6 +5449,9 @@ const StoneSearchPage = () => {
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [initialLoading, setInitialLoading] = useState(true);
+  // Keep the route-transition gem visible until the inventory's first
+  // fetch settles. Background refreshes don't gate the page.
+  useRouteLoading(initialLoading);
   const [progress, setProgress] = useState(0);
   const [sortConfig, setSortConfig] = useState({ field: "sku", direction: "asc" });
   const [viewMode, setViewMode] = useState("table");

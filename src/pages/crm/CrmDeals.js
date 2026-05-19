@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
+import { useRouteLoading } from "../../components/RouteLoadingContext";
 import toast from "react-hot-toast";
 import {
   fetchDeals,
@@ -23,6 +24,7 @@ export default function CrmDeals() {
   const [deals, setDeals] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
+  useRouteLoading(loading);
   const [view, setView] = useState(() => (typeof window !== "undefined" && window.innerWidth < 640 ? "list" : "kanban"));
   const [showForm, setShowForm] = useState(false);
   // Initial values for the new-deal modal — populated from URL query when arriving
