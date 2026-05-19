@@ -215,17 +215,15 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
                     placeholder="All locations"
                   />
                 </div>
-                {labOptions.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Lab</label>
-                    <MultiSelect
-                      value={filters.lab || []}
-                      options={labOptions}
-                      onChange={(val) => onChange({ ...filters, lab: val })}
-                      placeholder="All labs"
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Lab</label>
+                  <MultiSelect
+                    value={filters.lab || []}
+                    options={labOptions}
+                    onChange={(val) => onChange({ ...filters, lab: val })}
+                    placeholder="All labs"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Grouping Type</label>
                   <MultiSelect

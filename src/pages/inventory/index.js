@@ -6931,11 +6931,16 @@ const StoneSearchPage = () => {
     return ["All colors", ...sorted];
   }, [modeFilteredStones]);
 
-  // Lab options — derived from the actual data so the dropdown shows
-  // exactly the labs in the user's inventory (no empty "GIT" entry if
-  // no stone has a GIT cert). Case-normalised to upper, sorted A→Z.
+  // Lab options — we always include the canonical industry labs so the
+  // filter is useful even before data finishes loading (and so a stone
+  // with a brand-new cert lab still gets that option in the list). Any
+  // additional labs actually present in the user's inventory are merged
+  // in so custom / regional houses also show up. Case-normalised upper,
+  // sorted A→Z.
   const labOptions = useMemo(() => {
-    const set = new Set();
+    const set = new Set([
+      'GIA', 'GRS', 'SSEF', 'GUBELIN', 'CDC', 'AIGS', 'AGL', 'GIT', 'LOTUS', 'CGL', 'IGI',
+    ]);
     modeFilteredStones.forEach((s) => {
       const lab = (s.lab || '').trim();
       if (lab && lab.toUpperCase() !== 'N/A') set.add(lab.toUpperCase());
