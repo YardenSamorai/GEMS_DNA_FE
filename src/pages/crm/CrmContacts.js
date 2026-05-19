@@ -16,6 +16,7 @@ import {
 import ContactDrawer from "./components/ContactDrawer";
 import ContactFormModal from "./components/ContactFormModal";
 import ScanCardModal from "./components/ScanCardModal";
+import AttachCardModal from "./components/AttachCardModal";
 import FolderTree from "./components/FolderTree";
 import AdvancedFiltersDrawer, { EMPTY_FILTERS, countActiveFilters } from "./components/AdvancedFiltersDrawer";
 import ImportContactsModal from "./components/ImportContactsModal";
@@ -103,6 +104,9 @@ export default function CrmContacts() {
   const [selected, setSelected] = useState(new Set());
   const [showTagModal, setShowTagModal] = useState(false);
   const [cardLightbox, setCardLightbox] = useState(null); // { contactId, name, hasBack }
+  // When set, opens the "Attach business card" modal for a contact that
+  // currently has no card on file. Click target is the empty thumb tile.
+  const [attachCardContact, setAttachCardContact] = useState(null);
 
   useEffect(() => {
     if (routeId) setDrawerId(routeId);
@@ -582,6 +586,7 @@ export default function CrmContacts() {
                               hasBack: !!c.has_card_back,
                             })
                           }
+                          onAdd={() => setAttachCardContact(c)}
                         />
                       </td>
                       <td className="py-3 px-4">
@@ -655,24 +660,20 @@ export default function CrmContacts() {
                             (c.name || "?").charAt(0).toUpperCase()
                           )}
                         </button>
-                        {(thumbCache[c.id] || c.has_card_front || c.has_card_thumb) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCardLightbox({ contactId: c.id, name: c.name, hasBack: !!c.has_card_back });
-                            }}
-                            className="shrink-0 w-12 h-9 rounded-md overflow-hidden border border-stone-200 bg-stone-100"
-                            aria-label="View card image"
-                          >
-                            {thumbCache[c.id] ? (
-                              <img src={thumbCache[c.id]} alt="Card" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-stone-400">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 8a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" /></svg>
-                              </div>
-                            )}
-                          </button>
-                        )}
+                        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                          <CardThumb
+                            contact={c}
+                            thumb={thumbCache[c.id]}
+                            onOpen={() =>
+                              setCardLightbox({
+                                contactId: c.id,
+                                name: c.name,
+                                hasBack: !!c.has_card_back,
+                              })
+                            }
+                            onAdd={() => setAttachCardContact(c)}
+                          />
+                        </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0">
@@ -768,6 +769,38 @@ export default function CrmContacts() {
           onClose={() => setCardLightbox(null)}
         />
       )}
+      {attachCardContact && (
+        <AttachCardModal
+          contact={attachCardContact}
+          onClose={() => setAttachCardContact(null)}
+          onSaved={({ contact: updated, thumb }) => {
+            // Optimistic local update: flip the contact's flags so the
+            // thumb cell switches from "+" to a real image immediately,
+            // and feed the thumbnail straight into the cache (also
+            // persists it for the next page load).
+            const targetId = attachCardContact.id;
+            setContacts((prev) =>
+              prev.map((c) =>
+                c.id === targetId
+                  ? {
+                      ...c,
+                      has_card_front: !!updated?.card_image_front || c.has_card_front,
+                      has_card_back: !!updated?.card_image_back || c.has_card_back,
+                      has_card_thumb: !!thumb || !!updated?.card_image_thumb || c.has_card_thumb,
+                    }
+                  : c
+              )
+            );
+            if (thumb) {
+              setThumbCache((prev) => {
+                const next = { ...prev, [targetId]: thumb };
+                if (user?.id) saveCache(thumbsCacheKey(user.id), next);
+                return next;
+              });
+            }
+          }}
+        />
+      )}
       {showMoveFolder && (
         <MoveToFolderModal
           folders={folders}
@@ -847,10 +880,27 @@ const EmptyState = ({ onCreate, hasFilter }) => (
   </div>
 );
 
-function CardThumb({ contact, thumb, onOpen }) {
+function CardThumb({ contact, thumb, onOpen, onAdd }) {
   const hasFront = contact.has_card_front || contact.has_card_thumb || !!thumb;
+  // Empty state: render an inviting "+ camera" affordance so the user
+  // realises they can attach a card to this contact directly from the
+  // list. Previously this was a dead dashed box which made the whole
+  // CARD column look broken.
   if (!hasFront) {
-    return <div className="w-12 h-9 rounded-md border border-dashed border-stone-200 bg-stone-50" />;
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onAdd?.(); }}
+        className="group relative w-12 h-9 rounded-md border border-dashed border-stone-300 bg-stone-50 hover:border-stone-500 hover:bg-stone-100 flex items-center justify-center text-stone-400 hover:text-stone-700 transition-colors"
+        title="Add business card"
+        aria-label="Add business card"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-stone-900 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white opacity-0 group-hover:opacity-100 transition-opacity">+</span>
+      </button>
+    );
   }
   return (
     <button

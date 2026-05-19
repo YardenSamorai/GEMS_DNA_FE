@@ -16,6 +16,7 @@ import {
 } from "../../../services/crmApi";
 import ContactFormModal from "./ContactFormModal";
 import CardImageLightbox from "./CardImageLightbox";
+import AttachCardModal from "./AttachCardModal";
 import ContactMap from "./ContactMap";
 import {
   Skeleton,
@@ -45,6 +46,7 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCardLightbox, setShowCardLightbox] = useState(false);
+  const [showAttachCard, setShowAttachCard] = useState(false);
 
   const handleAssign = async (next) => {
     try {
@@ -352,7 +354,13 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
               {tab === "activity" && <ActivityTab contact={contact} onChanged={reload} userId={user?.id} />}
               {tab === "deals" && <DealsTab contact={contact} />}
               {tab === "tasks" && <TasksTab contact={contact} userId={user?.id} onChanged={reload} />}
-              {tab === "info" && <InfoTab contact={contact} onOpenCard={() => setShowCardLightbox(true)} />}
+              {tab === "info" && (
+                <InfoTab
+                  contact={contact}
+                  onOpenCard={() => setShowCardLightbox(true)}
+                  onAddCard={() => setShowAttachCard(true)}
+                />
+              )}
               {tab === "verify" && <VerifyTab contact={contact} onUpdate={(patch) => { updateContact(contactId, patch).then(() => { toast.success("Updated"); reload(); onChanged?.(); }).catch(e => toast.error(e.message)); }} />}
             </div>
           </>
@@ -387,6 +395,16 @@ export default function ContactDrawer({ contactId, onClose, onChanged }) {
           back={contact.card_image_back}
           hasBack={!!contact.card_image_back}
           onClose={() => setShowCardLightbox(false)}
+        />
+      )}
+      {showAttachCard && contact && (
+        <AttachCardModal
+          contact={contact}
+          onClose={() => setShowAttachCard(false)}
+          onSaved={() => {
+            reload();
+            onChanged?.();
+          }}
         />
       )}
     </div>
@@ -634,18 +652,29 @@ function TasksTab({ contact, userId, onChanged }) {
 }
 
 /* ---------- Info tab ---------- */
-function InfoTab({ contact, onOpenCard }) {
+function InfoTab({ contact, onOpenCard, onAddCard }) {
   const websiteHref = normaliseWebsite(contact.website);
   const cardPreview = contact.card_image_front || contact.card_image_thumb;
   return (
     <div className="p-4 space-y-3 text-sm">
-      {cardPreview && (
+      {cardPreview ? (
         <div className="pb-3 border-b border-stone-200">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-medium text-stone-500 uppercase tracking-wider">Business card</div>
-            {contact.card_image_back && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600">2 sides</span>
-            )}
+            <div className="flex items-center gap-2">
+              {contact.card_image_back && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600">2 sides</span>
+              )}
+              {onAddCard && (
+                <button
+                  onClick={onAddCard}
+                  className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-900 text-white hover:bg-stone-800"
+                  title="Replace business card image"
+                >
+                  Replace
+                </button>
+              )}
+            </div>
           </div>
           <button
             onClick={onOpenCard}
@@ -660,6 +689,27 @@ function InfoTab({ contact, onOpenCard }) {
             </div>
           </button>
         </div>
+      ) : (
+        onAddCard && (
+          <div className="pb-3 border-b border-stone-200">
+            <div className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">Business card</div>
+            <button
+              onClick={onAddCard}
+              className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-stone-300 hover:border-stone-500 hover:bg-stone-50 text-left transition"
+            >
+              <div className="w-10 h-10 rounded-lg bg-stone-900 text-white flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-stone-900">Add business card</div>
+                <div className="text-[11px] text-stone-500">Snap or upload — front and optional back</div>
+              </div>
+            </button>
+          </div>
+        )
       )}
       <Row label="Title" value={contact.title} />
       <Row label="Company" value={contact.company} />
