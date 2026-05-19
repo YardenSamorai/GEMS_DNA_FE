@@ -3581,7 +3581,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
 };
 
 /* ---------------- Filters ---------------- */
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, tags, onManageTags, inventoryMode }) => {
+const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions = [], tags, onManageTags, inventoryMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   
   const handleChange = (field) => (e) => {
@@ -3606,6 +3606,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
       category: [],
       tag: [],
       location: [],
+      lab: [],
       groupingType: [],
       diamondColor: [],
       fancyColor: [],
@@ -3630,6 +3631,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
     filters.category.length > 0,
     filters.tag.length > 0,
     filters.location.length > 0,
+    (filters.lab || []).length > 0,
     filters.groupingType.length > 0,
     filters.diamondColor.length > 0,
     filters.fancyColor.length > 0,
@@ -3782,6 +3784,15 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
                     options={locationOptions.filter(l => l !== 'All locations')}
                     onChange={(val) => onChange({ ...filters, location: val })}
                     placeholder="All locations"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Lab</label>
+                  <MultiSelect
+                    value={filters.lab || []}
+                    options={labOptions}
+                    onChange={(val) => onChange({ ...filters, lab: val })}
+                    placeholder="All labs"
                   />
                 </div>
                 <div>
