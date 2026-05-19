@@ -6,6 +6,7 @@ import {
   fetchContacts,
   fetchContactThumbs,
   createContact,
+  updateContact,
   bulkDeleteContacts,
   bulkTagContacts,
   fetchTags,
@@ -13,6 +14,7 @@ import {
   moveContactsToFolder,
   CONTACT_TYPES,
 } from "../../services/crmApi";
+import { makeThumbnail } from "./utils/cardImage";
 import ContactDrawer from "./components/ContactDrawer";
 import ContactFormModal from "./components/ContactFormModal";
 import ScanCardModal from "./components/ScanCardModal";
@@ -162,19 +164,50 @@ export default function CrmContacts() {
         setContacts(fresh);
         saveCache(key, fresh);
 
-        // Lazy-load thumbnails for any contact that has one but isn't in our local cache.
+        // Lazy-load thumbnails for any contact that has either a
+        // generated thumbnail OR a stored front (legacy rows from before
+        // the thumb pipeline existed). The endpoint coalesces and flags
+        // `needs_backfill` for the latter — we downscale those locally
+        // and POST a real thumbnail back so the next visit is small.
         const missingIds = fresh
-          .filter((c) => c.has_card_thumb && !thumbCache[c.id])
+          .filter((c) => (c.has_card_thumb || c.has_card_front) && !thumbCache[c.id])
           .map((c) => c.id);
         if (missingIds.length > 0) {
           fetchContactThumbs(missingIds)
-            .then((rows) => {
+            .then(async (rows) => {
               if (!rows.length) return;
+              // Stage 1 — paint immediately with whatever the BE sent.
               setThumbCache((prev) => {
                 const next = { ...prev };
                 rows.forEach((r) => { if (r.thumb) next[r.id] = r.thumb; });
                 if (user?.id) saveCache(thumbsCacheKey(user.id), next);
                 return next;
+              });
+              // Stage 2 — backfill: downscale legacy fronts into proper
+              // thumbnails and persist them so localStorage and future
+              // batched calls don't carry the heavy original image.
+              const toBackfill = rows.filter((r) => r.needs_backfill && r.thumb);
+              if (toBackfill.length === 0) return;
+              const generated = [];
+              for (const r of toBackfill) {
+                try {
+                  const small = await makeThumbnail(r.thumb);
+                  generated.push({ id: r.id, thumb: small });
+                } catch (_) { /* skip on decode failure */ }
+              }
+              if (generated.length === 0) return;
+              // Replace the heavy fronts in the local cache with the
+              // small thumbnails (keeps localStorage well under quota).
+              setThumbCache((prev) => {
+                const next = { ...prev };
+                generated.forEach((g) => { next[g.id] = g.thumb; });
+                if (user?.id) saveCache(thumbsCacheKey(user.id), next);
+                return next;
+              });
+              // Fire-and-forget: write the thumb back so subsequent
+              // /thumbs requests don't have to return the full front.
+              generated.forEach((g) => {
+                updateContact(g.id, { cardImageThumb: g.thumb }).catch(() => {});
               });
             })
             .catch(() => {});
