@@ -63,7 +63,7 @@ function PortalHeader() {
   const storeName    = me?.store?.name;
 
   return (
-    <header className="sticky top-0 z-30 glass-bar">
+    <header className="sticky top-0 z-30 glass-bar pt-safe safe-x">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 sm:h-[68px] flex items-center justify-between gap-4">
         <Link to="/store-portal" className="flex items-center gap-3 min-w-0 group">
           {/* Monogram mark — rounded ink tile, slightly lifted with a
@@ -119,7 +119,15 @@ function SecurePill() {
 function PortalSubNav() {
   const { count: basketCount } = useRequestBasket();
   return (
-    <nav className="sticky top-16 sm:top-[68px] z-20">
+    <nav
+      // The portal's parent header is `sticky top-0 pt-safe` (so it
+      // pads under the iOS notch when installed as a PWA). The
+      // sub-nav has to stick *below* that, so we add the safe-inset
+      // to the original 64/68px header heights. Without the inset
+      // the sub-nav would slide under the notch padding on a notched
+      // device.
+      className="sticky z-20 top-[calc(env(safe-area-inset-top,0px)+4rem)] sm:top-[calc(env(safe-area-inset-top,0px)+68px)]"
+    >
       <div className="max-w-6xl mx-auto px-3 sm:px-6 pt-3 pb-3">
         {/* A floating glass pill housing the section tabs. Pill itself
             scrolls horizontally on small screens; vertical overflow is

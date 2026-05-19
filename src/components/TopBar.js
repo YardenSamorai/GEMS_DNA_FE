@@ -74,40 +74,46 @@ const TopBar = ({ navItems }) => {
   const showActorBadge = team.ready && team.me && (team.members || []).length > 1;
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center justify-between glass-bar px-3 sm:px-5">
-      <div className="flex items-center gap-2 min-w-0">
-        {/* On mobile the bottom dock owns navigation, so the TopBar no
-            longer carries a hamburger — it now just renders the page
-            title. Desktop is unchanged. */}
-        <h1 className="truncate text-[13.5px] font-medium tracking-tight text-app-ink">
-          {title}
-        </h1>
-      </div>
+    // The outer header carries the glass background and the iOS
+    // safe-area top padding, so when installed as a PWA the glass
+    // bar extends up under the notch but the inner 48px row sits
+    // safely below the clock / battery glyphs.
+    <header className="sticky top-0 z-30 glass-bar pt-safe safe-x">
+      <div className="flex h-12 items-center justify-between px-3 sm:px-5">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* On mobile the bottom dock owns navigation, so the TopBar no
+              longer carries a hamburger — it now just renders the page
+              title. Desktop is unchanged. */}
+          <h1 className="truncate text-[13.5px] font-medium tracking-tight text-app-ink">
+            {title}
+          </h1>
+        </div>
 
-      <div className="flex items-center gap-3">
-        {showActorBadge && (
-          <Link
-            to="/team"
-            title={team.isOwner ? "Manage team" : "View team"}
-            className="hidden sm:inline-flex items-center gap-2 rounded-full pl-1 pr-2.5 py-0.5 text-[11.5px] font-medium transition bg-app-surface/55 hover:bg-app-surface/80 text-app-graphite border border-white/55 backdrop-blur-md"
-          >
-            <MemberAvatar member={team.me} size="xs" ring={false} />
-            <span className="truncate max-w-[120px] text-app-ink">{team.me?.name || "You"}</span>
-            <span className="text-[9px] uppercase tracking-[0.14em] text-app-muted">
-              {team.isOwner ? "Admin" : "Rep"}
-            </span>
-          </Link>
-        )}
-        <ThemeToggle />
-        <div className="h-6 w-px hidden sm:block bg-app-line" />
-        <UserButton
-          afterSignOutUrl={location.pathname}
-          appearance={{
-            elements: {
-              avatarBox: "w-8 h-8 ring-1 ring-app-line ring-offset-2 ring-offset-transparent",
-            },
-          }}
-        />
+        <div className="flex items-center gap-3">
+          {showActorBadge && (
+            <Link
+              to="/team"
+              title={team.isOwner ? "Manage team" : "View team"}
+              className="hidden sm:inline-flex items-center gap-2 rounded-full pl-1 pr-2.5 py-0.5 text-[11.5px] font-medium transition bg-app-surface/55 hover:bg-app-surface/80 text-app-graphite border border-white/55 backdrop-blur-md"
+            >
+              <MemberAvatar member={team.me} size="xs" ring={false} />
+              <span className="truncate max-w-[120px] text-app-ink">{team.me?.name || "You"}</span>
+              <span className="text-[9px] uppercase tracking-[0.14em] text-app-muted">
+                {team.isOwner ? "Admin" : "Rep"}
+              </span>
+            </Link>
+          )}
+          <ThemeToggle />
+          <div className="h-6 w-px hidden sm:block bg-app-line" />
+          <UserButton
+            afterSignOutUrl={location.pathname}
+            appearance={{
+              elements: {
+                avatarBox: "w-8 h-8 ring-1 ring-app-line ring-offset-2 ring-offset-transparent",
+              },
+            }}
+          />
+        </div>
       </div>
     </header>
   );

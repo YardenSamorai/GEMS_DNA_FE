@@ -4,7 +4,13 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#1c1917" />
+    <!-- Per-scheme theme colours so the iOS PWA status-bar tint matches
+         the current page background. Without these the bar always
+         renders as the dark canvas colour, which looks broken when the
+         user is in the light theme. -->
+    <meta name="theme-color" content="#FAFAF9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0c0a09" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FAFAF9" />
     <meta
       name="description"
       content="Gems DNA — CRM, inventory & business-card scanner"
@@ -12,9 +18,13 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
     <!-- iOS "Add to Home Screen" support — turns the site into a full-screen
-         standalone app, with a proper app title and status-bar styling. -->
+         standalone app, with a proper app title and status-bar styling.
+         "default" makes iOS reserve a strip at the top for the system
+         status bar (clock + battery) and adapt its background to the
+         current OS appearance, so our page content starts cleanly
+         below — no notch overlap, no glass-blur weirdness. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="GEMS DNA" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />

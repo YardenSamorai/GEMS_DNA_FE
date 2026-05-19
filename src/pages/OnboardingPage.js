@@ -325,14 +325,20 @@ const DocumentsMockup = () => {
 /* -------------------------------------------------------------------------- */
 
 const HeroComposition = () => (
-  <div className="relative w-full h-[460px] sm:h-[520px]">
+  // On mobile (default), the passport flows naturally as a single full-
+  // width column so its entire surface (GIA badge through CTA buttons)
+  // is always visible without horizontal/vertical clipping. The
+  // floating composition with memo + catalog tilted behind only kicks
+  // in at sm: where there's room to absolutely position them without
+  // colliding with the page chrome.
+  <div className="relative w-full sm:h-[520px] flex sm:block items-start justify-center">
     {/* Subtle ambient glows behind the glass */}
-    <div className="absolute inset-0 -z-10">
+    <div className="absolute inset-0 -z-10 pointer-events-none">
       <div className="absolute top-10 left-1/4 w-72 h-72 rounded-full bg-brand-emerald/10 blur-[80px]" />
       <div className="absolute bottom-10 right-1/4 w-80 h-80 rounded-full bg-app-ink/8 blur-[100px]" />
     </div>
 
-    {/* Memo (back-left) */}
+    {/* Memo (back-left) — desktop floating layer only */}
     <motion.div
       initial={{ opacity: 0, x: -40, rotate: -6 }}
       animate={{ opacity: 1, x: 0, rotate: -6 }}
@@ -343,7 +349,7 @@ const HeroComposition = () => (
       <MemoMockup />
     </motion.div>
 
-    {/* Catalog (back-right) */}
+    {/* Catalog (back-right) — desktop floating layer only */}
     <motion.div
       initial={{ opacity: 0, x: 40, rotate: 6 }}
       animate={{ opacity: 1, x: 0, rotate: 6 }}
@@ -354,12 +360,15 @@ const HeroComposition = () => (
       <PortalMockup />
     </motion.div>
 
-    {/* Passport (front-center) */}
+    {/* Passport — natural-flow centred at 260px on mobile so the whole
+        card (GIA badge through CTA buttons) fits comfortably inside
+        an iPhone viewport without cropping; absolutely positioned at
+        full 380px on sm+ where there's room for the floating layout. */}
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute left-1/2 -translate-x-1/2 top-12 sm:top-16 w-[320px] sm:w-[380px]"
+      className="w-full max-w-[260px] sm:max-w-none sm:w-[380px] sm:absolute sm:left-1/2 sm:-translate-x-1/2 sm:top-16"
     >
       <PassportMockup />
     </motion.div>

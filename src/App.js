@@ -375,8 +375,8 @@ const AuthPrompt = ({ message }) => (
 const MarketingHeader = () => {
   const location = useLocation();
   return (
-    <header className="sticky top-0 z-40 glass-bar">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 glass-bar pt-safe">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 safe-x">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-3 group">
             <DiamondIcon />
