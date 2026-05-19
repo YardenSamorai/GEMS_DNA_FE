@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useTeam } from "../context/TeamContext";
 
@@ -62,6 +63,48 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
   // need to branch on theme — every fill, border, and label flips through
   // the `data-theme="dark|light"` CSS variables defined in src/index.css.
   const [expanded, setExpanded] = useState(loadExpanded);
+
+  // Collapsed-sidebar flyout state. We render the flyout into <body> via a
+  // portal because the <nav> uses overflow-y: auto for scrolling, and a
+  // CSS sibling rule (overflow-y: auto + overflow-x: visible) silently
+  // collapses to overflow: hidden on both axes — which clipped the flyout
+  // at the 64px sidebar boundary and left only the first letter visible.
+  // Using a portal positioned fixed at the button's screen rect avoids
+  // the clipping entirely.
+  const [flyout, setFlyout] = useState(null); // { label, top, left, children } | null
+  const closeTimerRef = useRef(null);
+  const cancelClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    // Small grace period so the cursor can travel from the icon to the
+    // flyout panel without the panel disappearing en route.
+    closeTimerRef.current = setTimeout(() => setFlyout(null), 140);
+  };
+  const openFlyout = (item, anchorEl) => {
+    if (!collapsed) return;
+    cancelClose();
+    const rect = anchorEl.getBoundingClientRect();
+    setFlyout({
+      label: item.label,
+      top: rect.top,
+      left: rect.right + 8,
+      children: item.children,
+    });
+  };
+
+  // Close the flyout on route change (the user clicked a child link).
+  useEffect(() => {
+    setFlyout(null);
+    cancelClose();
+  }, [location.pathname]);
+
+  // Cleanup any pending close timer on unmount.
+  useEffect(() => () => cancelClose(), []);
 
   // Filter out owner-only sections / items for sales reps. We do this here
   // (not in App.js) so the same NAV_SECTIONS list still feeds the TopBar
@@ -150,7 +193,12 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
     const groupActive = childActive || (item.to ? item.matches(location.pathname) : false);
 
     return (
-      <div key={item.label} className="group/section relative">
+      <div
+        key={item.label}
+        className="relative"
+        onMouseEnter={(e) => openFlyout(item, e.currentTarget)}
+        onMouseLeave={scheduleClose}
+      >
         {/* Group header row */}
         <button
           type="button"
@@ -161,9 +209,6 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
           <span className={`flex-1 truncate text-left ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
           {!collapsed && (
             <Chevron open={isOpen} className={groupActive ? "text-app-canvas/70" : "text-app-soft"} />
-          )}
-          {collapsed && (
-            <span className="pointer-events-none absolute left-full top-0 ml-2 hidden whitespace-nowrap rounded-lg bg-app-ink px-2 py-1 text-[11px] font-medium text-app-canvas opacity-0 shadow-lg transition md:block group-hover/section:opacity-0" />
           )}
         </button>
 
@@ -186,35 +231,9 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
             })}
           </div>
         )}
-
-        {/* Flyout when sidebar collapsed (desktop) — glass card */}
-        {collapsed && (
-          <div className="pointer-events-none absolute left-full top-0 z-50 ml-2 hidden w-56 rounded-2xl glass-surface-strong p-2 opacity-0 transition md:block group-hover/section:pointer-events-auto group-hover/section:opacity-100">
-            <div className="mb-1 px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">
-              {item.label}
-            </div>
-            <div className="space-y-0.5">
-              {item.children.map((child) => {
-                const active = child.matches(location.pathname);
-                return (
-                  <Link
-                    key={child.to}
-                    to={child.to}
-                    onClick={onMobileClose}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition ${
-                      active
-                        ? "bg-app-surface/70 text-app-ink"
-                        : "text-app-graphite hover:bg-app-surface/55 hover:text-app-ink"
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? "bg-brand-emerald" : "bg-app-line2"}`} />
-                    <span className="truncate">{child.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Collapsed-mode flyout is rendered via portal in the Sidebar
+            root so it isn't clipped by the scrolling <nav>. See `flyout`
+            state at the top of this component. */}
       </div>
     );
   };
@@ -281,7 +300,9 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
 
   return (
     <>
-      {/* Desktop sidebar — glass aside, overflow-x-visible so flyouts can escape */}
+      {/* Desktop sidebar — glass aside. The inner <nav> handles vertical
+          scrolling, and the collapsed-mode flyout is portaled into <body>
+          so it isn't clipped by that overflow. */}
       <aside
         className="hidden md:flex flex-col shrink-0 glass-bar border-r border-app-line transition-[width] duration-200 ease-out"
         style={{ width: collapsed ? 64 : 240, height: "100vh", position: "sticky", top: 0 }}
@@ -301,6 +322,49 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
           </aside>
         </div>
       )}
+
+      {/* Collapsed-sidebar flyout (portal). Rendered into document.body so
+          the parent <nav>'s overflow-y:auto can't clip it horizontally. */}
+      {collapsed && flyout && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+            style={{
+              position: "fixed",
+              top: Math.max(8, flyout.top),
+              left: flyout.left,
+              zIndex: 70,
+            }}
+            className="hidden md:block w-56 rounded-2xl glass-surface-strong p-2 shadow-xl"
+          >
+            <div className="mb-1 px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">
+              {flyout.label}
+            </div>
+            <div className="space-y-0.5">
+              {flyout.children.map((child) => {
+                const active = child.matches(location.pathname);
+                return (
+                  <Link
+                    key={child.to}
+                    to={child.to}
+                    onClick={() => { onMobileClose?.(); setFlyout(null); }}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition ${
+                      active
+                        ? "bg-app-surface/70 text-app-ink"
+                        : "text-app-graphite hover:bg-app-surface/55 hover:text-app-ink"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? "bg-brand-emerald" : "bg-app-line2"}`} />
+                    <span className="truncate">{child.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )
+      }
     </>
   );
 };
