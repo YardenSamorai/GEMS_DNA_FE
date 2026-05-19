@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
@@ -9,6 +9,8 @@ import {
 } from "../../services/companiesApi";
 import { SkeletonCard } from "../../components/ui/Skeleton";
 import CompanyFormModal from "./components/CompanyFormModal";
+import AlphabetIndex from "./components/AlphabetIndex";
+import { buildAlphabet, groupByLetter, scrollToLetter } from "./utils/alphabetIndex";
 
 /**
  * CRM → Stores page.
@@ -50,6 +52,16 @@ export default function CrmCompanies() {
         .filter(Boolean).join(" ").toLowerCase().includes(q);
     });
   }, [companies, search, typeFilter]);
+
+  // A-Z / א-ת jump index — sort stores by first letter of name and
+  // render the grid in letter sections (a banner row spanning the
+  // whole grid then the cards under it).
+  const { companyGroups, alphabetLetters, alphabetPresent } = useMemo(() => {
+    const getName = (c) => c.name || "";
+    const { groups } = groupByLetter(filtered, getName);
+    const { letters, present } = buildAlphabet(filtered, getName);
+    return { companyGroups: groups, alphabetLetters: letters, alphabetPresent: present };
+  }, [filtered]);
 
   const handleCreate = async (data) => {
     try {
@@ -96,18 +108,47 @@ export default function CrmCompanies() {
         </button>
       </div>
 
-      {/* List */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} lines={3} />)}
+      {/* List + side A-Z index */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} lines={3} />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState onCreate={() => setCreating(true)} hasSearch={!!search || typeFilter !== "all"} />
+          ) : (
+            // One grid per letter so the section banner can run the
+            // full width above the cards. Within a letter the cards
+            // keep the same 1/2/3-column responsive grid as before.
+            <div className="space-y-1">
+              {companyGroups.map((g) => (
+                <Fragment key={g.letter}>
+                  <div
+                    data-letter-section={g.letter}
+                    className="sticky z-[5] bg-stone-100/90 backdrop-blur px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-y border-stone-200 rounded"
+                    style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
+                  >
+                    {g.letter}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 py-2">
+                    {g.items.map((c) => <CompanyCard key={c.id} company={c} />)}
+                  </div>
+                </Fragment>
+              ))}
+            </div>
+          )}
         </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState onCreate={() => setCreating(true)} hasSearch={!!search || typeFilter !== "all"} />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.map((c) => <CompanyCard key={c.id} company={c} />)}
-        </div>
-      )}
+        {!loading && filtered.length > 0 && alphabetLetters.length > 0 && (
+          <AlphabetIndex
+            letters={alphabetLetters}
+            present={alphabetPresent}
+            onJump={scrollToLetter}
+            className="sticky self-start"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 96px)" }}
+          />
+        )}
+      </div>
 
       {creating && (
         <CompanyFormModal

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { Fragment, useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
@@ -15,7 +15,9 @@ import {
   CONTACT_TYPES,
 } from "../../services/crmApi";
 import { makeThumbnail } from "./utils/cardImage";
+import { buildAlphabet, groupByLetter, scrollToLetter } from "./utils/alphabetIndex";
 import { useRouteLoading } from "../../components/RouteLoadingContext";
+import AlphabetIndex from "./components/AlphabetIndex";
 import ContactDrawer from "./components/ContactDrawer";
 import ContactFormModal from "./components/ContactFormModal";
 import ScanCardModal from "./components/ScanCardModal";
@@ -262,6 +264,22 @@ export default function CrmContacts() {
     if (!tagFilter) return contacts;
     return contacts.filter((c) => Array.isArray(c.tags) && c.tags.includes(tagFilter));
   }, [contacts, tagFilter]);
+
+  // A-Z / א-ת jump index data. Sort by the first letter of `name`,
+  // then alphabetically inside each bucket, and pre-compute the
+  // sectioned groups so the table can render letter dividers between
+  // them without re-grouping on every render.
+  const { sortedContacts, contactGroups, alphabetLetters, alphabetPresent } = useMemo(() => {
+    const getName = (c) => c.name || "";
+    const { sorted, groups } = groupByLetter(filteredContacts, getName);
+    const { letters, present } = buildAlphabet(filteredContacts, getName);
+    return {
+      sortedContacts: sorted,
+      contactGroups: groups,
+      alphabetLetters: letters,
+      alphabetPresent: present,
+    };
+  }, [filteredContacts]);
 
   const counts = useMemo(() => {
     const c = { all: contacts.length };
@@ -558,8 +576,9 @@ export default function CrmContacts() {
           </div>
         )}
 
-        {/* List */}
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        {/* List + side A-Z index */}
+        <div className="flex items-start gap-2">
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden flex-1 min-w-0">
           {loading ? (
             <>
               {/* Desktop: 8 rows × 7 columns matching the real header */}
@@ -611,7 +630,22 @@ export default function CrmContacts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredContacts.map((c) => (
+                  {contactGroups.map((g) => (
+                    <Fragment key={g.letter}>
+                      {/* Sticky letter divider — colSpan covers all 9
+                          desktop columns. We rely on window scroll, so
+                          `top` matches the global TopBar offset. */}
+                      <tr data-letter-section={g.letter}>
+                        <th
+                          colSpan={9}
+                          scope="rowgroup"
+                          className="sticky z-[5] bg-stone-100/90 backdrop-blur px-4 py-1.5 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-y border-stone-200"
+                          style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
+                        >
+                          {g.letter}
+                        </th>
+                      </tr>
+                      {g.items.map((c) => (
                     <tr
                       key={c.id}
                       onClick={() => setDrawerId(String(c.id))}
@@ -687,12 +721,26 @@ export default function CrmContacts() {
                       </td>
                     </tr>
                   ))}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
 
-              {/* Mobile cards */}
-              <div className="md:hidden divide-y divide-stone-100">
-                {filteredContacts.map((c) => {
+              {/* Mobile cards — same grouping as the desktop table.
+                  Each letter gets a sticky divider that stays just
+                  below the TopBar while you scroll through its rows. */}
+              <div className="md:hidden">
+                {contactGroups.map((g) => (
+                  <Fragment key={g.letter}>
+                    <div
+                      data-letter-section={g.letter}
+                      className="sticky z-[5] bg-stone-100/90 backdrop-blur px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-600 border-y border-stone-200"
+                      style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
+                    >
+                      {g.letter}
+                    </div>
+                    <div className="divide-y divide-stone-100">
+                {g.items.map((c) => {
                   const isSelected = selected.has(c.id);
                   return (
                     <div
@@ -762,9 +810,22 @@ export default function CrmContacts() {
                     </div>
                   );
                 })}
+                    </div>
+                  </Fragment>
+                ))}
               </div>
             </>
           )}
+        </div>
+        {!loading && filteredContacts.length > 0 && alphabetLetters.length > 0 && (
+          <AlphabetIndex
+            letters={alphabetLetters}
+            present={alphabetPresent}
+            onJump={scrollToLetter}
+            className="sticky self-start"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 96px)" }}
+          />
+        )}
         </div>
       </div>
 
