@@ -52,6 +52,10 @@ export default function ScanCardModal({ onClose, onSaved }) {
   const [forms, setForms] = useState([]);
   const [activeFormIdx, setActiveFormIdx] = useState(0);
   const [matchesPerForm, setMatchesPerForm] = useState([]);
+  // Per-form confidence flag from the BE. "exact" means the scan matched
+  // a contact by full phone or by email (i.e. it's certainly already in
+  // the CRM); "partial" is a softer "same last 9 phone digits" hit.
+  const [matchConfidencePerForm, setMatchConfidencePerForm] = useState([]);
   const [isTwoPeople, setIsTwoPeople] = useState(false);
   const [twoPeopleReason, setTwoPeopleReason] = useState(null);
   const [twoPeopleDecision, setTwoPeopleDecision] = useState(null); // null | 'split' | 'merge'
@@ -122,11 +126,36 @@ export default function ScanCardModal({ onClose, onSaved }) {
       }
       setForms(entries.map((e) => initialFormFromExtracted(e.extracted)));
       setMatchesPerForm(entries.map((e) => e.matches || []));
+      // Prefer per-entry confidence; fall back to the top-level field
+      // for older BE responses that only carry one.
+      const confidences = entries.map((e, i) =>
+        e.matchConfidence || (i === 0 ? (res.matchConfidence || "none") : "none")
+      );
+      setMatchConfidencePerForm(confidences);
       setIsTwoPeople(!!res.isTwoPeople && entries.length > 1);
       setTwoPeopleReason(res.reason || null);
       setTwoPeopleDecision(null);
       setActiveFormIdx(0);
       setStep("review");
+
+      // Flag exact duplicates loudly: a toast pops the moment the scan
+      // settles so the user notices even before reading the dialog.
+      const anyExact = confidences.some((c) => c === "exact");
+      if (anyExact) {
+        const exactMatch = entries
+          .map((e) => (e.matches || []).find((m) => m._matchReason))
+          .find(Boolean);
+        toast(
+          exactMatch
+            ? `Already in CRM: ${exactMatch.name}`
+            : "Contact already exists in your CRM",
+          {
+            icon: "👤",
+            duration: 4500,
+            style: { background: "#7f1d1d", color: "#fff" },
+          }
+        );
+      }
     } catch (e) {
       toast.error(e.message || "Scan failed");
     } finally {
@@ -138,7 +167,7 @@ export default function ScanCardModal({ onClose, onSaved }) {
   const handleRetakeBack = () => { setImageBack(null); setStep("capture-back"); };
   const handleStartOver = () => {
     setImageFront(null); setImageBack(null);
-    setForms([]); setMatchesPerForm([]);
+    setForms([]); setMatchesPerForm([]); setMatchConfidencePerForm([]);
     setIsTwoPeople(false); setTwoPeopleReason(null); setTwoPeopleDecision(null);
     setVerification(null);
     setStep("capture-front");
@@ -211,6 +240,21 @@ export default function ScanCardModal({ onClose, onSaved }) {
         return;
       }
     }
+    // Soft-confirm if the user is about to create a brand-new contact
+    // even though we found an exact dup on at least one of the forms.
+    // This prevents accidental "Save" clicks when the red banner was
+    // missed; we don't *block* the action since two real people could
+    // legitimately share a phone or email.
+    const exactIdx = matchConfidencePerForm.findIndex((c) => c === "exact");
+    if (exactIdx !== -1) {
+      const dupRow = (matchesPerForm[exactIdx] || []).find((m) => m._matchReason)
+        || (matchesPerForm[exactIdx] || [])[0];
+      const dupName = dupRow?.name || "an existing contact";
+      const ok = window.confirm(
+        `"${dupName}" already exists in your CRM with the same ${dupRow?._matchReason || "details"}. Save as a new separate contact anyway?`
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       // Build the card image payload. If splitting two people, give each their respective side.
@@ -256,6 +300,14 @@ export default function ScanCardModal({ onClose, onSaved }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Skip the merge dance entirely — just navigate the parent to the
+  // existing contact. Used when the scan returns a certain duplicate
+  // (same email / same phone) and the user picks "Open existing".
+  const handleOpenExisting = (existing) => {
+    onSaved?.(existing);
+    onClose();
   };
 
   const handleMergeIntoExisting = async (existing) => {
@@ -314,6 +366,11 @@ export default function ScanCardModal({ onClose, onSaved }) {
     setForms((arr) => arr.map((x, i) => i === idx ? { ...x, ...patch } : x));
 
   const activeMatches = matchesPerForm[activeFormIdx] || [];
+  const activeConfidence = matchConfidencePerForm[activeFormIdx] || "none";
+  const isExactDup = activeConfidence === "exact";
+  // Pick the row the BE flagged with _matchReason for the headline; if
+  // none is annotated (older BE), fall back to the first match.
+  const exactMatchRow = activeMatches.find((m) => m._matchReason) || activeMatches[0];
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 bg-stone-900/50 backdrop-blur-sm" onClick={onClose}>
@@ -440,8 +497,59 @@ export default function ScanCardModal({ onClose, onSaved }) {
                 </div>
               )}
 
-              {/* Match warning */}
-              {activeMatches.length > 0 && (
+              {/* Match warning — hard red banner for an exact dup
+                  (same email / same phone), soft amber for a partial
+                  hit that we want the user to glance at but not be
+                  blocked by. */}
+              {isExactDup && exactMatchRow && (
+                <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-full bg-red-100 text-red-700 flex items-center justify-center text-lg" aria-hidden>!</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-red-900">
+                        Already in your CRM
+                      </div>
+                      <div className="text-xs text-red-800/80 mt-0.5">
+                        {exactMatchRow._matchReason === "email"
+                          ? "Same email address as an existing contact"
+                          : exactMatchRow._matchReason === "phone"
+                          ? "Same phone number as an existing contact"
+                          : "Matches an existing contact"}
+                        {exactMatchRow.last_contact_at
+                          ? ` · last seen ${new Date(exactMatchRow.last_contact_at).toLocaleDateString()}`
+                          : ""}
+                      </div>
+                      <div className="mt-3 p-2.5 rounded-lg bg-white border border-red-200">
+                        <div className="font-medium text-stone-900 truncate">{exactMatchRow.name || "(no name)"}</div>
+                        <div className="text-xs text-stone-500 truncate">
+                          {[exactMatchRow.title, exactMatchRow.company, exactMatchRow.phone, exactMatchRow.email].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleOpenExisting(exactMatchRow)}
+                          disabled={saving}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-700 text-white hover:bg-red-800 disabled:opacity-50"
+                        >
+                          Open existing
+                        </button>
+                        <button
+                          onClick={() => handleMergeIntoExisting(exactMatchRow)}
+                          disabled={saving}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white text-red-800 border border-red-300 hover:bg-red-100 disabled:opacity-50"
+                        >
+                          Merge new info into existing
+                        </button>
+                      </div>
+                      <div className="text-[11px] text-red-700/70 mt-2">
+                        You can still scroll down and save as a new contact if this is a different person.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!isExactDup && activeMatches.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                   <div className="text-sm font-semibold text-amber-900 mb-1">
                     Possible duplicate{activeMatches.length > 1 ? "s" : ""} found
