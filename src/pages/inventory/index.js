@@ -5402,6 +5402,10 @@ const StoneSearchPage = () => {
     groupingType: [],
     diamondColor: [],
     fancyColor: [],
+    // Lab certification (GIA / GRS / SSEF / Gübelin / ...). Multi-select.
+    // The smart-search keyword path already supported labs; this brings
+    // the same filter back as a visible dropdown.
+    lab: [],
     box: "",
   };
 
@@ -6927,6 +6931,18 @@ const StoneSearchPage = () => {
     return ["All colors", ...sorted];
   }, [modeFilteredStones]);
 
+  // Lab options — derived from the actual data so the dropdown shows
+  // exactly the labs in the user's inventory (no empty "GIT" entry if
+  // no stone has a GIT cert). Case-normalised to upper, sorted A→Z.
+  const labOptions = useMemo(() => {
+    const set = new Set();
+    modeFilteredStones.forEach((s) => {
+      const lab = (s.lab || '').trim();
+      if (lab && lab.toUpperCase() !== 'N/A') set.add(lab.toUpperCase());
+    });
+    return Array.from(set).sort();
+  }, [modeFilteredStones]);
+
   const parsedSearch = useMemo(() => parseSmartSearch(smartSearch), [smartSearch]);
 
   const jewelryTypeOptions = useMemo(() => {
@@ -7038,6 +7054,16 @@ const StoneSearchPage = () => {
       if (filters.treatment.length > 0 && !filters.treatment.some(t => stone.treatment?.toLowerCase() === t.toLowerCase())) return false;
       if (filters.category.length > 0 && !filters.category.some(c => getMappedCategories(stone.category).includes(c))) return false;
       if (filters.location.length > 0 && !filters.location.includes(stone.location)) return false;
+      // Lab cert filter — case-insensitive equality. Treats blank/"N/A"
+      // labs as non-matching so picking "GIA" never includes a stone
+      // with no certificate. Default to [] so a stale saved-filter
+      // preset without `lab` doesn't blow up.
+      const labFilterValues = filters.lab || [];
+      if (labFilterValues.length > 0) {
+        const stoneLab = (stone.lab || '').trim().toUpperCase();
+        if (!stoneLab || stoneLab === 'N/A') return false;
+        if (!labFilterValues.some(l => stoneLab === String(l).toUpperCase())) return false;
+      }
 
       // Grouping type filter
       if (filters.groupingType.length > 0) {
@@ -7738,6 +7764,7 @@ const StoneSearchPage = () => {
             categoriesOptions={categoriesOptions}
             diamondColorOptions={diamondColorOptions}
             fancyColorOptions={fancyColorOptions}
+            labOptions={labOptions}
             tags={tags}
             onManageTags={() => setShowTagsModal(true)}
             inventoryMode={inventoryMode}
