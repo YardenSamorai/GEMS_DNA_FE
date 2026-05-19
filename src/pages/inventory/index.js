@@ -8027,14 +8027,17 @@ const StoneSearchPage = () => {
         </div>
       </div>
 
-      {/* Floating Actions Button */}
+      {/* Floating Actions Button.
+          On mobile, push above the MobileDock (h-14 ≈ 56px + iOS safe-area)
+          so the FAB never hides behind the bottom nav. On md+ the dock
+          isn't rendered, so we keep the original bottom-6 position. */}
       <AnimatePresence>
         {showFloatingExport && (
           <motion.div
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            className="fixed right-6 bottom-6 z-40"
+            className="fixed right-6 z-40 bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6"
           >
             <div className="relative group">
               <button
@@ -8327,7 +8330,7 @@ const StoneSearchPage = () => {
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-emerald-600 text-white rounded-xl shadow-lg flex items-center gap-3"
+            className="fixed left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-emerald-600 text-white rounded-xl shadow-lg flex items-center gap-3 bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
