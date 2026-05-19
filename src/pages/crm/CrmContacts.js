@@ -84,10 +84,13 @@ export default function CrmContacts() {
   const [tags, setTags] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Hold the route-transition overlay open while the contacts list is
-  // still on its initial fetch. Subsequent stale-while-revalidate
-  // refreshes don't gate the page (we already paint cached rows).
-  useRouteLoading(loading);
+  // `initialLoading` is true ONLY until the very first fetch lands.
+  // After that it stays false forever, even when `loading` flips back
+  // to true for a fresh search / filter change. That way the route-
+  // transition gem appears once on page entry but doesn't reappear on
+  // every keystroke in the search box.
+  const [initialLoading, setInitialLoading] = useState(true);
+  useRouteLoading(initialLoading);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState(null);
@@ -233,6 +236,10 @@ export default function CrmContacts() {
       .finally(() => {
         setLoading(false);
         setRefreshing(false);
+        // The first fetch has settled — release the route-transition
+        // gem. Setting state to the same value is a no-op in React, so
+        // subsequent refreshes don't churn.
+        setInitialLoading(false);
       });
   }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, assigneeFilter, thumbCache]);
 

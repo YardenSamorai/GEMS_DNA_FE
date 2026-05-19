@@ -138,8 +138,11 @@ const JewelryItemsList = () => {
   const [items, setItems] = useState([]);          // workshop jobs (jewelry_items)
   const [catalogItems, setCatalogItems] = useState([]); // catalog (jewelry_products)
   const [loading, setLoading] = useState(true);
-  // Keep the route-transition gem visible until the workshop list lands.
-  useRouteLoading(loading);
+  // Only the very first fetch gates the route-transition gem. Filter
+  // / search re-fetches happen in place without re-triggering the
+  // full-screen overlay.
+  const [initialLoading, setInitialLoading] = useState(true);
+  useRouteLoading(initialLoading);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -176,6 +179,7 @@ const JewelryItemsList = () => {
       setError(err.message || "Failed to load");
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   }, [userId, statusFilter, typeFilter, search]);
 

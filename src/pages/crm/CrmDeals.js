@@ -24,7 +24,11 @@ export default function CrmDeals() {
   const [deals, setDeals] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
-  useRouteLoading(loading);
+  // Only the very first fetch should gate the route-transition gem;
+  // subsequent filter changes update the page in place without
+  // re-triggering the full-screen overlay.
+  const [initialLoading, setInitialLoading] = useState(true);
+  useRouteLoading(initialLoading);
   const [view, setView] = useState(() => (typeof window !== "undefined" && window.innerWidth < 640 ? "list" : "kanban"));
   const [showForm, setShowForm] = useState(false);
   // Initial values for the new-deal modal — populated from URL query when arriving
@@ -78,7 +82,10 @@ export default function CrmDeals() {
     fetchDeals(user.id, filters)
       .then(setDeals)
       .catch((e) => toast.error(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setInitialLoading(false);
+      });
   };
 
   useEffect(() => {

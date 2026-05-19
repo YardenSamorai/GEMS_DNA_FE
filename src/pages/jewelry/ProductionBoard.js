@@ -206,7 +206,10 @@ const ProductionBoard = () => {
   const userId = user?.id;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  useRouteLoading(loading);
+  // Only the very first fetch gates the route-transition gem; switching
+  // the assignee filter refreshes the board in place.
+  const [initialLoading, setInitialLoading] = useState(true);
+  useRouteLoading(initialLoading);
   const [updating, setUpdating] = useState(false);
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
@@ -228,7 +231,10 @@ const ProductionBoard = () => {
         setItems(all.filter((i) => STAGE_VALUES.includes(i.status)));
       })
       .catch((err) => toast.error(err.message || "Failed to load items"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setInitialLoading(false);
+      });
   }, [userId, assigneeFilter]);
 
   useEffect(() => { load(); }, [load]);
