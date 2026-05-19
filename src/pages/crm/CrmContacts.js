@@ -40,8 +40,12 @@ const typeStyle = (type) => {
 // the network roundtrip finishes. The cached data is then quietly refreshed
 // in the background; the UI swaps in the fresh data when it arrives.
 const CONTACTS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+// Bump CACHE_VERSION whenever the list payload shape changes (new
+// columns/flags) so previously cached responses don't keep older rows
+// alive without the new fields. v2 = adds `has_card_front` awareness.
+const CACHE_VERSION = "v2";
 const cacheKey = (userId, filterPayload) =>
-  `crm.contactsCache.${userId || "anon"}.${JSON.stringify(filterPayload)}`;
+  `crm.contactsCache.${CACHE_VERSION}.${userId || "anon"}.${JSON.stringify(filterPayload)}`;
 const thumbsCacheKey = (userId) => `crm.thumbsCache.${userId || "anon"}`;
 
 const loadCache = (key) => {
@@ -164,13 +168,17 @@ export default function CrmContacts() {
         setContacts(fresh);
         saveCache(key, fresh);
 
-        // Lazy-load thumbnails for any contact that has either a
-        // generated thumbnail OR a stored front (legacy rows from before
-        // the thumb pipeline existed). The endpoint coalesces and flags
-        // `needs_backfill` for the latter — we downscale those locally
-        // and POST a real thumbnail back so the next visit is small.
+        // Lazy-load thumbnails. We deliberately DO NOT predicate on
+        // `has_card_thumb` / `has_card_front` because those flags can
+        // be stale (e.g. the localStorage list cache predates the
+        // columns being added). The /thumbs endpoint itself filters to
+        // rows that actually have image data, so the worst case is one
+        // empty response. The endpoint coalesces thumb-or-front and
+        // flags `needs_backfill` for legacy rows — we downscale those
+        // locally and POST a real thumbnail back so the next visit is
+        // small.
         const missingIds = fresh
-          .filter((c) => (c.has_card_thumb || c.has_card_front) && !thumbCache[c.id])
+          .filter((c) => !thumbCache[c.id])
           .map((c) => c.id);
         if (missingIds.length > 0) {
           fetchContactThumbs(missingIds)

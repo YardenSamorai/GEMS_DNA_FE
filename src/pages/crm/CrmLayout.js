@@ -157,7 +157,7 @@ export default function CrmLayout() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] pb-20 sm:pb-12">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         {/* Header */}
         <div className="mb-5 sm:mb-7 flex items-center justify-between gap-3">
           <div>
