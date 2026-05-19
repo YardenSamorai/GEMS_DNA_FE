@@ -46,20 +46,21 @@ export default function AlphabetIndex({ letters, present, onJump, className = ""
   };
 
   // Drag-to-scrub: capture pointer at down, then map Y to letter on
-  // every move. This is what makes the iOS index feel instant on long
-  // lists. We don't preventDefault on tap-only interactions so the
-  // <button> still gets its normal click event (good for keyboard
-  // & mouse users who don't drag).
+  // every move. We run the same logic for mouse, pen and touch — the
+  // inner buttons are pointer-events:none so the parent owns *all*
+  // tap/drag interaction. That keeps the iPhone-like "slide your
+  // thumb across the strip" gesture working everywhere.
   const handlePointerDown = (e) => {
-    if (e.pointerType === "touch") {
-      e.preventDefault();
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      const l = letterFromClientY(e.clientY);
-      fireJump(l);
-    }
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch (_) {}
+    const l = letterFromClientY(e.clientY);
+    fireJump(l);
   };
 
   const handlePointerMove = (e) => {
+    // Only follow movement while the pointer is captured (i.e. between
+    // pointerdown and pointerup). Avoid jumping just because the user
+    // hovered over the strip with a mouse.
     if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) return;
     const l = letterFromClientY(e.clientY);
     fireJump(l);
@@ -79,33 +80,36 @@ export default function AlphabetIndex({ letters, present, onJump, className = ""
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className={`shrink-0 flex flex-col items-center justify-center gap-px py-1 px-1 rounded-full bg-white/70 backdrop-blur-sm border border-stone-200/80 shadow-sm select-none touch-none ${className}`}
+      className={`shrink-0 flex flex-col items-center justify-start gap-px py-1 px-1 rounded-2xl bg-white/70 backdrop-blur-sm border border-stone-200/80 shadow-sm select-none touch-none ${className}`}
       role="navigation"
       aria-label="Jump to letter"
-      style={{ writingMode: "horizontal-tb", ...style }}
+      style={{
+        writingMode: "horizontal-tb",
+        // Cap the strip so a long mixed alphabet (A-Z + א-ת = 52 cells)
+        // can't extend past the bottom of the viewport / under the
+        // mobile bottom dock. We pad ~160px for TopBar + dock + margin.
+        maxHeight: "calc(100dvh - 160px)",
+        ...style,
+      }}
     >
       {letters.map((l) => {
         const isPresent = present.has(l);
         return (
-          <button
+          <div
             key={l}
-            type="button"
             data-letter={l}
-            disabled={!isPresent}
-            tabIndex={isPresent ? 0 : -1}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isPresent) onJump?.(l);
-            }}
-            className={`w-5 h-4 text-[10px] font-semibold leading-none rounded transition-colors ${
-              isPresent
-                ? "text-stone-700 hover:bg-stone-200/70 cursor-pointer"
-                : "text-stone-300 cursor-default"
-            }`}
             aria-label={`Jump to ${l}`}
+            // Bigger touch slot on mobile so thumbs can actually hit it
+            // (Apple HIG ≥ 44pt). Desktop stays compact so the strip
+            // doesn't dominate the layout.
+            className={`flex items-center justify-center w-7 h-5 sm:w-5 sm:h-4 text-[11px] sm:text-[10px] font-semibold leading-none rounded select-none ${
+              isPresent
+                ? "text-stone-700"
+                : "text-stone-300"
+            }`}
           >
             {l}
-          </button>
+          </div>
         );
       })}
     </div>

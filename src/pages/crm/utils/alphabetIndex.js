@@ -114,13 +114,27 @@ export function groupByLetter(items, getName) {
  * below the sticky TopBar. We measure the actual TopBar `<header>` at
  * click time rather than hard-coding 48px so iPhone PWAs (which add
  * env(safe-area-inset-top) to the header) end up with the right offset.
+ *
+ * NOTE: Contacts and Stores render two parallel DOMs — a desktop table
+ * (display:none on mobile) and a mobile card list. Both carry the same
+ * `data-letter-section` attribute. A naive querySelector finds the
+ * desktop one first, but on mobile its bounding rect is 0,0 (hidden),
+ * so scrolling broke silently. We now pick the first *visible*
+ * candidate (non-zero offsetParent / clientRect).
  */
 export function scrollToLetter(letter) {
-  const el = document.querySelector(`[data-letter-section="${letter}"]`);
+  const candidates = document.querySelectorAll(`[data-letter-section="${letter}"]`);
+  let el = null;
+  for (const node of candidates) {
+    // offsetParent is null for elements whose ancestor has display:none
+    // and for elements that are themselves display:none. Sticky <tr>s
+    // can sometimes have offsetParent=null too, so cross-check with the
+    // rect dimensions.
+    const rect = node.getBoundingClientRect();
+    const visible = node.offsetParent !== null || rect.width > 0 || rect.height > 0;
+    if (visible) { el = node; break; }
+  }
   if (!el) return;
-  // The global TopBar lives at the very top of the document and is the
-  // first <header> with sticky positioning. If we can't find it, fall
-  // back to a sane default that still clears the bar.
   let topbarHeight = 48;
   const topbar = document.querySelector("header.sticky, header[class*='sticky']");
   if (topbar) {
