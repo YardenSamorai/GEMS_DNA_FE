@@ -339,15 +339,8 @@ const FullScreenLoader = () => (
     aria-label="Loading workspace"
     className="min-h-screen w-full flex items-center justify-center"
   >
-    <div className="flex flex-col items-center gap-5">
-      <div className="relative w-14 h-14 rounded-2xl bg-app-ink flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(0,0,0,0.45)]">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
-          <path d="M2 9H22" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" />
-          <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.25" />
-        </svg>
-        <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
-      </div>
+    <div className="flex flex-col items-center gap-6">
+      <SpinningGem />
       <div className="flex items-center gap-2 text-app-muted text-[11px] font-medium tracking-[0.14em] uppercase">
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-emerald animate-pulse" />
         Loading workspace
@@ -355,6 +348,67 @@ const FullScreenLoader = () => (
     </div>
   </div>
 );
+
+/**
+ * SpinningGem — a faceted "diamond" that spins continuously on the Y
+ * axis. Built from three identical SVG faces stacked at 0°/60°/120°
+ * inside a `transform-style: preserve-3d` stage, so from any angle at
+ * least one face is roughly perpendicular to the viewer. The result
+ * reads as a real spinning crystal without pulling in three.js or a
+ * GLTF model. Theme-safe: the gradient stops cover a tonal range that
+ * stays visible on both dark and light canvases.
+ */
+const SpinningGem = () => {
+  const Face = ({ deg }) => (
+    <svg
+      className="gem3d-face"
+      viewBox="0 0 64 64"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ transform: `rotateY(${deg}deg)` }}
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={`gem-crown-${deg}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#CBD5E1" stopOpacity="0.9" />
+        </linearGradient>
+        <linearGradient id={`gem-pavilion-${deg}`} x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="#94A3B8" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#1E293B" stopOpacity="1" />
+        </linearGradient>
+      </defs>
+      {/* Crown — top half, two facets */}
+      <polygon points="32,6 6,24 32,24"  fill={`url(#gem-crown-${deg})`} />
+      <polygon points="32,6 58,24 32,24" fill={`url(#gem-crown-${deg})`} fillOpacity="0.82" />
+      {/* Pavilion — bottom half, two facets */}
+      <polygon points="6,24 32,24 32,58"  fill={`url(#gem-pavilion-${deg})`} />
+      <polygon points="32,24 58,24 32,58" fill={`url(#gem-pavilion-${deg})`} fillOpacity="0.9" />
+      {/* Cut detail: girdle + vertical seam */}
+      <line x1="6"  y1="24" x2="58" y2="24" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="0.6" />
+      <line x1="32" y1="6"  x2="32" y2="58" stroke="#FFFFFF" strokeOpacity="0.28" strokeWidth="0.5" />
+      {/* Specular table highlight */}
+      <polygon points="32,6 22,14 42,14" fill="#FFFFFF" fillOpacity="0.22" />
+      {/* Crisp outline for readability on dark backgrounds */}
+      <polygon
+        points="32,6 6,24 32,58 58,24"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeOpacity="0.4"
+        strokeWidth="0.5"
+      />
+    </svg>
+  );
+  return (
+    <div className="gem3d" aria-hidden>
+      <span className="gem3d-halo" />
+      <div className="gem3d-stage">
+        <Face deg={0} />
+        <Face deg={60} />
+        <Face deg={120} />
+      </div>
+    </div>
+  );
+};
 
 const AuthPrompt = ({ message }) => (
   <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
