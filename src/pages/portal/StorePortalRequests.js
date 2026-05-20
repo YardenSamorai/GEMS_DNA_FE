@@ -147,7 +147,7 @@ function RequestRow({ req, onOpen }) {
           <span className="text-[11.5px] text-glass-soft tabular-nums">#{req.id}</span>
           {created && (
             <span className="text-[11.5px] text-glass-soft">
-              {created.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              {created.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </span>
           )}
         </div>
@@ -247,7 +247,7 @@ function RequestDrawer({ id, onClose, onChanged }) {
               {data.preferred_due_at && (
                 <div className="text-[13px] text-glass-graphite">
                   <span className="text-[11px] text-glass-muted mr-2">Preferred receive date</span>
-                  <span className="text-glass-ink font-medium">{new Date(data.preferred_due_at).toLocaleDateString()}</span>
+                  <span className="text-glass-ink font-medium">{new Date(data.preferred_due_at).toLocaleDateString("en-US")}</span>
                 </div>
               )}
               {data.message && (

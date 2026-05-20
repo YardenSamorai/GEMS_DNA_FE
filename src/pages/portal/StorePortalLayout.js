@@ -28,7 +28,12 @@ export default function StorePortalLayout() {
         <SignedIn>
           <PortalHeader />
           <PortalSubNav />
-          <main className="max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-10 relative z-0">
+          {/* No `z-0` here: a `relative z-0` would form a stacking
+              context that traps `sticky` banners (e.g. the memo
+              acknowledgment banner) below the sub-nav (`z-20`) even when
+              they raise their own z-index. We rely on natural flow plus
+              the explicit z values set by the sticky banner. */}
+          <main className="max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-10">
             <Outlet />
           </main>
           <PortalFooter />

@@ -161,7 +161,7 @@ function PortalEditorialHero({ me, loading, kpis }) {
           />
           <KpiStat
             label="Next due"
-            value={loading ? null : (kpis.due ? kpis.due.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—")}
+            value={loading ? null : (kpis.due ? kpis.due.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—")}
           />
         </div>
       </div>
@@ -260,10 +260,10 @@ function MemoRow({ memo }) {
       </div>
       <div className="text-right shrink-0">
         <div className="text-[18px] sm:text-[20px] text-glass-ink font-semibold whitespace-nowrap leading-none tabular-nums tracking-tight">
-          ${Number(memo.total_value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          ${Number(memo.total_value || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}
         </div>
         <div className="text-[11.5px] text-glass-soft mt-2">
-          {memo.issued_at ? new Date(memo.issued_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Not issued"}
+          {memo.issued_at ? new Date(memo.issued_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Not issued"}
         </div>
       </div>
       <svg className="w-4 h-4 text-glass-soft shrink-0 mt-2 hidden sm:block group-hover:text-glass-ink group-hover:translate-x-1 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -35,9 +35,14 @@ import SignatureRequiredBanner from "../../components/signature/SignatureRequire
  */
 
 /* ─── tiny helpers (copied from MemoDetail to keep look identical) ─── */
-const fmtMoney = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
-const fmtDateLong = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "—";
+// Force en-US for every date / number in this view. The portal is a B2B
+// document tool used by stores in many countries; rendering "ISSUED" /
+// "DUE" in the user's OS locale (often Hebrew on our team's devices)
+// makes the audit trail unreadable for the counterparty and looks
+// unprofessional on the printed PDF. Keep the document language uniform.
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+const fmtDateLong = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "—";
 const initials = (name) => (name || "?").split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase();
 const daysFromNow = (iso) => {
   if (!iso) return null;
@@ -152,7 +157,23 @@ export default function StorePortalMemoDetail() {
       <FinancialSummary totals={totals} />
       <ItemsCard memo={memo} reload={reload} userId={user?.id} gateActive={signatureGateActive} />
 
-      <SignaturesCard memo={memo} />
+      <SignaturesCard
+        memo={memo}
+        gateActive={signatureGateActive}
+        canSignIssueStore={needsAcknowledgment}
+        onSignIssueStore={() => setSignaturePrompt({
+          event: "issue",
+          signerRole: "store",
+          title: `Acknowledge receipt of memo ${memo.memo_number}`,
+          actionLabel: "Sign acknowledgment",
+        })}
+        onSignCloseStore={() => setSignaturePrompt({
+          event: "close",
+          signerRole: "store",
+          title: `Acknowledge close of memo ${memo.memo_number}`,
+          actionLabel: "Sign close",
+        })}
+      />
 
       {memo.notes && (
         <div className="glass-surface rounded-2xl p-4 sm:p-5">
@@ -184,8 +205,26 @@ export default function StorePortalMemoDetail() {
 /* ─────────── Awaiting-signature banner ─────────── */
 
 function AwaitingSignatureBanner({ memoNumber, onSign }) {
+  // The portal layout has TWO sticky bars above this banner — the main
+  // header (z-30 in the layout) and the tab nav (z-20, semi-transparent).
+  // Without explicit positioning the banner scrolls *behind* the tab nav
+  // and its own button stops accepting clicks. Pinning the banner just
+  // under both bars with a higher z keeps it tappable and always in view
+  // until the user signs.
+  //
+  // Vertical math (must clear the sticky chrome above us):
+  //   safe-area-inset-top  (notch padding on iOS PWA)
+  // + 4rem    (mobile header: h-16)            / 4.25rem on desktop (h-[68px])
+  // + 4rem    (sub-nav: 24px padding + ~40px pill = 64px total)
+  // + 0.5rem  (breathing room so we don't kiss the tabs)
+  // ≈ 8.5rem on mobile / 8.75rem on desktop.
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 sm:px-5 py-3 sm:py-4">
+    <div
+      className="sticky z-40 bg-amber-50 border border-amber-200 rounded-2xl px-4 sm:px-5 py-3 sm:py-4 shadow-sm"
+      style={{
+        top: "calc(env(safe-area-inset-top, 0px) + 8.5rem)",
+      }}
+    >
       <div className="flex items-start gap-3 flex-wrap">
         <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -211,7 +250,7 @@ function AwaitingSignatureBanner({ memoNumber, onSign }) {
 
 /* ─────────── Signatures card (portal view) ─────────── */
 
-function SignaturesCard({ memo }) {
+function SignaturesCard({ memo, gateActive, canSignIssueStore = false, onSignIssueStore, onSignCloseStore }) {
   const sigs = memo?.signatures || [];
   // Hide while the memo is still a draft — no signatures are expected
   // yet. Once issued (even if no signatures have been collected),
@@ -225,6 +264,11 @@ function SignaturesCard({ memo }) {
   const closeSupplier = find("close", "supplier");
   const closeStore = find("close", "store");
   const showCloseRow = !!closeSupplier || !!closeStore || memo.status === "closed";
+  // The store user can only sign their *own* close slot once the
+  // supplier signed close. Issuance signability is computed at the
+  // parent (mirrors `needsAcknowledgment`) and passed down so the
+  // banner CTA and the slot CTA stay in lockstep.
+  const canSignCloseStore = !closeStore && !!closeSupplier;
 
   const handleDownload = async () => {
     try { await downloadMemoPdf(memo); }
@@ -270,7 +314,14 @@ function SignaturesCard({ memo }) {
           : <AwaitingSlot kind="Supplier" event="issuance" />}
         {issueStore
           ? <SignatureBlock signature={issueStore} accent="store" />
-          : <AwaitingSlot kind="Store" event="issuance" />}
+          : (
+            <AwaitingSlot
+              kind="Store"
+              event="issuance"
+              onSign={canSignIssueStore ? onSignIssueStore : null}
+              hint={gateActive ? "Waiting for the supplier to sign first" : null}
+            />
+          )}
       </div>
 
       {showCloseRow && (
@@ -280,17 +331,59 @@ function SignaturesCard({ memo }) {
             : <AwaitingSlot kind="Supplier" event="close" />}
           {closeStore
             ? <SignatureBlock signature={closeStore} accent="store" />
-            : <AwaitingSlot kind="Store" event="close" />}
+            : (
+              <AwaitingSlot
+                kind="Store"
+                event="close"
+                onSign={canSignCloseStore ? onSignCloseStore : null}
+                hint={!closeSupplier ? "Waiting for the supplier to sign close first" : null}
+              />
+            )}
         </div>
       )}
     </div>
   );
 }
 
-function AwaitingSlot({ kind, event }) {
+function AwaitingSlot({ kind, event, onSign = null, hint = null }) {
+  // When this slot is *the* slot the current user can fill in, render an
+  // explicit primary CTA inside the empty card so the user has two
+  // obvious ways to start signing — the sticky banner at the top *and*
+  // a clear action right where the signature will end up. This was
+  // requested after store users couldn't see/reach the banner button on
+  // some screens.
+  const isActive = typeof onSign === "function";
   return (
-    <div className="border border-dashed border-stone-200 rounded-xl p-4 flex items-center justify-center text-xs text-stone-400 min-h-[100px]">
-      Awaiting {kind} signature ({event})
+    <div
+      className={[
+        "rounded-xl p-4 flex flex-col items-center justify-center gap-3 min-h-[120px] text-center",
+        isActive
+          ? "border border-amber-300 bg-amber-50/60"
+          : "border border-dashed border-stone-200",
+      ].join(" ")}
+    >
+      <div className={`text-[10px] uppercase tracking-[0.18em] font-semibold ${isActive ? "text-amber-700" : "text-stone-400"}`}>
+        {kind} · {event}
+      </div>
+      {isActive ? (
+        <>
+          <button
+            type="button"
+            onClick={onSign}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-[12px] font-semibold hover:bg-amber-700 active:scale-[0.98] transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Sign here
+          </button>
+          <div className="text-[11px] text-amber-800/80">Tap to acknowledge {event}</div>
+        </>
+      ) : (
+        <div className="text-xs text-stone-400">
+          {hint || `Awaiting ${kind} signature`}
+        </div>
+      )}
     </div>
   );
 }

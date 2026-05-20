@@ -20,8 +20,8 @@ import { downloadMemoPdf, printMemoPdf } from "../../services/memoPdf";
  * available — same translation as the rest of the portal UI.
  */
 
-const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
-const fmtMoney = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
 export default function StorePortalDocuments() {
   const { user } = useUser();
