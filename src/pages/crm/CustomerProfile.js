@@ -22,6 +22,7 @@ import {
 } from "../../services/crmApi";
 import { fetchJewelryItems } from "../../services/jewelryApi";
 import NewJewelryItemModal from "../jewelry/components/NewJewelryItemModal";
+import DnaInquiriesBlock from "./components/DnaInquiriesBlock";
 import {
   Skeleton,
   SkeletonAvatar,
@@ -1031,16 +1032,48 @@ export default function CustomerProfile() {
       // production_update events come from the jewelry workshop status hook —
       // they deserve their own visual treatment so the timeline reads like a workflow.
       const isProd = intr.type === "production_update";
+      // dna_inquiry events get a tailored title / subtitle so the
+      // backend-appended "Stone: SKU\nIP: x.x.x.x" lines don't leak into
+      // the timeline. The full stone snapshot already has its own block at
+      // the top of the page, so here we just show "DNA inquiry · SKU"
+      // plus the visitor's message (if any).
+      const isDna = intr.type === "dna_inquiry";
+      let title = intr.subject || intr.type;
+      let subtitle = (intr.content || "").slice(0, 100);
+      if (isDna) {
+        let meta = intr.metadata;
+        if (typeof meta === "string") {
+          try { meta = JSON.parse(meta); } catch (_) { meta = {}; }
+        }
+        const sku = meta?.sku || "";
+        title = sku ? `DNA inquiry · ${sku}` : "DNA inquiry";
+        const cleanMsg = (intr.content || "")
+          .split("\n")
+          .filter((line) => {
+            const l = line.trim();
+            if (!l) return false;
+            if (/^stone\s*:/i.test(l)) return false;
+            if (/^ip\s*:/i.test(l)) return false;
+            return true;
+          })
+          .join(" ")
+          .trim();
+        subtitle = cleanMsg || "Clicked “I’m interested” on the DNA page";
+      } else if (isProd && intr.metadata && !subtitle) {
+        subtitle = `${intr.metadata.from_status || "—"} → ${intr.metadata.to_status || "—"}`;
+      }
       items.push({
-        kind: isProd ? "production" : intr.type,
+        kind: isDna ? "dna_inquiry" : isProd ? "production" : intr.type,
         id: `intr-${intr.id}`,
-        title: intr.subject || intr.type,
-        subtitle: (intr.content || "").slice(0, 100) || (isProd && intr.metadata
-          ? `${intr.metadata.from_status || "—"} → ${intr.metadata.to_status || "—"}`
-          : ""),
+        title,
+        subtitle,
         date: intr.occurred_at,
-        icon: isProd ? <Gear /> : <Note />,
-        color: isProd ? "bg-emerald-50 text-emerald-600" : "bg-stone-50 text-stone-600",
+        icon: isDna ? <Note /> : isProd ? <Gear /> : <Note />,
+        color: isDna
+          ? "bg-emerald-50 text-emerald-700"
+          : isProd
+          ? "bg-emerald-50 text-emerald-600"
+          : "bg-stone-50 text-stone-600",
       });
     });
     interactions.filter((i) => i.type === "note").forEach((n) => {
@@ -1230,6 +1263,11 @@ export default function CustomerProfile() {
       {/* Body: tabs + sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
+          {/* DNA "Interested in" — full-width above the tabs so it's the
+              first thing a rep sees when opening a profile they got from
+              the DNA inbox. Component returns null for non-DNA contacts. */}
+          <DnaInquiriesBlock contact={contact} variant="full" />
+
           {/* Tabs */}
           <div className="border-b border-stone-200">
             <div className="flex gap-1 overflow-x-auto scrollbar-hide">

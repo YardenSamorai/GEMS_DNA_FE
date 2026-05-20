@@ -18,6 +18,7 @@ import ContactFormModal from "./ContactFormModal";
 import CardImageLightbox from "./CardImageLightbox";
 import AttachCardModal from "./AttachCardModal";
 import ContactMap from "./ContactMap";
+import DnaInquiriesBlock from "./DnaInquiriesBlock";
 import {
   Skeleton,
   SkeletonAvatar,
@@ -657,6 +658,10 @@ function InfoTab({ contact, onOpenCard, onAddCard }) {
   const cardPreview = contact.card_image_front || contact.card_image_thumb;
   return (
     <div className="p-4 space-y-3 text-sm">
+      {/* DNA "Interested in" block — rendered first so reps see *what*
+          the lead was looking at before they call. Component returns null
+          when the contact has no DNA signal at all. */}
+      <DnaInquiriesBlock contact={contact} variant="compact" />
       {cardPreview ? (
         <div className="pb-3 border-b border-stone-200">
           <div className="flex items-center justify-between mb-2">
