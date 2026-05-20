@@ -738,19 +738,21 @@ export default function CrmContacts() {
               </table>
 
               {/* Mobile cards — same grouping as the desktop table.
-                  Each letter gets a sticky divider that stays just
-                  below the TopBar while you scroll through its rows.
-                  Background is *fully opaque* so card avatars never
-                  bleed through it when scrolled — the previous /90
-                  + backdrop-blur combo read as broken on iOS. */}
+                  IMPORTANT: on mobile the letter dividers are NOT
+                  sticky. Cards on phones are tall (avatar + card thumb
+                  + 2-3 text lines), so a sticky banner pinned under
+                  the TopBar always covered the first card's name/
+                  avatar in the section it was sticking to. The right-
+                  hand A-Z strip already shows the user "which letter
+                  am I in", so the inline divider here is purely a
+                  visual separator that scrolls with the list. */}
               <div className="md:hidden">
                 {contactGroups.map((g) => (
                   <Fragment key={g.letter}>
                     {showSectionHeaders && (
                       <div
                         data-letter-section={g.letter}
-                        className="sticky z-[5] bg-stone-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-b border-stone-200"
-                        style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
+                        className="bg-stone-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-b border-stone-200"
                       >
                         {g.letter}
                       </div>

@@ -134,7 +134,12 @@ export default function CrmCompanies() {
                   {showSectionHeaders && (
                     <div
                       data-letter-section={g.letter}
-                      className="sticky z-[5] bg-stone-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-b border-stone-200 rounded"
+                      // sticky from md: up only — on phones the banner
+                      // gets pinned right under the TopBar and covers
+                      // the top of the next card. Desktop has enough
+                      // vertical breathing room for the iOS-style
+                      // sticky behaviour to feel natural.
+                      className="md:sticky md:z-[5] bg-stone-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-b border-stone-200 rounded"
                       style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
                     >
                       {g.letter}
