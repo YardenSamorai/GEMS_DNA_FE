@@ -437,6 +437,8 @@ function EmptyState({ onCreate }) {
   );
 }
 
+const ITEMS_PAGE_SIZE = 100;
+
 function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "stones", onAddTyped }) {
   // Local UI state — type filter ("all" | "stone" | "jewelry"), free-text
   // search, and a bulk-select mode so the supplier can clear out tens of
@@ -446,12 +448,32 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
   const [search, setSearch] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
+
+  // Stone advanced filters
+  const [weightMin, setWeightMin] = useState("");
+  const [weightMax, setWeightMax] = useState("");
+  const [colorsF, setColorsF] = useState([]);
+  const [claritiesF, setClaritiesF] = useState([]);
+  const [labsF, setLabsF] = useState([]);
+  const [shapesF, setShapesF] = useState([]);
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [ppcMin, setPpcMin] = useState("");
+  const [ppcMax, setPpcMax] = useState("");
+
+  // Jewelry advanced filters
+  const [sourcesF, setSourcesF] = useState(["workshop", "catalog"]);
+  const [categoriesF, setCategoriesF] = useState([]);
+  const [metalsF, setMetalsF] = useState([]);
 
   // Reset selection whenever the underlying item list changes (e.g.
   // after a tier switch or a successful remove). Without this the
   // checked state would stay associated with stale rows.
   useEffect(() => {
     setSelected(new Set());
+    setPage(1);
   }, [items]);
 
   const counts = useMemo(() => {
@@ -464,18 +486,113 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
     return { all: items.length, stones, jewelry };
   }, [items]);
 
+  // Build dropdown options from the actual items in this tier — only
+  // show values that exist so the dropdowns never offer dead filters.
+  const stoneOptions = useMemo(() => {
+    const colors = new Set();
+    const clarities = new Set();
+    const labs = new Set();
+    const shapes = new Set();
+    for (const it of items) {
+      if (it.item_type !== "stone") continue;
+      if (it.stone_color) colors.add(it.stone_color);
+      if (it.stone_clarity) clarities.add(it.stone_clarity);
+      if (it.stone_lab) labs.add(it.stone_lab);
+      if (it.stone_shape) shapes.add(it.stone_shape);
+    }
+    const sort = (xs) => Array.from(xs).sort((a, b) => a.localeCompare(b));
+    return { colors: sort(colors), clarities: sort(clarities), labs: sort(labs), shapes: sort(shapes) };
+  }, [items]);
+
+  const jewelryOptions = useMemo(() => {
+    const categories = new Set();
+    const metals = new Set();
+    for (const it of items) {
+      if (it.item_type !== "jewelry") continue;
+      if (it.jewelry_category) categories.add(it.jewelry_category);
+      if (it.jewelry_metal) metals.add(it.jewelry_metal);
+    }
+    const sort = (xs) => Array.from(xs).sort((a, b) => a.localeCompare(b));
+    return { categories: sort(categories), metals: sort(metals) };
+  }, [items]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
+    const wmin = parseFloat(weightMin); const wmax = parseFloat(weightMax);
+    const pmin = parseFloat(priceMin);  const pmax = parseFloat(priceMax);
+    const cmin = parseFloat(ppcMin);    const cmax = parseFloat(ppcMax);
     return items.filter((it) => {
       if (typeFilter !== "all" && it.item_type !== typeFilter) return false;
+      if (it.item_type === "stone") {
+        if (colorsF.length && !colorsF.includes(it.stone_color)) return false;
+        if (claritiesF.length && !claritiesF.includes(it.stone_clarity)) return false;
+        if (labsF.length && !labsF.includes(it.stone_lab)) return false;
+        if (shapesF.length && !shapesF.includes(it.stone_shape)) return false;
+        const w = it.stone_weight != null ? Number(it.stone_weight) : null;
+        if (!Number.isNaN(wmin) && (w == null || w < wmin)) return false;
+        if (!Number.isNaN(wmax) && (w == null || w > wmax)) return false;
+        const tp = it.stone_total_price != null ? Number(it.stone_total_price) : null;
+        if (!Number.isNaN(pmin) && (tp == null || tp < pmin)) return false;
+        if (!Number.isNaN(pmax) && (tp == null || tp > pmax)) return false;
+        const ppc = it.stone_price_per_carat != null ? Number(it.stone_price_per_carat) : null;
+        if (!Number.isNaN(cmin) && (ppc == null || ppc < cmin)) return false;
+        if (!Number.isNaN(cmax) && (ppc == null || ppc > cmax)) return false;
+      } else if (it.item_type === "jewelry") {
+        if (sourcesF.length && it.jewelry_source && !sourcesF.includes(it.jewelry_source)) return false;
+        if (categoriesF.length && !categoriesF.includes(it.jewelry_category)) return false;
+        if (metalsF.length && !metalsF.includes(it.jewelry_metal)) return false;
+      }
       if (!q) return true;
-      const hay = [it.item_sku, it.title, it.subtitle, it.shape, it.category]
+      const hay = [it.item_sku, it.title, it.subtitle, it.stone_shape, it.category,
+                   it.stone_color, it.stone_clarity, it.stone_lab, it.jewelry_metal, it.jewelry_category]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [items, typeFilter, search]);
+  }, [
+    items, typeFilter, search,
+    colorsF, claritiesF, labsF, shapesF,
+    weightMin, weightMax, priceMin, priceMax, ppcMin, ppcMax,
+    sourcesF, categoriesF, metalsF,
+  ]);
+
+  // Clamp page when filter results shrink. Without this you can stay on
+  // p20 of "All" and then switch to "Jewelry" which only has 1 page.
+  useEffect(() => {
+    setPage(1);
+  }, [typeFilter, search, colorsF, claritiesF, labsF, shapesF,
+      weightMin, weightMax, priceMin, priceMax, ppcMin, ppcMax,
+      sourcesF, categoriesF, metalsF]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PAGE_SIZE));
+  const pageStart = (page - 1) * ITEMS_PAGE_SIZE;
+  const pageEnd = Math.min(filtered.length, pageStart + ITEMS_PAGE_SIZE);
+  const paginated = filtered.slice(pageStart, pageEnd);
+
+  const resetAdvancedFilters = () => {
+    if (typeFilter === "jewelry") {
+      setCategoriesF([]); setMetalsF([]);
+      setSourcesF(["workshop", "catalog"]);
+    } else {
+      setColorsF([]); setClaritiesF([]); setLabsF([]); setShapesF([]);
+      setWeightMin(""); setWeightMax("");
+      setPriceMin(""); setPriceMax("");
+      setPpcMin(""); setPpcMax("");
+      if (typeFilter === "all") {
+        setCategoriesF([]); setMetalsF([]);
+        setSourcesF(["workshop", "catalog"]);
+      }
+    }
+  };
+
+  const advancedActiveCount =
+    (colorsF.length > 0) + (claritiesF.length > 0) + (labsF.length > 0) + (shapesF.length > 0)
+    + (weightMin ? 1 : 0) + (weightMax ? 1 : 0)
+    + (priceMin ? 1 : 0) + (priceMax ? 1 : 0)
+    + (ppcMin ? 1 : 0) + (ppcMax ? 1 : 0)
+    + (categoriesF.length > 0) + (metalsF.length > 0)
+    + (sourcesF.length !== 2 ? 1 : 0);
 
   const toggleOne = (it) => {
     const k = `${it.item_type}::${it.item_sku}`;
@@ -488,11 +605,11 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
   const toggleAllVisible = () => {
     setSelected((prev) => {
       const next = new Set(prev);
-      const allOnPage = filtered.every((it) => next.has(`${it.item_type}::${it.item_sku}`));
+      const allOnPage = paginated.every((it) => next.has(`${it.item_type}::${it.item_sku}`));
       if (allOnPage) {
-        for (const it of filtered) next.delete(`${it.item_type}::${it.item_sku}`);
+        for (const it of paginated) next.delete(`${it.item_type}::${it.item_sku}`);
       } else {
-        for (const it of filtered) next.add(`${it.item_type}::${it.item_sku}`);
+        for (const it of paginated) next.add(`${it.item_type}::${it.item_sku}`);
       }
       return next;
     });
@@ -545,6 +662,26 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {items.length > 0 && (
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold transition ${
+                showFilters
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 8h12M9 12h6M11 16h2" />
+              </svg>
+              Filters
+              {advancedActiveCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                  {advancedActiveCount}
+                </span>
+              )}
+            </button>
+          )}
           {selectMode ? (
             <>
               <span className="text-xs text-slate-500 mr-1">{selected.size} selected</span>
@@ -616,101 +753,257 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
         )}
       </div>
 
-      {/* Body */}
+      {/* Body — optional filter rail on the left, grid on the right */}
       {items.length === 0 ? (
         <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500">
           Click <strong>Add items</strong> to populate this tier with stones and/or jewelry.
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500">
-          {search
-            ? "No items match your search."
-            : typeFilter === "jewelry"
-              ? "No jewelry in this tier yet. Use Add jewelry to expose pieces to subscribed stores."
-              : typeFilter === "stone"
-                ? "No stones in this tier yet."
-                : "No items match this filter."}
-        </div>
       ) : (
-        <>
-          {selectMode && (
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
-              <label className="inline-flex items-center gap-2 cursor-pointer text-slate-600">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300"
-                  checked={filtered.length > 0 && filtered.every((it) => selected.has(`${it.item_type}::${it.item_sku}`))}
-                  onChange={toggleAllVisible}
+        <div className={`grid gap-4 ${showFilters ? "md:grid-cols-[260px_1fr]" : "grid-cols-1"}`}>
+          {showFilters && (
+            <aside className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4 self-start sticky top-4 max-h-[calc(100vh-4rem)] overflow-y-auto">
+              <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500">Refine in-tier view</div>
+              {typeFilter !== "jewelry" && counts.stones > 0 && (
+                <StoneFiltersPanel
+                  options={stoneOptions}
+                  weightMin={weightMin} setWeightMin={setWeightMin}
+                  weightMax={weightMax} setWeightMax={setWeightMax}
+                  colors={colorsF} setColors={setColorsF}
+                  clarities={claritiesF} setClarities={setClaritiesF}
+                  labs={labsF} setLabs={setLabsF}
+                  shapes={shapesF} setShapes={setShapesF}
+                  priceMin={priceMin} setPriceMin={setPriceMin}
+                  priceMax={priceMax} setPriceMax={setPriceMax}
+                  ppcMin={ppcMin} setPpcMin={setPpcMin}
+                  ppcMax={ppcMax} setPpcMax={setPpcMax}
                 />
-                Select all {filtered.length} visible
-              </label>
-              <span className="text-slate-400">Use the Remove button above to drop them from this tier.</span>
-            </div>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filtered.map((it) => {
-              const key = `${it.item_type}-${it.item_sku}`;
-              const sk = `${it.item_type}::${it.item_sku}`;
-              const isChecked = selected.has(sk);
-              return (
-                <div
-                  key={key}
-                  className={`border rounded-xl p-3 flex gap-3 transition group bg-white ${
-                    isChecked
-                      ? "border-emerald-400 ring-1 ring-emerald-200"
-                      : "border-slate-200 hover:shadow-sm hover:border-slate-300"
-                  } ${selectMode ? "cursor-pointer" : ""}`}
-                  onClick={selectMode ? () => toggleOne(it) : undefined}
+              )}
+              {typeFilter !== "stone" && counts.jewelry > 0 && (
+                <JewelryFiltersPanel
+                  options={jewelryOptions}
+                  workshopCount={items.filter((it) => it.item_type === "jewelry" && it.jewelry_source === "workshop").length}
+                  catalogCount={items.filter((it) => it.item_type === "jewelry" && it.jewelry_source === "catalog").length}
+                  jewelrySources={sourcesF} setJewelrySources={setSourcesF}
+                  categories={categoriesF} setCategories={setCategoriesF}
+                  metals={metalsF} setMetals={setMetalsF}
+                />
+              )}
+              {advancedActiveCount > 0 && (
+                <button
+                  onClick={resetAdvancedFilters}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-medium"
                 >
-                  {selectMode && (
-                    <div className={`w-5 h-5 mt-0.5 rounded-md border-2 flex-shrink-0 grid place-items-center ${
-                      isChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
-                    }`}>
-                      {isChecked && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  )}
-                  <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
-                    {it.image_url ? (
-                      <img src={it.image_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full grid place-items-center text-slate-300 text-xs">No image</div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${
-                        it.item_type === "stone" ? "bg-sky-100 text-sky-700" : "bg-purple-100 text-purple-700"
-                      }`}>
-                        {it.item_type}
-                      </span>
-                      <span className="text-xs font-mono text-slate-500 truncate">{it.item_sku}</span>
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-slate-800 truncate">
-                      {it.title || it.item_sku}
-                    </div>
-                    <div className="text-xs text-slate-500 truncate">
-                      {[it.subtitle, it.weight && `${it.weight}${it.item_type === "stone" ? "ct" : "g"}`].filter(Boolean).join(" · ")}
-                    </div>
-                  </div>
-                  {!selectMode && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onRemove(it); }}
-                      className="text-xs text-slate-400 hover:text-rose-600 self-start opacity-0 group-hover:opacity-100 transition"
-                      title="Remove from this tier"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  Clear filters
+                </button>
+              )}
+            </aside>
+          )}
+
+          <div className="space-y-3 min-w-0">
+            {selectMode && (
+              <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                <label className="inline-flex items-center gap-2 cursor-pointer text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-300"
+                    checked={paginated.length > 0 && paginated.every((it) => selected.has(`${it.item_type}::${it.item_sku}`))}
+                    onChange={toggleAllVisible}
+                  />
+                  Select all {paginated.length} on this page
+                </label>
+                <span className="text-slate-400">Use Remove selected above to drop them.</span>
+              </div>
+            )}
+
+            {filtered.length === 0 ? (
+              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500">
+                No items match the current filters.
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {paginated.map((it) => {
+                    const key = `${it.item_type}-${it.item_sku}`;
+                    const sk = `${it.item_type}::${it.item_sku}`;
+                    const isChecked = selected.has(sk);
+                    const priceLine = it.item_type === "stone"
+                      ? (it.stone_total_price
+                          ? `$${Number(it.stone_total_price).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                            + (it.stone_price_per_carat
+                                ? ` · $${Number(it.stone_price_per_carat).toLocaleString("en-US", { maximumFractionDigits: 0 })}/ct`
+                                : "")
+                          : null)
+                      : null;
+                    return (
+                      <div
+                        key={key}
+                        className={`border rounded-xl p-3 flex gap-3 transition group bg-white ${
+                          isChecked
+                            ? "border-emerald-400 ring-1 ring-emerald-200"
+                            : "border-slate-200 hover:shadow-sm hover:border-slate-300"
+                        } ${selectMode ? "cursor-pointer" : ""}`}
+                        onClick={selectMode ? () => toggleOne(it) : undefined}
+                      >
+                        {selectMode && (
+                          <div className={`w-5 h-5 mt-0.5 rounded-md border-2 flex-shrink-0 grid place-items-center ${
+                            isChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
+                          }`}>
+                            {isChecked && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        )}
+                        <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
+                          {it.image_url ? (
+                            <img src={it.image_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full grid place-items-center text-slate-300 text-xs">No image</div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${
+                              it.item_type === "stone" ? "bg-sky-100 text-sky-700" : "bg-purple-100 text-purple-700"
+                            }`}>
+                              {it.item_type}
+                            </span>
+                            <span className="text-xs font-mono text-slate-500 truncate">{it.item_sku}</span>
+                            {it.item_type === "jewelry" && it.jewelry_source === "catalog" && (
+                              <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-purple-50 text-purple-700 font-bold">Catalog</span>
+                            )}
+                            {it.item_type === "jewelry" && it.jewelry_source === "workshop" && (
+                              <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">Workshop</span>
+                            )}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-800 truncate">
+                            {it.title || it.item_sku}
+                          </div>
+                          <div className="text-xs text-slate-500 truncate">
+                            {[it.subtitle, it.weight && `${it.weight}${it.item_type === "stone" ? "ct" : "g"}`].filter(Boolean).join(" · ")}
+                          </div>
+                          {priceLine && (
+                            <div className="text-[11px] text-slate-400 mt-0.5 tabular-nums truncate">{priceLine}</div>
+                          )}
+                        </div>
+                        {!selectMode && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onRemove(it); }}
+                            className="text-xs text-slate-400 hover:text-rose-600 self-start opacity-0 group-hover:opacity-100 transition"
+                            title="Remove from this tier"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+
+                <Pagination
+                  page={page}
+                  totalPages={totalPages}
+                  rangeStart={filtered.length === 0 ? 0 : pageStart + 1}
+                  rangeEnd={pageEnd}
+                  total={filtered.length}
+                  onChange={setPage}
+                />
+              </>
+            )}
           </div>
-        </>
+        </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Page navigator with first / prev / numbered / next / last buttons.
+ * The numbered list is compact (max 7 buttons) with ellipses for
+ * long ranges, e.g. 1 … 4 5 [6] 7 8 … 25.
+ */
+function Pagination({ page, totalPages, rangeStart, rangeEnd, total, onChange }) {
+  if (totalPages <= 1) return null;
+
+  const buildList = (current, last) => {
+    if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+    const pages = new Set([1, last, current, current - 1, current + 1]);
+    if (current <= 4) [2, 3, 4, 5].forEach((p) => pages.add(p));
+    if (current >= last - 3) [last - 4, last - 3, last - 2, last - 1].forEach((p) => pages.add(p));
+    const sorted = Array.from(pages).filter((p) => p >= 1 && p <= last).sort((a, b) => a - b);
+    const out = [];
+    let prev = 0;
+    for (const p of sorted) {
+      if (p - prev > 1) out.push("…");
+      out.push(p);
+      prev = p;
+    }
+    return out;
+  };
+
+  const list = buildList(page, totalPages);
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-3 pt-2">
+      <div className="text-xs text-slate-500 tabular-nums">
+        Showing <span className="font-semibold text-slate-700">{rangeStart.toLocaleString("en-US")}</span>
+        {"–"}
+        <span className="font-semibold text-slate-700">{rangeEnd.toLocaleString("en-US")}</span>
+        {" of "}
+        <span className="font-semibold text-slate-700">{total.toLocaleString("en-US")}</span>
+        {" · "}
+        <span>{ITEMS_PAGE_SIZE} per page</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(1)}
+          disabled={!canPrev}
+          className="px-2 py-1 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          « First
+        </button>
+        <button
+          onClick={() => onChange(Math.max(1, page - 1))}
+          disabled={!canPrev}
+          className="px-2 py-1 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          ‹ Prev
+        </button>
+        {list.map((p, i) => (
+          p === "…" ? (
+            <span key={`gap-${i}`} className="px-1 text-xs text-slate-400">…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onChange(p)}
+              className={`min-w-[28px] px-2 py-1 rounded-md text-xs font-semibold transition ${
+                p === page
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {p}
+            </button>
+          )
+        ))}
+        <button
+          onClick={() => onChange(Math.min(totalPages, page + 1))}
+          disabled={!canNext}
+          className="px-2 py-1 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Next ›
+        </button>
+        <button
+          onClick={() => onChange(totalPages)}
+          disabled={!canNext}
+          className="px-2 py-1 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Last »
+        </button>
+      </div>
     </div>
   );
 }
