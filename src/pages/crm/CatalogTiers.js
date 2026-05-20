@@ -14,8 +14,9 @@ import {
   removeCompaniesFromTier,
 } from "../../services/catalogTiersApi";
 import { fetchSoapStones } from "../../services/stonesApi";
-import { fetchJewelryItems } from "../../services/jewelryApi";
+import { fetchJewelryItems, fetchJewelryCatalog } from "../../services/jewelryApi";
 import { fetchCompanies } from "../../services/companiesApi";
+import { decryptPrice } from "../../utils/decrypt";
 
 /**
  * Catalog Tiers admin page.
@@ -926,27 +927,127 @@ function TierFormModal({ title, initial, onClose, onSubmit }) {
 
 /* ───────────────────── Item picker modal ───────────────────── */
 
+/* ============================================================
+   Inventory normalization
+
+   The picker draws from three different shapes:
+     - Stones from soap_stones (canonical pricing table)
+     - Workshop jewelry from jewelry_items (per-tenant)
+     - WooCommerce catalog jewelry from jewelry_products (shared)
+   They all flow into a single "row" shape in this picker so the
+   filter logic and the grid render don't have to branch every
+   line. The original BE rows are kept under `__raw` for debug.
+   ============================================================ */
+const normalizeStoneRow = (row) => ({
+  __kind: "stone",
+  __source: "inventory",
+  __raw: row,
+  sku: row.sku,
+  shape: row.shape || "",
+  category: row.category || "",
+  color: row.color || "",
+  clarity: row.clarity || "",
+  lab: row.lab || "",
+  origin: row.origin || "",
+  weight: row.weight != null ? Number(row.weight) : null,
+  totalPrice: row.total_price != null ? Number(row.total_price) : null,
+  pricePerCarat: row.price_per_carat != null ? Number(row.price_per_carat) : null,
+  image: row.image || (row.additional_pictures || "").split(";").map(s => s.trim()).filter(Boolean)[0] || null,
+});
+
+const normalizeWorkshopJewelry = (row) => ({
+  __kind: "jewelry",
+  __source: "workshop",
+  __raw: row,
+  sku: row.sku,
+  name: row.name || row.sku,
+  category: row.category || "",
+  type: row.type || "",
+  metalType: row.metal_summary || "",
+  weight: row.weight_grams != null ? Number(row.weight_grams) : null,
+  image: row.cover_image_url || row.image_url || null,
+});
+
+const normalizeCatalogJewelry = (row) => {
+  let price = 0;
+  try { price = row.price ? Number(decryptPrice(row.price)) || 0 : 0; } catch (_) {}
+  const firstImage = (row.all_pictures_link || "")
+    .split(";").map(s => s.trim()).filter(Boolean)[0] || null;
+  return {
+    __kind: "jewelry",
+    __source: "catalog",
+    __raw: row,
+    sku: row.model_number,
+    name: row.title || row.model_number,
+    category: row.jewelry_type || row.category || "",
+    type: "",
+    metalType: row.metal_type || "",
+    weight: row.jewelry_weight != null ? Number(row.jewelry_weight) : null,
+    totalPrice: price || null,
+    image: firstImage,
+  };
+};
+
+/* ============================================================
+   Item picker — wider modal with a filter rail and a grid.
+
+   For stones the supplier can dial in by weight range, colour /
+   clarity / lab multi-selects, plus total-price and per-carat
+   price ranges (matches what they'd filter on in the inventory
+   page). For jewelry there's a source toggle (workshop /
+   WooCommerce catalog / both) and category multi-select.
+   ============================================================ */
 function ItemPickerModal({ alreadyIn, onClose, onConfirm, initialTab = "stones" }) {
   const { user } = useUser();
   const [tab, setTab] = useState(initialTab === "jewelry" ? "jewelry" : "stones");
   const [stones, setStones] = useState([]);
-  const [jewelry, setJewelry] = useState([]);
+  const [workshopJewelry, setWorkshopJewelry] = useState([]);
+  const [catalogJewelry, setCatalogJewelry] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [picked, setPicked] = useState(new Map());
+  const [showFilters, setShowFilters] = useState(true);
+
+  // Stone filters
+  const [weightMin, setWeightMin] = useState("");
+  const [weightMax, setWeightMax] = useState("");
+  const [colors, setColors] = useState([]);
+  const [clarities, setClarities] = useState([]);
+  const [labs, setLabs] = useState([]);
+  const [shapes, setShapes] = useState([]);
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [ppcMin, setPpcMin] = useState("");
+  const [ppcMax, setPpcMax] = useState("");
+
+  // Jewelry filters
+  const [jewelrySources, setJewelrySources] = useState(["workshop", "catalog"]);
+  const [categories, setCategories] = useState([]);
+  const [metals, setMetals] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const [stonesRes, jewelryRes] = await Promise.all([
+        // Three parallel fetches. The WooCommerce catalog is global so
+        // we don't pass userId — it returns one shared list for every
+        // tenant. Jewelry items endpoint is tenant-scoped.
+        const [stonesRes, workshopRes, catalogRes] = await Promise.all([
           fetchSoapStones(user, { assignedTo: "all" }),
-          fetchJewelryItems(user.id),
+          fetchJewelryItems(user.id).catch(() => ({ items: [] })),
+          fetchJewelryCatalog().catch(() => ({ jewelry: [] })),
         ]);
         if (cancelled) return;
-        setStones(Array.isArray(stonesRes?.stones) ? stonesRes.stones : (Array.isArray(stonesRes) ? stonesRes : []));
-        setJewelry(Array.isArray(jewelryRes?.items) ? jewelryRes.items : (Array.isArray(jewelryRes) ? jewelryRes : []));
+        const rawStones = Array.isArray(stonesRes?.stones) ? stonesRes.stones
+          : Array.isArray(stonesRes) ? stonesRes : [];
+        const rawWorkshop = Array.isArray(workshopRes?.items) ? workshopRes.items
+          : Array.isArray(workshopRes) ? workshopRes : [];
+        const rawCatalog = Array.isArray(catalogRes?.jewelry) ? catalogRes.jewelry
+          : Array.isArray(catalogRes) ? catalogRes : [];
+        setStones(rawStones.map(normalizeStoneRow).filter(r => r.sku));
+        setWorkshopJewelry(rawWorkshop.map(normalizeWorkshopJewelry).filter(r => r.sku));
+        setCatalogJewelry(rawCatalog.map(normalizeCatalogJewelry).filter(r => r.sku));
       } catch (e) {
         toast.error(e.message);
       } finally {
@@ -970,38 +1071,156 @@ function ItemPickerModal({ alreadyIn, onClose, onConfirm, initialTab = "stones" 
     onConfirm(Array.from(picked.values()));
   };
 
+  // Build dropdown options dynamically from the actual inventory so we
+  // never offer a value that would return zero matches.
+  const stoneOptions = useMemo(() => {
+    const colors = new Set();
+    const clarities = new Set();
+    const labs = new Set();
+    const shapes = new Set();
+    for (const s of stones) {
+      if (s.color) colors.add(s.color);
+      if (s.clarity) clarities.add(s.clarity);
+      if (s.lab) labs.add(s.lab);
+      if (s.shape) shapes.add(s.shape);
+    }
+    const sort = (xs) => Array.from(xs).sort((a, b) => a.localeCompare(b));
+    return {
+      colors:    sort(colors),
+      clarities: sort(clarities),
+      labs:      sort(labs),
+      shapes:    sort(shapes),
+    };
+  }, [stones]);
+
+  const jewelryOptions = useMemo(() => {
+    const cats = new Set();
+    const metals = new Set();
+    for (const j of [...workshopJewelry, ...catalogJewelry]) {
+      if (j.category) cats.add(j.category);
+      if (j.metalType) metals.add(j.metalType);
+    }
+    const sort = (xs) => Array.from(xs).sort((a, b) => a.localeCompare(b));
+    return { categories: sort(cats), metals: sort(metals) };
+  }, [workshopJewelry, catalogJewelry]);
+
+  // Filter pipeline
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    const list = tab === "stones" ? stones : jewelry;
+    const isStone = tab === "stones";
+    const list = isStone
+      ? stones
+      : [
+          ...(jewelrySources.includes("workshop") ? workshopJewelry : []),
+          ...(jewelrySources.includes("catalog")  ? catalogJewelry  : []),
+        ];
+
+    const wmin = parseFloat(weightMin); const wmax = parseFloat(weightMax);
+    const pmin = parseFloat(priceMin);  const pmax = parseFloat(priceMax);
+    const cmin = parseFloat(ppcMin);    const cmax = parseFloat(ppcMax);
+
     return list.filter((row) => {
       const sku = row.sku;
       if (!sku) return false;
-      if (alreadyIn.has(`${tab === "stones" ? "stone" : "jewelry"}::${sku}`)) return false;
+      if (alreadyIn.has(`${isStone ? "stone" : "jewelry"}::${sku}`)) return false;
+
+      if (isStone) {
+        if (colors.length && !colors.includes(row.color)) return false;
+        if (clarities.length && !clarities.includes(row.clarity)) return false;
+        if (labs.length && !labs.includes(row.lab)) return false;
+        if (shapes.length && !shapes.includes(row.shape)) return false;
+        if (!Number.isNaN(wmin) && (row.weight == null || row.weight < wmin)) return false;
+        if (!Number.isNaN(wmax) && (row.weight == null || row.weight > wmax)) return false;
+        if (!Number.isNaN(pmin) && (row.totalPrice == null || row.totalPrice < pmin)) return false;
+        if (!Number.isNaN(pmax) && (row.totalPrice == null || row.totalPrice > pmax)) return false;
+        if (!Number.isNaN(cmin) && (row.pricePerCarat == null || row.pricePerCarat < cmin)) return false;
+        if (!Number.isNaN(cmax) && (row.pricePerCarat == null || row.pricePerCarat > cmax)) return false;
+      } else {
+        if (categories.length && !categories.includes(row.category)) return false;
+        if (metals.length && !metals.includes(row.metalType)) return false;
+      }
+
       if (!q) return true;
       const hay = [
         sku,
         row.shape, row.category, row.color, row.clarity, row.origin, row.lab,
-        row.name, row.type, row.metal_summary,
+        row.name, row.type, row.metalType,
       ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q);
     });
-  }, [tab, stones, jewelry, search, alreadyIn]);
+  }, [
+    tab, stones, workshopJewelry, catalogJewelry, search, alreadyIn,
+    colors, clarities, labs, shapes, weightMin, weightMax, priceMin, priceMax, ppcMin, ppcMax,
+    jewelrySources, categories, metals,
+  ]);
+
+  const resetFilters = () => {
+    if (tab === "stones") {
+      setColors([]); setClarities([]); setLabs([]); setShapes([]);
+      setWeightMin(""); setWeightMax("");
+      setPriceMin(""); setPriceMax("");
+      setPpcMin(""); setPpcMax("");
+    } else {
+      setCategories([]); setMetals([]);
+      setJewelrySources(["workshop", "catalog"]);
+    }
+  };
+
+  const activeFilterCount = tab === "stones"
+    ? (colors.length > 0) + (clarities.length > 0) + (labs.length > 0) + (shapes.length > 0)
+      + (weightMin ? 1 : 0) + (weightMax ? 1 : 0)
+      + (priceMin ? 1 : 0) + (priceMax ? 1 : 0)
+      + (ppcMin ? 1 : 0) + (ppcMax ? 1 : 0)
+    : (categories.length > 0) + (metals.length > 0)
+      + (jewelrySources.length !== 2 ? 1 : 0);
+
+  const stonesCount = stones.length;
+  const jewelryCount = workshopJewelry.length + catalogJewelry.length;
+
+  // Cap rendering at 300 rows for huge inventories so scrolling stays
+  // smooth — the supplier almost always narrows with filters first.
+  const RENDER_CAP = 300;
+  const visible = filtered.slice(0, RENDER_CAP);
+  const overflowed = filtered.length - visible.length;
+
+  const selectAllVisible = () => {
+    setPicked((prev) => {
+      const next = new Map(prev);
+      const type = tab === "stones" ? "stone" : "jewelry";
+      const allKeys = visible.map((r) => `${type}::${r.sku}`);
+      const allIn = allKeys.every((k) => next.has(k));
+      if (allIn) {
+        allKeys.forEach((k) => next.delete(k));
+      } else {
+        allKeys.forEach((k) => next.set(k, { type, sku: k.split("::")[1] }));
+      }
+      return next;
+    });
+  };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900">Add items to tier</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 backdrop-blur-sm p-2 sm:p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[95dvh] sm:h-[90dvh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-slate-900">Add items to tier</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Pulling from your inventory — stones from the price book and jewelry from both workshop pieces and the catalog.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg leading-none p-2">✕</button>
         </div>
 
+        {/* Type segmented control + search bar */}
         <div className="px-5 pt-4 pb-3 border-b border-slate-100 space-y-3">
-          {/* Big segmented control — equal halves so the supplier can't
-              miss that jewelry is supported alongside stones. */}
           <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100">
             {[
-              { id: "stones",  label: "Stones",  count: stones.length,  accent: "sky" },
-              { id: "jewelry", label: "Jewelry", count: jewelry.length, accent: "purple" },
+              { id: "stones",  label: "Stones",  count: stonesCount,  accent: "sky" },
+              { id: "jewelry", label: "Jewelry", count: jewelryCount, accent: "purple" },
             ].map((t) => {
               const isActive = tab === t.id;
               return (
@@ -1014,11 +1233,7 @@ function ItemPickerModal({ alreadyIn, onClose, onConfirm, initialTab = "stones" 
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      t.accent === "sky" ? "bg-sky-500" : "bg-purple-500"
-                    }`}
-                  />
+                  <span className={`w-2 h-2 rounded-full ${t.accent === "sky" ? "bg-sky-500" : "bg-purple-500"}`} />
                   <span>{t.label}</span>
                   <span className={`text-[11px] tabular-nums font-bold ${isActive ? "text-slate-500" : "text-slate-400"}`}>
                     {t.count.toLocaleString("en-US")}
@@ -1027,62 +1242,160 @@ function ItemPickerModal({ alreadyIn, onClose, onConfirm, initialTab = "stones" 
               );
             })}
           </div>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={tab === "stones" ? "Search SKU, shape, color, clarity…" : "Search SKU, name, category…"}
-            className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none text-sm"
-          />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={tab === "stones" ? "Search SKU, shape, color, clarity, origin…" : "Search SKU, name, category, metal…"}
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none text-sm"
+              />
+              <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+              </svg>
+            </div>
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold border transition ${
+                showFilters
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 8h12M9 12h6M11 16h2" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {loading ? (
-            <div className="text-center text-slate-400 py-8">Loading inventory…</div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center text-slate-400 py-8">
-              {alreadyIn.size ? "All matching items are already in this tier." : "No matching items."}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {filtered.map((row) => {
-                const isStone = tab === "stones";
-                const sku = row.sku;
-                const k = `${isStone ? "stone" : "jewelry"}::${sku}`;
-                const checked = picked.has(k);
-                const image = isStone
-                  ? (row.image || (row.additional_pictures || "").split(";")[0] || null)
-                  : (row.cover_image_url || row.image_url || null);
-                const title = isStone ? (row.shape || sku) : (row.name || sku);
-                const subtitle = isStone
-                  ? [row.weight && `${row.weight}ct`, row.color, row.clarity].filter(Boolean).join(" · ")
-                  : [row.category, row.metal_summary].filter(Boolean).join(" · ");
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => togglePick(isStone ? "stone" : "jewelry", sku)}
-                    className={`flex items-center gap-3 p-2 rounded-lg border text-left transition ${
-                      checked ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-slate-300 bg-white"
-                    }`}
-                  >
-                    <div className="w-12 h-12 rounded-md bg-slate-100 overflow-hidden flex-shrink-0">
-                      {image ? <img src={image} alt="" className="w-full h-full object-cover" /> : null}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-mono text-slate-500">{sku}</div>
-                      <div className="text-sm font-semibold text-slate-800 truncate">{title}</div>
-                      <div className="text-xs text-slate-500 truncate">{subtitle}</div>
-                    </div>
-                    <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 grid place-items-center ${
-                      checked ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
-                    }`}>
-                      {checked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+        {/* Body: filters rail (collapsible) + items grid */}
+        <div className="flex-1 min-h-0 grid md:grid-cols-[280px_1fr] overflow-hidden">
+          {showFilters && (
+            <aside className="border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto p-4 space-y-4 max-h-[40vh] md:max-h-none">
+              {tab === "stones" ? (
+                <StoneFiltersPanel
+                  options={stoneOptions}
+                  weightMin={weightMin} setWeightMin={setWeightMin}
+                  weightMax={weightMax} setWeightMax={setWeightMax}
+                  colors={colors} setColors={setColors}
+                  clarities={clarities} setClarities={setClarities}
+                  labs={labs} setLabs={setLabs}
+                  shapes={shapes} setShapes={setShapes}
+                  priceMin={priceMin} setPriceMin={setPriceMin}
+                  priceMax={priceMax} setPriceMax={setPriceMax}
+                  ppcMin={ppcMin} setPpcMin={setPpcMin}
+                  ppcMax={ppcMax} setPpcMax={setPpcMax}
+                />
+              ) : (
+                <JewelryFiltersPanel
+                  options={jewelryOptions}
+                  workshopCount={workshopJewelry.length}
+                  catalogCount={catalogJewelry.length}
+                  jewelrySources={jewelrySources} setJewelrySources={setJewelrySources}
+                  categories={categories} setCategories={setCategories}
+                  metals={metals} setMetals={setMetals}
+                />
+              )}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={resetFilters}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-medium"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </aside>
           )}
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+            {loading ? (
+              <div className="text-center text-slate-400 py-8">Loading inventory…</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center text-slate-400 py-8">
+                {alreadyIn.size && activeFilterCount === 0 && !search
+                  ? "All matching items are already in this tier."
+                  : "No items match the current filters."}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-3 text-xs text-slate-500">
+                  <span>
+                    Showing <span className="font-semibold text-slate-700">{visible.length.toLocaleString("en-US")}</span>
+                    {overflowed > 0 && (
+                      <> of {filtered.length.toLocaleString("en-US")} matches (narrow filters to see more)</>
+                    )}
+                  </span>
+                  <button
+                    onClick={selectAllVisible}
+                    className="text-emerald-700 hover:text-emerald-800 font-semibold"
+                  >
+                    {visible.every((r) => picked.has(`${tab === "stones" ? "stone" : "jewelry"}::${r.sku}`))
+                      ? "Unselect all visible"
+                      : "Select all visible"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {visible.map((row) => {
+                    const isStone = tab === "stones";
+                    const k = `${isStone ? "stone" : "jewelry"}::${row.sku}`;
+                    const checked = picked.has(k);
+                    const image = row.image;
+                    const title = isStone ? (row.shape || row.sku) : (row.name || row.sku);
+                    const subtitle = isStone
+                      ? [row.weight && `${row.weight}ct`, row.color, row.clarity, row.lab].filter(Boolean).join(" · ")
+                      : [row.category, row.metalType].filter(Boolean).join(" · ");
+                    const priceLine = isStone
+                      ? (row.totalPrice ? `$${row.totalPrice.toLocaleString("en-US", { maximumFractionDigits: 0 })}` +
+                          (row.pricePerCarat ? ` · $${row.pricePerCarat.toLocaleString("en-US", { maximumFractionDigits: 0 })}/ct` : "")
+                        : null)
+                      : (row.totalPrice ? `$${row.totalPrice.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : null);
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => togglePick(isStone ? "stone" : "jewelry", row.sku)}
+                        className={`flex items-center gap-3 p-2 rounded-lg border text-left transition ${
+                          checked ? "border-emerald-400 bg-emerald-50" : "border-slate-200 hover:border-slate-300 bg-white"
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-md bg-slate-100 overflow-hidden flex-shrink-0">
+                          {image ? <img src={image} alt="" className="w-full h-full object-cover" /> : null}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-mono text-slate-500 truncate">{row.sku}</span>
+                            {!isStone && row.__source === "catalog" && (
+                              <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-purple-50 text-purple-700 font-bold">Catalog</span>
+                            )}
+                            {!isStone && row.__source === "workshop" && (
+                              <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">Workshop</span>
+                            )}
+                          </div>
+                          <div className="text-sm font-semibold text-slate-800 truncate">{title}</div>
+                          <div className="text-xs text-slate-500 truncate">{subtitle}</div>
+                          {priceLine && (
+                            <div className="text-[11px] text-slate-400 mt-0.5 tabular-nums truncate">{priceLine}</div>
+                          )}
+                        </div>
+                        <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 grid place-items-center ${
+                          checked ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
+                        }`}>
+                          {checked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -1096,6 +1409,198 @@ function ItemPickerModal({ alreadyIn, onClose, onConfirm, initialTab = "stones" 
         </div>
       </div>
     </div>
+  );
+}
+
+/* ───────────────────── Filter sub-components ───────────────────── */
+
+function StoneFiltersPanel({
+  options,
+  weightMin, setWeightMin, weightMax, setWeightMax,
+  colors, setColors, clarities, setClarities,
+  labs, setLabs, shapes, setShapes,
+  priceMin, setPriceMin, priceMax, setPriceMax,
+  ppcMin, setPpcMin, ppcMax, setPpcMax,
+}) {
+  return (
+    <>
+      <FilterSection title="Weight (ct)">
+        <RangeInputs
+          min={weightMin} max={weightMax}
+          onMin={setWeightMin} onMax={setWeightMax}
+          step="0.01" placeholderMin="0" placeholderMax="∞"
+        />
+      </FilterSection>
+
+      <FilterSection title="Shape">
+        <MultiSelectChips options={options.shapes} value={shapes} onChange={setShapes} />
+      </FilterSection>
+
+      <FilterSection title="Color">
+        <MultiSelectChips options={options.colors} value={colors} onChange={setColors} />
+      </FilterSection>
+
+      <FilterSection title="Clarity">
+        <MultiSelectChips options={options.clarities} value={clarities} onChange={setClarities} />
+      </FilterSection>
+
+      <FilterSection title="Lab / Certificate">
+        <MultiSelectChips options={options.labs} value={labs} onChange={setLabs} />
+      </FilterSection>
+
+      <FilterSection title="Total price ($)">
+        <RangeInputs
+          min={priceMin} max={priceMax}
+          onMin={setPriceMin} onMax={setPriceMax}
+          step="1" placeholderMin="0" placeholderMax="∞"
+        />
+      </FilterSection>
+
+      <FilterSection title="Price per carat ($/ct)">
+        <RangeInputs
+          min={ppcMin} max={ppcMax}
+          onMin={setPpcMin} onMax={setPpcMax}
+          step="1" placeholderMin="0" placeholderMax="∞"
+        />
+      </FilterSection>
+    </>
+  );
+}
+
+function JewelryFiltersPanel({
+  options, workshopCount, catalogCount,
+  jewelrySources, setJewelrySources,
+  categories, setCategories,
+  metals, setMetals,
+}) {
+  const toggleSource = (s) => {
+    setJewelrySources((prev) => {
+      // Don't allow zero sources — clicking the only active one re-enables
+      // the other, so the user is never left with an empty pool by accident.
+      if (prev.includes(s)) {
+        if (prev.length === 1) return ["workshop", "catalog"].filter((x) => x !== s);
+        return prev.filter((x) => x !== s);
+      }
+      return [...prev, s];
+    });
+  };
+  return (
+    <>
+      <FilterSection title="Source">
+        <div className="space-y-1.5">
+          <SourceRow
+            id="workshop"
+            label="Workshop pieces"
+            sub={`${workshopCount.toLocaleString("en-US")} item${workshopCount === 1 ? "" : "s"} · custom orders / stock`}
+            checked={jewelrySources.includes("workshop")}
+            onChange={() => toggleSource("workshop")}
+          />
+          <SourceRow
+            id="catalog"
+            label="WooCommerce catalog"
+            sub={`${catalogCount.toLocaleString("en-US")} item${catalogCount === 1 ? "" : "s"} · imported model numbers`}
+            checked={jewelrySources.includes("catalog")}
+            onChange={() => toggleSource("catalog")}
+          />
+        </div>
+      </FilterSection>
+
+      <FilterSection title="Category">
+        <MultiSelectChips options={options.categories} value={categories} onChange={setCategories} />
+      </FilterSection>
+
+      <FilterSection title="Metal">
+        <MultiSelectChips options={options.metals} value={metals} onChange={setMetals} />
+      </FilterSection>
+    </>
+  );
+}
+
+function FilterSection({ title, children }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function RangeInputs({ min, max, onMin, onMax, step = "1", placeholderMin = "Min", placeholderMax = "Max" }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <input
+        type="number"
+        inputMode="decimal"
+        step={step}
+        value={min}
+        onChange={(e) => onMin(e.target.value)}
+        placeholder={placeholderMin}
+        className="w-full px-2 py-1.5 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm tabular-nums"
+      />
+      <input
+        type="number"
+        inputMode="decimal"
+        step={step}
+        value={max}
+        onChange={(e) => onMax(e.target.value)}
+        placeholder={placeholderMax}
+        className="w-full px-2 py-1.5 rounded-lg border border-slate-200 focus:border-emerald-500 outline-none text-sm tabular-nums"
+      />
+    </div>
+  );
+}
+
+function MultiSelectChips({ options, value, onChange }) {
+  if (!options || options.length === 0) {
+    return <div className="text-xs text-slate-400 italic">No values in inventory.</div>;
+  }
+  const toggle = (v) => {
+    if (value.includes(v)) onChange(value.filter((x) => x !== v));
+    else onChange([...value, v]);
+  };
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((opt) => {
+        const isOn = value.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition ${
+              isOn
+                ? "bg-slate-900 border-slate-900 text-white"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SourceRow({ id, label, sub, checked, onChange }) {
+  return (
+    <label
+      htmlFor={`src-${id}`}
+      className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition ${
+        checked ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200 hover:bg-slate-50"
+      }`}
+    >
+      <input
+        id={`src-${id}`}
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="mt-0.5"
+      />
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-slate-800">{label}</div>
+        <div className="text-[10.5px] text-slate-500 truncate">{sub}</div>
+      </div>
+    </label>
   );
 }
 
