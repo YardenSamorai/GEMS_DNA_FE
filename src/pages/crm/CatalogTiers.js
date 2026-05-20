@@ -40,6 +40,11 @@ export default function CatalogTiers() {
   const [creating, setCreating] = useState(false);
   const [editingTier, setEditingTier] = useState(null);
   const [pickingItems, setPickingItems] = useState(false);
+  // When the supplier launches the picker from a typed chip ("Add
+  // jewelry") we open it on the right tab so they don't waste a click
+  // hunting for it. Stored alongside the boolean so we keep the trigger
+  // explicit and easy to follow.
+  const [pickerInitialTab, setPickerInitialTab] = useState("stones");
   const [pickingStores, setPickingStores] = useState(false);
   const [activeSubtab, setActiveSubtab] = useState("items");
 
@@ -144,6 +149,23 @@ export default function CatalogTiers() {
     }
   };
 
+  const onBulkRemoveItems = async (payload) => {
+    if (!activeId || !payload?.length) return;
+    try {
+      const r = await removeItemsFromTier(user.id, activeId, payload);
+      toast.success(`Removed ${r.removed ?? payload.length} item${(r.removed ?? payload.length) === 1 ? "" : "s"}`);
+      await reloadDetail();
+      await reloadTiers();
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
+
+  const openPickerWithTab = (tab) => {
+    setPickerInitialTab(tab === "jewelry" ? "jewelry" : "stones");
+    setPickingItems(true);
+  };
+
   const onAddCompanies = async (companyIds) => {
     if (!activeId || !companyIds.length) return;
     try {
@@ -243,6 +265,9 @@ export default function CatalogTiers() {
                     <div className="mt-1 ml-5 text-[11px] text-slate-500">
                       {Number(t.item_count) || 0} items · {Number(t.company_count) || 0} stores
                     </div>
+                    <div className="mt-1 ml-5">
+                      <TierScopeBadge stones={Number(t.stone_count) || 0} jewelry={Number(t.jewelry_count) || 0} />
+                    </div>
                   </button>
                 ))}
               </div>
@@ -271,6 +296,10 @@ export default function CatalogTiers() {
                               Default
                             </span>
                           )}
+                          <TierScopeBadge
+                            stones={Number(detail.stone_count) || (detail.items || []).filter((it) => it.item_type === "stone").length}
+                            jewelry={Number(detail.jewelry_count) || (detail.items || []).filter((it) => it.item_type === "jewelry").length}
+                          />
                         </div>
                         {detail.description && (
                           <p className="mt-1.5 text-sm text-slate-600 max-w-2xl">{detail.description}</p>
@@ -319,8 +348,10 @@ export default function CatalogTiers() {
                   ) : activeSubtab === "items" ? (
                     <ItemsTab
                       items={detail.items || []}
-                      onAdd={() => setPickingItems(true)}
+                      onAdd={() => openPickerWithTab("stones")}
+                      onAddTyped={openPickerWithTab}
                       onRemove={onRemoveItem}
+                      onBulkRemove={onBulkRemoveItems}
                     />
                   ) : (
                     <StoresTab
@@ -355,6 +386,7 @@ export default function CatalogTiers() {
       {pickingItems && detail && (
         <ItemPickerModal
           alreadyIn={new Set((detail.items || []).map((it) => `${it.item_type}::${it.item_sku}`))}
+          initialTab={pickerInitialTab}
           onClose={() => setPickingItems(false)}
           onConfirm={onAddItems}
         />
@@ -404,66 +436,350 @@ function EmptyState({ onCreate }) {
   );
 }
 
-function ItemsTab({ items, onAdd, onRemove }) {
+function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "stones", onAddTyped }) {
+  // Local UI state — type filter ("all" | "stone" | "jewelry"), free-text
+  // search, and a bulk-select mode so the supplier can clear out tens of
+  // SKUs at once. None of this persists across tier switches (the parent
+  // remounts the tab when activeId changes).
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState(new Set());
+
+  // Reset selection whenever the underlying item list changes (e.g.
+  // after a tier switch or a successful remove). Without this the
+  // checked state would stay associated with stale rows.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [items]);
+
+  const counts = useMemo(() => {
+    let stones = 0;
+    let jewelry = 0;
+    for (const it of items) {
+      if (it.item_type === "stone") stones += 1;
+      else if (it.item_type === "jewelry") jewelry += 1;
+    }
+    return { all: items.length, stones, jewelry };
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return items.filter((it) => {
+      if (typeFilter !== "all" && it.item_type !== typeFilter) return false;
+      if (!q) return true;
+      const hay = [it.item_sku, it.title, it.subtitle, it.shape, it.category]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, typeFilter, search]);
+
+  const toggleOne = (it) => {
+    const k = `${it.item_type}::${it.item_sku}`;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  };
+  const toggleAllVisible = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allOnPage = filtered.every((it) => next.has(`${it.item_type}::${it.item_sku}`));
+      if (allOnPage) {
+        for (const it of filtered) next.delete(`${it.item_type}::${it.item_sku}`);
+      } else {
+        for (const it of filtered) next.add(`${it.item_type}::${it.item_sku}`);
+      }
+      return next;
+    });
+  };
+  const exitSelectMode = () => { setSelectMode(false); setSelected(new Set()); };
+  const performBulkRemove = async () => {
+    if (!selected.size) return;
+    const payload = Array.from(selected).map((k) => {
+      const [type, sku] = k.split("::");
+      return { type, sku };
+    });
+    if (!window.confirm(`Remove ${payload.length} item${payload.length === 1 ? "" : "s"} from this tier?\n\nThe items themselves stay in inventory — only their visibility to subscribed stores changes.`)) return;
+    await onBulkRemove?.(payload);
+    exitSelectMode();
+  };
+
+  // Show a one-line "scope" summary so the supplier knows at a glance
+  // what a store will see when subscribed to this tier.
+  const scopeSummary = (() => {
+    if (counts.all === 0) return "No items yet — stores in this tier won't see anything.";
+    if (counts.jewelry === 0) return `Stones-only tier · ${counts.stones.toLocaleString("en-US")} stone${counts.stones === 1 ? "" : "s"} visible.`;
+    if (counts.stones === 0)  return `Jewelry-only tier · ${counts.jewelry.toLocaleString("en-US")} piece${counts.jewelry === 1 ? "" : "s"} visible.`;
+    return `Mixed tier · ${counts.stones.toLocaleString("en-US")} stones · ${counts.jewelry.toLocaleString("en-US")} jewelry visible.`;
+  })();
+
   return (
-    <div className="p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm text-slate-500">
-          {items.length === 0
-            ? "No items in this tier yet — stores in this tier won't see anything."
-            : `${items.length} item${items.length === 1 ? "" : "s"} visible to subscribed stores.`}
+    <div className="p-5 space-y-4">
+      {/* Header row with type chips + actions */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 flex-wrap">
+          <FilterChip
+            label="All"
+            count={counts.all}
+            active={typeFilter === "all"}
+            onClick={() => setTypeFilter("all")}
+          />
+          <FilterChip
+            label="Stones"
+            count={counts.stones}
+            active={typeFilter === "stone"}
+            onClick={() => setTypeFilter("stone")}
+            accent="sky"
+          />
+          <FilterChip
+            label="Jewelry"
+            count={counts.jewelry}
+            active={typeFilter === "jewelry"}
+            onClick={() => setTypeFilter("jewelry")}
+            accent="purple"
+          />
         </div>
-        <button
-          onClick={onAdd}
-          className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold"
-        >
-          + Add items
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectMode ? (
+            <>
+              <span className="text-xs text-slate-500 mr-1">{selected.size} selected</span>
+              <button
+                onClick={performBulkRemove}
+                disabled={!selected.size}
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold disabled:opacity-50"
+              >
+                Remove selected
+              </button>
+              <button
+                onClick={exitSelectMode}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-medium"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              {items.length > 0 && (
+                <button
+                  onClick={() => setSelectMode(true)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-medium"
+                >
+                  Select
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  // Route to the picker on whichever tab matches the
+                  // current chip — "Add jewelry" opens on Jewelry, "Add
+                  // stones" on Stones, "All" defaults to whatever the
+                  // parent prefers (currently stones).
+                  const target = typeFilter === "jewelry"
+                    ? "jewelry"
+                    : typeFilter === "stone"
+                      ? "stones"
+                      : defaultPickerTab;
+                  if (typeof onAddTyped === "function") {
+                    onAddTyped(target);
+                  } else {
+                    onAdd?.();
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold"
+              >
+                + Add {typeFilter === "jewelry" ? "jewelry" : typeFilter === "stone" ? "stones" : "items"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
+      {/* Scope summary + search */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-xs text-slate-500">{scopeSummary}</div>
+        {items.length > 0 && (
+          <div className="relative w-full sm:w-72">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search SKU, shape, name…"
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none text-sm"
+            />
+            <svg className="absolute left-2.5 top-2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
       {items.length === 0 ? (
         <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500">
-          Click <strong>Add items</strong> to populate this tier.
+          Click <strong>Add items</strong> to populate this tier with stones and/or jewelry.
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500">
+          {search
+            ? "No items match your search."
+            : typeFilter === "jewelry"
+              ? "No jewelry in this tier yet. Use Add jewelry to expose pieces to subscribed stores."
+              : typeFilter === "stone"
+                ? "No stones in this tier yet."
+                : "No items match this filter."}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {items.map((it) => (
-            <div key={`${it.item_type}-${it.item_sku}`} className="border border-slate-200 rounded-xl p-3 flex gap-3 hover:shadow-sm hover:border-slate-300 transition group bg-white">
-              <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
-                {it.image_url ? (
-                  <img src={it.image_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full grid place-items-center text-slate-300 text-xs">No image</div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${
-                    it.item_type === "stone" ? "bg-sky-100 text-sky-700" : "bg-purple-100 text-purple-700"
-                  }`}>
-                    {it.item_type}
-                  </span>
-                  <span className="text-xs font-mono text-slate-500 truncate">{it.item_sku}</span>
-                </div>
-                <div className="mt-1 text-sm font-semibold text-slate-800 truncate">
-                  {it.title || it.item_sku}
-                </div>
-                <div className="text-xs text-slate-500 truncate">
-                  {[it.subtitle, it.weight && `${it.weight}${it.item_type === "stone" ? "ct" : "g"}`].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-              <button
-                onClick={() => onRemove(it)}
-                className="text-xs text-slate-400 hover:text-rose-600 self-start opacity-0 group-hover:opacity-100 transition"
-                title="Remove from this tier"
-              >
-                ✕
-              </button>
+        <>
+          {selectMode && (
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+              <label className="inline-flex items-center gap-2 cursor-pointer text-slate-600">
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300"
+                  checked={filtered.length > 0 && filtered.every((it) => selected.has(`${it.item_type}::${it.item_sku}`))}
+                  onChange={toggleAllVisible}
+                />
+                Select all {filtered.length} visible
+              </label>
+              <span className="text-slate-400">Use the Remove button above to drop them from this tier.</span>
             </div>
-          ))}
-        </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filtered.map((it) => {
+              const key = `${it.item_type}-${it.item_sku}`;
+              const sk = `${it.item_type}::${it.item_sku}`;
+              const isChecked = selected.has(sk);
+              return (
+                <div
+                  key={key}
+                  className={`border rounded-xl p-3 flex gap-3 transition group bg-white ${
+                    isChecked
+                      ? "border-emerald-400 ring-1 ring-emerald-200"
+                      : "border-slate-200 hover:shadow-sm hover:border-slate-300"
+                  } ${selectMode ? "cursor-pointer" : ""}`}
+                  onClick={selectMode ? () => toggleOne(it) : undefined}
+                >
+                  {selectMode && (
+                    <div className={`w-5 h-5 mt-0.5 rounded-md border-2 flex-shrink-0 grid place-items-center ${
+                      isChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
+                    }`}>
+                      {isChecked && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  )}
+                  <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
+                    {it.image_url ? (
+                      <img src={it.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full grid place-items-center text-slate-300 text-xs">No image</div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${
+                        it.item_type === "stone" ? "bg-sky-100 text-sky-700" : "bg-purple-100 text-purple-700"
+                      }`}>
+                        {it.item_type}
+                      </span>
+                      <span className="text-xs font-mono text-slate-500 truncate">{it.item_sku}</span>
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800 truncate">
+                      {it.title || it.item_sku}
+                    </div>
+                    <div className="text-xs text-slate-500 truncate">
+                      {[it.subtitle, it.weight && `${it.weight}${it.item_type === "stone" ? "ct" : "g"}`].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                  {!selectMode && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRemove(it); }}
+                      className="text-xs text-slate-400 hover:text-rose-600 self-start opacity-0 group-hover:opacity-100 transition"
+                      title="Remove from this tier"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+/**
+ * Compact scope pill that tells the supplier at a glance whether a tier
+ * is jewelry-only, stones-only, or mixed — and roughly how big it is.
+ * Rendered both in the sidebar (so users can scan their tiers and pick
+ * the right one without opening it) and beside the tier title in the
+ * detail header.
+ */
+function TierScopeBadge({ stones = 0, jewelry = 0 }) {
+  if (stones === 0 && jewelry === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase tracking-wider">
+        Empty
+      </span>
+    );
+  }
+  if (jewelry === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[10px] font-semibold uppercase tracking-wider">
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+        Stones only
+      </span>
+    );
+  }
+  if (stones === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-semibold uppercase tracking-wider">
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+        Jewelry only
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold uppercase tracking-wider">
+      <span className="inline-flex items-center gap-0.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+        <span className="tabular-nums">{stones.toLocaleString("en-US")}</span>
+      </span>
+      <span className="text-slate-300">·</span>
+      <span className="inline-flex items-center gap-0.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+        <span className="tabular-nums">{jewelry.toLocaleString("en-US")}</span>
+      </span>
+    </span>
+  );
+}
+
+function FilterChip({ label, count, active, onClick, accent = "slate" }) {
+  const palette = {
+    slate:  { activeBg: "bg-slate-900",   activeText: "text-white",       idle: "text-slate-600 hover:bg-slate-100" },
+    sky:    { activeBg: "bg-sky-500",     activeText: "text-white",       idle: "text-slate-600 hover:bg-sky-50" },
+    purple: { activeBg: "bg-purple-500",  activeText: "text-white",       idle: "text-slate-600 hover:bg-purple-50" },
+  }[accent] || { activeBg: "bg-slate-900", activeText: "text-white", idle: "text-slate-600 hover:bg-slate-100" };
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition border ${
+        active
+          ? `${palette.activeBg} ${palette.activeText} border-transparent shadow-sm`
+          : `bg-white border-slate-200 ${palette.idle}`
+      }`}
+    >
+      <span>{label}</span>
+      <span className={`tabular-nums text-[11px] font-bold ${active ? "opacity-90" : "text-slate-400"}`}>
+        {count.toLocaleString("en-US")}
+      </span>
+    </button>
   );
 }
 
@@ -610,9 +926,9 @@ function TierFormModal({ title, initial, onClose, onSubmit }) {
 
 /* ───────────────────── Item picker modal ───────────────────── */
 
-function ItemPickerModal({ alreadyIn, onClose, onConfirm }) {
+function ItemPickerModal({ alreadyIn, onClose, onConfirm, initialTab = "stones" }) {
   const { user } = useUser();
-  const [tab, setTab] = useState("stones");
+  const [tab, setTab] = useState(initialTab === "jewelry" ? "jewelry" : "stones");
   const [stones, setStones] = useState([]);
   const [jewelry, setJewelry] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -680,26 +996,41 @@ function ItemPickerModal({ alreadyIn, onClose, onConfirm }) {
         </div>
 
         <div className="px-5 pt-4 pb-3 border-b border-slate-100 space-y-3">
-          <div className="flex gap-1">
+          {/* Big segmented control — equal halves so the supplier can't
+              miss that jewelry is supported alongside stones. */}
+          <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100">
             {[
-              { id: "stones",  label: `Stones (${stones.length})` },
-              { id: "jewelry", label: `Jewelry (${jewelry.length})` },
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
-                  tab === t.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+              { id: "stones",  label: "Stones",  count: stones.length,  accent: "sky" },
+              { id: "jewelry", label: "Jewelry", count: jewelry.length, accent: "purple" },
+            ].map((t) => {
+              const isActive = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`relative flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                    isActive
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      t.accent === "sky" ? "bg-sky-500" : "bg-purple-500"
+                    }`}
+                  />
+                  <span>{t.label}</span>
+                  <span className={`text-[11px] tabular-nums font-bold ${isActive ? "text-slate-500" : "text-slate-400"}`}>
+                    {t.count.toLocaleString("en-US")}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search SKU, shape, color, name…"
+            placeholder={tab === "stones" ? "Search SKU, shape, color, clarity…" : "Search SKU, name, category…"}
             className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none text-sm"
           />
         </div>
