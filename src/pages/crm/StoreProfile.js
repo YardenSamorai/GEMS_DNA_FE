@@ -2059,34 +2059,52 @@ function InvitePortalUserModal({ storeId, onClose, onInvited }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
-        <div className="px-4 sm:px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+    // Tap-outside-to-close on the overlay; stopPropagation on the panel
+    // keeps clicks *inside* the dialog from bubbling up and dismissing it.
+    <div
+      className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      {/*
+        Constrain the panel to the *dynamic* viewport (100dvh) and let the
+        body section scroll on its own — without these, iPhones cut the
+        dialog in half the moment the on-screen keyboard opens (the
+        keyboard pushes the viewport up, but the bottom-anchored sheet
+        thinks the screen is still its original height). pb-safe keeps
+        the action row clear of the home-indicator bar on PWA installs.
+      */}
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[95dvh] sm:max-h-[90dvh] overflow-hidden flex flex-col"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
+        <div className="px-4 sm:px-6 py-4 border-b border-stone-100 flex items-center justify-between shrink-0">
           <div>
             <h2 className="font-bold text-stone-900">Invite portal user</h2>
             <p className="text-xs text-stone-500 mt-0.5">They'll get an email with a link to sign in to the consignment portal.</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100" aria-label="Close">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <form onSubmit={submit} className="p-4 sm:p-6 space-y-3">
+        <div className="px-4 sm:px-6 py-4 space-y-3 overflow-y-auto">
           <Input label="Full name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="e.g. Sarah Levi" />
           <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" placeholder="sarah@store.com" />
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={busy}
-              className="px-3 py-2 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 disabled:opacity-50"
-            >
-              {busy ? "Sending…" : "Send invitation"}
-            </button>
-          </div>
-        </form>
-      </div>
+        </div>
+        <div className="px-4 sm:px-6 py-3 border-t border-stone-100 flex justify-end gap-2 shrink-0 bg-white">
+          <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm font-semibold text-stone-600 hover:bg-stone-100">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className="px-3 py-2 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 disabled:opacity-50"
+          >
+            {busy ? "Sending…" : "Send invitation"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
