@@ -2210,8 +2210,13 @@ const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel }) => {
   if (!isOpen || !stone) return null;
 
   const isJewelry = stone.category === 'Jewelry';
+  // Workshop pieces don't have a public DNA page — share the workshop
+  // detail (owner-only) so reps can deep-link the row from the team
+  // chat. Catalog jewelry stays on /jewelry/:modelNumber (public DNA).
   const shareUrl = isJewelry
-    ? `https://gems-dna.com/jewelry/${stone.sku}`
+    ? (stone.source === 'workshop'
+        ? `https://gems-dna.com/jewelry/items/${stone.workshopId}`
+        : `https://gems-dna.com/jewelry/${stone.sku}`)
     : `https://gems-dna.com/${stone.sku}`;
 
   const images = isJewelry ? (stone.allImages || (stone.imageUrl ? [stone.imageUrl] : [])) : [];
@@ -4115,15 +4120,15 @@ const JewelryDetails = ({ stone }) => {
           {/* Links & Actions */}
           <div className="flex flex-wrap gap-2 pt-1">
             <a
-              href={`/jewelry/${stone.sku}`}
-              target="_blank"
+              href={stone.detailHref || (stone.sku ? `/jewelry/${stone.sku}` : '#')}
+              target={stone.source === 'workshop' ? '_self' : '_blank'}
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-medium hover:bg-slate-900 transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              View DNA
+              {stone.source === 'workshop' ? 'Open in Production' : 'View DNA'}
             </a>
             {stone.certificateLink && (
               <a href={stone.certificateLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 text-xs font-medium hover:bg-stone-200 transition-colors">
@@ -5477,19 +5482,59 @@ const StoneSearchPage = () => {
   // Jewelry state - fetched from backend API
   const [jewelryItems, setJewelryItems] = useState([]);
   const [jewelryLoading, setJewelryLoading] = useState(false);
+  // 'all' | 'workshop' | 'catalog' — restricts the merged jewelry list
+  // to one of its two sources. Lives outside the main `filters` object
+  // because the jewelry table only has it; the rest of the system uses
+  // the unified filter shape.
+  const [jewelrySourceFilter, setJewelrySourceFilter] = useState('all');
   const allItems = useMemo(() => [...stones, ...jewelryItems], [stones, jewelryItems]);
 
+  // /inventory?tab=jewelry now reads from TWO sources and merges them
+  // into one unified jewelry list:
+  //
+  //   • /api/jewelry        → jewelry_products (WooCommerce CSV import,
+  //                            global to the workspace)
+  //   • /api/jewelry-items  → jewelry_items (workshop / production
+  //                            pieces, tenant-scoped to the owner)
+  //
+  // Each row carries a `source` field ('catalog' | 'workshop') so the
+  // UI can route clicks correctly (workshop → /jewelry/items/:id ,
+  // catalog → /jewelry/:modelNumber DNA page) and so we can offer a
+  // source filter chip.
   const fetchJewelry = useCallback(async () => {
     setJewelryLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/jewelry`);
-      if (!res.ok) throw new Error('Failed to fetch jewelry');
-      const data = await res.json();
-      const items = (data.jewelry || []).map((row, idx) => {
+      const [catalogSettled, workshopSettled] = await Promise.allSettled([
+        fetch(`${API_BASE}/api/jewelry`).then((r) => {
+          if (!r.ok) throw new Error(`catalog failed (${r.status})`);
+          return r.json();
+        }),
+        user?.id
+          ? fetch(`${API_BASE}/api/jewelry-items?userId=${encodeURIComponent(user.id)}`).then((r) => {
+              if (!r.ok) throw new Error(`workshop failed (${r.status})`);
+              return r.json();
+            })
+          : Promise.resolve({ items: [] }),
+      ]);
+
+      if (catalogSettled.status === "rejected") {
+        console.warn("Inventory: catalog jewelry fetch failed", catalogSettled.reason);
+      }
+      if (workshopSettled.status === "rejected") {
+        console.warn("Inventory: workshop jewelry fetch failed", workshopSettled.reason);
+      }
+
+      const catalogRaw  = catalogSettled.status  === "fulfilled" ? (catalogSettled.value?.jewelry  || []) : [];
+      const workshopRaw = workshopSettled.status === "fulfilled" ? (workshopSettled.value?.items || []) : [];
+
+      const catalogItems = catalogRaw.map((row, idx) => {
         const images = (row.all_pictures_link || '').split(';').map(u => u.trim()).filter(Boolean);
+        const sku = row.model_number || '';
         return {
-          id: `jwl_${idx}_${row.model_number || idx}`,
-          sku: row.model_number || '',
+          id: `jwl_${idx}_${sku || idx}`,
+          source: 'catalog',
+          detailHref: sku ? `/jewelry/${sku}` : null,
+          sku,
           stockNumber: row.stock_number || '',
           title: sanitizeText(row.title) || '',
           jewelryType: row.jewelry_type || '',
@@ -5518,13 +5563,64 @@ const StoneSearchPage = () => {
           jewelrySize: row.jewelry_size || '',
         };
       });
-      setJewelryItems(items);
+
+      // Workshop pieces. Field names diverge (name vs title,
+      // cover_image_url vs all_pictures_link, sale_price vs price,
+      // metal_summary vs metal_type), so we map them into the same
+      // unified shape. Status surfaces as `workshopStatus` so the UI
+      // can show a small "draft / in progress / ready / sold" pill.
+      const workshopItems = workshopRaw.map((row) => ({
+        id: `ws_${row.id}`,
+        source: 'workshop',
+        workshopId: row.id,
+        workshopStatus: row.status || 'draft',
+        workshopType: row.type || '',
+        detailHref: `/jewelry/items/${row.id}`,
+        sku: row.sku || '',
+        stockNumber: '',
+        title: sanitizeText(row.name) || row.sku || '',
+        jewelryType: row.category || row.type || '',
+        style: '',
+        collection: '',
+        priceTotal: Number(row.sale_price ?? row.total_cost ?? 0),
+        imageUrl: row.cover_image_url || null,
+        allImages: row.cover_image_url ? [row.cover_image_url] : [],
+        videoLink: '',
+        certificateLink: '',
+        certificateNumber: '',
+        description: sanitizeText(row.description) || '',
+        fullDescription: sanitizeText(row.internal_notes) || sanitizeText(row.description) || '',
+        jewelryWeight: row.weight_grams ?? '',
+        weightCt: 0,
+        stoneType: '',
+        centerStoneCarat: 0,
+        shape: '',
+        color: '',
+        clarity: '',
+        metalType: row.metal_summary || '',
+        currency: 'USD',
+        availability: row.status === 'sold' ? 'Sold' : (row.status === 'ready' ? 'Ready' : 'In production'),
+        shippingFrom: row.location || '',
+        category: 'Jewelry',
+        jewelrySize: row.size || '',
+      }));
+
+      // eslint-disable-next-line no-console
+      console.log("[Inventory jewelry] loaded:", {
+        catalog: catalogItems.length,
+        workshop: workshopItems.length,
+        total: catalogItems.length + workshopItems.length,
+      });
+
+      // Workshop pieces first so the user sees their own active
+      // production work above the bulk WooCommerce catalog.
+      setJewelryItems([...workshopItems, ...catalogItems]);
     } catch (e) {
       console.log('Failed to load jewelry:', e.message);
     } finally {
       setJewelryLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => { fetchJewelry(); }, [fetchJewelry]);
 
@@ -6832,7 +6928,11 @@ const StoneSearchPage = () => {
   }, [filters, smartSearch]);
 
   const modeFilteredStones = useMemo(() => {
-    if (inventoryMode === 'jewelry') return jewelryItems;
+    if (inventoryMode === 'jewelry') {
+      if (jewelrySourceFilter === 'workshop') return jewelryItems.filter((j) => j.source === 'workshop');
+      if (jewelrySourceFilter === 'catalog')  return jewelryItems.filter((j) => j.source === 'catalog');
+      return jewelryItems;
+    }
     return stones.filter(stone => {
       const mapped = getMappedCategories(stone.category);
       if (inventoryMode === 'diamonds') {
@@ -6840,11 +6940,14 @@ const StoneSearchPage = () => {
       }
       return !mapped.includes('Diamond');
     });
-  }, [stones, jewelryItems, inventoryMode]);
+  }, [stones, jewelryItems, inventoryMode, jewelrySourceFilter]);
 
   const diamondCount = useMemo(() => stones.filter(s => getMappedCategories(s.category).includes('Diamond')).length, [stones]);
   const gemstoneCount = useMemo(() => stones.filter(s => !getMappedCategories(s.category).includes('Diamond')).length, [stones]);
   const jewelryCount = jewelryItems.length;
+  // Per-source counts used by the jewelry source chips.
+  const jewelryWorkshopCount = useMemo(() => jewelryItems.filter((j) => j.source === 'workshop').length, [jewelryItems]);
+  const jewelryCatalogCount  = useMemo(() => jewelryItems.filter((j) => j.source === 'catalog').length,  [jewelryItems]);
 
   const shapesOptions = useMemo(() => {
     const set = new Set();
@@ -7734,7 +7837,10 @@ const StoneSearchPage = () => {
           )}
           {inventoryMode === 'jewelry' && !jewelryLoading && jewelryItems.length === 0 && (
             <div className="mb-4 p-4 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-600">
-              No jewelry items found. Upload a Jewelry CSV from the <Link to="/dashboard?tab=jewelry" className="font-semibold underline">Jewelry dashboard</Link>.
+              No jewelry items yet. Add a workshop piece from the{" "}
+              <Link to="/jewelry/production" className="font-semibold underline">Production Board</Link>
+              {" "}or import a WooCommerce catalog CSV from the{" "}
+              <Link to="/dashboard?tab=jewelry" className="font-semibold underline">Jewelry dashboard</Link>.
             </div>
           )}
 
@@ -7762,15 +7868,51 @@ const StoneSearchPage = () => {
           {/* Filters */}
           {inventoryMode === 'jewelry' ? (
             jewelryItems.length > 0 && (
-              <JewelryFilters
-                filters={filters}
-                onChange={setFilters}
-                jewelryTypeOptions={jewelryTypeOptions}
-                jewelryStyleOptions={jewelryStyleOptions}
-                jewelryCollectionOptions={jewelryCollectionOptions}
-                jewelryStoneTypeOptions={jewelryStoneTypeOptions}
-                jewelryMetalTypeOptions={jewelryMetalTypeOptions}
-              />
+              <>
+                {/* Source filter chips. Workshop = jewelry_items table
+                    (your own production board pieces), Catalog =
+                    jewelry_products table (WooCommerce CSV import). */}
+                <div className="mb-3 flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] uppercase tracking-wider font-semibold text-stone-500">
+                    Source:
+                  </span>
+                  {[
+                    { id: 'all',      label: 'All',      count: jewelryCount },
+                    { id: 'workshop', label: 'Workshop', count: jewelryWorkshopCount },
+                    { id: 'catalog',  label: 'Catalog',  count: jewelryCatalogCount  },
+                  ].map((opt) => {
+                    const active = jewelrySourceFilter === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setJewelrySourceFilter(opt.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                          active
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                        }`}
+                      >
+                        {opt.label}
+                        <span className={`tabular-nums text-[10px] px-1.5 py-0.5 rounded-full ${
+                          active ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'
+                        }`}>
+                          {opt.count.toLocaleString()}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <JewelryFilters
+                  filters={filters}
+                  onChange={setFilters}
+                  jewelryTypeOptions={jewelryTypeOptions}
+                  jewelryStyleOptions={jewelryStyleOptions}
+                  jewelryCollectionOptions={jewelryCollectionOptions}
+                  jewelryStoneTypeOptions={jewelryStoneTypeOptions}
+                  jewelryMetalTypeOptions={jewelryMetalTypeOptions}
+                />
+              </>
             )
           ) : (
           <StoneFilters

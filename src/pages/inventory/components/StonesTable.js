@@ -115,6 +115,17 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'sku': return (
         <td key={colId} className={cellBase}>
           <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
+          {/* Workshop / Catalog pill — set only on jewelry rows. */}
+          {stone.source === 'workshop' && (
+            <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+              WS
+            </span>
+          )}
+          {stone.source === 'catalog' && (
+            <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider px-1 py-0.5 rounded bg-violet-50 text-violet-700 ring-1 ring-violet-200">
+              CAT
+            </span>
+          )}
           <OnMemoBadge sku={stone.sku} type="stone" size="sm" className="ml-1.5" />
         </td>
       );

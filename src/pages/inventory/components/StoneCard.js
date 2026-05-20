@@ -127,6 +127,20 @@ const StoneCard = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs font-mono text-primary px-1.5 py-0.5 rounded bg-primary/10">{stone.sku}</span>
+                {/* Workshop vs Catalog source pill — only set on
+                    jewelry rows so stone cards stay clean. */}
+                {stone.source === 'workshop' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                    <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                    Workshop
+                  </span>
+                )}
+                {stone.source === 'catalog' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 ring-1 ring-violet-200">
+                    <span className="w-1 h-1 rounded-full bg-violet-500" />
+                    Catalog
+                  </span>
+                )}
                 <StoneAssignmentChip
                   stone={stone}
                   onAssign={onAssign}
