@@ -281,6 +281,15 @@ export default function CrmContacts() {
     };
   }, [filteredContacts]);
 
+  // Section headers + the A-Z jump strip only add value once there are
+  // *multiple* letter groups to navigate between. After a tight search
+  // ("Kes" → 1 contact under K) they just clutter the layout — especially
+  // on mobile, where the thin sticky banner used to bleed the card avatar
+  // through behind it and read as "broken". iOS Contacts hides both
+  // affordances in this case for the same reason.
+  const showSectionHeaders = contactGroups.length > 1;
+  const showAlphabetIndex = contactGroups.length > 1;
+
   const counts = useMemo(() => {
     const c = { all: contacts.length };
     CONTACT_TYPES.forEach((t) => (c[t.value] = 0));
@@ -635,16 +644,18 @@ export default function CrmContacts() {
                       {/* Sticky letter divider — colSpan covers all 9
                           desktop columns. We rely on window scroll, so
                           `top` matches the global TopBar offset. */}
-                      <tr data-letter-section={g.letter}>
-                        <th
-                          colSpan={9}
-                          scope="rowgroup"
-                          className="sticky z-[5] bg-stone-100/90 backdrop-blur px-4 py-1.5 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-y border-stone-200"
-                          style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
-                        >
-                          {g.letter}
-                        </th>
-                      </tr>
+                      {showSectionHeaders && (
+                        <tr data-letter-section={g.letter}>
+                          <th
+                            colSpan={9}
+                            scope="rowgroup"
+                            className="sticky z-[5] bg-stone-50 px-4 py-1.5 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-b border-stone-200"
+                            style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
+                          >
+                            {g.letter}
+                          </th>
+                        </tr>
+                      )}
                       {g.items.map((c) => (
                     <tr
                       key={c.id}
@@ -728,17 +739,22 @@ export default function CrmContacts() {
 
               {/* Mobile cards — same grouping as the desktop table.
                   Each letter gets a sticky divider that stays just
-                  below the TopBar while you scroll through its rows. */}
+                  below the TopBar while you scroll through its rows.
+                  Background is *fully opaque* so card avatars never
+                  bleed through it when scrolled — the previous /90
+                  + backdrop-blur combo read as broken on iOS. */}
               <div className="md:hidden">
                 {contactGroups.map((g) => (
                   <Fragment key={g.letter}>
-                    <div
-                      data-letter-section={g.letter}
-                      className="sticky z-[5] bg-stone-100/90 backdrop-blur px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-600 border-y border-stone-200"
-                      style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
-                    >
-                      {g.letter}
-                    </div>
+                    {showSectionHeaders && (
+                      <div
+                        data-letter-section={g.letter}
+                        className="sticky z-[5] bg-stone-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-b border-stone-200"
+                        style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
+                      >
+                        {g.letter}
+                      </div>
+                    )}
                     <div className="divide-y divide-stone-100">
                 {g.items.map((c) => {
                   const isSelected = selected.has(c.id);
@@ -817,7 +833,7 @@ export default function CrmContacts() {
             </>
           )}
         </div>
-        {!loading && filteredContacts.length > 0 && alphabetLetters.length > 0 && (
+        {!loading && filteredContacts.length > 0 && showAlphabetIndex && (
           <AlphabetIndex
             letters={alphabetLetters}
             present={alphabetPresent}

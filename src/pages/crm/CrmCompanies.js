@@ -63,6 +63,13 @@ export default function CrmCompanies() {
     return { companyGroups: groups, alphabetLetters: letters, alphabetPresent: present };
   }, [filtered]);
 
+  // Only show section banners + the side A-Z strip once there's actually
+  // more than one letter group to navigate between. Otherwise (e.g. a
+  // search that narrows the list to a single letter) they just add
+  // visual noise and read as broken on small screens.
+  const showSectionHeaders = companyGroups.length > 1;
+  const showAlphabetIndex = companyGroups.length > 1;
+
   const handleCreate = async (data) => {
     try {
       const created = await createCompany(user.id, data);
@@ -124,13 +131,15 @@ export default function CrmCompanies() {
             <div className="space-y-1">
               {companyGroups.map((g) => (
                 <Fragment key={g.letter}>
-                  <div
-                    data-letter-section={g.letter}
-                    className="sticky z-[5] bg-stone-100/90 backdrop-blur px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-y border-stone-200 rounded"
-                    style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
-                  >
-                    {g.letter}
-                  </div>
+                  {showSectionHeaders && (
+                    <div
+                      data-letter-section={g.letter}
+                      className="sticky z-[5] bg-stone-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stone-600 border-b border-stone-200 rounded"
+                      style={{ top: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
+                    >
+                      {g.letter}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 py-2">
                     {g.items.map((c) => <CompanyCard key={c.id} company={c} />)}
                   </div>
@@ -139,7 +148,7 @@ export default function CrmCompanies() {
             </div>
           )}
         </div>
-        {!loading && filtered.length > 0 && alphabetLetters.length > 0 && (
+        {!loading && filtered.length > 0 && showAlphabetIndex && (
           <AlphabetIndex
             letters={alphabetLetters}
             present={alphabetPresent}
