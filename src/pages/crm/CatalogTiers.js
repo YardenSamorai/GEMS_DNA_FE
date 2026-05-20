@@ -201,7 +201,7 @@ export default function CatalogTiers() {
           backgroundImage:
             "radial-gradient(circle at 20% 20%, rgba(16,185,129,0.4), transparent 40%), radial-gradient(circle at 80% 30%, rgba(56,189,248,0.3), transparent 40%)",
         }} />
-        <div className="relative max-w-7xl mx-auto px-6 py-10">
+        <div className="relative max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
               <div className="text-xs uppercase tracking-[0.2em] text-emerald-300/80">Catalog control</div>
@@ -232,13 +232,13 @@ export default function CatalogTiers() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
           <div className="text-slate-500 text-sm">Loading tiers…</div>
         ) : tiers.length === 0 ? (
           <EmptyState onCreate={() => setCreating(true)} />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-6">
             {/* Sidebar */}
             <aside className="space-y-2">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 px-2">All tiers</div>
@@ -438,6 +438,7 @@ function EmptyState({ onCreate }) {
 }
 
 const ITEMS_PAGE_SIZE = 100;
+const VIEW_MODE_KEY = "catalog.tier.items.viewMode";
 
 function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "stones", onAddTyped }) {
   // Local UI state — type filter ("all" | "stone" | "jewelry"), free-text
@@ -450,6 +451,21 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
   const [selected, setSelected] = useState(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
+  // View mode is persisted across sessions — power users have a strong
+  // preference between dense rows ("scan a long list") and image-first
+  // cards ("browse visually"), and we want their choice to stick when
+  // they come back tomorrow.
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const v = localStorage.getItem(VIEW_MODE_KEY);
+      return v === "rows" ? "rows" : "grid";
+    } catch (_) {
+      return "grid";
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch (_) {}
+  }, [viewMode]);
 
   // Stone advanced filters
   const [weightMin, setWeightMin] = useState("");
@@ -663,24 +679,27 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {items.length > 0 && (
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold transition ${
-                showFilters
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 8h12M9 12h6M11 16h2" />
-              </svg>
-              Filters
-              {advancedActiveCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
-                  {advancedActiveCount}
-                </span>
-              )}
-            </button>
+            <>
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold transition ${
+                  showFilters
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 8h12M9 12h6M11 16h2" />
+                </svg>
+                Filters
+                {advancedActiveCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                    {advancedActiveCount}
+                  </span>
+                )}
+              </button>
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </>
           )}
           {selectMode ? (
             <>
@@ -821,85 +840,23 @@ function ItemsTab({ items, onAdd, onRemove, onBulkRemove, defaultPickerTab = "st
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {paginated.map((it) => {
-                    const key = `${it.item_type}-${it.item_sku}`;
-                    const sk = `${it.item_type}::${it.item_sku}`;
-                    const isChecked = selected.has(sk);
-                    const priceLine = it.item_type === "stone"
-                      ? (it.stone_total_price
-                          ? `$${Number(it.stone_total_price).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
-                            + (it.stone_price_per_carat
-                                ? ` · $${Number(it.stone_price_per_carat).toLocaleString("en-US", { maximumFractionDigits: 0 })}/ct`
-                                : "")
-                          : null)
-                      : null;
-                    return (
-                      <div
-                        key={key}
-                        className={`border rounded-xl p-3 flex gap-3 transition group bg-white ${
-                          isChecked
-                            ? "border-emerald-400 ring-1 ring-emerald-200"
-                            : "border-slate-200 hover:shadow-sm hover:border-slate-300"
-                        } ${selectMode ? "cursor-pointer" : ""}`}
-                        onClick={selectMode ? () => toggleOne(it) : undefined}
-                      >
-                        {selectMode && (
-                          <div className={`w-5 h-5 mt-0.5 rounded-md border-2 flex-shrink-0 grid place-items-center ${
-                            isChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
-                          }`}>
-                            {isChecked && (
-                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        )}
-                        <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
-                          {it.image_url ? (
-                            <img src={it.image_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full grid place-items-center text-slate-300 text-xs">No image</div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${
-                              it.item_type === "stone" ? "bg-sky-100 text-sky-700" : "bg-purple-100 text-purple-700"
-                            }`}>
-                              {it.item_type}
-                            </span>
-                            <span className="text-xs font-mono text-slate-500 truncate">{it.item_sku}</span>
-                            {it.item_type === "jewelry" && it.jewelry_source === "catalog" && (
-                              <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-purple-50 text-purple-700 font-bold">Catalog</span>
-                            )}
-                            {it.item_type === "jewelry" && it.jewelry_source === "workshop" && (
-                              <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">Workshop</span>
-                            )}
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-slate-800 truncate">
-                            {it.title || it.item_sku}
-                          </div>
-                          <div className="text-xs text-slate-500 truncate">
-                            {[it.subtitle, it.weight && `${it.weight}${it.item_type === "stone" ? "ct" : "g"}`].filter(Boolean).join(" · ")}
-                          </div>
-                          {priceLine && (
-                            <div className="text-[11px] text-slate-400 mt-0.5 tabular-nums truncate">{priceLine}</div>
-                          )}
-                        </div>
-                        {!selectMode && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onRemove(it); }}
-                            className="text-xs text-slate-400 hover:text-rose-600 self-start opacity-0 group-hover:opacity-100 transition"
-                            title="Remove from this tier"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                {viewMode === "grid" ? (
+                  <ItemsGrid
+                    rows={paginated}
+                    selected={selected}
+                    selectMode={selectMode}
+                    onToggle={toggleOne}
+                    onRemove={onRemove}
+                  />
+                ) : (
+                  <ItemsRows
+                    rows={paginated}
+                    selected={selected}
+                    selectMode={selectMode}
+                    onToggle={toggleOne}
+                    onRemove={onRemove}
+                  />
+                )}
 
                 <Pagination
                   page={page}
@@ -1052,6 +1009,281 @@ function TierScopeBadge({ stones = 0, jewelry = 0 }) {
       </span>
     </span>
   );
+}
+
+/**
+ * Two-segment toggle between the visual grid and the dense rows table
+ * layouts. Lives in the items toolbar, persists across sessions via
+ * localStorage.
+ */
+function ViewModeToggle({ value, onChange }) {
+  const Btn = ({ id, label, icon }) => {
+    const active = value === id;
+    return (
+      <button
+        onClick={() => onChange(id)}
+        title={`${label} view`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold transition ${
+          active ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+        }`}
+        aria-pressed={active}
+      >
+        {icon}
+        <span className="hidden sm:inline">{label}</span>
+      </button>
+    );
+  };
+  return (
+    <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+      <Btn
+        id="grid"
+        label="Grid"
+        icon={
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5h6v6H4zM14 5h6v6h-6zM4 13h6v6H4zM14 13h6v6h-6z" />
+          </svg>
+        }
+      />
+      <Btn
+        id="rows"
+        label="Rows"
+        icon={
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * Image-first card grid. The number of columns adapts to the
+ * available width so the catalog stays browsable on ultrawide
+ * monitors without leaving giant white margins.
+ */
+function ItemsGrid({ rows, selected, selectMode, onToggle, onRemove }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 [@media(min-width:1700px)]:grid-cols-5 gap-3">
+      {rows.map((it) => {
+        const key = `${it.item_type}-${it.item_sku}`;
+        const sk = `${it.item_type}::${it.item_sku}`;
+        const isChecked = selected.has(sk);
+        const priceLine = it.item_type === "stone"
+          ? (it.stone_total_price
+              ? `$${Number(it.stone_total_price).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                + (it.stone_price_per_carat
+                    ? ` · $${Number(it.stone_price_per_carat).toLocaleString("en-US", { maximumFractionDigits: 0 })}/ct`
+                    : "")
+              : null)
+          : null;
+        return (
+          <div
+            key={key}
+            className={`border rounded-xl p-3 flex gap-3 transition group bg-white ${
+              isChecked
+                ? "border-emerald-400 ring-1 ring-emerald-200"
+                : "border-slate-200 hover:shadow-sm hover:border-slate-300"
+            } ${selectMode ? "cursor-pointer" : ""}`}
+            onClick={selectMode ? () => onToggle(it) : undefined}
+          >
+            {selectMode && (
+              <div className={`w-5 h-5 mt-0.5 rounded-md border-2 flex-shrink-0 grid place-items-center ${
+                isChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300"
+              }`}>
+                {isChecked && (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            )}
+            <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
+              {it.image_url ? (
+                <img src={it.image_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-slate-300 text-xs">No image</div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <TypeBadge type={it.item_type} />
+                <span className="text-xs font-mono text-slate-500 truncate">{it.item_sku}</span>
+                <SourceBadge source={it.item_type === "jewelry" ? it.jewelry_source : null} />
+              </div>
+              <div className="mt-1 text-sm font-semibold text-slate-800 truncate">
+                {it.title || it.item_sku}
+              </div>
+              <div className="text-xs text-slate-500 truncate">
+                {[it.subtitle, it.weight && `${it.weight}${it.item_type === "stone" ? "ct" : "g"}`].filter(Boolean).join(" · ")}
+              </div>
+              {priceLine && (
+                <div className="text-[11px] text-slate-400 mt-0.5 tabular-nums truncate">{priceLine}</div>
+              )}
+            </div>
+            {!selectMode && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemove(it); }}
+                className="text-xs text-slate-400 hover:text-rose-600 self-start opacity-0 group-hover:opacity-100 transition"
+                title="Remove from this tier"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Compact tabular layout — one row per SKU, fixed-width columns. Lets
+ * the supplier scan a thousand-item tier without scrolling forever.
+ * Specs/weight/price columns are hidden below md so the row never
+ * truncates badly on small screens.
+ */
+function ItemsRows({ rows, selected, selectMode, onToggle, onRemove }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      {/* Header */}
+      <div className="grid grid-cols-[40px_minmax(120px,180px)_minmax(0,1fr)_120px_140px_40px] md:grid-cols-[40px_minmax(140px,200px)_minmax(0,1fr)_minmax(140px,1fr)_100px_150px_40px] gap-3 items-center px-4 py-2 bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider font-bold text-slate-500">
+        <span></span>
+        <span>SKU</span>
+        <span>Title</span>
+        <span className="hidden md:block">Specs</span>
+        <span className="text-right tabular-nums">Weight</span>
+        <span className="text-right tabular-nums">Price</span>
+        <span></span>
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {rows.map((it) => {
+          const key = `${it.item_type}-${it.item_sku}`;
+          const sk = `${it.item_type}::${it.item_sku}`;
+          const isChecked = selected.has(sk);
+          const isStone = it.item_type === "stone";
+          const specs = isStone
+            ? [it.stone_color, it.stone_clarity, it.stone_lab].filter(Boolean).join(" · ")
+            : [it.jewelry_category, it.jewelry_metal].filter(Boolean).join(" · ");
+          const weight = it.weight
+            ? `${it.weight}${isStone ? "ct" : "g"}`
+            : null;
+          const totalPrice = isStone && it.stone_total_price
+            ? `$${Number(it.stone_total_price).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+            : null;
+          const ppc = isStone && it.stone_price_per_carat
+            ? `$${Number(it.stone_price_per_carat).toLocaleString("en-US", { maximumFractionDigits: 0 })}/ct`
+            : null;
+          return (
+            <div
+              key={key}
+              className={`grid grid-cols-[40px_minmax(120px,180px)_minmax(0,1fr)_120px_140px_40px] md:grid-cols-[40px_minmax(140px,200px)_minmax(0,1fr)_minmax(140px,1fr)_100px_150px_40px] gap-3 items-center px-4 py-2 hover:bg-slate-50 group transition ${
+                isChecked ? "bg-emerald-50/40" : ""
+              } ${selectMode ? "cursor-pointer" : ""}`}
+              onClick={selectMode ? () => onToggle(it) : undefined}
+            >
+              {/* Image + select checkbox */}
+              <div className="relative">
+                {selectMode ? (
+                  <div className={`w-7 h-7 rounded-md border-2 grid place-items-center ${
+                    isChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-white"
+                  }`}>
+                    {isChecked && (
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-9 h-9 rounded-md bg-slate-100 overflow-hidden">
+                    {it.image_url ? (
+                      <img src={it.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : null}
+                  </div>
+                )}
+              </div>
+
+              {/* Type + SKU column */}
+              <div className="flex items-center gap-1.5 min-w-0">
+                <TypeBadge type={it.item_type} />
+                <span className="text-xs font-mono text-slate-500 truncate">{it.item_sku}</span>
+              </div>
+
+              {/* Title (+ source badge on jewelry) */}
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-800 truncate">
+                  {it.title || it.item_sku}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate md:hidden">{specs}</div>
+                {!isStone && (
+                  <div className="md:hidden mt-0.5">
+                    <SourceBadge source={it.jewelry_source} />
+                  </div>
+                )}
+              </div>
+
+              {/* Specs (hidden on mobile, where it's inlined above) */}
+              <div className="hidden md:flex items-center gap-2 min-w-0">
+                <span className="text-xs text-slate-600 truncate">{specs || "—"}</span>
+                {!isStone && <SourceBadge source={it.jewelry_source} />}
+              </div>
+
+              {/* Weight */}
+              <div className="text-right text-xs tabular-nums text-slate-600">
+                {weight || "—"}
+              </div>
+
+              {/* Price (total + per-ct on second line for stones) */}
+              <div className="text-right text-xs tabular-nums">
+                {totalPrice ? (
+                  <>
+                    <div className="font-semibold text-slate-800">{totalPrice}</div>
+                    {ppc && <div className="text-[10px] text-slate-400">{ppc}</div>}
+                  </>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="text-right">
+                {!selectMode && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRemove(it); }}
+                    className="text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition text-sm"
+                    title="Remove from this tier"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TypeBadge({ type }) {
+  return (
+    <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold ${
+      type === "stone" ? "bg-sky-100 text-sky-700" : "bg-purple-100 text-purple-700"
+    }`}>
+      {type}
+    </span>
+  );
+}
+
+function SourceBadge({ source }) {
+  if (source === "catalog") {
+    return <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-purple-50 text-purple-700 font-bold">Catalog</span>;
+  }
+  if (source === "workshop") {
+    return <span className="text-[9px] uppercase tracking-wider px-1 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">Workshop</span>;
+  }
+  return null;
 }
 
 function FilterChip({ label, count, active, onClick, accent = "slate" }) {
