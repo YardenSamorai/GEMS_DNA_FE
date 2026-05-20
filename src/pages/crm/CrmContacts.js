@@ -153,9 +153,15 @@ export default function CrmContacts() {
 
   const reload = useCallback(() => {
     if (!user?.id) return;
+    // NOTE: `type` (the Lead/Buyer/Dealer pill) is *intentionally* not
+    // sent to the server. We need every chip's count to stay correct as
+    // the user clicks between them (`All (16)` shouldn't shrink to 8 the
+    // moment they peek at "Lead"), so the contacts state must always
+    // contain the whole result and the type filter is applied locally
+    // in `filteredContacts`. The cache key therefore doesn't include
+    // type either — switching pills is now a zero-fetch UI flip.
     const filterPayload = {
       search,
-      type: typeFilter,
       folderId: selectedFolderId,
       assignedTo: assigneeFilter !== "all" ? assigneeFilter : undefined,
       ...stripTypeFromFilters(advancedFilters),
@@ -243,7 +249,7 @@ export default function CrmContacts() {
         // subsequent refreshes don't churn.
         setInitialLoading(false);
       });
-  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, assigneeFilter, thumbCache]);
+  }, [user?.id, search, selectedFolderId, advancedFilters, assigneeFilter, thumbCache]);
 
   // Load tags + folders ONCE per page (not on every keystroke / filter change)
   const reloadSidebars = useCallback(() => {
@@ -258,12 +264,24 @@ export default function CrmContacts() {
     if (!user?.id) return;
     const t = setTimeout(reload, 250);
     return () => clearTimeout(t);
-  }, [user?.id, search, typeFilter, selectedFolderId, advancedFilters, assigneeFilter, reload]);
+  }, [user?.id, search, selectedFolderId, advancedFilters, assigneeFilter, reload]);
 
+  // Apply the Lead/Buyer/Dealer pill *here* (client-side) so the contacts
+  // state always contains the full set the server matched on search /
+  // folder / assignee. That's what keeps every chip's count accurate even
+  // when one of them is the active filter (previously clicking "Lead"
+  // collapsed `All` to 8 because the server-side type filter shrank the
+  // dataset the counts were derived from).
   const filteredContacts = useMemo(() => {
-    if (!tagFilter) return contacts;
-    return contacts.filter((c) => Array.isArray(c.tags) && c.tags.includes(tagFilter));
-  }, [contacts, tagFilter]);
+    let list = contacts;
+    if (typeFilter && typeFilter !== "all") {
+      list = list.filter((c) => c.type === typeFilter);
+    }
+    if (tagFilter) {
+      list = list.filter((c) => Array.isArray(c.tags) && c.tags.includes(tagFilter));
+    }
+    return list;
+  }, [contacts, typeFilter, tagFilter]);
 
   // A-Z / א-ת jump index data. Sort by the first letter of `name`,
   // then alphabetically inside each bucket, and pre-compute the
