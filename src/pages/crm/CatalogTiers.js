@@ -55,6 +55,10 @@ export default function CatalogTiers() {
   // catalog jewelry is 0 the supplier knows immediately that they need
   // to import their WooCommerce CSV, not that the tier is broken.
   const [inventorySummary, setInventorySummary] = useState(null);
+  // 'stones' | 'jewelry' | null — which sync is currently running.
+  // Disables both buttons while one is in-flight so the supplier can't
+  // double-tap and create duplicate POSTs.
+  const [syncingKind, setSyncingKind] = useState(null);
 
   const reloadTiers = useCallback(async () => {
     if (!user?.id) return;
@@ -185,6 +189,88 @@ export default function CatalogTiers() {
     setPickerInitialTab(tab === "jewelry" ? "jewelry" : "stones");
     setPickingItems(true);
   };
+
+  /**
+   * One-click "bring this tier in sync with my inventory". Pulls every
+   * SKU from the source endpoints, diffs against what's already in the
+   * tier, confirms the operation if it's a big add, and POSTs the
+   * missing items. Slices into 500-SKU chunks so the BE doesn't choke
+   * on a single 5,000-row INSERT when a supplier first sets up Public.
+   */
+  const syncFromInventory = useCallback(async (kind) => {
+    if (!activeId || !user?.id) return;
+    const already = new Set(
+      (detail?.items || []).map((it) => `${it.item_type}::${it.item_sku}`)
+    );
+
+    setSyncingKind(kind);
+    try {
+      let toAdd = [];
+
+      if (kind === "stones") {
+        const res = await fetchSoapStones(user, { assignedTo: "all" });
+        const rows = Array.isArray(res?.stones) ? res.stones
+          : Array.isArray(res) ? res : [];
+        toAdd = rows
+          .map((s) => s.sku)
+          .filter(Boolean)
+          .filter((sku) => !already.has(`stone::${sku}`))
+          .map((sku) => ({ type: "stone", sku }));
+      } else if (kind === "jewelry") {
+        // Pull both jewelry sources in parallel, dedupe SKU collisions
+        // between workshop and catalog (workshop wins because it's the
+        // owner's editable copy).
+        const [wsSettled, catSettled] = await Promise.allSettled([
+          fetchJewelryItems(user.id),
+          fetchJewelryCatalog(),
+        ]);
+        if (wsSettled.status === "rejected") {
+          console.warn("Sync jewelry: workshop fetch failed", wsSettled.reason);
+        }
+        if (catSettled.status === "rejected") {
+          console.warn("Sync jewelry: catalog fetch failed",  catSettled.reason);
+        }
+        const wsRows  = wsSettled.status  === "fulfilled" ? (wsSettled.value?.items   || []) : [];
+        const catRows = catSettled.status === "fulfilled" ? (catSettled.value?.jewelry || []) : [];
+        const skus = new Set();
+        for (const j of wsRows)  { if (j.sku) skus.add(j.sku); }
+        for (const j of catRows) { if (j.model_number && !skus.has(j.model_number)) skus.add(j.model_number); }
+        toAdd = Array.from(skus)
+          .filter((sku) => !already.has(`jewelry::${sku}`))
+          .map((sku) => ({ type: "jewelry", sku }));
+      }
+
+      if (!toAdd.length) {
+        toast(kind === "stones" ? "All stones are already in this tier" : "All jewelry is already in this tier", { icon: "✓" });
+        return;
+      }
+
+      if (toAdd.length > 100) {
+        const confirmed = window.confirm(
+          `Add ${toAdd.length.toLocaleString()} ${kind} from inventory to this tier?\n\nThis will make them visible to every store subscribed to it.`
+        );
+        if (!confirmed) return;
+      }
+
+      // Chunk into batches of 500 — the items endpoint is a single
+      // INSERT statement and we'd rather have a clean progress trail
+      // than one heavy request that might time out.
+      const CHUNK = 500;
+      let added = 0;
+      for (let i = 0; i < toAdd.length; i += CHUNK) {
+        const slice = toAdd.slice(i, i + CHUNK);
+        const r = await addItemsToTier(user.id, activeId, slice);
+        added += Number(r?.added || slice.length);
+      }
+      toast.success(`Added ${added.toLocaleString()} ${kind} from inventory`);
+      await reloadDetail();
+      await reloadTiers();
+    } catch (e) {
+      toast.error(e.message || `Couldn't sync ${kind}`);
+    } finally {
+      setSyncingKind(null);
+    }
+  }, [activeId, user, detail?.items, reloadDetail, reloadTiers]);
 
   const onAddCompanies = async (companyIds) => {
     if (!activeId || !companyIds.length) return;
@@ -327,6 +413,9 @@ export default function CatalogTiers() {
                         <InventorySnapshot
                           summary={inventorySummary}
                           tier={detail}
+                          syncingKind={syncingKind}
+                          onSyncStones={() => syncFromInventory("stones")}
+                          onSyncJewelry={() => syncFromInventory("jewelry")}
                         />
                       </div>
                       <div className="flex items-center gap-2">
@@ -1037,13 +1126,19 @@ function TierScopeBadge({ stones = 0, jewelry = 0 }) {
 /**
  * Inventory snapshot strip rendered under the tier title. Anchors the
  * supplier in the reality of what they could possibly expose, then
- * shows what this specific tier currently exposes. Killed two birds
- * for the "I only see 1 jewelry, why?" confusion:
+ * shows what this specific tier currently exposes. Doubles as the
+ * one-click "sync missing items from inventory" surface — when the
+ * tier is missing N items we show explicit "+ Add N missing" buttons
+ * so the supplier doesn't have to hunt through the picker manually.
+ *
+ * Kills three birds with the same UI for the "I only see 1 jewelry,
+ * why?" confusion:
  *   • If catalogJewelry is 0 → no WooCommerce CSV has been imported.
- *   • If workshopJewelry is high but tier jewelry is low → the
- *     supplier simply hasn't added them to this tier yet.
+ *   • If inventory has more jewelry than the tier exposes → "+ Add N
+ *     missing jewelry" surfaces inline.
+ *   • Same for stones.
  */
-function InventorySnapshot({ summary, tier }) {
+function InventorySnapshot({ summary, tier, onSyncJewelry, onSyncStones, syncingKind }) {
   // While the summary is loading we render a neutral skeleton so the
   // header doesn't jump.
   if (!summary) {
@@ -1067,7 +1162,11 @@ function InventorySnapshot({ summary, tier }) {
   const totalJewelry = workshop + catalog;
   const tierStones  = Number(tier?.stone_count)   || (tier?.items || []).filter((it) => it.item_type === "stone").length;
   const tierJewelry = Number(tier?.jewelry_count) || (tier?.items || []).filter((it) => it.item_type === "jewelry").length;
+  const missingStones  = Math.max(0, stones - tierStones);
+  const missingJewelry = Math.max(0, totalJewelry - tierJewelry);
   const noCatalog = catalog === 0;
+  const stonesBusy  = syncingKind === "stones";
+  const jewelryBusy = syncingKind === "jewelry";
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
       <span className="font-semibold uppercase tracking-wider text-slate-500">Inventory</span>
@@ -1093,6 +1192,40 @@ function InventorySnapshot({ summary, tier }) {
         <span className="font-semibold tabular-nums">{tierJewelry.toLocaleString("en-US")}</span>
         <span className="text-slate-500"> jewelry</span>
       </span>
+      {missingStones > 0 && typeof onSyncStones === "function" && (
+        <button
+          type="button"
+          onClick={onSyncStones}
+          disabled={stonesBusy || jewelryBusy}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold tabular-nums transition ${
+            stonesBusy
+              ? "bg-sky-50 border-sky-200 text-sky-400 cursor-wait"
+              : "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100"
+          }`}
+          title={`Add the ${missingStones.toLocaleString("en-US")} stones that exist in your inventory but aren't yet in this tier`}
+        >
+          {stonesBusy
+            ? `Syncing stones…`
+            : `+ Add ${missingStones.toLocaleString("en-US")} missing stones`}
+        </button>
+      )}
+      {missingJewelry > 0 && typeof onSyncJewelry === "function" && (
+        <button
+          type="button"
+          onClick={onSyncJewelry}
+          disabled={stonesBusy || jewelryBusy}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold tabular-nums transition ${
+            jewelryBusy
+              ? "bg-purple-50 border-purple-200 text-purple-400 cursor-wait"
+              : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+          }`}
+          title={`Add the ${missingJewelry.toLocaleString("en-US")} jewelry pieces that exist in your inventory but aren't yet in this tier`}
+        >
+          {jewelryBusy
+            ? `Syncing jewelry…`
+            : `+ Add ${missingJewelry.toLocaleString("en-US")} missing jewelry`}
+        </button>
+      )}
       {noCatalog && (
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
           No WooCommerce catalog imported yet
