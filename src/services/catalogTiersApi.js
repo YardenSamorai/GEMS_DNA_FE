@@ -54,6 +54,17 @@ export const fetchCatalogTiers = (userId) =>
 export const fetchCatalogTier = (userId, tierId) =>
   fetch(`${API_BASE}/api/catalog-tiers/${tierId}${qs({ userId })}`).then(json);
 
+/**
+ * Owner-only inventory counts across every source the picker can pull
+ * from (live stones, workshop jewelry, WooCommerce catalog jewelry).
+ * Used by the tier detail header so the supplier instantly sees the
+ * difference between "what's in my inventory" and "what's in this
+ * tier" — and to diagnose missing items (e.g. catalog count = 0 means
+ * the WooCommerce CSV has never been imported on this tenant).
+ */
+export const fetchInventorySummary = (userId) =>
+  fetch(`${API_BASE}/api/catalog-tiers/inventory-summary${qs({ userId })}`).then(json);
+
 export const createCatalogTier = (userId, payload) =>
   fetch(`${API_BASE}/api/catalog-tiers${qs({ userId })}`, {
     method: "POST",

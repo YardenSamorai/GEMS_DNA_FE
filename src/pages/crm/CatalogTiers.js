@@ -12,6 +12,7 @@ import {
   removeItemsFromTier,
   addCompaniesToTier,
   removeCompaniesFromTier,
+  fetchInventorySummary,
 } from "../../services/catalogTiersApi";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { fetchJewelryItems, fetchJewelryCatalog } from "../../services/jewelryApi";
@@ -48,6 +49,12 @@ export default function CatalogTiers() {
   const [pickerInitialTab, setPickerInitialTab] = useState("stones");
   const [pickingStores, setPickingStores] = useState(false);
   const [activeSubtab, setActiveSubtab] = useState("items");
+  // Snapshot of what the supplier could potentially expose. Pulled once
+  // on mount so the tier detail header can show "Inventory: X stones · Y
+  // workshop jewelry · Z catalog jewelry" alongside the tier scope. If
+  // catalog jewelry is 0 the supplier knows immediately that they need
+  // to import their WooCommerce CSV, not that the tier is broken.
+  const [inventorySummary, setInventorySummary] = useState(null);
 
   const reloadTiers = useCallback(async () => {
     if (!user?.id) return;
@@ -81,6 +88,18 @@ export default function CatalogTiers() {
 
   useEffect(() => { reloadTiers(); /* eslint-disable-next-line */ }, [user?.id]);
   useEffect(() => { reloadDetail(); }, [reloadDetail]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) { setInventorySummary(null); return; }
+    fetchInventorySummary(user.id)
+      .then((data) => { if (!cancelled) setInventorySummary(data); })
+      .catch((e) => {
+        console.warn("Inventory summary failed", e);
+        if (!cancelled) setInventorySummary({ error: true });
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const totalItems    = useMemo(() => tiers.reduce((acc, t) => acc + Number(t.item_count || 0), 0), [tiers]);
   const totalStones   = useMemo(() => tiers.reduce((acc, t) => acc + Number(t.stone_count || 0), 0), [tiers]);
@@ -305,6 +324,10 @@ export default function CatalogTiers() {
                         {detail.description && (
                           <p className="mt-1.5 text-sm text-slate-600 max-w-2xl">{detail.description}</p>
                         )}
+                        <InventorySnapshot
+                          summary={inventorySummary}
+                          tier={detail}
+                        />
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -1012,6 +1035,74 @@ function TierScopeBadge({ stones = 0, jewelry = 0 }) {
 }
 
 /**
+ * Inventory snapshot strip rendered under the tier title. Anchors the
+ * supplier in the reality of what they could possibly expose, then
+ * shows what this specific tier currently exposes. Killed two birds
+ * for the "I only see 1 jewelry, why?" confusion:
+ *   • If catalogJewelry is 0 → no WooCommerce CSV has been imported.
+ *   • If workshopJewelry is high but tier jewelry is low → the
+ *     supplier simply hasn't added them to this tier yet.
+ */
+function InventorySnapshot({ summary, tier }) {
+  // While the summary is loading we render a neutral skeleton so the
+  // header doesn't jump.
+  if (!summary) {
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+        <span className="font-semibold uppercase tracking-wider">Inventory</span>
+        <span className="inline-block w-32 h-3 rounded bg-slate-100 animate-pulse" />
+      </div>
+    );
+  }
+  if (summary.error) {
+    return (
+      <div className="mt-3 text-[11px] text-rose-500">
+        Couldn't load inventory snapshot.
+      </div>
+    );
+  }
+  const stones = Number(summary.stones) || 0;
+  const workshop = Number(summary.workshopJewelry) || 0;
+  const catalog = Number(summary.catalogJewelry) || 0;
+  const totalJewelry = workshop + catalog;
+  const tierStones  = Number(tier?.stone_count)   || (tier?.items || []).filter((it) => it.item_type === "stone").length;
+  const tierJewelry = Number(tier?.jewelry_count) || (tier?.items || []).filter((it) => it.item_type === "jewelry").length;
+  const noCatalog = catalog === 0;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
+      <span className="font-semibold uppercase tracking-wider text-slate-500">Inventory</span>
+      <span className="inline-flex items-center gap-1 text-slate-700">
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+        <span className="tabular-nums font-semibold">{stones.toLocaleString("en-US")}</span>
+        <span className="text-slate-500">stones</span>
+      </span>
+      <span className="inline-flex items-center gap-1 text-slate-700">
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+        <span className="tabular-nums font-semibold">{totalJewelry.toLocaleString("en-US")}</span>
+        <span className="text-slate-500">jewelry</span>
+        <span className="text-slate-400 tabular-nums">
+          ({workshop.toLocaleString("en-US")} workshop · {catalog.toLocaleString("en-US")} catalog)
+        </span>
+      </span>
+      <span className="text-slate-300">→</span>
+      <span className="text-slate-700">
+        This tier exposes{" "}
+        <span className="font-semibold tabular-nums">{tierStones.toLocaleString("en-US")}</span>
+        <span className="text-slate-500"> stones</span>
+        <span className="text-slate-300"> · </span>
+        <span className="font-semibold tabular-nums">{tierJewelry.toLocaleString("en-US")}</span>
+        <span className="text-slate-500"> jewelry</span>
+      </span>
+      {noCatalog && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
+          No WooCommerce catalog imported yet
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * Two-segment toggle between the visual grid and the dense rows table
  * layouts. Lives in the items toolbar, persists across sessions via
  * localStorage.
@@ -1558,18 +1649,45 @@ function ItemPickerModal({ alreadyIn, onClose, onConfirm, initialTab = "stones" 
         // Three parallel fetches. The WooCommerce catalog is global so
         // we don't pass userId — it returns one shared list for every
         // tenant. Jewelry items endpoint is tenant-scoped.
-        const [stonesRes, workshopRes, catalogRes] = await Promise.all([
+        //
+        // We use Promise.allSettled instead of swallowing errors with
+        // .catch(() => ({...})) so a failing endpoint surfaces a toast
+        // and a clear "Workshop pieces (—)" badge rather than silently
+        // showing 0 items.
+        const [stonesSettled, workshopSettled, catalogSettled] = await Promise.allSettled([
           fetchSoapStones(user, { assignedTo: "all" }),
-          fetchJewelryItems(user.id).catch(() => ({ items: [] })),
-          fetchJewelryCatalog().catch(() => ({ jewelry: [] })),
+          fetchJewelryItems(user.id),
+          fetchJewelryCatalog(),
         ]);
         if (cancelled) return;
+
+        if (workshopSettled.status === "rejected") {
+          console.warn("Picker: workshop jewelry fetch failed", workshopSettled.reason);
+          toast.error("Couldn't load workshop jewelry");
+        }
+        if (catalogSettled.status === "rejected") {
+          console.warn("Picker: catalog jewelry fetch failed", catalogSettled.reason);
+          toast.error("Couldn't load WooCommerce catalog");
+        }
+
+        const stonesRes   = stonesSettled.status   === "fulfilled" ? stonesSettled.value   : {};
+        const workshopRes = workshopSettled.status === "fulfilled" ? workshopSettled.value : {};
+        const catalogRes  = catalogSettled.status  === "fulfilled" ? catalogSettled.value  : {};
+
         const rawStones = Array.isArray(stonesRes?.stones) ? stonesRes.stones
           : Array.isArray(stonesRes) ? stonesRes : [];
         const rawWorkshop = Array.isArray(workshopRes?.items) ? workshopRes.items
           : Array.isArray(workshopRes) ? workshopRes : [];
         const rawCatalog = Array.isArray(catalogRes?.jewelry) ? catalogRes.jewelry
           : Array.isArray(catalogRes) ? catalogRes : [];
+
+        // eslint-disable-next-line no-console
+        console.log("[CatalogTiers picker] inventory loaded:", {
+          stones: rawStones.length,
+          workshopJewelry: rawWorkshop.length,
+          catalogJewelry: rawCatalog.length,
+        });
+
         setStones(rawStones.map(normalizeStoneRow).filter(r => r.sku));
         setWorkshopJewelry(rawWorkshop.map(normalizeWorkshopJewelry).filter(r => r.sku));
         setCatalogJewelry(rawCatalog.map(normalizeCatalogJewelry).filter(r => r.sku));
