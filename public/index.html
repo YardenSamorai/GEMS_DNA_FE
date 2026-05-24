@@ -34,13 +34,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@400;500;600;700&family=Cormorant:wght@300;400;500;600;700&family=Inter:wght@100;200;300;400;500;600;700&family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- Preload the brand 3D loader GLB so it's already in the HTTP
-         cache by the time React mounts SpinningGem. Fetched as a
-         no-credentials request because Vercel serves /public assets
-         from the same origin and the model-viewer fetch() call uses
-         the default fetch mode. -->
-    <link rel="preload" href="%PUBLIC_URL%/loader/gem.glb" as="fetch" type="model/gltf-binary" crossorigin="anonymous" />
-
     <title>Gems DNA</title>
   </head>
   <body>
