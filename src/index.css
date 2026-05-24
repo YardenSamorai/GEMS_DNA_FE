@@ -612,10 +612,12 @@ body {
 
 /* ============================================================
    3D Diamond loader — used in the FullScreenLoader splash.
-   Three identical faceted SVG faces stacked at 0/60/120° around
-   the Y axis spin together, giving a credible spinning-crystal
-   silhouette with zero JS or 3D library. A soft emerald halo
-   pulses underneath for brand identity.
+   Now rendered as a real GLB inside <model-viewer> (auto-rotated by
+   the element itself). The emerald halo pulse stays — it gives the
+   loader something to show during the brief window before the GLB
+   has parsed/decoded. `.gem3d-stage` and `.gem3d-face` are kept as
+   dead selectors only because old screenshots / Storybook stories
+   may still target them. They don't render anything anymore.
    ============================================================ */
 .gem3d {
   position: relative;
