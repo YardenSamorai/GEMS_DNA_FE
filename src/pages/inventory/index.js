@@ -5633,6 +5633,30 @@ const StoneSearchPage = () => {
     }));
   }, [priceMode]);
 
+  // Toggle Neto ⇆ Bruto. The price filters (Total + PPC) are entered in the
+  // currently displayed units, so we rescale them on toggle to keep the same
+  // underlying stones in the result set. Neto = Bruto / 2, therefore
+  // Neto → Bruto doubles each threshold and Bruto → Neto halves it. Blank
+  // fields are left untouched.
+  const togglePriceMode = useCallback(() => {
+    const next = priceMode === 'neto' ? 'bruto' : 'neto';
+    const factor = next === 'bruto' ? 2 : 0.5;
+    const rescale = (val) => {
+      if (val === '' || val == null) return val;
+      const num = Number(val);
+      if (!Number.isFinite(num)) return val;
+      return String(Math.round(num * factor));
+    };
+    setFilters((f) => ({
+      ...f,
+      minPrice: rescale(f.minPrice),
+      maxPrice: rescale(f.maxPrice),
+      minPricePerCt: rescale(f.minPricePerCt),
+      maxPricePerCt: rescale(f.maxPricePerCt),
+    }));
+    setPriceMode(next);
+  }, [priceMode]);
+
   // Tags state
   const [tags, setTags] = useState([]);
   const [stoneTags, setStoneTags] = useState({}); // { sku: [tag1, tag2, ...] }
@@ -7401,7 +7425,7 @@ const StoneSearchPage = () => {
 
                 {inventoryMode === 'gemstones' && (
                 <button
-                  onClick={() => setPriceMode(prev => prev === 'neto' ? 'bruto' : 'neto')}
+                  onClick={togglePriceMode}
                     className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
                 >
                   {priceMode === 'neto' ? 'Neto' : 'B'}

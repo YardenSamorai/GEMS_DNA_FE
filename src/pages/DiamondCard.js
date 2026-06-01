@@ -358,7 +358,13 @@ const DiamondCard = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-app-muted font-medium text-[12.5px]">Price per carat</span>
                           <span className="text-[16px] font-semibold tracking-tight text-app-ink">
-                            B{encryptPrice(decryptPrice(details.price_per_carat))}
+                            {/* Diamonds have no Bruto/Neto split — they're always
+                                Neto, so we show the Neto code (price/2, no "B"
+                                prefix) to match the Neto Total above. Gemstones
+                                keep the Bruto code (B + full price). */}
+                            {isDiamond()
+                              ? encryptPrice(decryptPrice(details.price_per_carat) / 2)
+                              : <>B{encryptPrice(decryptPrice(details.price_per_carat))}</>}
                           </span>
                         </div>
                       </div>
