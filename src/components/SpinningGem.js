@@ -52,7 +52,10 @@ export default function SpinningGem({ size = 64 }) {
     renderer.setSize(w, h, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    // Slightly under-exposed on purpose: the bright key light + high
+    // envMapIntensity would otherwise clip the whole gem to white. Keeping
+    // exposure below 1 preserves the dark/bright facet contrast.
+    renderer.toneMappingExposure = 0.85;
     renderer.setClearColor(0x000000, 0); // transparent
     mount.appendChild(renderer.domElement);
     renderer.domElement.style.width = "100%";
@@ -68,37 +71,56 @@ export default function SpinningGem({ size = 64 }) {
 
     /* ────────────── Camera ────────────── */
     const camera = new THREE.PerspectiveCamera(28, w / h, 0.1, 50);
-    camera.position.set(0, 0.35, 3.6);
+    camera.position.set(0, 0.32, 4.1);
     camera.lookAt(0, 0, 0);
 
     /* ────────────── Diamond mesh ────────────── */
     const geometry = createBrilliantDiamond();
+    // No transmission. At ~64px on a transparent canvas a transmissive
+    // material has nothing to refract, so tone-mapping blows the whole
+    // silhouette out to a flat white blob. Instead we render the gem as a
+    // highly reflective faceted crystal: a faint icy tint, sharp clearcoat,
+    // strong env reflections and iridescent "fire". Adjacent facets then
+    // bounce the studio light at different intensities, which is exactly
+    // what reads as a sparkling diamond rather than a white shape.
     const material = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      metalness: 0,
-      roughness: 0.02,
-      transmission: 0.92,
-      thickness: 0.55,
-      ior: 2.4,
-      attenuationDistance: 1.5,
-      attenuationColor: 0xffffff,
-      envMapIntensity: 1.6,
+      // Emerald green (matches the app's brand-emerald). Saturated base so
+      // the gem reads clearly green; envMapIntensity is held a touch lower
+      // than the white version so the studio reflections don't wash it pale.
+      color: 0x0aa05f,
+      metalness: 0.0,
+      roughness: 0.06,
+      envMapIntensity: 1.9,
       clearcoat: 1,
-      clearcoatRoughness: 0,
+      clearcoatRoughness: 0.03,
+      reflectivity: 1,
+      iridescence: 0.6,
+      iridescenceIOR: 1.3,
+      iridescenceThicknessRange: [120, 400],
+      // FrontSide + outward-oriented winding (see createBrilliantDiamond)
+      // keeps the gem a clean opaque solid. DoubleSide let the back facets
+      // bleed through and made the shape unreadable.
       side: THREE.FrontSide,
-      // Flat shading so the per-triangle normals read as real facets
-      // (with smooth shading the gem looks like a sphere).
+      // Flat shading so each triangle reads as a distinct facet instead of
+      // a smooth (sphere-like) blob.
       flatShading: true,
     });
     const diamond = new THREE.Mesh(geometry, material);
-    diamond.scale.setScalar(1.05);
+    diamond.scale.setScalar(0.95);
     scene.add(diamond);
 
-    // A single rim light gives the crown a strong vertical "fire"
-    // streak that the IBL alone doesn't produce.
-    const rim = new THREE.DirectionalLight(0xffffff, 1.3);
-    rim.position.set(2, 3, 2);
-    scene.add(rim);
+    // A bright key + cool fill from opposite sides make adjacent facets
+    // catch light at different intensities — that contrast is what sells
+    // "faceted gem". The point light adds a moving specular sparkle.
+    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    key.position.set(2, 3, 2);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0x7be0b0, 1.2);
+    fill.position.set(-2.5, -1, -1.5);
+    scene.add(fill);
+    const sparkle = new THREE.PointLight(0xffffff, 1.6, 12);
+    sparkle.position.set(0, 1.5, 3);
+    scene.add(sparkle);
 
     /* ────────────── Animation loop ────────────── */
     let rafId = 0;
@@ -167,7 +189,9 @@ function createBrilliantDiamond() {
   const GIRDLE_R = 0.95;
   const TABLE_Y = 0.30;
   const GIRDLE_Y = 0.0;
-  const CULET_Y = -0.55;
+  // Deep pavilion so the profile narrows to a real point (the old -0.55
+  // was too shallow and read as a flying-saucer disc rather than a gem).
+  const CULET_Y = -0.92;
 
   const tablePts = [];
   const girdlePts = [];
@@ -208,11 +232,60 @@ function createBrilliantDiamond() {
     addTri(culet, gB, gA);
   }
 
+  // Orient every triangle so its face normal points away from the body
+  // centre. The hand-authored winding above is inconsistent between the
+  // table / crown / pavilion sections, which left some facets facing
+  // inward — with FrontSide culling those facets vanished (or rendered
+  // dark), which is what made the gem look broken. This pass guarantees a
+  // clean, fully-lit convex solid.
+  orientTrianglesOutward(positions);
+
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute(
     "position",
     new THREE.Float32BufferAttribute(positions, 3)
   );
   geometry.computeVertexNormals(); // per-triangle (non-indexed) → flat facet normals
+  // Recentre on the bounding-box midpoint so the gem spins around its own
+  // axis instead of an off-centre point (the asymmetric crown/pavilion
+  // heights otherwise make it look like it's wobbling on a stick).
+  geometry.center();
   return geometry;
+}
+
+/**
+ * Flip any triangle whose normal faces the interior so the whole mesh has
+ * consistently outward-pointing normals. Operates in place on a flat
+ * [x,y,z, x,y,z, ...] position array (9 floats per triangle).
+ */
+function orientTrianglesOutward(positions) {
+  const n = positions.length / 3;
+  let cx = 0, cy = 0, cz = 0;
+  for (let i = 0; i < positions.length; i += 3) {
+    cx += positions[i];
+    cy += positions[i + 1];
+    cz += positions[i + 2];
+  }
+  cx /= n; cy /= n; cz /= n;
+
+  for (let i = 0; i < positions.length; i += 9) {
+    const ax = positions[i],     ay = positions[i + 1], az = positions[i + 2];
+    const bx = positions[i + 3], by = positions[i + 4], bz = positions[i + 5];
+    const cxx = positions[i + 6], cyy = positions[i + 7], czz = positions[i + 8];
+    // face normal = (b-a) × (c-a)
+    const ux = bx - ax, uy = by - ay, uz = bz - az;
+    const vx = cxx - ax, vy = cyy - ay, vz = czz - az;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    // direction from body centre to the triangle centroid
+    const gx = (ax + bx + cxx) / 3 - cx;
+    const gy = (ay + by + cyy) / 3 - cy;
+    const gz = (az + bz + czz) / 3 - cz;
+    if (nx * gx + ny * gy + nz * gz < 0) {
+      // facing inward → swap b and c to reverse the winding
+      positions[i + 3] = cxx; positions[i + 4] = cyy; positions[i + 5] = czz;
+      positions[i + 6] = bx;  positions[i + 7] = by;  positions[i + 8] = bz;
+    }
+  }
 }
