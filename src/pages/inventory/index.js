@@ -3586,9 +3586,13 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
 };
 
 /* ---------------- Filters ---------------- */
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions = [], tags, onManageTags, inventoryMode }) => {
+const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions = [], tags, onManageTags, inventoryMode, priceMode = 'neto' }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
+
+  // Price filters are entered in the currently displayed units (Neto = Bruto/2),
+  // so we annotate the Price/PPC labels with the active mode to make that explicit.
+  const priceUnitLabel = priceMode === 'neto' ? 'Neto' : 'Bruto';
+
   const handleChange = (field) => (e) => {
     onChange({ ...filters, [field]: e.target.value });
   };
@@ -3707,19 +3711,19 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Price ($)</label>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Price ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
                   <input type="number" value={filters.minPrice} onChange={handleChange("minPrice")} placeholder="From" className="input-modern" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max Price ($)</label>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max Price ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
                   <input type="number" value={filters.maxPrice} onChange={handleChange("maxPrice")} placeholder="To" className="input-modern" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min PPC ($)</label>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min PPC ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
                   <input type="number" value={filters.minPricePerCt} onChange={handleChange("minPricePerCt")} placeholder="From" className="input-modern" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max PPC ($)</label>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max PPC ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
                   <input type="number" value={filters.maxPricePerCt} onChange={handleChange("maxPricePerCt")} placeholder="To" className="input-modern" />
                 </div>
               </div>
@@ -7950,6 +7954,7 @@ const StoneSearchPage = () => {
             tags={tags}
             onManageTags={() => setShowTagsModal(true)}
             inventoryMode={inventoryMode}
+            priceMode={priceMode}
           />
           )}
 
