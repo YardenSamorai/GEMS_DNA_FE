@@ -894,7 +894,10 @@ const HomePage = () => {
   /* ─── Render ──────────────────────────────────────────────── */
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="min-h-screen bg-background">
+      {/* Use the shared app canvas (not shadcn `bg-background`, which is a
+          near-black 4% in dark mode) so this tab matches the softer Overview
+          surface instead of reading as a harsh high-contrast page. */}
+      <div className="min-h-screen bg-app-canvas">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
           {/* ── Header ──────────────────────────────────────── */}

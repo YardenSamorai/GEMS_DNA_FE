@@ -138,25 +138,29 @@
 }
 
 [data-theme="dark"] {
-  /* shadcn dark */
-  --background: 20 14% 4%;
-  --foreground: 60 9% 98%;
-  --card: 24 10% 10%;
-  --card-foreground: 60 9% 98%;
-  --popover: 24 10% 10%;
-  --popover-foreground: 60 9% 98%;
+  /* shadcn dark — aligned to the softer Apple-dark `app-*` palette so
+     shadcn surfaces (Stones tab, dialogs, popovers) read as calm raised
+     greys instead of near-black with stark white. Was: background 4%,
+     card/muted 10–15%. Now matches --app-canvas / --app-canvas-2 /
+     --app-line so cards sit just above the canvas like the Overview tab. */
+  --background: 240 4% 11%;   /* ≈ #1C1C1E (--app-canvas) */
+  --foreground: 240 23% 96%;  /* ≈ #F2F2F7 (--app-ink), softer than pure white */
+  --card: 240 3% 18%;         /* ≈ #2C2C2E (--app-canvas-2) → gentle raise */
+  --card-foreground: 240 23% 96%;
+  --popover: 240 3% 18%;
+  --popover-foreground: 240 23% 96%;
   --primary: 160 84% 39%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 12 6% 15%;
-  --secondary-foreground: 60 9% 98%;
-  --muted: 12 6% 15%;
-  --muted-foreground: 24 5% 64%;
-  --accent: 12 6% 15%;
-  --accent-foreground: 60 9% 98%;
+  --secondary: 240 3% 18%;
+  --secondary-foreground: 240 23% 96%;
+  --muted: 240 3% 18%;
+  --muted-foreground: 240 3% 61%;  /* ≈ #98989D (--app-muted) */
+  --accent: 240 3% 18%;
+  --accent-foreground: 240 23% 96%;
   --destructive: 0 63% 31%;
   --destructive-foreground: 60 9% 98%;
-  --border: 12 6% 15%;
-  --input: 12 6% 15%;
+  --border: 240 3% 22%;       /* ≈ #38383A (--app-line) */
+  --input: 240 3% 22%;
   --ring: 160 84% 39%;
 
   /* === v1.0.5 system tokens — DARK (Apple macOS Dark) === */
@@ -609,6 +613,11 @@ body {
   50%      { box-shadow: 0 0 16px 0 rgba(var(--brand-emerald), 0.25); }
 }
 @keyframes shimmer  { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* Optional spin for the emerald BrandMark logo (off by default). A flat-SVG
+   coin-flip around Y reads as the gem turning in place. */
+@keyframes brandmark-spin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+.brandmark-spin { animation: brandmark-spin 4.5s linear infinite; }
 
 /* ============================================================
    3D Diamond loader — used in the FullScreenLoader splash.

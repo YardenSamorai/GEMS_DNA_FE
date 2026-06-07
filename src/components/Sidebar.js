@@ -2,22 +2,13 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useTeam } from "../context/TeamContext";
+import BrandMark from "./BrandMark";
 
 /**
- * Sidebar monogram — v1.0.5 ink tile. Replaces the legacy emerald-gradient
- * diamond with a calm white-on-ink silhouette matching the rest of the
- * system's brand marks (App.js MarketingHeader, portal "GD", FullScreenLoader).
+ * Sidebar monogram — v1.1 emerald brilliant-cut mark (shared BrandMark
+ * component, same face as the marketing header, loader and portal).
  */
-const DiamondLogo = () => (
-  <span className="relative inline-flex w-8 h-8 rounded-[10px] bg-app-ink items-center justify-center shadow-[0_4px_12px_-4px_rgba(0,0,0,0.30)] shrink-0">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
-      <path d="M2 9H22" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" />
-      <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.25" />
-    </svg>
-    <span className="absolute inset-0 rounded-[10px] ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
-  </span>
-);
+const DiamondLogo = () => <BrandMark size={32} />;
 
 const EXPANDED_KEY = "sidebar-expanded-sections";
 const loadExpanded = () => {

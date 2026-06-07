@@ -35,6 +35,7 @@ import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import MobileDock from "./components/MobileDock";
 import SpinningGem from "./components/SpinningGem";
+import BrandMark from "./components/BrandMark";
 import { RouteLoadingProvider } from "./components/RouteLoadingContext";
 import RouteTransitionOverlay from "./components/RouteTransitionOverlay";
 import StorePortalLayout from "./pages/portal/StorePortalLayout";
@@ -67,20 +68,11 @@ const ThemeProvider = ({ children }) => {
 
 // ---------- Logo (used on marketing/landing) ----------
 //
-// Switched from the legacy emerald-gradient diamond to a calm, ink-on-canvas
-// monogram in v1.0.5. The brand emerald is still locked in as a quiet
-// hairline at the bottom of the tile — the same visual idiom as the portal's
-// "GD" monogram, so the public landing and the trade portal share a face.
-const DiamondIcon = () => (
-  <span className="relative inline-flex w-8 h-8 rounded-[10px] bg-app-ink items-center justify-center shadow-[0_4px_12px_-4px_rgba(0,0,0,0.30)]">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
-      <path d="M2 9H22" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" />
-      <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.25" />
-    </svg>
-    <span className="absolute inset-0 rounded-[10px] ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
-  </span>
-);
+// v1.1 brand mark — the emerald brilliant-cut gem (echoing the SpinningGem
+// loader), packaged in BrandMark so the marketing header, sidebar and
+// loader all share one face. The tile flips with the theme; the gem's
+// emerald gradients read on both light and dark.
+const DiamondIcon = () => <BrandMark size={32} />;
 
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();

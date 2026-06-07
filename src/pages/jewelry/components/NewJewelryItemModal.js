@@ -4,8 +4,11 @@ import { useNavigate } from "react-router-dom";
 import {
   createJewelryItem,
   JEWELRY_TYPES,
-  JEWELRY_CATEGORIES,
 } from "../../../services/jewelryApi";
+import {
+  getAllJewelryCategories,
+  SETTINGS_CHANGED_EVENT,
+} from "../../../services/jewelrySettingsApi";
 import { fetchDeals } from "../../../services/crmApi";
 import CustomerPicker from "./CustomerPicker";
 
@@ -15,6 +18,9 @@ const NewJewelryItemModal = ({ open, onClose, onCreated, initialContactId = null
   const [name, setName] = useState("");
   const [type, setType] = useState("custom");
   const [category, setCategory] = useState("Ring");
+  // Built-in + user-defined categories (from Jewelry Settings). Refresh when the
+  // modal opens and whenever settings change so new categories show immediately.
+  const [categories, setCategories] = useState(getAllJewelryCategories);
   const [contactId, setContactId] = useState(initialContactId);
   const [dealId, setDealId] = useState(initialDealId);
   const [description, setDescription] = useState("");
@@ -30,8 +36,16 @@ const NewJewelryItemModal = ({ open, onClose, onCreated, initialContactId = null
     if (open) {
       setContactId(initialContactId);
       setDealId(initialDealId);
+      setCategories(getAllJewelryCategories());
     }
   }, [open, initialContactId, initialDealId]);
+
+  // Pick up category changes made in Jewelry Settings without a reload
+  useEffect(() => {
+    const refresh = () => setCategories(getAllJewelryCategories());
+    window.addEventListener(SETTINGS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, refresh);
+  }, []);
 
   // Whenever a customer is picked, load their open deals so we can offer to attach
   useEffect(() => {
@@ -140,7 +154,7 @@ const NewJewelryItemModal = ({ open, onClose, onCreated, initialContactId = null
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
-                  {JEWELRY_CATEGORIES.map((c) => (
+                  {categories.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>

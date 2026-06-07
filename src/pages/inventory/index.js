@@ -3586,7 +3586,7 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
 };
 
 /* ---------------- Filters ---------------- */
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions = [], tags, onManageTags, inventoryMode, priceMode = 'neto' }) => {
+const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions = [], tags, onManageTags, inventoryMode, priceMode = 'neto', smartSearch = '', onSmartSearchChange, parsedSearch }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   // Price filters are entered in the currently displayed units (Neto = Bruto/2),
@@ -3599,7 +3599,9 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
 
   const handleClear = () => {
     onChange({
-      sku: "",
+      // SKU search now lives in the prominent top bar with its own clear button,
+      // so "Clear all" here leaves it untouched and only resets the filter fields.
+      sku: filters.sku,
       minPrice: "",
       maxPrice: "",
       minPricePerCt: "",
@@ -3621,10 +3623,11 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
       fancyColor: [],
       box: "",
     });
+    onSmartSearchChange && onSmartSearchChange("");
   };
 
   const activeFiltersCount = [
-    filters.sku,
+    smartSearch,
     filters.minPrice,
     filters.maxPrice,
     filters.minPricePerCt,
@@ -3690,26 +3693,76 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
           >
             <div className="pt-4 space-y-4">
 
-              {/* Row 1: SKU + Price */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">
-                    Search by SKU
-                    <span className="text-stone-400 font-normal ml-1">(comma / line separated)</span>
-                  </label>
-                  <textarea
-                    value={filters.sku}
-                    onChange={handleChange("sku")}
-                    placeholder="e.g. T9548, T9549, T9550"
-                    className="input-modern min-h-[38px] resize-y"
-                    rows={1}
+              {/* Smart Search (natural language). Moved here from the top bar so
+                  the prominent search is the simple SKU box people expect; this
+                  is the advanced "describe what you want" search. Parses shape,
+                  weight, clarity, color, lab, price/ct, SKU, etc. */}
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1.5">
+                  Smart search
+                  <span className="text-stone-400 font-normal ml-1">(describe the stone in plain words)</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={smartSearch}
+                    onChange={(e) => onSmartSearchChange && onSmartSearchChange(e.target.value)}
+                    placeholder="e.g. Emerald 3ct VS2, Diamond J SI1 GIA, Cushion 5-7ct"
+                    className="w-full pl-9 pr-9 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-all"
                   />
-                  {(filters.sku?.includes(',') || filters.sku?.includes('\n')) && (
-                    <p className="text-[10px] text-emerald-600 mt-0.5">
-                      Searching {filters.sku.split(/[,\n]/).filter(s => s.trim()).length} SKUs
-                    </p>
+                  {smartSearch && (
+                    <button
+                      type="button"
+                      onClick={() => onSmartSearchChange && onSmartSearchChange("")}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   )}
                 </div>
+                {smartSearch && parsedSearch && (() => {
+                  const ss = parsedSearch;
+                  const hasTags = ss.shapes.length > 0 || ss.weight || ss.weightRange || ss.clarities.length > 0 ||
+                    ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
+                    ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
+                    ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0 ||
+                    ss.pricePerCt;
+                  if (!hasTags) return null;
+                  const Badge = ({ label, type, color }) => (
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+                      <span className="opacity-60">{type}:</span> {label}
+                    </span>
+                  );
+                  return (
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {ss.skus.map(s => <Badge key={`sku-${s}`} label={s} type="SKU" color="bg-violet-100 text-violet-700" />)}
+                      {ss.categories.map(c => <Badge key={`cat-${c}`} label={c} type="Category" color="bg-blue-100 text-blue-700" />)}
+                      {ss.shapes.map(s => <Badge key={`shp-${s}`} label={s} type="Shape" color="bg-emerald-100 text-emerald-700" />)}
+                      {ss.weightRange && <Badge label={`${ss.weightRange.min}-${ss.weightRange.max}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
+                      {!ss.weightRange && ss.weight && <Badge label={`~${ss.weight}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
+                      {ss.pricePerCt && <Badge label={`$${Math.round(ss.pricePerCt.min).toLocaleString()}-${Math.round(ss.pricePerCt.max).toLocaleString()}/ct`} type="Price" color="bg-green-100 text-green-700" />}
+                      {ss.clarities.map(c => <Badge key={`cl-${c}`} label={c} type="Clarity" color="bg-sky-100 text-sky-700" />)}
+                      {ss.colors.map(c => <Badge key={`col-${c}`} label={c} type="Color" color="bg-pink-100 text-pink-700" />)}
+                      {ss.fancyColors.map(c => <Badge key={`fc-${c}`} label={c} type="Fancy" color="bg-rose-100 text-rose-700" />)}
+                      {ss.treatments.map(t => <Badge key={`tr-${t}`} label={t} type="Treatment" color="bg-orange-100 text-orange-700" />)}
+                      {ss.labs.map(l => <Badge key={`lab-${l}`} label={l} type="Lab" color="bg-indigo-100 text-indigo-700" />)}
+                      {ss.locations.map(l => <Badge key={`loc-${l}`} label={l} type="Location" color="bg-teal-100 text-teal-700" />)}
+                      {ss.origins.map(o => <Badge key={`org-${o}`} label={o} type="Origin" color="bg-lime-100 text-lime-700" />)}
+                      {ss.groupingTypes.map(g => <Badge key={`gt-${g}`} label={g} type="Type" color="bg-stone-200 text-stone-700" />)}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Row 1: Price */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Price ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
                   <input type="number" value={filters.minPrice} onChange={handleChange("minPrice")} placeholder="From" className="input-modern" />
@@ -7796,7 +7849,10 @@ const StoneSearchPage = () => {
             </div>
           </div>
 
-          {/* Smart Search */}
+          {/* Primary search — by SKU. This is the box people reach for first, so
+              it owns the prominent top slot. The natural-language "smart search"
+              now lives inside the Filters panel (advanced). Accepts one SKU or a
+              comma / newline separated list; matching is exact per SKU. */}
           <div className="mb-4">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -7806,14 +7862,14 @@ const StoneSearchPage = () => {
               </div>
               <input
                 type="text"
-                value={smartSearch}
-                onChange={(e) => setSmartSearch(e.target.value)}
-                placeholder="Smart search... e.g. Emerald 3ct VS2, Diamond J SI1 GIA, T9548"
+                value={filters.sku}
+                onChange={(e) => setFilters((f) => ({ ...f, sku: e.target.value }))}
+                placeholder="Search by SKU… e.g. T9548 or M1413  (comma-separate for multiple)"
                 className="w-full pl-9 pr-9 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-all"
               />
-              {smartSearch && (
+              {filters.sku && (
                 <button
-                  onClick={() => setSmartSearch("")}
+                  onClick={() => setFilters((f) => ({ ...f, sku: "" }))}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -7822,38 +7878,11 @@ const StoneSearchPage = () => {
                 </button>
               )}
             </div>
-            {smartSearch && (() => {
-              const ss = parsedSearch;
-              const hasTags = ss.shapes.length > 0 || ss.weight || ss.weightRange || ss.clarities.length > 0 ||
-                ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
-                ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
-                ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0 ||
-                ss.pricePerCt;
-              if (!hasTags) return null;
-              const Badge = ({ label, type, color }) => (
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
-                  <span className="opacity-60">{type}:</span> {label}
-                </span>
-              );
-              return (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {ss.skus.map(s => <Badge key={`sku-${s}`} label={s} type="SKU" color="bg-violet-100 text-violet-700" />)}
-                  {ss.categories.map(c => <Badge key={`cat-${c}`} label={c} type="Category" color="bg-blue-100 text-blue-700" />)}
-                  {ss.shapes.map(s => <Badge key={`shp-${s}`} label={s} type="Shape" color="bg-emerald-100 text-emerald-700" />)}
-                  {ss.weightRange && <Badge label={`${ss.weightRange.min}-${ss.weightRange.max}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
-                  {!ss.weightRange && ss.weight && <Badge label={`~${ss.weight}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
-                  {ss.pricePerCt && <Badge label={`$${Math.round(ss.pricePerCt.min).toLocaleString()}-${Math.round(ss.pricePerCt.max).toLocaleString()}/ct`} type="Price" color="bg-green-100 text-green-700" />}
-                  {ss.clarities.map(c => <Badge key={`cl-${c}`} label={c} type="Clarity" color="bg-sky-100 text-sky-700" />)}
-                  {ss.colors.map(c => <Badge key={`col-${c}`} label={c} type="Color" color="bg-pink-100 text-pink-700" />)}
-                  {ss.fancyColors.map(c => <Badge key={`fc-${c}`} label={c} type="Fancy" color="bg-rose-100 text-rose-700" />)}
-                  {ss.treatments.map(t => <Badge key={`tr-${t}`} label={t} type="Treatment" color="bg-orange-100 text-orange-700" />)}
-                  {ss.labs.map(l => <Badge key={`lab-${l}`} label={l} type="Lab" color="bg-indigo-100 text-indigo-700" />)}
-                  {ss.locations.map(l => <Badge key={`loc-${l}`} label={l} type="Location" color="bg-teal-100 text-teal-700" />)}
-                  {ss.origins.map(o => <Badge key={`org-${o}`} label={o} type="Origin" color="bg-lime-100 text-lime-700" />)}
-                  {ss.groupingTypes.map(g => <Badge key={`gt-${g}`} label={g} type="Type" color="bg-stone-200 text-stone-700" />)}
-                </div>
-              );
-            })()}
+            {(filters.sku?.includes(',') || filters.sku?.includes('\n')) && (
+              <p className="text-[11px] text-emerald-600 mt-1.5">
+                Searching {filters.sku.split(/[,\n]/).filter(s => s.trim()).length} SKUs
+              </p>
+            )}
           </div>
 
           {/* Jewelry info bar */}
@@ -7955,6 +7984,9 @@ const StoneSearchPage = () => {
             onManageTags={() => setShowTagsModal(true)}
             inventoryMode={inventoryMode}
             priceMode={priceMode}
+            smartSearch={smartSearch}
+            onSmartSearchChange={setSmartSearch}
+            parsedSearch={parsedSearch}
           />
           )}
 

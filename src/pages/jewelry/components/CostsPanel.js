@@ -5,6 +5,7 @@ import {
   recalcJewelryItem,
   updateJewelryItem,
 } from "../../../services/jewelryApi";
+import { getDefaultMarkupPercent } from "../../../services/jewelrySettingsApi";
 
 const CATEGORIES = [
   { value: "labor",    label: "Labor" },
@@ -16,7 +17,11 @@ const CATEGORIES = [
 const CostsPanel = ({ itemId, costs, item, onChanged }) => {
   const [form, setForm] = useState({ label: "", category: "labor", amount: "", notes: "" });
   const [busy, setBusy] = useState(false);
-  const [markup, setMarkup] = useState(item?.markup_percent || 0);
+  // Existing markup wins; otherwise fall back to the workshop default so new
+  // pieces start from the owner's configured markup instead of 0%.
+  const [markup, setMarkup] = useState(
+    item?.markup_percent || getDefaultMarkupPercent()
+  );
 
   const handleAdd = async (e) => {
     e.preventDefault();
