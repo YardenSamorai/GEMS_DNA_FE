@@ -9,11 +9,13 @@ import { Toaster } from "react-hot-toast";
 import InventoryHub from "./pages/InventoryHub";
 import JewelryItemDetail from "./pages/jewelry/JewelryItemDetail";
 import CustomerSharePage from "./pages/share/CustomerSharePage";
+import OfferViewPage from "./pages/share/OfferViewPage";
 import SignaturePage from "./pages/sign/SignaturePage";
 import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
 import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
+import OffersPage from "./pages/offers/OffersPage";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
@@ -203,6 +205,16 @@ const NAV_SECTIONS = [
         icon: (cls) => (
           <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+      },
+      {
+        to: "/offers",
+        label: "Offers",
+        matches: (path) => path.startsWith("/offers"),
+        icon: (cls) => (
+          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
           </svg>
         ),
       },
@@ -493,6 +505,9 @@ function AppContent() {
             <Route path="/qa" element={<Navigate to="/qa-data" replace />} />
             {/* Sprint 3 — sales-rep management (admin) + per-rep KPIs. */}
             <Route path="/team" element={<TeamSettings />} />
+            {/* Anonymous stone offers — salesperson tracks links they sent. */}
+            <Route path="/offers" element={<OffersPage />} />
+            <Route path="/offers/:id" element={<OffersPage />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>
@@ -539,6 +554,10 @@ function AppContent() {
               workshop sends to the buyer. Rendered outside <AppLayout> so
               the customer never sees our sidebar / TopBar / Clerk gates. */}
           <Route path="/share/:token" element={<CustomerSharePage />} />
+
+          {/* Anonymous, unbranded stone offer — salesperson sends this opaque
+              link to a buyer. No app chrome, no brand, noindex. */}
+          <Route path="/o/:token" element={<OfferViewPage />} />
 
           {/* Public memo-signature endpoint — token URLs the supplier
               sends to a store over WhatsApp/email when the store doesn't
