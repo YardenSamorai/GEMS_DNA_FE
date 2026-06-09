@@ -19,6 +19,28 @@ const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, on
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Keep the `position: fixed` menu glued to its button while open: re-anchor
+  // it on scroll/resize so it scrolls off with the row instead of floating in
+  // place. `capture: true` also catches scrolls on inner scroll containers.
+  useEffect(() => {
+    if (!isOpen) return;
+    const updatePos = () => {
+      if (!buttonRef.current) return;
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + 4,
+        left: Math.min(rect.left, window.innerWidth - 200),
+      });
+    };
+    updatePos();
+    window.addEventListener("scroll", updatePos, true);
+    window.addEventListener("resize", updatePos);
+    return () => {
+      window.removeEventListener("scroll", updatePos, true);
+      window.removeEventListener("resize", updatePos);
+    };
+  }, [isOpen]);
+
   const handleOpen = (e) => {
     e.stopPropagation();
     if (buttonRef.current) {

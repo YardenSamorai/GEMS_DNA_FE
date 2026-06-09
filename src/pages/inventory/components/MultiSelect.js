@@ -18,7 +18,9 @@ const MultiSelect = ({ value, options, onChange, placeholder }) => {
   }, []);
 
   useEffect(() => {
-    if (open && btnRef.current) {
+    if (!open) return;
+    const updatePos = () => {
+      if (!btnRef.current) return;
       const rect = btnRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       const dropHeight = 240;
@@ -28,7 +30,18 @@ const MultiSelect = ({ value, options, onChange, placeholder }) => {
         left: rect.left,
         width: rect.width,
       });
-    }
+    };
+    updatePos();
+    // The menu is `position: fixed`, so it won't move with the page on its
+    // own. Re-anchor it to the button on every scroll/resize so it stays
+    // glued to the field (and scrolls off with it) instead of floating in
+    // place. `capture: true` also catches scrolls on inner scroll containers.
+    window.addEventListener("scroll", updatePos, true);
+    window.addEventListener("resize", updatePos);
+    return () => {
+      window.removeEventListener("scroll", updatePos, true);
+      window.removeEventListener("resize", updatePos);
+    };
   }, [open]);
 
   const toggle = (opt) => {
