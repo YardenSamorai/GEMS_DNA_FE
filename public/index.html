@@ -3,7 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- `maximum-scale=1` + `user-scalable=no` make the app behave like a
+         native iOS client: no pinch-zoom, no double-tap zoom, and (combined
+         with the 16px min font-size on inputs in index.css) no auto-zoom when
+         a form field is focused. Respected in the standalone PWA. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <!-- Per-scheme theme colours so the iOS PWA status-bar tint matches
          the current page background. Without these the bar always
          renders as the dark canvas colour, which looks broken when the

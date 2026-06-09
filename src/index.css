@@ -208,6 +208,24 @@
 * { box-sizing: border-box; }
 
 /* ============================================================
+   iOS — kill the focus auto-zoom.
+   ------------------------------------------------------------
+   Mobile Safari zooms the viewport in whenever a focused form
+   control has a computed font-size below 16px (e.g. the 14px
+   inputs/selects used across the inventory filters). Forcing a
+   16px minimum on touch devices removes the trigger entirely, so
+   tapping a filter field no longer jolts the screen. Scoped to
+   `pointer: coarse` so the desktop layout keeps its 14px fields.
+   ============================================================ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ============================================================
    Body backdrop — v1.0.5 tonal Liquid-Glass canvas.
    Replaces the legacy green-tinted gradient. The radial washes
    give the glass surfaces something subtle to refract over so
