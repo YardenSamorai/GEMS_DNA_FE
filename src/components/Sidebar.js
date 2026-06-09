@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useTeam } from "../context/TeamContext";
 import BrandMark from "./BrandMark";
+import useOffersUnseen from "../hooks/useOffersUnseen";
 
 /**
  * Sidebar monogram — v1.1 emerald brilliant-cut mark (shared BrandMark
@@ -50,6 +51,9 @@ const Chevron = ({ open, className = "" }) => (
 const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, onMobileClose }) => {
   const location = useLocation();
   const team = useTeam();
+  // Red notification badge counts for nav items that opt in via `badgeKey`.
+  const offersUnseen = useOffersUnseen();
+  const badgeFor = (item) => (item.badgeKey === "offers" ? offersUnseen : 0);
   // The sidebar uses theme-aware `app-*` tokens throughout, so we no longer
   // need to branch on theme — every fill, border, and label flips through
   // the `data-theme="dark|light"` CSS variables defined in src/index.css.
@@ -159,6 +163,7 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
 
   const renderLeaf = (item) => {
     const active = item.matches(location.pathname);
+    const badge = badgeFor(item);
     return (
       <Link
         key={item.to}
@@ -167,8 +172,24 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
         title={collapsed ? item.label : undefined}
         className={linkClasses(active, collapsed ? "md:justify-center md:px-2" : "")}
       >
-        <span className="shrink-0">{item.icon("w-5 h-5")}</span>
+        <span className="relative shrink-0">
+          {item.icon("w-5 h-5")}
+          {/* Collapsed (md) — small red dot on the icon. */}
+          {badge > 0 && collapsed && (
+            <span className="absolute -right-1 -top-1 hidden h-2 w-2 rounded-full bg-red-500 ring-2 ring-app-canvas md:block" />
+          )}
+        </span>
         <span className={`truncate ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
+        {/* Expanded / mobile — red count pill. Follows the label's visibility. */}
+        {badge > 0 && (
+          <span
+            className={`ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10.5px] font-semibold leading-none text-white ${
+              collapsed ? "md:hidden" : ""
+            }`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
         {collapsed && (
           <span className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-lg bg-app-ink px-2 py-1 text-[11px] font-medium text-app-canvas opacity-0 shadow-lg transition group-hover:opacity-100 md:block">
             {item.label}

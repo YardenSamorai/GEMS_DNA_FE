@@ -16,6 +16,7 @@ import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
 import OffersPage from "./pages/offers/OffersPage";
+import SalesInventory from "./pages/sales/SalesInventory";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
@@ -209,8 +210,19 @@ const NAV_SECTIONS = [
         ),
       },
       {
+        to: "/sales/inventory",
+        label: "Sales Inventory",
+        matches: (path) => path.startsWith("/sales/inventory"),
+        icon: (cls) => (
+          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10" />
+          </svg>
+        ),
+      },
+      {
         to: "/offers",
         label: "Offers",
+        badgeKey: "offers",
         matches: (path) => path.startsWith("/offers"),
         icon: (cls) => (
           <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -508,6 +520,8 @@ function AppContent() {
             {/* Anonymous stone offers — salesperson tracks links they sent. */}
             <Route path="/offers" element={<OffersPage />} />
             <Route path="/offers/:id" element={<OffersPage />} />
+            {/* Salesperson-focused stone browser (built incrementally). */}
+            <Route path="/sales/inventory" element={<SalesInventory />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>

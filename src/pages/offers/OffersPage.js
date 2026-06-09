@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import { useRouteLoading } from "../../components/RouteLoadingContext";
+import { markOffersSeen } from "../../hooks/useOffersUnseen";
 import {
   fetchOffers,
   fetchOffer,
@@ -64,7 +65,14 @@ const OffersPage = () => {
     if (!userId) return;
     setLoading(true);
     fetchOffers(userId)
-      .then((res) => setOffers(res.offers || []))
+      .then((res) => {
+        const list = res.offers || [];
+        setOffers(list);
+        // Visiting the page clears the sidebar badge: mark the current total
+        // of buyer responses as seen.
+        const total = list.reduce((a, b) => a + (Number(b.response_count) || 0), 0);
+        markOffersSeen(total);
+      })
       .catch((err) => toast.error(err.message || "Failed to load offers"))
       .finally(() => { setLoading(false); setInitialLoading(false); });
   }, [userId]);
