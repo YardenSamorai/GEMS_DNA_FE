@@ -50,13 +50,13 @@ const PRIMARY_SLOTS = [
     ),
   },
   {
-    key: "production",
-    label: "Workshop",
-    to: "/jewelry/production",
-    matches: (path) => path.startsWith("/jewelry/"),
+    key: "sales",
+    label: "Sales",
+    to: "/sales/inventory",
+    matches: (path) => path.startsWith("/sales/inventory"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 3l3.057-3 4.886 0L16 3l4 5-8 13L4 8l1-5z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
       </svg>
     ),
   },
@@ -111,21 +111,53 @@ const MobileDock = ({ navSections = [] }) => {
   const team = useTeam();
   const { theme, toggleTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
+  // When a text field is focused the iOS keyboard opens and would shove this
+  // `fixed bottom-0` dock up above the keyboard (looks broken). We track field
+  // focus and slide the dock out of the way while typing — like a native app.
+  const [inputFocused, setInputFocused] = useState(false);
 
   // Close the "More" sheet on route change.
   useEffect(() => { setSheetOpen(false); }, [location.pathname]);
+
+  // Hide the dock while an editable field has focus (keyboard is open).
+  useEffect(() => {
+    const isEditable = (el) => {
+      if (!el) return false;
+      const tag = el.tagName;
+      if (tag === "TEXTAREA" || tag === "SELECT") return true;
+      if (tag === "INPUT") {
+        const type = (el.getAttribute("type") || "text").toLowerCase();
+        // Non-text inputs (checkbox, range, etc.) don't open the keyboard.
+        return !["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"].includes(type);
+      }
+      return el.isContentEditable;
+    };
+    const onFocusIn = (e) => { if (isEditable(e.target)) setInputFocused(true); };
+    const onFocusOut = () => {
+      // Defer so tabbing field→field doesn't flash the dock between blurs.
+      setTimeout(() => {
+        if (!isEditable(document.activeElement)) setInputFocused(false);
+      }, 0);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
 
   // The "More" sheet lists everything the dock can't fit. We derive its
   // contents from the same navSections the Sidebar consumes so a single
   // source of truth keeps the two surfaces in sync.
   const moreEntries = (() => {
     const flat = [];
-    const dockKeys = new Set(["/dashboard", "/inventory", "/jewelry/production", "/crm/contacts"]);
+    const dockKeys = new Set(["/dashboard", "/inventory", "/sales/inventory", "/crm/contacts"]);
     for (const section of navSections) {
       for (const item of section.items || []) {
         // Skip items already represented in the primary dock to avoid a
-        // duplicate row in the sheet. Jewelry sub-children are still
-        // listed under a "Workshop" group below.
+        // duplicate row in the sheet. Workshop is not in the dock, so it
+        // falls through and renders as a normal group (with its children).
         if (item.to && dockKeys.has(item.to)) continue;
         if (item.children && item.children.length) {
           flat.push({ kind: "group", label: item.label, icon: item.icon, children: item.children });
@@ -137,27 +169,15 @@ const MobileDock = ({ navSections = [] }) => {
     return flat;
   })();
 
-  // Workshop sub-routes — surfaced as a quick-jump strip inside the
-  // sheet so users can land on Sold / Designs / Settings without going
-  // through the Production page first.
-  const workshopGroup = (() => {
-    for (const section of navSections) {
-      for (const item of section.items || []) {
-        if (item.to === "/jewelry/production" && item.children) {
-          return item.children.filter((c) => c.to !== "/jewelry/production");
-        }
-      }
-    }
-    return [];
-  })();
-
   const moreActive = !PRIMARY_SLOTS.some((slot) => slot.matches(location.pathname));
 
   return (
     <>
       {/* Bottom dock — fixed, glass bar, safe-area padded. Hidden on md+ */}
       <nav
-        className="md:hidden fixed inset-x-0 bottom-0 z-40 glass-bar border-t border-app-line"
+        className={`md:hidden fixed inset-x-0 bottom-0 z-40 glass-bar border-t border-app-line transition-transform duration-200 ease-out ${
+          inputFocused ? "translate-y-full" : "translate-y-0"
+        }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         aria-label="Primary navigation"
       >
@@ -233,41 +253,9 @@ const MobileDock = ({ navSections = [] }) => {
                   </Link>
                 )}
 
-                {/* Workshop sub-routes — quick-jump strip. Only show when
-                    something other than the production board exists. */}
-                {workshopGroup.length > 0 && (
-                  <div className="mb-5">
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-app-line2" />
-                      <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-app-muted">
-                        Workshop
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {workshopGroup.map((child) => {
-                        const active = child.matches(location.pathname);
-                        return (
-                          <Link
-                            key={child.to}
-                            to={child.to}
-                            onClick={() => setSheetOpen(false)}
-                            className={`flex flex-col items-center justify-center text-center rounded-2xl border px-2 py-3 transition ${
-                              active
-                                ? "bg-app-ink text-app-canvas border-app-ink"
-                                : "bg-app-canvas2 border-app-line text-app-graphite active:bg-app-line"
-                            }`}
-                          >
-                            <span className="text-[12px] font-medium tracking-tight leading-tight">
-                              {child.label}
-                            </span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Long-tail nav — single-list, solid rows. */}
+                {/* Long-tail nav — single-list, solid rows. Workshop (now
+                    demoted from the dock) appears here as a normal group with
+                    its Production Board / Sold / Designs / Settings children. */}
                 <div className="mb-5">
                   <div className="flex items-center gap-2 mb-2 px-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-app-line2" />
