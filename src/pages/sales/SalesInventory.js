@@ -80,6 +80,20 @@ const FANCY_COLORS = [
   "Purple",
   "Black",
 ];
+const CLARITY_GRADES = [
+  "FL",
+  "IF",
+  "VVS1",
+  "VVS2",
+  "VS1",
+  "VS2",
+  "SI1",
+  "SI2",
+  "SI3",
+  "I1",
+  "I2",
+  "I3",
+];
 
 /* Add/remove a value from a multi-select array state setter. */
 const toggleVal = (setter, val) =>
@@ -235,6 +249,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [colorGrades, setColorGrades] = useState([]);
   const [fancyIntensity, setFancyIntensity] = useState([]);
   const [fancyColor, setFancyColor] = useState([]);
+  const [claritySel, setClaritySel] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -248,6 +263,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setColorGrades([]);
     setFancyIntensity([]);
     setFancyColor([]);
+    setClaritySel([]);
     const load = async () => {
       try {
         setLoading(true);
@@ -612,6 +628,24 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                         </div>
                       </div>
                     )}
+                  </section>
+
+                  {/* Clarity — multi-select grade chips. */}
+                  <section>
+                    <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                      Clarity
+                    </h3>
+                    <ScrollRow>
+                      {CLARITY_GRADES.map((c) => (
+                        <Chip
+                          key={c}
+                          active={claritySel.includes(c)}
+                          onClick={() => toggleVal(setClaritySel, c)}
+                        >
+                          {c}
+                        </Chip>
+                      ))}
+                    </ScrollRow>
                   </section>
                   </div>
                 ) : (
