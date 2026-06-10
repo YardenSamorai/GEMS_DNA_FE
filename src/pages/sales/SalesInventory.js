@@ -513,6 +513,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // Quick toggles: restrict to stones that carry a certificate / any media.
   const [onlyCert, setOnlyCert] = useState(false);
   const [onlyMedia, setOnlyMedia] = useState(false);
+  const [onlyInStock, setOnlyInStock] = useState(false);
   const advancedGroups = [
     { title: "Cut", options: GRADE_EVGF, sel: cutSel, setter: setCutSel },
     { title: "Polish", options: GRADE_EVGF, sel: polishSel, setter: setPolishSel },
@@ -551,6 +552,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setParcelSel([]);
     setOnlyCert(false);
     setOnlyMedia(false);
+    setOnlyInStock(false);
     setSkuQuery("");
     const load = async () => {
       try {
@@ -694,6 +696,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       // every stone carries a v360 video link, so including video here made the
       // filter meaningless (image-less stones still showed "Coming Soon").
       if (onlyMedia && !stoneImage(s)) return false;
+      if (onlyInStock && resolveLocation(s).memo) return false;
 
       if (skuQuery.trim()) {
         const q = norm(skuQuery);
@@ -729,6 +732,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     parcelSel,
     onlyCert,
     onlyMedia,
+    onlyInStock,
     skuQuery,
   ]);
 
@@ -762,6 +766,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setParcelSel([]);
     setOnlyCert(false);
     setOnlyMedia(false);
+    setOnlyInStock(false);
   };
 
   const visibleStones = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
@@ -1228,6 +1233,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     {[
                       { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
                       { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
+                      { label: "Only in stock", checked: onlyInStock, set: setOnlyInStock },
                     ].map(({ label, checked, set }) => (
                       <label
                         key={label}
