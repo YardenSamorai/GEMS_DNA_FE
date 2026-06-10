@@ -52,8 +52,9 @@ const PRIMARY_SLOTS = [
   {
     key: "sales",
     label: "Sales",
-    to: "/sales/inventory",
-    matches: (path) => path.startsWith("/sales/inventory"),
+    // Default landing surface for the sales catalog is Emeralds.
+    to: "/sales/emeralds",
+    matches: (path) => path.startsWith("/sales"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -85,51 +86,57 @@ const SALES_SLOTS = [
     matches: (path) => path === "/dashboard" || path.startsWith("/dashboard"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 11.5l9-8 9 8M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3.5 11.25L12 4l8.5 7.25M5.5 9.6V19a1 1 0 001 1h3.5v-5.75h4V20h3.5a1 1 0 001-1V9.6" />
       </svg>
     ),
   },
   {
+    // Side-view brilliant cut — full outline + crown & pavilion facets.
     key: "diamond",
     label: "Diamond",
     to: "/sales/diamonds",
     matches: (path) => path.startsWith("/sales/diamonds"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 9h16M9 3.5L6.5 9l5.5 11.5L17.5 9 15 3.5M9 3.5h6M9 3.5L12 9l3-5.5M12 9v11.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.3} d="M9 3.5h6L20 9l-8 11.5L4 9l5-5.5zM4 9h16M9 3.5L6.5 9l5.5 11.5L17.5 9 15 3.5M9 3.5L12 9l3-5.5M12 9v11.5" />
       </svg>
     ),
   },
   {
+    // Top-view emerald step cut — octagon outline, inner step and corner facets.
     key: "emerald",
     label: "Emeralds",
     to: "/sales/emeralds",
     matches: (path) => path.startsWith("/sales/emeralds"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M8 4h8l4 4v8l-4 4H8l-4-4V8l4-4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.3} d="M8 3.5h8L20.5 8v8L16 20.5H8L3.5 16V8L8 3.5zM9.2 6.5h5.6l2.7 2.7v5.6l-2.7 2.7H9.2l-2.7-2.7V9.2l2.7-2.7zM8 3.5l1.2 3M16 3.5l-1.2 3M20.5 8l-3 1.2M20.5 16l-3-1.2M16 20.5l-1.2-3M8 20.5l1.2-3M3.5 16l3-1.2M3.5 8l3 1.2" />
       </svg>
     ),
   },
   {
+    // Top-view round brilliant — girdle circle, octagonal table, radial facets.
     key: "gemstones",
     label: "Gemstones",
     to: "/sales/inventory",
     matches: (path) => path.startsWith("/sales/inventory") || path.startsWith("/sales/gemstones"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 3l7.5 4.5v9L12 21l-7.5-4.5v-9L12 3z" />
+        <circle cx="12" cy="12" r="8.5" strokeWidth={1.3} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.3} d="M12 7.2l3.4 1.4 1.4 3.4-1.4 3.4-3.4 1.4-3.4-1.4-1.4-3.4 1.4-3.4L12 7.2zM12 3.5v3.7M20.5 12h-3.7M12 20.5v-3.7M3.5 12h3.7M18 6l-2.6 2.6M18 18l-2.6-2.6M6 18l2.6-2.6M6 6l2.6 2.6" />
       </svg>
     ),
   },
   {
+    // Engagement ring — band with a faceted solitaire on top.
     key: "jewelry",
     label: "Jewelry",
     to: "/inventory?tab=jewelry",
     matches: () => false,
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 22a6 6 0 100-12 6 6 0 000 12z M9 9l3-4 3 4" />
+        <circle cx="12" cy="15.25" r="5.75" strokeWidth={1.3} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.3} d="M8.8 6.2l1.6-2.7h3.2l1.6 2.7L12 9.5 8.8 6.2zM8.8 6.2h6.4M10.4 3.5L12 6.2l1.6-2.7" />
       </svg>
     ),
   },
@@ -144,19 +151,19 @@ const MoreIcon = (cls) => (
 const DockTile = ({ active, label, icon, onClick, to, compact }) => {
   const inner = (
     <span
-      className={`flex flex-col items-center justify-center gap-0.5 rounded-2xl py-1.5 transition-colors ${
-        compact ? "px-1.5" : "px-3"
+      className={`flex flex-col items-center justify-center gap-1 rounded-2xl py-2 transition-colors ${
+        compact ? "px-2" : "px-3.5"
       } ${
         active
-          ? "bg-app-ink/10 text-app-ink"
+          ? "bg-emerald-500/10 text-emerald-600"
           : "text-app-graphite hover:text-app-ink"
       }`}
     >
-      {icon(compact ? "w-[21px] h-[21px]" : "w-[23px] h-[23px]")}
+      {icon(compact ? "w-[24px] h-[24px]" : "w-[26px] h-[26px]")}
       <span
-        className={`font-semibold tracking-[0.01em] leading-none ${
-          compact ? "text-[9.5px]" : "text-[10.5px]"
-        }`}
+        className={`tracking-[0.01em] leading-none ${
+          active ? "font-bold" : "font-semibold"
+        } ${compact ? "text-[10px]" : "text-[11px]"}`}
       >
         {label}
       </span>
@@ -268,7 +275,7 @@ const MobileDock = ({ navSections = [] }) => {
         }}
         aria-label="Primary navigation"
       >
-        <div className={`flex items-stretch h-16 ${compact ? "px-1" : "px-1.5"}`}>
+        <div className={`flex items-stretch h-[74px] ${compact ? "px-1" : "px-1.5"}`}>
           {slots.map((slot) => (
             <DockTile
               key={slot.key}
@@ -310,7 +317,7 @@ const MobileDock = ({ navSections = [] }) => {
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 320 }}
               className="absolute inset-x-0 bottom-0 bg-app-surface border-t border-app-line rounded-t-3xl max-h-[85vh] overflow-hidden flex flex-col"
-              style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 64px)" }}
+              style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 74px)" }}
               role="dialog"
               aria-label="More navigation"
             >

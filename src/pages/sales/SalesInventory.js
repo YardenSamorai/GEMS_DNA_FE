@@ -328,6 +328,11 @@ const LOCATION_MAP = {
   "ESHED DIAM HK EMERALDS": "Eshed Diam HK",
   "ESHED DIAM (HK) LTD": "Eshed Diam HK",
   "ESHED DESIGNS LTD": "Eshed Designs",
+  // The cutting/oiling factory is ours — stones there are NOT on memo.
+  FACTORY: "Factory",
+  "FACTORY OILED": "Factory",
+  "FACTORY - EY": "Factory",
+  "FACTORY NEW": "Factory",
 };
 const normLoc = (v) => String(v || "").trim().replace(/\s+/g, " ").toUpperCase();
 
