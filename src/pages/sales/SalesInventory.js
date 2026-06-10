@@ -94,10 +94,75 @@ const CLARITY_GRADES = [
   "I2",
   "I3",
 ];
+const LAB_OPTIONS = ["GIA", "HRD", "IGI", "EGL"];
+const LOCATION_OPTIONS = ["HK", "IL", "LA", "NY"];
+/* Advanced (collapsed by default) finish grades + fluorescence. */
+const GRADE_EVGF = ["EX", "VG", "G", "F"];
+const FLUOR_OPTIONS = ["None", "Faint", "Med.", "Strong"];
+const PARCEL_OPTIONS = ["Single", "Pair", "Set", "Parcel"];
 
 /* Add/remove a value from a multi-select array state setter. */
 const toggleVal = (setter, val) =>
   setter((cur) => (cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val]));
+
+/* ---- Filter matching maps -------------------------------------------------
+ * Inventory shape/grade values come from the Barak export in varied forms
+ * (raw codes like "RD"/"ASH", DNA names like "Round", and full words). Each
+ * filter key maps to the set of tokens that should match a stone's raw shape
+ * code OR its resolved DNA shape name. Shapes with no data equivalent simply
+ * match nothing. */
+const SHAPE_MATCH = {
+  Round: ["RD", "BR", "ROUND"],
+  Oval: ["OV", "MOVAL", "OVAL"],
+  Emerald: ["EC", "EM", "SQEC", "EMERALD"],
+  Pear: ["PS", "PEAR"],
+  Square: ["SQ", "CARRE"],
+  Heart: ["HS", "HEART"],
+  Marquise: ["MQ", "MARQUISE"],
+  Cushion: ["CU", "CB", "CMB", "CUSHION"],
+  Octagonal: ["OCT", "OCTAGON", "OCTAGONAL"],
+  Radiant: ["RAD", "RADIANT"],
+  Asscher: ["ASH", "ASSCHER"],
+  Cabochon: ["CAB", "CABUSHON", "CABOCHON", "HD", "SUGAR", "SUGARLOAF"],
+  Trilliant: ["TR", "TRIANGLE", "TRILLIANT"],
+  Baguette: ["BGT", "BAGUETTE"],
+  TaperedBaguette: ["TPR", "TAPER"],
+  Kite: ["KITE"],
+  Lozenge: ["LOZENGE", "LOZ"],
+  Bullets: ["BULLET", "BULLETS"],
+  Hexagonal: ["HEX", "HEXAGON", "HEXAGONAL"],
+  Pentagonal: ["PENTAGON", "PENTAGONAL"],
+  Triangular: ["TR", "TRIANGLE", "TRIANGULAR"],
+  Shield: ["SHI", "SHIELD"],
+  Rose: ["ROSE", "RRC"],
+  Briolette: ["BRIO", "BRIOLLETE", "BRIOLETTE"],
+  EuropeanCut: ["EUROPEAN", "EUR"],
+  Flanders: ["FLANDERS"],
+  SquareRadiant: ["SQRAD", "SQUARE RADIANT"],
+  CushionBrilliant: ["CUSHION BRILLIANT"],
+  CushionModified: ["CUSHION MODIFIED"],
+  OldMine: ["OM", "OMB", "OLD MINE"],
+};
+const LOCATION_MATCH = {
+  HK: ["HK", "HONG KONG"],
+  IL: ["IL", "ISRAEL"],
+  LA: ["LA", "LOS ANGELES"],
+  NY: ["NY", "NEW YORK"],
+};
+const GRADE_MATCH = {
+  EX: ["EX", "EXCELLENT", "ID", "IDEAL"],
+  VG: ["VG", "VERY GOOD"],
+  G: ["G", "GOOD"],
+  F: ["F", "FAIR"],
+};
+const FLUOR_MATCH = {
+  None: ["NONE", "NON", "NO", "N"],
+  Faint: ["FAINT", "FNT", "FN"],
+  "Med.": ["MED", "MEDIUM"],
+  Strong: ["STRONG", "STG", "VERY STRONG"],
+};
+
+const norm = (v) => (v == null ? "" : String(v).trim().toUpperCase());
 
 /* "Coming soon" fallback shown when a stone has no usable photo (or its URL
  * fails to load). Pure CSS so it's crisp at any size and theme-aware. */
@@ -160,6 +225,40 @@ const ScrollRow = ({ children }) => (
   <div className="scrollbar-hide -mx-5 overflow-x-auto px-5">
     <div className="flex gap-2">{children}</div>
   </div>
+);
+
+/* Collapsible section divider — a centred label between two hairlines with a
+ * gem glyph and a chevron, used to group/toggle the Basic and Advanced filter
+ * blocks. */
+const SectionDivider = ({ label, open, onClick }) => (
+  <button
+    type="button"
+    aria-expanded={open}
+    onClick={onClick}
+    className="flex w-full items-center gap-3 py-1"
+  >
+    <span className="h-px flex-1 bg-app-line" />
+    <span className="flex items-center gap-2 text-app-ink">
+      <svg className="h-4 w-4 text-app-graphite" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.3}
+          d="M4 9h16M9 3.5L6.5 9l5.5 11.5L17.5 9 15 3.5M9 3.5h6M9 3.5L12 9l3-5.5M12 9v11.5"
+        />
+      </svg>
+      <span className="text-[11.5px] font-semibold uppercase tracking-[0.16em]">{label}</span>
+      <svg
+        className={`h-4 w-4 text-app-muted transition-transform ${open ? "rotate-180" : ""}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 9l-7 7-7-7" />
+      </svg>
+    </span>
+    <span className="h-px flex-1 bg-app-line" />
+  </button>
 );
 
 /* A single toggleable filter chip. */
@@ -250,6 +349,27 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [fancyIntensity, setFancyIntensity] = useState([]);
   const [fancyColor, setFancyColor] = useState([]);
   const [claritySel, setClaritySel] = useState([]);
+  const [labSel, setLabSel] = useState([]);
+  const [locationSel, setLocationSel] = useState([]);
+  // Basic block (open by default) wraps the primary filters; Advanced
+  // (collapsed) holds the finish grades + fluorescence.
+  const [basicOpen, setBasicOpen] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [cutSel, setCutSel] = useState([]);
+  const [polishSel, setPolishSel] = useState([]);
+  const [symmetrySel, setSymmetrySel] = useState([]);
+  const [fluorSel, setFluorSel] = useState([]);
+  const [parcelSel, setParcelSel] = useState([]);
+  // Quick toggles: restrict to stones that carry a certificate / any media.
+  const [onlyCert, setOnlyCert] = useState(false);
+  const [onlyMedia, setOnlyMedia] = useState(false);
+  const advancedGroups = [
+    { title: "Cut", options: GRADE_EVGF, sel: cutSel, setter: setCutSel },
+    { title: "Polish", options: GRADE_EVGF, sel: polishSel, setter: setPolishSel },
+    { title: "Symmetry", options: GRADE_EVGF, sel: symmetrySel, setter: setSymmetrySel },
+    { title: "Fluorescence", options: FLUOR_OPTIONS, sel: fluorSel, setter: setFluorSel },
+    { title: "Parcel type", options: PARCEL_OPTIONS, sel: parcelSel, setter: setParcelSel },
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -264,6 +384,17 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setFancyIntensity([]);
     setFancyColor([]);
     setClaritySel([]);
+    setLabSel([]);
+    setLocationSel([]);
+    setBasicOpen(true);
+    setAdvancedOpen(false);
+    setCutSel([]);
+    setPolishSel([]);
+    setSymmetrySel([]);
+    setFluorSel([]);
+    setParcelSel([]);
+    setOnlyCert(false);
+    setOnlyMedia(false);
     const load = async () => {
       try {
         setLoading(true);
@@ -291,15 +422,155 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     };
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visibleStones = useMemo(() => stones.slice(0, visibleCount), [stones, visibleCount]);
-  const hasMore = visibleCount < stones.length;
+  // Apply the selected filters to the loaded (category-scoped) stones. Each
+  // active facet narrows the result; empty facets are ignored. Diamond mode is
+  // the only one with filter controls today, but the logic is harmless for the
+  // others (all selections stay empty → everything passes).
+  const filtered = useMemo(() => {
+    return stones.filter((s) => {
+      if (shapeSel.length) {
+        const raw = norm(s.shape);
+        const dna = norm(getDisplayShape(s.shape));
+        const ok = shapeSel.some((k) =>
+          (SHAPE_MATCH[k] || [k.toUpperCase()]).some((t) => t === raw || t === dna)
+        );
+        if (!ok) return false;
+      }
+
+      if (sizeFrom || sizeTo || sizeBands.length) {
+        const ct = parseFloat(s.weightCt);
+        let ok = false;
+        if (sizeFrom || sizeTo) {
+          const f = sizeFrom ? parseFloat(sizeFrom) : -Infinity;
+          const t = sizeTo ? parseFloat(sizeTo) : Infinity;
+          if (!isNaN(ct) && ct >= f && ct <= t) ok = true;
+        }
+        if (!ok && sizeBands.length) {
+          ok = sizeBands.some((label) => {
+            const b = SIZE_PRESETS.find((p) => p.label === label);
+            if (!b) return false;
+            const f = b.from ? parseFloat(b.from) : -Infinity;
+            const t = b.to ? parseFloat(b.to) : Infinity;
+            return !isNaN(ct) && ct >= f && ct <= t;
+          });
+        }
+        if (!ok) return false;
+      }
+
+      if (colorMode === "white") {
+        if (colorGrades.length) {
+          const tokens = norm(s.color).split(/[\s,\-+/]+/).filter(Boolean);
+          if (!colorGrades.some((g) => tokens.includes(g))) return false;
+        }
+      } else {
+        if (fancyIntensity.length) {
+          const fi = norm(s.fancyIntensity);
+          if (!fancyIntensity.some((v) => fi.includes(norm(v)))) return false;
+        }
+        if (fancyColor.length) {
+          const fc = norm(s.fancyColor);
+          if (!fancyColor.some((v) => fc.includes(norm(v)))) return false;
+        }
+      }
+
+      if (claritySel.length) {
+        const cl = norm(s.clarity);
+        const parts = cl.split(/[\s,\-+/]+/).filter(Boolean);
+        if (!claritySel.some((v) => cl === norm(v) || parts.includes(norm(v)))) return false;
+      }
+
+      if (labSel.length) {
+        const lab = norm(s.lab);
+        if (!labSel.some((v) => lab.includes(norm(v)))) return false;
+      }
+
+      if (locationSel.length) {
+        const loc = norm(s.location);
+        if (!locationSel.some((v) => (LOCATION_MATCH[v] || [v]).some((t) => loc.includes(t)))) {
+          return false;
+        }
+      }
+
+      const gradeOk = (sel, field) => {
+        if (!sel.length) return true;
+        const val = norm(s[field]);
+        return sel.some((v) => (GRADE_MATCH[v] || [v]).some((t) => val === t || val.startsWith(t)));
+      };
+      if (!gradeOk(cutSel, "cut")) return false;
+      if (!gradeOk(polishSel, "polish")) return false;
+      if (!gradeOk(symmetrySel, "symmetry")) return false;
+      if (fluorSel.length) {
+        const fl = norm(s.fluorescence);
+        if (!fluorSel.some((v) => (FLUOR_MATCH[v] || [v]).some((t) => fl.includes(t)))) return false;
+      }
+
+      if (parcelSel.length) {
+        const gt = norm(s.groupingType);
+        if (!parcelSel.some((v) => gt === norm(v))) return false;
+      }
+
+      if (onlyCert && !(s.certificateUrl || s.certificateNumber)) return false;
+      if (onlyMedia && !(stoneImage(s) || s.videoUrl)) return false;
+
+      return true;
+    });
+  }, [
+    stones,
+    shapeSel,
+    sizeFrom,
+    sizeTo,
+    sizeBands,
+    colorMode,
+    colorGrades,
+    fancyIntensity,
+    fancyColor,
+    claritySel,
+    labSel,
+    locationSel,
+    cutSel,
+    polishSel,
+    symmetrySel,
+    fluorSel,
+    parcelSel,
+    onlyCert,
+    onlyMedia,
+  ]);
+
+  // Reset paging whenever the filtered set changes so the grid starts at top.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filtered]);
+
+  const resetFilters = () => {
+    setShapeSel([]);
+    setSizeFrom("");
+    setSizeTo("");
+    setSizeBands([]);
+    setColorMode("white");
+    setColorGrades([]);
+    setFancyIntensity([]);
+    setFancyColor([]);
+    setClaritySel([]);
+    setLabSel([]);
+    setLocationSel([]);
+    setCutSel([]);
+    setPolishSel([]);
+    setSymmetrySel([]);
+    setFluorSel([]);
+    setParcelSel([]);
+    setOnlyCert(false);
+    setOnlyMedia(false);
+  };
+
+  const visibleStones = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const hasMore = visibleCount < filtered.length;
 
   // Infinite scroll — reveal the next batch when the sentinel nears the
   // viewport. `rootMargin` pre-loads slightly before the user hits bottom.
   const sentinelRef = useRef(null);
   const loadMore = useCallback(() => {
-    setVisibleCount((c) => Math.min(c + PAGE_SIZE, stones.length));
-  }, [stones.length]);
+    setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+  }, [filtered.length]);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -363,14 +634,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       )}
 
       {/* Empty */}
-      {!loading && !error && stones.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <div className="mt-8 rounded-2xl glass-surface p-10 text-center">
-          <p className="text-[14px] font-medium text-app-ink">No {cfg.noun} in inventory</p>
+          <p className="text-[14px] font-medium text-app-ink">
+            {stones.length === 0 ? `No ${cfg.noun} in inventory` : `No ${cfg.noun} match your filters`}
+          </p>
         </div>
       )}
 
       {/* Grid — 2 cards per row on phones, wider on larger screens. */}
-      {!loading && !error && stones.length > 0 && (
+      {!loading && !error && filtered.length > 0 && (
         <>
           <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
             {visibleStones.map((stone, idx) => (
@@ -436,12 +709,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
 
               {/* Scrollable body — vertical scroll for the section stack,
                   while individual rows (like Shape) scroll horizontally. */}
-              <div
-                className="flex-1 overflow-y-auto px-5 py-4"
-                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
-              >
+              <div className="flex-1 overflow-y-auto px-5 py-4">
                 {mode === "diamond" ? (
                   <div className="space-y-7">
+                  <SectionDivider
+                    label="Basic"
+                    open={basicOpen}
+                    onClick={() => setBasicOpen((o) => !o)}
+                  />
+                  {basicOpen && (
+                  <>
                   <section>
                     <div className="mb-2.5 flex items-center justify-between">
                       <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
@@ -461,7 +738,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     {/* Two rows, columns flow horizontally and scroll right.
                         Scrollbar hidden but swipe/scroll still works. */}
                     <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
-                      <div className="grid grid-flow-col grid-rows-2 auto-cols-[76px] gap-2">
+                      <div className="grid grid-flow-col grid-rows-2 auto-cols-[108px] gap-2.5">
                         {DIAMOND_SHAPES.map((sh) => {
                           const active = shapeSel.includes(sh.key);
                           return (
@@ -470,14 +747,14 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                               type="button"
                               aria-pressed={active}
                               onClick={() => toggleShape(sh.key)}
-                              className={`flex flex-col items-center gap-1 rounded-2xl border px-1.5 py-2.5 transition ${
+                              className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2.5 py-4 transition ${
                                 active
                                   ? "border-app-ink bg-app-ink/5 text-app-ink"
                                   : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
                               }`}
                             >
-                              {sh.icon("h-8 w-8")}
-                              <span className="w-full truncate text-center text-[10px] font-medium leading-none">
+                              {sh.icon("h-11 w-11")}
+                              <span className="w-full text-center text-[11px] font-medium leading-tight">
                                 {sh.label}
                               </span>
                             </button>
@@ -647,10 +924,132 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                       ))}
                     </ScrollRow>
                   </section>
+
+                  {/* Lab — multi-select grading labs. */}
+                  <section>
+                    <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                      Lab
+                    </h3>
+                    <ScrollRow>
+                      {LAB_OPTIONS.map((l) => (
+                        <Chip
+                          key={l}
+                          active={labSel.includes(l)}
+                          onClick={() => toggleVal(setLabSel, l)}
+                        >
+                          {l}
+                        </Chip>
+                      ))}
+                    </ScrollRow>
+                  </section>
+
+                  {/* Location — multi-select stock locations. */}
+                  <section>
+                    <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                      Location
+                    </h3>
+                    <ScrollRow>
+                      {LOCATION_OPTIONS.map((loc) => (
+                        <Chip
+                          key={loc}
+                          active={locationSel.includes(loc)}
+                          onClick={() => toggleVal(setLocationSel, loc)}
+                        >
+                          {loc}
+                        </Chip>
+                      ))}
+                    </ScrollRow>
+                  </section>
+
+                  {/* Quick toggles — keep stones that carry a cert / media. */}
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                    {[
+                      { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
+                      { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
+                    ].map(({ label, checked, set }) => (
+                      <label
+                        key={label}
+                        className="flex cursor-pointer select-none items-center gap-2 text-[13px] font-medium text-app-ink"
+                      >
+                        <span
+                          className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
+                            checked
+                              ? "border-app-ink bg-app-ink text-app-canvas"
+                              : "border-app-line bg-app-surface text-transparent"
+                          }`}
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
+                          </svg>
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={checked}
+                          onChange={() => set((v) => !v)}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  </>
+                  )}
+
+                  {/* Advanced Search — collapsible divider revealing finish
+                      grades (Cut / Polish / Symmetry) and Fluorescence. */}
+                  <SectionDivider
+                    label="Advanced search"
+                    open={advancedOpen}
+                    onClick={() => setAdvancedOpen((o) => !o)}
+                  />
+                  {advancedOpen && (
+                    <div className="space-y-6">
+                      {advancedGroups.map((g) => (
+                        <div key={g.title}>
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                            {g.title}
+                          </h4>
+                          <ScrollRow>
+                            {g.options.map((opt) => (
+                              <Chip
+                                key={opt}
+                                active={g.sel.includes(opt)}
+                                onClick={() => toggleVal(g.setter, opt)}
+                              >
+                                {opt}
+                              </Chip>
+                            ))}
+                          </ScrollRow>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   </div>
                 ) : (
                   <p className="text-[13px] text-app-soft">No filters configured yet.</p>
                 )}
+              </div>
+
+              {/* Sticky footer — clear everything or apply (the grid filters
+                  live, so "Show" just closes the sheet on the results). */}
+              <div
+                className="flex shrink-0 items-center gap-3 border-t border-app-line px-5 py-3"
+                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+              >
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-xl border border-app-line bg-app-surface px-5 py-2.5 text-[13px] font-semibold text-app-graphite transition hover:bg-app-canvas2"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="flex-1 rounded-xl bg-app-ink px-5 py-2.5 text-[13px] font-semibold text-app-canvas transition active:scale-[0.99]"
+                >
+                  Show {filtered.length} {filtered.length === 1 ? "result" : "results"}
+                </button>
               </div>
             </motion.div>
           </div>

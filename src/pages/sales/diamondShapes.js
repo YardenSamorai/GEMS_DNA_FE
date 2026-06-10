@@ -1,17 +1,17 @@
 import React from "react";
 
-/* Compact line-art icons for the diamond Shape filter. Each `icon` is a
- * render fn `(cls) => <svg/>` so callers control sizing/colour via className
- * (stroke = currentColor). Kept deliberately simple/uniform so the row reads
- * as a clean set of glyphs rather than detailed illustrations. */
+/* Faceted line-art icons for the diamond Shape filter, drawn on a 64×64 grid
+ * to match the realistic gem outlines in the design reference (outer girdle +
+ * table + crown/step facets). Each `icon` is a render fn `(cls) => <svg/>` so
+ * callers control sizing/colour via className (stroke = currentColor). */
 const S = (children) => (cls) =>
   (
     <svg
       className={cls}
-      viewBox="0 0 24 24"
+      viewBox="0 0 64 64"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.3"
+      strokeWidth="1.1"
       strokeLinejoin="round"
       strokeLinecap="round"
     >
@@ -25,109 +25,245 @@ export const DIAMOND_SHAPES = [
     label: "Round",
     icon: S(
       <>
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
-      </>
-    ),
-  },
-  {
-    key: "Princess",
-    label: "Princess",
-    icon: S(
-      <>
-        <rect x="4" y="4" width="16" height="16" rx="1.2" />
-        <path d="M4 4l16 16M20 4L4 20" />
-      </>
-    ),
-  },
-  {
-    key: "Cushion",
-    label: "Cushion",
-    icon: S(<rect x="4" y="4" width="16" height="16" rx="6" />),
-  },
-  {
-    key: "Radiant",
-    label: "Radiant",
-    icon: S(
-      <>
-        <path d="M8 4h8l4 4v8l-4 4H8l-4-4V8l4-4z" />
-        <path d="M8 4l8 16M16 4L8 20" />
-      </>
-    ),
-  },
-  {
-    key: "Emerald",
-    label: "Emerald",
-    icon: S(<path d="M9 3h6l3 3v12l-3 3H9l-3-3V6l3-3z" />),
-  },
-  {
-    key: "Asscher",
-    label: "Asscher",
-    icon: S(
-      <>
-        <path d="M8 4h8l4 4v8l-4 4H8l-4-4V8l4-4z" />
-        <rect x="9" y="9" width="6" height="6" />
+        <circle cx="32" cy="32" r="27" />
+        <polygon points="42.2,36.2 36.2,42.2 27.8,42.2 21.8,36.2 21.8,27.8 27.8,21.8 36.2,21.8 42.2,27.8" />
+        <path d="M59,32 L42.2,36.2 M59,32 L42.2,27.8 M51.1,51.1 L42.2,36.2 M51.1,51.1 L36.2,42.2 M32,59 L36.2,42.2 M32,59 L27.8,42.2 M12.9,51.1 L27.8,42.2 M12.9,51.1 L21.8,36.2 M5,32 L21.8,36.2 M5,32 L21.8,27.8 M12.9,12.9 L21.8,27.8 M12.9,12.9 L27.8,21.8 M32,5 L27.8,21.8 M32,5 L36.2,21.8 M51.1,12.9 L36.2,21.8 M51.1,12.9 L42.2,27.8" />
       </>
     ),
   },
   {
     key: "Oval",
     label: "Oval",
-    icon: S(<ellipse cx="12" cy="12" rx="6" ry="9" />),
-  },
-  {
-    key: "Pear",
-    label: "Pear",
-    icon: S(<path d="M12 3c3.6 4 6 7.2 6 10.2A6 6 0 116 13.2C6 10.2 8.4 7 12 3z" />),
-  },
-  {
-    key: "Marquise",
-    label: "Marquise",
-    icon: S(<path d="M3 12c4-5.5 14-5.5 18 0-4 5.5-14 5.5-18 0z" />),
-  },
-  {
-    key: "Heart",
-    label: "Heart",
-    icon: S(<path d="M12 20S4 15 4 9.5A3.8 3.8 0 0112 7a3.8 3.8 0 018 2.5C20 15 12 20 12 20z" />),
-  },
-  {
-    key: "Trilliant",
-    label: "Trilliant",
-    icon: S(<path d="M12 4l8.5 15h-17z" />),
-  },
-  {
-    key: "Baguette",
-    label: "Baguette",
-    icon: S(<rect x="8.5" y="3" width="7" height="18" rx="0.8" />),
-  },
-  {
-    key: "Trapezoid",
-    label: "Trapeze",
-    icon: S(<path d="M4 18h16l-3.5-12h-9z" />),
-  },
-  {
-    key: "HalfMoon",
-    label: "Half Moon",
-    icon: S(<path d="M4 8h16a8 8 0 01-16 0z" />),
-  },
-  {
-    key: "OldEuropean",
-    label: "Eur. Cut",
     icon: S(
       <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M5.3 5.3l13.4 13.4M18.7 5.3L5.3 18.7" />
+        <ellipse cx="32" cy="32" rx="20" ry="27" />
+        <polygon points="40,38 36,44 28,44 24,38 24,26 28,20 36,20 40,26" />
+        <path d="M32,5 L36,20 M32,5 L28,20 M32,59 L36,44 M32,59 L28,44 M12,32 L24,26 M12,32 L24,38 M52,32 L40,26 M52,32 L40,38 M46.1,12.9 L40,26 M46.1,51.1 L40,38 M17.9,51.1 L24,38 M17.9,12.9 L24,26" />
       </>
     ),
   },
   {
-    key: "OldMine",
-    label: "Old Mine",
+    key: "Emerald",
+    label: "Emerald Cut",
     icon: S(
       <>
-        <rect x="5" y="5" width="14" height="14" rx="5" />
-        <path d="M6 6l12 12M18 6L6 18" />
+        <polygon points="24,6 40,6 46,12 46,52 40,58 24,58 18,52 18,12" />
+        <polygon points="28,11 36,11 41,16 41,48 36,53 28,53 23,48 23,16" />
+        <polygon points="30,17 34,17 39,22 39,42 34,47 30,47 25,42 25,22" />
+        <path d="M46,12 L41,16 M46,52 L41,48 M18,52 L23,48 M18,12 L23,16 M41,16 L39,22 M41,48 L39,42 M23,48 L25,42 M23,16 L25,22" />
+      </>
+    ),
+  },
+  {
+    key: "Pear",
+    label: "Pear",
+    icon: S(
+      <>
+        <path d="M32,5 C42,15 50,26 50,38 A18,18 0 1 1 14,38 C14,26 22,15 32,5 Z" />
+        <polygon points="24,24 40,24 43,33 38,42 26,42 21,33" />
+        <path d="M32,5 L24,24 M32,5 L40,24 M14,38 L21,33 M50,38 L43,33 M32,56 L26,42 M32,56 L38,42 M21,33 L43,33" />
+      </>
+    ),
+  },
+  {
+    key: "Square",
+    label: "Square",
+    icon: S(
+      <>
+        <polygon points="24,8 40,8 56,24 56,40 40,56 24,56 8,40 8,24" />
+        <polygon points="27,12 37,12 52,27 52,37 37,52 27,52 12,37 12,27" />
+        <polygon points="28,20 36,20 44,28 44,36 36,44 28,44 20,36 20,28" />
+        <path d="M56,24 L52,27 M56,40 L52,37 M40,56 L37,52 M24,56 L27,52 M8,40 L12,37 M8,24 L12,27 M24,8 L27,12 M40,8 L37,12" />
+      </>
+    ),
+  },
+  {
+    key: "Heart",
+    label: "Heart",
+    icon: S(
+      <>
+        <path d="M32,18 C28,10 18,9 13,16 C7,24 13,34 32,52 C51,34 57,24 51,16 C46,9 36,10 32,18 Z" />
+        <path d="M32,18 L32,52 M13,16 L26,31 M51,16 L38,31 M32,52 L26,31 M32,52 L38,31 M26,31 L38,31" />
+      </>
+    ),
+  },
+  {
+    key: "Marquise",
+    label: "Marquise",
+    icon: S(
+      <>
+        <path d="M32,5 C44,18 44,46 32,59 C20,46 20,18 32,5 Z" />
+        <polygon points="32,20 42,32 32,44 22,32" />
+        <path d="M32,5 L42,32 M32,5 L22,32 M32,59 L42,32 M32,59 L22,32 M32,5 L32,20 M32,44 L32,59" />
+      </>
+    ),
+  },
+  {
+    key: "Cushion",
+    label: "Cushion",
+    icon: S(
+      <>
+        <path d="M20,8 L44,8 Q56,8 56,20 L56,44 Q56,56 44,56 L20,56 Q8,56 8,44 L8,20 Q8,8 20,8 Z" />
+        <polygon points="42.2,36.2 36.2,42.2 27.8,42.2 21.8,36.2 21.8,27.8 27.8,21.8 36.2,21.8 42.2,27.8" />
+        <path d="M14,14 L21.8,27.8 M50,14 L42.2,27.8 M50,50 L42.2,36.2 M14,50 L21.8,36.2 M32,8 L32,21.8 M32,56 L32,42.2 M8,32 L21.8,32 M56,32 L42.2,32" />
+      </>
+    ),
+  },
+  {
+    key: "Octagonal",
+    label: "Octagonal",
+    icon: S(
+      <>
+        <polygon points="56.9,42.3 42.3,56.9 21.7,56.9 7.1,42.3 7.1,21.7 21.7,7.1 42.3,7.1 56.9,21.7" />
+        <polygon points="42.2,36.2 36.2,42.2 27.8,42.2 21.8,36.2 21.8,27.8 27.8,21.8 36.2,21.8 42.2,27.8" />
+        <path d="M56.9,42.3 L42.2,36.2 M42.3,56.9 L36.2,42.2 M21.7,56.9 L27.8,42.2 M7.1,42.3 L21.8,36.2 M7.1,21.7 L21.8,27.8 M21.7,7.1 L27.8,21.8 M42.3,7.1 L36.2,21.8 M56.9,21.7 L42.2,27.8" />
+        <path d="M56.9,42.3 L42.2,27.8 M42.3,56.9 L42.2,36.2 M21.7,56.9 L36.2,42.2 M7.1,42.3 L27.8,42.2 M7.1,21.7 L21.8,36.2 M21.7,7.1 L21.8,27.8 M42.3,7.1 L27.8,21.8 M56.9,21.7 L36.2,21.8" />
+      </>
+    ),
+  },
+  {
+    key: "Radiant",
+    label: "Radiant",
+    icon: S(
+      <>
+        <polygon points="24,8 40,8 56,24 56,40 40,56 24,56 8,40 8,24" />
+        <polygon points="28,20 36,20 44,28 44,36 36,44 28,44 20,36 20,28" />
+        <path d="M56,24 L44,28 M56,40 L44,36 M40,56 L36,44 M24,56 L28,44 M8,40 L20,36 M8,24 L20,28 M24,8 L28,20 M40,8 L36,20 M32,8 L32,20 M32,56 L32,44 M8,32 L20,32 M56,32 L44,32" />
+      </>
+    ),
+  },
+  {
+    key: "Asscher",
+    label: "Asscher",
+    icon: S(
+      <>
+        <polygon points="24,8 40,8 56,24 56,40 40,56 24,56 8,40 8,24" />
+        <polygon points="28,12 36,12 52,28 52,36 36,52 28,52 12,36 12,28" />
+        <polygon points="29,20 35,20 44,29 44,35 35,44 29,44 20,35 20,29" />
+        <path d="M24,8 L29,20 M40,8 L35,20 M56,24 L44,29 M56,40 L44,35 M40,56 L35,44 M24,56 L29,44 M8,40 L20,35 M8,24 L20,29 M56,24 L52,28 M56,40 L52,36 M40,56 L36,52 M24,56 L28,52 M8,40 L12,36 M8,24 L12,28 M24,8 L28,12 M40,8 L36,12" />
+      </>
+    ),
+  },
+  {
+    key: "Cabochon",
+    label: "Cabochon",
+    icon: S(
+      <>
+        <circle cx="32" cy="32" r="26" />
+        <path d="M16,24 C20,17 27,14 33,15" opacity="0.6" />
+      </>
+    ),
+  },
+  {
+    key: "Trilliant",
+    label: "Trilliant",
+    icon: S(
+      <>
+        <path d="M32,8 Q33,8 34,10 L53,50 Q54,53 51,53 L13,53 Q10,53 11,50 L30,10 Q31,8 32,8 Z" />
+        <polygon points="32,16 46,49 18,49" />
+        <path d="M32,8 L32,40 M14,52 L32,40 M50,52 L32,40 M22,33 L42,33" />
+      </>
+    ),
+  },
+  {
+    key: "Baguette",
+    label: "Baguette",
+    icon: S(
+      <>
+        <polygon points="22,8 42,8 42,56 22,56" />
+        <polygon points="26,12 38,12 38,52 26,52" />
+        <polygon points="29,16 35,16 35,48 29,48" />
+        <path d="M22,8 L26,12 M42,8 L38,12 M42,56 L38,52 M22,56 L26,52" />
+      </>
+    ),
+  },
+  {
+    key: "TaperedBaguette",
+    label: "Tap. Bag.",
+    icon: S(
+      <>
+        <polygon points="25,8 39,8 36,56 28,56" />
+        <polygon points="28,12 36,12 34,52 30,52" />
+        <path d="M25,8 L28,12 M39,8 L36,12 M28,56 L30,52 M36,56 L34,52 M32,12 L32,52" />
+      </>
+    ),
+  },
+  {
+    key: "Kite",
+    label: "Kite",
+    icon: S(
+      <>
+        <polygon points="32,6 48,24 32,58 16,24" />
+        <polygon points="32,14 42,25 32,50 22,25" />
+        <path d="M32,6 L32,14 M32,58 L32,50 M16,24 L22,25 M48,24 L42,25 M22,25 L42,25" />
+      </>
+    ),
+  },
+  {
+    key: "Lozenge",
+    label: "Lozenge",
+    icon: S(
+      <>
+        <polygon points="32,6 47,32 32,58 17,32" />
+        <polygon points="32,14 41,32 32,50 23,32" />
+        <polygon points="32,20 37,32 32,44 27,32" />
+        <path d="M32,6 L32,14 M32,58 L32,50 M17,32 L23,32 M47,32 L41,32" />
+      </>
+    ),
+  },
+  {
+    key: "Bullets",
+    label: "Bullets",
+    icon: S(
+      <>
+        <polygon points="24,8 40,8 40,40 32,56 24,40" />
+        <polygon points="28,12 36,12 36,39 32,49 28,39" />
+        <polygon points="30,16 34,16 34,38 32,44 30,38" />
+        <path d="M24,8 L28,12 M40,8 L36,12 M40,40 L36,39 M24,40 L28,39 M32,56 L32,49" />
+      </>
+    ),
+  },
+  {
+    key: "Hexagonal",
+    label: "Hexagonal",
+    icon: S(
+      <>
+        <polygon points="58,32 45,54.5 19,54.5 6,32 19,9.5 45,9.5" />
+        <polygon points="45,32 38.5,43.3 25.5,43.3 19,32 25.5,20.7 38.5,20.7" />
+        <path d="M58,32 L45,32 M45,54.5 L38.5,43.3 M19,54.5 L25.5,43.3 M6,32 L19,32 M19,9.5 L25.5,20.7 M45,9.5 L38.5,20.7" />
+      </>
+    ),
+  },
+  {
+    key: "Pentagonal",
+    label: "Pentagonal",
+    icon: S(
+      <>
+        <polygon points="32,6 7.3,24 16.7,53 47.3,53 56.7,24" />
+        <polygon points="32,19 19.6,28 24.4,42.5 39.6,42.5 44.4,28" />
+        <path d="M32,6 L32,19 M7.3,24 L19.6,28 M16.7,53 L24.4,42.5 M47.3,53 L39.6,42.5 M56.7,24 L44.4,28" />
+      </>
+    ),
+  },
+  {
+    key: "Triangular",
+    label: "Triangular",
+    icon: S(
+      <>
+        <polygon points="8,14 56,14 32,58" />
+        <polygon points="15,18 49,18 32,50" />
+        <path d="M8,14 L15,18 M56,14 L49,18 M32,58 L32,50 M32,18 L20,36 M32,18 L44,36 M20,36 L44,36" />
+      </>
+    ),
+  },
+  {
+    key: "Shield",
+    label: "Shield",
+    icon: S(
+      <>
+        <path d="M14,10 L50,10 L50,30 C50,44 42,52 32,58 C22,52 14,44 14,30 Z" />
+        <path d="M19,15 L45,15 L45,30 C45,41 39,48 32,53 C25,48 19,41 19,30 Z" />
+        <path d="M14,10 L19,15 M50,10 L45,15 M32,58 L32,53 M32,16 L32,40 M22,33 L42,33" />
       </>
     ),
   },
@@ -136,8 +272,86 @@ export const DIAMOND_SHAPES = [
     label: "Rose",
     icon: S(
       <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 4l2.7 4.3L19.5 9l-3.8 3 1.3 5.5L12 15l-5 2.5 1.3-5.5-3.8-3 4.8-.7z" />
+        <circle cx="32" cy="32" r="26" />
+        <polygon points="32,20 21.6,26 21.6,38 32,44 42.4,38 42.4,26" />
+        <path d="M32,20 L32,6 M21.6,26 L9.5,19 M21.6,38 L9.5,45 M32,44 L32,58 M42.4,38 L54.5,45 M42.4,26 L54.5,19" />
+        <path d="M32,20 L21.6,38 M21.6,26 L32,44 M21.6,38 L42.4,38 M32,44 L42.4,26 M42.4,38 L32,20 M42.4,26 L21.6,26" />
+      </>
+    ),
+  },
+  {
+    key: "Briolette",
+    label: "Briolette",
+    icon: S(
+      <>
+        <path d="M32,6 C44,18 50,30 50,40 A18,18 0 1 1 14,40 C14,30 20,18 32,6 Z" />
+        <path d="M32,6 L32,58 M16,32 L48,32 M20,44 L44,44 M22,20 L42,20" />
+      </>
+    ),
+  },
+  {
+    key: "EuropeanCut",
+    label: "Eur. Cut",
+    icon: S(
+      <>
+        <circle cx="32" cy="32" r="26" />
+        <polygon points="44.9,37.4 37.4,44.9 26.6,44.9 19.1,37.4 19.1,26.6 26.6,19.1 37.4,19.1 44.9,26.6" />
+        <path d="M58,32 L44.9,37.4 M58,32 L44.9,26.6 M50.4,50.4 L44.9,37.4 M50.4,50.4 L37.4,44.9 M32,58 L37.4,44.9 M32,58 L26.6,44.9 M13.6,50.4 L26.6,44.9 M13.6,50.4 L19.1,37.4 M6,32 L19.1,37.4 M6,32 L19.1,26.6 M13.6,13.6 L19.1,26.6 M13.6,13.6 L26.6,19.1 M32,6 L26.6,19.1 M32,6 L37.4,19.1 M50.4,13.6 L37.4,19.1 M50.4,13.6 L44.9,26.6" />
+      </>
+    ),
+  },
+  {
+    key: "Flanders",
+    label: "Flanders",
+    icon: S(
+      <>
+        <polygon points="20,8 44,8 56,20 56,44 44,56 20,56 8,44 8,20" />
+        <polygon points="40,36 36,40 28,40 24,36 24,28 28,24 36,24 40,28" />
+        <path d="M20,8 L28,24 M44,8 L36,24 M56,20 L40,28 M56,44 L40,36 M44,56 L36,40 M20,56 L28,40 M8,44 L24,36 M8,20 L24,28" />
+      </>
+    ),
+  },
+  {
+    key: "SquareRadiant",
+    label: "Sq. Rad.",
+    icon: S(
+      <>
+        <polygon points="24,8 40,8 56,24 56,40 40,56 24,56 8,40 8,24" />
+        <polygon points="30,16 34,16 48,30 48,34 34,48 30,48 16,34 16,30" />
+        <path d="M24,8 L30,16 M40,8 L34,16 M56,24 L48,30 M56,40 L48,34 M40,56 L34,48 M24,56 L30,48 M8,40 L16,34 M8,24 L16,30 M32,8 L32,16 M32,56 L32,48 M8,32 L16,32 M56,32 L48,32" />
+      </>
+    ),
+  },
+  {
+    key: "CushionBrilliant",
+    label: "Cus. Bril.",
+    icon: S(
+      <>
+        <path d="M22,8 L42,8 Q56,8 56,22 L56,42 Q56,56 42,56 L22,56 Q8,56 8,42 L8,22 Q8,8 22,8 Z" />
+        <polygon points="42.2,36.2 36.2,42.2 27.8,42.2 21.8,36.2 21.8,27.8 27.8,21.8 36.2,21.8 42.2,27.8" />
+        <path d="M14,14 L21.8,27.8 M50,14 L42.2,27.8 M50,50 L42.2,36.2 M14,50 L21.8,36.2 M14,14 L27.8,21.8 M50,14 L36.2,21.8 M50,50 L36.2,42.2 M14,50 L27.8,42.2 M32,8 L32,21.8 M32,56 L32,42.2 M8,32 L21.8,32 M56,32 L42.2,32" />
+      </>
+    ),
+  },
+  {
+    key: "CushionModified",
+    label: "Cus. Mod.",
+    icon: S(
+      <>
+        <path d="M22,8 L42,8 Q56,8 56,22 L56,42 Q56,56 42,56 L22,56 Q8,56 8,42 L8,22 Q8,8 22,8 Z" />
+        <polygon points="39,35 35,39 29,39 25,35 25,29 29,25 35,25 39,29" />
+        <path d="M14,14 L25,29 M50,14 L39,29 M50,50 L39,35 M14,50 L25,35 M32,8 L29,25 M32,8 L35,25 M32,56 L29,39 M32,56 L35,39 M8,32 L25,29 M8,32 L25,35 M56,32 L39,29 M56,32 L39,35" />
+      </>
+    ),
+  },
+  {
+    key: "OldMine",
+    label: "Old Min.",
+    icon: S(
+      <>
+        <path d="M22,9 L42,9 Q55,9 55,22 L55,42 Q55,55 42,55 L22,55 Q9,55 9,42 L9,22 Q9,9 22,9 Z" />
+        <polygon points="42,36 36,42 28,42 22,36 22,28 28,22 36,22 42,28" />
+        <path d="M15,15 L22,28 M49,15 L42,28 M49,49 L42,36 M15,49 L22,36 M32,9 L32,22 M32,55 L32,42 M9,32 L22,32 M55,32 L42,32" />
       </>
     ),
   },
