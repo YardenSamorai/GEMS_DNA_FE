@@ -46,18 +46,44 @@ const PAGE_SIZE = 12;
 /* Quick carat bands for the diamond Size filter. Clicking one fills the
  * From/To fields; the last band is open-ended (5ct and up). */
 const SIZE_PRESETS = [
-  { label: "0.30 - 0.39", from: "0.30", to: "0.39" },
-  { label: "0.40 - 0.49", from: "0.40", to: "0.49" },
-  { label: "0.50 - 0.69", from: "0.50", to: "0.69" },
-  { label: "0.70 - 0.89", from: "0.70", to: "0.89" },
-  { label: "0.90 - 0.99", from: "0.90", to: "0.99" },
-  { label: "1.00 - 1.49", from: "1.00", to: "1.49" },
-  { label: "1.50 - 1.99", from: "1.50", to: "1.99" },
-  { label: "2.00 - 2.99", from: "2.00", to: "2.99" },
-  { label: "3.00 - 3.99", from: "3.00", to: "3.99" },
-  { label: "4.00 - 4.99", from: "4.00", to: "4.99" },
-  { label: "5.00 +", from: "5.00", to: "" },
+  { label: "0.00 - 0.99", from: "0.00", to: "0.99" },
+  { label: "0.99 - 1.99", from: "0.99", to: "1.99" },
+  { label: "1.99 - 2.99", from: "1.99", to: "2.99" },
+  { label: "2.99 - 3.99", from: "2.99", to: "3.99" },
+  { label: "3.99 - 5.00", from: "3.99", to: "5.00" },
+  { label: "5.00 - 15.00", from: "5.00", to: "15.00" },
+  { label: "15.00 +", from: "15.00", to: "" },
 ];
+
+/* Diamond colour grades (white) and the fancy-colour sub-filters that replace
+ * them when the Fancy segment is active. */
+const COLOR_GRADES = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const FANCY_INTENSITY = [
+  "Faint",
+  "Very Faint",
+  "Light",
+  "Fancy Light",
+  "Fancy",
+  "Fancy Dark",
+  "Fancy Intense",
+  "Fancy Vivid",
+  "Fancy Deep",
+];
+const FANCY_COLORS = [
+  "Yellow",
+  "Pink",
+  "Green",
+  "Blue",
+  "Orange",
+  "Brown",
+  "Red",
+  "Purple",
+  "Black",
+];
+
+/* Add/remove a value from a multi-select array state setter. */
+const toggleVal = (setter, val) =>
+  setter((cur) => (cur.includes(val) ? cur.filter((x) => x !== val) : [...cur, val]));
 
 /* "Coming soon" fallback shown when a stone has no usable photo (or its URL
  * fails to load). Pure CSS so it's crisp at any size and theme-aware. */
@@ -113,6 +139,30 @@ const stoneImage = (s) => {
   const firstExtra = (s.additionalPictures || "").split(";")[0];
   return usableImg(firstExtra);
 };
+
+/* A horizontally-scrolling chip row (scrollbar hidden, bleeds to the sheet
+ * edges so chips can scroll under the padding). */
+const ScrollRow = ({ children }) => (
+  <div className="scrollbar-hide -mx-5 overflow-x-auto px-5">
+    <div className="flex gap-2">{children}</div>
+  </div>
+);
+
+/* A single toggleable filter chip. */
+const Chip = ({ active, onClick, children }) => (
+  <button
+    type="button"
+    aria-pressed={active}
+    onClick={onClick}
+    className={`whitespace-nowrap rounded-xl border px-3 py-2 text-[12.5px] font-medium transition ${
+      active
+        ? "border-app-ink bg-app-ink/5 text-app-ink"
+        : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+    }`}
+  >
+    {children}
+  </button>
+);
 
 /* One plain detail line under the title (treatment, lab, measurements, …). */
 const Line = ({ value }) =>
@@ -173,14 +223,18 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [shapeSel, setShapeSel] = useState([]);
   const toggleShape = (key) =>
     setShapeSel((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
-  // Carat size range (custom fields + quick-band presets).
+  // Carat size: custom From/To range plus independently multi-selectable
+  // quick bands.
   const [sizeFrom, setSizeFrom] = useState("");
   const [sizeTo, setSizeTo] = useState("");
-  const applyPreset = (p) => {
-    const active = sizeFrom === p.from && sizeTo === p.to;
-    setSizeFrom(active ? "" : p.from);
-    setSizeTo(active ? "" : p.to);
-  };
+  const [sizeBands, setSizeBands] = useState([]);
+  const toggleBand = (label) =>
+    setSizeBands((cur) => (cur.includes(label) ? cur.filter((l) => l !== label) : [...cur, label]));
+  // Colour: White grades (D–Z) vs Fancy (intensity + fancy colour), all multi.
+  const [colorMode, setColorMode] = useState("white");
+  const [colorGrades, setColorGrades] = useState([]);
+  const [fancyIntensity, setFancyIntensity] = useState([]);
+  const [fancyColor, setFancyColor] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,6 +243,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setShapeSel([]);
     setSizeFrom("");
     setSizeTo("");
+    setSizeBands([]);
+    setColorMode("white");
+    setColorGrades([]);
+    setFancyIntensity([]);
+    setFancyColor([]);
     const load = async () => {
       try {
         setLoading(true);
@@ -454,13 +513,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     <div className="scrollbar-hide -mx-5 mt-3 overflow-x-auto px-5">
                       <div className="flex gap-2">
                         {SIZE_PRESETS.map((p) => {
-                          const active = sizeFrom === p.from && sizeTo === p.to;
+                          const active = sizeBands.includes(p.label);
                           return (
                             <button
                               key={p.label}
                               type="button"
                               aria-pressed={active}
-                              onClick={() => applyPreset(p)}
+                              onClick={() => toggleBand(p.label)}
                               className={`whitespace-nowrap rounded-xl border px-3 py-2 text-[12.5px] font-medium transition ${
                                 active
                                   ? "border-app-ink bg-app-ink/5 text-app-ink"
@@ -473,6 +532,86 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                         })}
                       </div>
                     </div>
+                  </section>
+
+                  {/* Colour — White grades (D–Z) or, under Fancy, intensity +
+                      fancy-colour pickers. All multi-select. */}
+                  <section>
+                    <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                      Color
+                    </h3>
+
+                    {/* White / Fancy segmented toggle */}
+                    <div className="inline-flex rounded-xl border border-app-line bg-app-surface p-0.5">
+                      {[
+                        { key: "white", label: "White" },
+                        { key: "fancy", label: "Fancy" },
+                      ].map((seg) => (
+                        <button
+                          key={seg.key}
+                          type="button"
+                          onClick={() => setColorMode(seg.key)}
+                          className={`rounded-lg px-6 py-1.5 text-[13px] font-medium transition ${
+                            colorMode === seg.key
+                              ? "bg-app-ink text-app-canvas"
+                              : "text-app-graphite hover:text-app-ink"
+                          }`}
+                        >
+                          {seg.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {colorMode === "white" ? (
+                      <div className="mt-3">
+                        <ScrollRow>
+                          {COLOR_GRADES.map((g) => (
+                            <Chip
+                              key={g}
+                              active={colorGrades.includes(g)}
+                              onClick={() => toggleVal(setColorGrades, g)}
+                            >
+                              {g}
+                            </Chip>
+                          ))}
+                        </ScrollRow>
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                            Intensity
+                          </h4>
+                          <ScrollRow>
+                            {FANCY_INTENSITY.map((v) => (
+                              <Chip
+                                key={v}
+                                active={fancyIntensity.includes(v)}
+                                onClick={() => toggleVal(setFancyIntensity, v)}
+                              >
+                                {v}
+                              </Chip>
+                            ))}
+                          </ScrollRow>
+                        </div>
+                        <div>
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                            Color
+                          </h4>
+                          <ScrollRow>
+                            {FANCY_COLORS.map((v) => (
+                              <Chip
+                                key={v}
+                                active={fancyColor.includes(v)}
+                                onClick={() => toggleVal(setFancyColor, v)}
+                              >
+                                {v}
+                              </Chip>
+                            ))}
+                          </ScrollRow>
+                        </div>
+                      </div>
+                    )}
                   </section>
                   </div>
                 ) : (
