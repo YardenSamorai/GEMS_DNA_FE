@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
@@ -184,11 +185,11 @@ const FLUOR_MATCH = {
   Strong: ["STRONG", "STG", "VERY STRONG"],
 };
 
-const norm = (v) => (v == null ? "" : String(v).trim().toUpperCase());
+export const norm = (v) => (v == null ? "" : String(v).trim().toUpperCase());
 
 /* Parse a measurement string ("14.94-11.75-6.62" / "14.94 x 11.75 x 6.62")
  * into [length, width, depth] numbers. */
-const parseDims = (m) =>
+export const parseDims = (m) =>
   String(m || "")
     .split(/[^\d.]+/)
     .map(parseFloat)
@@ -306,10 +307,10 @@ const FLUOR_DISPLAY = {
   S: "Strong", STG: "Strong", STRONG: "Strong",
   VS: "Very Strong", VST: "Very Strong", "VERY STRONG": "Very Strong",
 };
-const fluorDisplay = (v) => FLUOR_DISPLAY[norm(v)] || v || "";
+export const fluorDisplay = (v) => FLUOR_DISPLAY[norm(v)] || v || "";
 
 /* "$12,500" — whole-dollar money formatting. */
-const money = (n) => {
+export const money = (n) => {
   const num = Number(n);
   if (!isFinite(num) || !num) return null;
   return `$${num.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -340,7 +341,7 @@ const normLoc = (v) => String(v || "").trim().replace(/\s+/g, " ").toUpperCase()
  *  - Known in-house location  -> clean label, not on memo.
  *  - Other (real company)     -> show it, flagged as MEMO OUT.
  *  - Empty                    -> fall back to branch/city, not on memo. */
-const resolveLocation = (s) => {
+export const resolveLocation = (s) => {
   const raw = s.exactLocation && String(s.exactLocation).trim() ? String(s.exactLocation).trim() : "";
   if (!raw) return { label: s.location || null, memo: false };
   const mapped = LOCATION_MAP[normLoc(raw)];
@@ -375,7 +376,7 @@ const buildEmeraldTitle = (s) => {
  * was uploaded, so the URL 404s and renders as a broken thumbnail. Treat those
  * as "no image": require a filename after the last slash, otherwise fall back
  * to the first usable additional picture, else show the placeholder. */
-const usableImg = (u) => {
+export const usableImg = (u) => {
   if (!u || typeof u !== "string") return null;
   const trimmed = u.trim();
   if (!trimmed) return null;
@@ -383,7 +384,7 @@ const usableImg = (u) => {
   return file ? trimmed : null;
 };
 
-const stoneImage = (s) => {
+export const stoneImage = (s) => {
   const main = usableImg(s.imageUrl);
   if (main) return main;
   const firstExtra = (s.additionalPictures || "").split(";")[0];
@@ -394,7 +395,7 @@ const stoneImage = (s) => {
  * for almost every stone even when there is no cert, so its mere presence is
  * meaningless. A real certificate has a cert number, or a URL that points to an
  * actual file. */
-const hasCert = (s) =>
+export const hasCert = (s) =>
   Boolean(
     (s.certificateNumber && String(s.certificateNumber).trim()) ||
       usableImg(s.certificateUrl) ||
@@ -488,7 +489,7 @@ const PriceRange = ({ from, setFrom, to, setTo, bands, toggleBand, presets }) =>
       <div className="flex gap-2">
         {presets.map((p) => {
           const active = bands.includes(p.label);
-          return (
+  return (
             <button
               key={p.label}
               type="button"
@@ -1152,11 +1153,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
 
       {/* Empty */}
       {!loading && !error && filtered.length === 0 && (
-        <div className="mt-8 rounded-2xl glass-surface p-10 text-center">
+      <div className="mt-8 rounded-2xl glass-surface p-10 text-center">
           <p className="text-[14px] font-medium text-app-ink">
             {stones.length === 0 ? `No ${cfg.noun} in inventory` : `No ${cfg.noun} match your filters`}
-          </p>
-        </div>
+        </p>
+      </div>
       )}
 
       {/* Grid — 2 cards per row on phones, wider on larger screens. */}
@@ -1164,7 +1165,14 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         <>
           <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
             {visibleStones.map((stone, idx) => (
-              <GemstoneCard key={stone.id ?? stone.sku ?? idx} stone={stone} mode={mode} />
+              <Link
+                key={stone.id ?? stone.sku ?? idx}
+                to={`/sales/stone/${encodeURIComponent(stone.sku || "")}`}
+                state={{ stone }}
+                className="transition active:opacity-80"
+              >
+                <GemstoneCard stone={stone} mode={mode} />
+              </Link>
             ))}
           </div>
 
