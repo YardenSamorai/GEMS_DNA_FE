@@ -148,14 +148,14 @@ const DockTile = ({ active, label, icon, onClick, to, compact }) => {
         compact ? "px-1.5" : "px-3"
       } ${
         active
-          ? "bg-app-ink/8 text-app-ink"
-          : "text-app-muted hover:text-app-graphite"
+          ? "bg-app-ink/10 text-app-ink"
+          : "text-app-graphite hover:text-app-ink"
       }`}
     >
-      {icon(compact ? "w-[20px] h-[20px]" : "w-[22px] h-[22px]")}
+      {icon(compact ? "w-[21px] h-[21px]" : "w-[23px] h-[23px]")}
       <span
-        className={`font-medium tracking-[0.01em] leading-none ${
-          compact ? "text-[9px]" : "text-[10.5px]"
+        className={`font-semibold tracking-[0.01em] leading-none ${
+          compact ? "text-[9.5px]" : "text-[10.5px]"
         }`}
       >
         {label}
@@ -251,13 +251,13 @@ const MobileDock = ({ navSections = [] }) => {
     <>
       {/* Bottom dock — fixed, glass bar, safe-area padded. Hidden on md+ */}
       <nav
-        className={`md:hidden fixed inset-x-0 bottom-0 z-40 glass-bar border-t border-app-line transition-transform duration-200 ease-out ${
+        className={`md:hidden fixed inset-x-0 bottom-0 z-40 glass-bar dock-bar border-t border-app-line transition-transform duration-200 ease-out ${
           inputFocused ? "translate-y-full" : "translate-y-0"
         }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         aria-label="Primary navigation"
       >
-        <div className={`flex items-stretch h-14 ${compact ? "px-1" : "px-1.5"}`}>
+        <div className={`flex items-stretch h-16 ${compact ? "px-1" : "px-1.5"}`}>
           {slots.map((slot) => (
             <DockTile
               key={slot.key}

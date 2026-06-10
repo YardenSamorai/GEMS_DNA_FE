@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
@@ -148,6 +149,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,11 +206,27 @@ const SalesInventory = ({ mode = "gemstone" }) => {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-        <h1 className="text-2xl font-semibold tracking-tight text-app-ink">{cfg.title}</h1>
-        {!loading && !error && (
-          <span className="text-sm text-app-muted">{stones.length} {cfg.noun}</span>
-        )}
+      {/* No page title — the bottom dock already shows which catalog you're in.
+          "Filter" sits top-left, "Sort" top-right, where the title used to be. */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen(true)}
+          className="rounded-xl border border-app-line bg-app-surface px-5 py-2 text-sm font-semibold tracking-tight text-app-ink transition hover:bg-app-canvas2 active:scale-95"
+        >
+          Filter
+        </button>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={sortOpen}
+          onClick={() => setSortOpen(true)}
+          className="rounded-xl border border-app-line bg-app-surface px-5 py-2 text-sm font-semibold tracking-tight text-app-ink transition hover:bg-app-canvas2 active:scale-95"
+        >
+          Sort
+        </button>
       </div>
 
       {/* Loading skeleton */}
@@ -259,6 +278,118 @@ const SalesInventory = ({ mode = "gemstone" }) => {
           )}
         </>
       )}
+
+      {/* Filter dialog — bottom sheet that slides up to ~70% of the viewport.
+          The body scrolls both vertically and horizontally. Filter controls
+          will live inside here. */}
+      <AnimatePresence>
+        {filtersOpen && (
+          <div className="fixed inset-0 z-50">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setFiltersOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 320 }}
+              className="absolute inset-x-0 bottom-0 flex h-[70vh] flex-col rounded-t-3xl border-t border-app-line bg-app-surface"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Filters"
+            >
+              {/* Drag handle */}
+              <div className="flex shrink-0 justify-center pt-3 pb-1">
+                <div className="h-1.5 w-12 rounded-full bg-app-line2" />
+              </div>
+
+              {/* Sheet header */}
+              <div className="flex shrink-0 items-center justify-between border-b border-app-line px-5 py-3">
+                <h2 className="text-base font-semibold tracking-tight text-app-ink">Filter</h2>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  aria-label="Close"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-app-muted transition hover:bg-app-canvas2 hover:text-app-ink"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Scrollable body — overflow on both axes. */}
+              <div
+                className="flex-1 overflow-auto p-5"
+                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
+              >
+                <p className="text-[13px] text-app-soft">No filters configured yet.</p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Sort dialog — bottom sheet, same slide-up behaviour as Filter. */}
+      <AnimatePresence>
+        {sortOpen && (
+          <div className="fixed inset-0 z-50">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setSortOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 320 }}
+              className="absolute inset-x-0 bottom-0 flex max-h-[70vh] flex-col rounded-t-3xl border-t border-app-line bg-app-surface"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Sort"
+            >
+              {/* Drag handle */}
+              <div className="flex shrink-0 justify-center pt-3 pb-1">
+                <div className="h-1.5 w-12 rounded-full bg-app-line2" />
+              </div>
+
+              {/* Sheet header */}
+              <div className="flex shrink-0 items-center justify-between border-b border-app-line px-5 py-3">
+                <h2 className="text-base font-semibold tracking-tight text-app-ink">Sort</h2>
+                <button
+                  type="button"
+                  onClick={() => setSortOpen(false)}
+                  aria-label="Close"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-app-muted transition hover:bg-app-canvas2 hover:text-app-ink"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Scrollable body */}
+              <div
+                className="flex-1 overflow-auto p-5"
+                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
+              >
+                <p className="text-[13px] text-app-soft">No sort options configured yet.</p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -321,7 +321,7 @@ const AppLayout = () => {
             <TopBar navItems={NAV_ITEMS} />
             {/* Bottom padding on mobile makes room for the fixed
                 MobileDock. Desktop falls through to the regular flow. */}
-            <main className="flex-1 min-w-0 pb-20 md:pb-0">
+            <main className="flex-1 min-w-0 pb-24 md:pb-0">
               <Outlet />
             </main>
           </div>

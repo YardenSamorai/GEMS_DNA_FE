@@ -331,6 +331,21 @@ body {
   border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Mobile bottom dock — needs a much more opaque surface than the standard
+ * glass-bar so the icons/labels stay legible over busy page content (photo
+ * grids etc.). Keeps a touch of blur for depth but the background does the
+ * heavy lifting. Defined after .glass-bar so it wins the cascade. */
+.dock-bar {
+  background-color: rgba(var(--app-canvas), 0.94);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 -8px 24px -12px rgba(0, 0, 0, 0.18);
+}
+[data-theme="dark"] .dock-bar {
+  background-color: rgba(var(--app-canvas), 0.96);
+  box-shadow: 0 -8px 24px -10px rgba(0, 0, 0, 0.5);
+}
+
 .glass-hairline { background-color: rgb(var(--app-line)); }
 
 /* Print mode — glass surfaces collapse to solid white panels so PDF
