@@ -163,6 +163,26 @@ const FLUOR_MATCH = {
 
 const norm = (v) => (v == null ? "" : String(v).trim().toUpperCase());
 
+/* Parse a measurement string ("14.94-11.75-6.62" / "14.94 x 11.75 x 6.62")
+ * into [length, width, depth] numbers. */
+const parseDims = (m) =>
+  String(m || "")
+    .split(/[^\d.]+/)
+    .map(parseFloat)
+    .filter((n) => !isNaN(n));
+
+/* True when `val` falls inside an optional [from, to] range. A set bound with
+ * a missing value fails (we can't confirm it's in range). */
+const inRange = (val, from, to) => {
+  if (from) {
+    if (typeof val !== "number" || val < parseFloat(from)) return false;
+  }
+  if (to) {
+    if (typeof val !== "number" || val > parseFloat(to)) return false;
+  }
+  return true;
+};
+
 /* "Coming soon" fallback shown when a stone has no usable photo (or its URL
  * fails to load). Pure CSS so it's crisp at any size and theme-aware. */
 const ComingSoon = () => (
@@ -196,6 +216,34 @@ const buildTitle = (s) => {
   const shape = getDisplayShape(s.shape);
   const ct = s.weightCt != null && s.weightCt !== "" ? `${s.weightCt} ct` : "";
   return [color, type, shape, ct].filter(Boolean).join(", ");
+};
+
+/* Human-readable fluorescence from the Barak single-letter codes. */
+const FLUOR_DISPLAY = {
+  N: "None", NON: "None", NONE: "None",
+  F: "Faint", FNT: "Faint", FAINT: "Faint",
+  M: "Med.", MED: "Med.", MEDIUM: "Med.",
+  S: "Strong", STG: "Strong", STRONG: "Strong",
+  VS: "Very Strong", VST: "Very Strong", "VERY STRONG": "Very Strong",
+};
+const fluorDisplay = (v) => FLUOR_DISPLAY[norm(v)] || v || "";
+
+/* "$12,500" — whole-dollar money formatting. */
+const money = (n) => {
+  const num = Number(n);
+  if (!isFinite(num) || !num) return null;
+  return `$${num.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+};
+
+/* Diamond title: "0.51 Round H SI1 None IGI"
+ * weight · shape · color · clarity · fluorescence · cert lab. */
+const buildDiamondTitle = (s) => {
+  const wt =
+    s.weightCt != null && s.weightCt !== "" ? Number(s.weightCt).toFixed(2) : "";
+  const shape = getDisplayShape(s.shape);
+  return [wt, shape, s.color, s.clarity, fluorDisplay(s.fluorescence), s.lab]
+    .filter(Boolean)
+    .join(" ");
 };
 
 /* Many soap_stones rows carry a folder-only image URL (e.g. ".../StoneImages/")
@@ -282,13 +330,24 @@ const Line = ({ value }) =>
     <p className="text-[12.5px] leading-snug text-app-muted">{value}</p>
   );
 
-const GemstoneCard = ({ stone }) => {
-  const title = buildTitle(stone);
+const GemstoneCard = ({ stone, mode }) => {
+  const isDiamond = mode === "diamond";
+  const title = isDiamond ? buildDiamondTitle(stone) : buildTitle(stone);
   const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : null;
   const treatment = stone.treatment ? shortTreatment(stone.treatment) : null;
   const img = stoneImage(stone);
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = img && !imgFailed;
+
+  // Cut / Polish / Symmetry condensed onto one line, values only (no labels).
+  const finish = [stone.cut, stone.polish, stone.symmetry]
+    .filter(Boolean)
+    .join("  ·  ");
+  const ppc = money(stone.pricePerCt);
+  const rap =
+    stone.rapPrice != null && stone.rapPrice !== "" ? `RAP ${stone.rapPrice}%` : null;
+  const total = money(stone.priceTotal);
+
   return (
     <div className="flex flex-col">
       {/* Image — shows the photo when present, otherwise a "Coming soon"
@@ -310,13 +369,36 @@ const GemstoneCard = ({ stone }) => {
       {/* Details — bold title, then plain stacked lines (catalog style). */}
       <div className="mt-2.5 flex flex-col gap-0.5">
         <h3 className="text-[14px] font-semibold leading-snug text-app-ink">
-          {title || stone.sku || "Gemstone"}
+          {title || stone.sku || (isDiamond ? "Diamond" : "Gemstone")}
         </h3>
-        <Line value={treatment} />
-        <Line value={lab} />
-        <Line value={stone.measurements} />
-        <Line value={stone.location} />
-        <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
+        {isDiamond ? (
+          <>
+            <Line value={finish || null} />
+            <Line value={stone.location} />
+            <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
+            {/* Prices pinned to the bottom on a single, non-wrapping row so the
+                total never drops below the per-ct / RAP figures. */}
+            {(ppc || rap || total) && (
+              <div className="mt-1.5 flex items-baseline justify-between gap-x-2 whitespace-nowrap tabular-nums">
+                <span className="flex items-baseline gap-x-2 text-[11px] text-app-muted">
+                  {ppc && <span>{ppc}/ct</span>}
+                  {rap && <span>{rap}</span>}
+                </span>
+                {total && (
+                  <span className="text-[12px] font-semibold text-app-ink">{total}</span>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <Line value={treatment} />
+            <Line value={lab} />
+            <Line value={stone.measurements} />
+            <Line value={stone.location} />
+            <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -342,6 +424,14 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [sizeBands, setSizeBands] = useState([]);
   const toggleBand = (label) =>
     setSizeBands((cur) => (cur.includes(label) ? cur.filter((l) => l !== label) : [...cur, label]));
+  // Measurements (mm): independent Length and Width From/To ranges.
+  const [lenFrom, setLenFrom] = useState("");
+  const [lenTo, setLenTo] = useState("");
+  const [widthFrom, setWidthFrom] = useState("");
+  const [widthTo, setWidthTo] = useState("");
+  // Length / width ratio range.
+  const [ratioFrom, setRatioFrom] = useState("");
+  const [ratioTo, setRatioTo] = useState("");
   // Colour: White grades (D–Z) vs Fancy (intensity + fancy colour), all multi.
   const [colorMode, setColorMode] = useState("white");
   const [colorGrades, setColorGrades] = useState([]);
@@ -353,6 +443,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // Basic block (open by default) wraps the primary filters; Advanced
   // (collapsed) holds the finish grades + fluorescence.
   const [basicOpen, setBasicOpen] = useState(true);
+  const [measureOpen, setMeasureOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [cutSel, setCutSel] = useState([]);
   const [polishSel, setPolishSel] = useState([]);
@@ -377,6 +468,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setSizeFrom("");
     setSizeTo("");
     setSizeBands([]);
+    setLenFrom("");
+    setLenTo("");
+    setWidthFrom("");
+    setWidthTo("");
+    setRatioFrom("");
+    setRatioTo("");
     setColorMode("white");
     setColorGrades([]);
     setFancyIntensity([]);
@@ -385,6 +482,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setLabSel([]);
     setLocationSel([]);
     setBasicOpen(true);
+    setMeasureOpen(false);
     setAdvancedOpen(false);
     setCutSel([]);
     setPolishSel([]);
@@ -455,6 +553,21 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         if (!ok) return false;
       }
 
+      if (lenFrom || lenTo || widthFrom || widthTo) {
+        const [len, wid] = parseDims(s.measurements);
+        if (!inRange(len, lenFrom, lenTo)) return false;
+        if (!inRange(wid, widthFrom, widthTo)) return false;
+      }
+
+      if (ratioFrom || ratioTo) {
+        let r = parseFloat(s.ratio);
+        if (!Number.isFinite(r)) {
+          const [len, wid] = parseDims(s.measurements);
+          if (Number.isFinite(len) && Number.isFinite(wid) && wid) r = len / wid;
+        }
+        if (!inRange(Number.isFinite(r) ? r : undefined, ratioFrom, ratioTo)) return false;
+      }
+
       // White vs Fancy is a hard split for diamonds: the White tab shows only
       // colourless/near-colourless diamonds, the Fancy tab only fancy-colour
       // stones. (Other modes have no fancy stones, so this is a no-op there.)
@@ -516,7 +629,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       }
 
       if (onlyCert && !(s.certificateUrl || s.certificateNumber)) return false;
-      if (onlyMedia && !(stoneImage(s) || s.videoUrl)) return false;
+      // "Media" = an actual photo, since the card only renders an image. Almost
+      // every stone carries a v360 video link, so including video here made the
+      // filter meaningless (image-less stones still showed "Coming Soon").
+      if (onlyMedia && !stoneImage(s)) return false;
 
       return true;
     });
@@ -527,6 +643,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     sizeFrom,
     sizeTo,
     sizeBands,
+    lenFrom,
+    lenTo,
+    widthFrom,
+    widthTo,
+    ratioFrom,
+    ratioTo,
     colorMode,
     colorGrades,
     fancyIntensity,
@@ -553,6 +675,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setSizeFrom("");
     setSizeTo("");
     setSizeBands([]);
+    setLenFrom("");
+    setLenTo("");
+    setWidthFrom("");
+    setWidthTo("");
+    setRatioFrom("");
+    setRatioTo("");
     setColorMode("white");
     setColorGrades([]);
     setFancyIntensity([]);
@@ -654,7 +782,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         <>
           <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
             {visibleStones.map((stone, idx) => (
-              <GemstoneCard key={stone.id ?? stone.sku ?? idx} stone={stone} />
+              <GemstoneCard key={stone.id ?? stone.sku ?? idx} stone={stone} mode={mode} />
             ))}
           </div>
 
@@ -778,7 +906,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                                   : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
                               }`}
                             >
-                              {sh.icon("h-8 w-8")}
+                              {sh.icon("h-6 w-6")}
                               <span className="w-full text-center text-[12px] font-medium leading-tight">
                                 {sh.label}
                               </span>
@@ -1047,6 +1175,89 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                           </ScrollRow>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Measurements — collapsible divider with Length & Width (mm)
+                      From/To ranges. */}
+                  <SectionDivider
+                    label="Measurements"
+                    open={measureOpen}
+                    onClick={() => setMeasureOpen((o) => !o)}
+                  />
+                  {measureOpen && (
+                    <div className="space-y-3">
+                      {[
+                        { label: "Length", from: lenFrom, setFrom: setLenFrom, to: lenTo, setTo: setLenTo },
+                        { label: "Width", from: widthFrom, setFrom: setWidthFrom, to: widthTo, setTo: setWidthTo },
+                      ].map((row) => (
+                        <div key={row.label} className="flex items-center gap-3">
+                          <span className="w-14 shrink-0 text-[12.5px] font-medium text-app-soft">
+                            {row.label}
+                          </span>
+                          <label className="relative flex-1">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              min="0"
+                              value={row.from}
+                              onChange={(e) => row.setFrom(e.target.value)}
+                              placeholder="From"
+                              className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-3 pr-9 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+                            />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-app-soft">
+                              mm
+                            </span>
+                          </label>
+                          <label className="relative flex-1">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              min="0"
+                              value={row.to}
+                              onChange={(e) => row.setTo(e.target.value)}
+                              placeholder="To"
+                              className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-3 pr-9 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+                            />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-app-soft">
+                              mm
+                            </span>
+                          </label>
+                        </div>
+                      ))}
+
+                      {/* Ratio (length / width) — unitless From/To. */}
+                      <div className="flex items-center gap-3">
+                        <span className="w-14 shrink-0 text-[12.5px] font-medium text-app-soft">
+                          Ratio
+                        </span>
+                        <label className="flex-1">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={ratioFrom}
+                            onChange={(e) => setRatioFrom(e.target.value)}
+                            placeholder="From"
+                            className="w-full rounded-xl border border-app-line bg-app-surface px-3 py-2.5 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+                          />
+                        </label>
+                        <label className="flex-1">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={ratioTo}
+                            onChange={(e) => setRatioTo(e.target.value)}
+                            placeholder="To"
+                            className="w-full rounded-xl border border-app-line bg-app-surface px-3 py-2.5 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+                          />
+                        </label>
+                      </div>
                     </div>
                   )}
                   </div>
