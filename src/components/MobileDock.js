@@ -73,23 +73,93 @@ const PRIMARY_SLOTS = [
   },
 ];
 
+/* Contextual dock used while browsing the sales catalog (/sales/*). Swaps the
+ * generic admin rail for category shortcuts: Home, the three catalog surfaces
+ * (Diamonds / Emeralds / Gemstones) and Jewelry. The "More" tile still opens
+ * the full menu, so nothing is lost. */
+const SALES_SLOTS = [
+  {
+    key: "home",
+    label: "Home",
+    to: "/dashboard",
+    matches: (path) => path === "/dashboard" || path.startsWith("/dashboard"),
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 11.5l9-8 9 8M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" />
+      </svg>
+    ),
+  },
+  {
+    key: "diamond",
+    label: "Diamond",
+    to: "/sales/diamonds",
+    matches: (path) => path.startsWith("/sales/diamonds"),
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 9h16M9 3.5L6.5 9l5.5 11.5L17.5 9 15 3.5M9 3.5h6M9 3.5L12 9l3-5.5M12 9v11.5" />
+      </svg>
+    ),
+  },
+  {
+    key: "emerald",
+    label: "Emeralds",
+    to: "/sales/emeralds",
+    matches: (path) => path.startsWith("/sales/emeralds"),
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M8 4h8l4 4v8l-4 4H8l-4-4V8l4-4z" />
+      </svg>
+    ),
+  },
+  {
+    key: "gemstones",
+    label: "Gemstones",
+    to: "/sales/inventory",
+    matches: (path) => path.startsWith("/sales/inventory") || path.startsWith("/sales/gemstones"),
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 3l7.5 4.5v9L12 21l-7.5-4.5v-9L12 3z" />
+      </svg>
+    ),
+  },
+  {
+    key: "jewelry",
+    label: "Jewelry",
+    to: "/inventory?tab=jewelry",
+    matches: () => false,
+    icon: (cls) => (
+      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 22a6 6 0 100-12 6 6 0 000 12z M9 9l3-4 3 4" />
+      </svg>
+    ),
+  },
+];
+
 const MoreIcon = (cls) => (
   <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 12h16M4 18h16" />
   </svg>
 );
 
-const DockTile = ({ active, label, icon, onClick, to }) => {
+const DockTile = ({ active, label, icon, onClick, to, compact }) => {
   const inner = (
     <span
-      className={`flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-1.5 transition-colors ${
+      className={`flex flex-col items-center justify-center gap-0.5 rounded-2xl py-1.5 transition-colors ${
+        compact ? "px-1.5" : "px-3"
+      } ${
         active
           ? "bg-app-ink/8 text-app-ink"
           : "text-app-muted hover:text-app-graphite"
       }`}
     >
-      {icon("w-[22px] h-[22px]")}
-      <span className="text-[10.5px] font-medium tracking-[0.01em] leading-none">{label}</span>
+      {icon(compact ? "w-[20px] h-[20px]" : "w-[22px] h-[22px]")}
+      <span
+        className={`font-medium tracking-[0.01em] leading-none ${
+          compact ? "text-[9px]" : "text-[10.5px]"
+        }`}
+      >
+        {label}
+      </span>
     </span>
   );
   if (to) {
@@ -169,7 +239,13 @@ const MobileDock = ({ navSections = [] }) => {
     return flat;
   })();
 
-  const moreActive = !PRIMARY_SLOTS.some((slot) => slot.matches(location.pathname));
+  // On the sales catalog, swap the generic rail for category shortcuts.
+  const inSales = location.pathname.startsWith("/sales");
+  const slots = inSales ? SALES_SLOTS : PRIMARY_SLOTS;
+  // 5 shortcuts + "More" = 6 tiles, so tighten the layout to fit on phones.
+  const compact = slots.length > 4;
+
+  const moreActive = !slots.some((slot) => slot.matches(location.pathname));
 
   return (
     <>
@@ -181,14 +257,15 @@ const MobileDock = ({ navSections = [] }) => {
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         aria-label="Primary navigation"
       >
-        <div className="flex items-stretch h-14 px-1.5">
-          {PRIMARY_SLOTS.map((slot) => (
+        <div className={`flex items-stretch h-14 ${compact ? "px-1" : "px-1.5"}`}>
+          {slots.map((slot) => (
             <DockTile
               key={slot.key}
               to={slot.to}
               label={slot.label}
               icon={slot.icon}
               active={slot.matches(location.pathname)}
+              compact={compact}
             />
           ))}
           <DockTile
@@ -196,6 +273,7 @@ const MobileDock = ({ navSections = [] }) => {
             icon={MoreIcon}
             active={moreActive || sheetOpen}
             onClick={() => setSheetOpen((s) => !s)}
+            compact={compact}
           />
         </div>
       </nav>

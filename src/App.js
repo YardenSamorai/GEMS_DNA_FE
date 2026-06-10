@@ -520,8 +520,13 @@ function AppContent() {
             {/* Anonymous stone offers — salesperson tracks links they sent. */}
             <Route path="/offers" element={<OffersPage />} />
             <Route path="/offers/:id" element={<OffersPage />} />
-            {/* Salesperson-focused stone browser (built incrementally). */}
-            <Route path="/sales/inventory" element={<SalesInventory />} />
+            {/* Salesperson-focused stone browser (built incrementally). The
+                catalog is split into disjoint category surfaces that share the
+                same card grid: gemstones (default), diamonds and emeralds. */}
+            <Route path="/sales/inventory" element={<SalesInventory mode="gemstone" />} />
+            <Route path="/sales/gemstones" element={<SalesInventory mode="gemstone" />} />
+            <Route path="/sales/diamonds" element={<SalesInventory mode="diamond" />} />
+            <Route path="/sales/emeralds" element={<SalesInventory mode="emerald" />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>
