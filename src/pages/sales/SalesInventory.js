@@ -76,8 +76,6 @@ const FANCY_COLORS = [
   "Blue",
   "Orange",
   "Brown",
-  "Red",
-  "Purple",
   "Black",
 ];
 const CLARITY_GRADES = [
@@ -99,7 +97,8 @@ const LOCATION_OPTIONS = ["HK", "IL", "LA", "NY"];
 /* Advanced (collapsed by default) finish grades + fluorescence. */
 const GRADE_EVGF = ["EX", "VG", "G", "F"];
 const FLUOR_OPTIONS = ["None", "Faint", "Med.", "Strong"];
-const PARCEL_OPTIONS = ["Single", "Pair", "Set", "Parcel"];
+// Diamonds only deal in Single / Pair; Set & Parcel will live under Emeralds.
+const PARCEL_OPTIONS = ["Single", "Pair"];
 
 /* Add/remove a value from a multi-select array state setter. */
 const toggleVal = (setter, val) =>
@@ -267,9 +266,9 @@ const Chip = ({ active, onClick, children }) => (
     type="button"
     aria-pressed={active}
     onClick={onClick}
-    className={`whitespace-nowrap rounded-xl border px-3 py-2 text-[12.5px] font-medium transition ${
+    className={`min-w-[68px] shrink-0 whitespace-nowrap rounded-xl border px-5 py-2.5 text-center text-[13.5px] font-medium transition ${
       active
-        ? "border-app-ink bg-app-ink/5 text-app-ink"
+        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
         : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
     }`}
   >
@@ -368,7 +367,6 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     { title: "Polish", options: GRADE_EVGF, sel: polishSel, setter: setPolishSel },
     { title: "Symmetry", options: GRADE_EVGF, sel: symmetrySel, setter: setSymmetrySel },
     { title: "Fluorescence", options: FLUOR_OPTIONS, sel: fluorSel, setter: setFluorSel },
-    { title: "Parcel type", options: PARCEL_OPTIONS, sel: parcelSel, setter: setParcelSel },
   ];
 
   useEffect(() => {
@@ -457,6 +455,14 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         if (!ok) return false;
       }
 
+      // White vs Fancy is a hard split for diamonds: the White tab shows only
+      // colourless/near-colourless diamonds, the Fancy tab only fancy-colour
+      // stones. (Other modes have no fancy stones, so this is a no-op there.)
+      if (mode === "diamond") {
+        const isFancy = getMappedCategories(s.category).includes("Fancy");
+        if (colorMode === "fancy" ? !isFancy : isFancy) return false;
+      }
+
       if (colorMode === "white") {
         if (colorGrades.length) {
           const tokens = norm(s.color).split(/[\s,\-+/]+/).filter(Boolean);
@@ -516,6 +522,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     });
   }, [
     stones,
+    mode,
     shapeSel,
     sizeFrom,
     sizeTo,
@@ -712,6 +719,24 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               <div className="flex-1 overflow-y-auto px-5 py-4">
                 {mode === "diamond" ? (
                   <div className="space-y-7">
+                  {/* Parcel type — kept above Basic; diamonds use Single / Pair. */}
+                  <section>
+                    <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                      Parcel type
+                    </h3>
+                    <ScrollRow>
+                      {PARCEL_OPTIONS.map((p) => (
+                        <Chip
+                          key={p}
+                          active={parcelSel.includes(p)}
+                          onClick={() => toggleVal(setParcelSel, p)}
+                        >
+                          {p}
+                        </Chip>
+                      ))}
+                    </ScrollRow>
+                  </section>
+
                   <SectionDivider
                     label="Basic"
                     open={basicOpen}
@@ -738,7 +763,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     {/* Two rows, columns flow horizontally and scroll right.
                         Scrollbar hidden but swipe/scroll still works. */}
                     <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
-                      <div className="grid grid-flow-col grid-rows-2 auto-cols-[108px] gap-2.5">
+                      <div className="grid grid-flow-col grid-rows-2 auto-cols-[90px] gap-1.5">
                         {DIAMOND_SHAPES.map((sh) => {
                           const active = shapeSel.includes(sh.key);
                           return (
@@ -747,14 +772,14 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                               type="button"
                               aria-pressed={active}
                               onClick={() => toggleShape(sh.key)}
-                              className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2.5 py-4 transition ${
+                              className={`flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 transition ${
                                 active
-                                  ? "border-app-ink bg-app-ink/5 text-app-ink"
+                                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
                                   : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
                               }`}
                             >
-                              {sh.icon("h-11 w-11")}
-                              <span className="w-full text-center text-[11px] font-medium leading-tight">
+                              {sh.icon("h-8 w-8")}
+                              <span className="w-full text-center text-[12px] font-medium leading-tight">
                                 {sh.label}
                               </span>
                             </button>
@@ -813,9 +838,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                               type="button"
                               aria-pressed={active}
                               onClick={() => toggleBand(p.label)}
-                              className={`whitespace-nowrap rounded-xl border px-3 py-2 text-[12.5px] font-medium transition ${
+                              className={`whitespace-nowrap rounded-xl border px-4 py-2.5 text-[13.5px] font-medium transition ${
                                 active
-                                  ? "border-app-ink bg-app-ink/5 text-app-ink"
+                                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
                                   : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
                               }`}
                             >
@@ -846,7 +871,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                           onClick={() => setColorMode(seg.key)}
                           className={`rounded-lg px-6 py-1.5 text-[13px] font-medium transition ${
                             colorMode === seg.key
-                              ? "bg-app-ink text-app-canvas"
+                              ? "bg-emerald-500 text-white"
                               : "text-app-graphite hover:text-app-ink"
                           }`}
                         >
@@ -974,7 +999,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                         <span
                           className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
                             checked
-                              ? "border-app-ink bg-app-ink text-app-canvas"
+                              ? "border-emerald-500 bg-emerald-500 text-white"
                               : "border-app-line bg-app-surface text-transparent"
                           }`}
                         >
