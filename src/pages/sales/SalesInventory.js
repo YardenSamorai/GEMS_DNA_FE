@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
+import { DIAMOND_SHAPES } from "./diamondShapes";
 
 /* The sales catalog is split into three category surfaces that all share this
  * same card grid. The category map resolves e.g. "Sapphire O" -> ["Sapphire"],
@@ -41,6 +42,22 @@ const MODES = {
  * ========================================================================== */
 
 const PAGE_SIZE = 12;
+
+/* Quick carat bands for the diamond Size filter. Clicking one fills the
+ * From/To fields; the last band is open-ended (5ct and up). */
+const SIZE_PRESETS = [
+  { label: "0.30 - 0.39", from: "0.30", to: "0.39" },
+  { label: "0.40 - 0.49", from: "0.40", to: "0.49" },
+  { label: "0.50 - 0.69", from: "0.50", to: "0.69" },
+  { label: "0.70 - 0.89", from: "0.70", to: "0.89" },
+  { label: "0.90 - 0.99", from: "0.90", to: "0.99" },
+  { label: "1.00 - 1.49", from: "1.00", to: "1.49" },
+  { label: "1.50 - 1.99", from: "1.50", to: "1.99" },
+  { label: "2.00 - 2.99", from: "2.00", to: "2.99" },
+  { label: "3.00 - 3.99", from: "3.00", to: "3.99" },
+  { label: "4.00 - 4.99", from: "4.00", to: "4.99" },
+  { label: "5.00 +", from: "5.00", to: "" },
+];
 
 /* "Coming soon" fallback shown when a stone has no usable photo (or its URL
  * fails to load). Pure CSS so it's crisp at any size and theme-aware. */
@@ -151,9 +168,27 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  // Selected diamond shapes (multi-select). Other categories will grow their
+  // own filter state alongside this.
+  const [shapeSel, setShapeSel] = useState([]);
+  const toggleShape = (key) =>
+    setShapeSel((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
+  // Carat size range (custom fields + quick-band presets).
+  const [sizeFrom, setSizeFrom] = useState("");
+  const [sizeTo, setSizeTo] = useState("");
+  const applyPreset = (p) => {
+    const active = sizeFrom === p.from && sizeTo === p.to;
+    setSizeFrom(active ? "" : p.from);
+    setSizeTo(active ? "" : p.to);
+  };
 
   useEffect(() => {
     let cancelled = false;
+    // Different categories expose different filters — clear selections so a
+    // shape picked under Diamonds doesn't linger when you hop to Emeralds.
+    setShapeSel([]);
+    setSizeFrom("");
+    setSizeTo("");
     const load = async () => {
       try {
         setLoading(true);
@@ -324,12 +359,125 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                 </button>
               </div>
 
-              {/* Scrollable body — overflow on both axes. */}
+              {/* Scrollable body — vertical scroll for the section stack,
+                  while individual rows (like Shape) scroll horizontally. */}
               <div
-                className="flex-1 overflow-auto p-5"
+                className="flex-1 overflow-y-auto px-5 py-4"
                 style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
               >
-                <p className="text-[13px] text-app-soft">No filters configured yet.</p>
+                {mode === "diamond" ? (
+                  <div className="space-y-7">
+                  <section>
+                    <div className="mb-2.5 flex items-center justify-between">
+                      <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                        Shape
+                      </h3>
+                      {shapeSel.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShapeSel([])}
+                          className="text-[12px] font-medium text-app-soft hover:text-app-ink"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Two rows, columns flow horizontally and scroll right.
+                        Scrollbar hidden but swipe/scroll still works. */}
+                    <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
+                      <div className="grid grid-flow-col grid-rows-2 auto-cols-[76px] gap-2">
+                        {DIAMOND_SHAPES.map((sh) => {
+                          const active = shapeSel.includes(sh.key);
+                          return (
+                            <button
+                              key={sh.key}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => toggleShape(sh.key)}
+                              className={`flex flex-col items-center gap-1 rounded-2xl border px-1.5 py-2.5 transition ${
+                                active
+                                  ? "border-app-ink bg-app-ink/5 text-app-ink"
+                                  : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+                              }`}
+                            >
+                              {sh.icon("h-8 w-8")}
+                              <span className="w-full truncate text-center text-[10px] font-medium leading-none">
+                                {sh.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Size — custom From/To carat fields plus quick bands. */}
+                  <section>
+                    <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                      Size
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <label className="relative flex-1">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min="0"
+                          value={sizeFrom}
+                          onChange={(e) => setSizeFrom(e.target.value)}
+                          placeholder="From"
+                          className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-3 pr-8 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-app-soft">
+                          ct
+                        </span>
+                      </label>
+                      <label className="relative flex-1">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min="0"
+                          value={sizeTo}
+                          onChange={(e) => setSizeTo(e.target.value)}
+                          placeholder="To"
+                          className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-3 pr-8 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-app-soft">
+                          ct
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Quick carat bands — single scrollable row. */}
+                    <div className="scrollbar-hide -mx-5 mt-3 overflow-x-auto px-5">
+                      <div className="flex gap-2">
+                        {SIZE_PRESETS.map((p) => {
+                          const active = sizeFrom === p.from && sizeTo === p.to;
+                          return (
+                            <button
+                              key={p.label}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => applyPreset(p)}
+                              className={`whitespace-nowrap rounded-xl border px-3 py-2 text-[12.5px] font-medium transition ${
+                                active
+                                  ? "border-app-ink bg-app-ink/5 text-app-ink"
+                                  : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-app-soft">No filters configured yet.</p>
+                )}
               </div>
             </motion.div>
           </div>
