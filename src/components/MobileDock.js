@@ -249,12 +249,23 @@ const MobileDock = ({ navSections = [] }) => {
 
   return (
     <>
-      {/* Bottom dock — fixed, glass bar, safe-area padded. Hidden on md+ */}
+      {/* Bottom dock — fixed, solid bar, safe-area padded. Hidden on md+.
+          iOS Safari fails to repaint a thin `position: fixed` bar during
+          momentum scroll, leaving it stranded mid-screen until the scroll
+          settles. Forcing it onto its own GPU compositor layer (translate3d +
+          will-change + backface-visibility) makes Safari keep it pinned. We
+          drive the transform inline (instead of Tailwind's 2D translate
+          utilities) so the hidden/shown states stay on that same 3D layer. */}
       <nav
-        className={`md:hidden fixed inset-x-0 bottom-0 z-40 dock-bar border-t border-app-line transition-transform duration-200 ease-out ${
-          inputFocused ? "translate-y-full" : "translate-y-0"
-        }`}
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        className="md:hidden fixed inset-x-0 bottom-0 z-40 dock-bar border-t border-app-line"
+        style={{
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          transform: inputFocused ? "translate3d(0, 100%, 0)" : "translate3d(0, 0, 0)",
+          transition: "transform 0.2s ease-out",
+          willChange: "transform",
+          WebkitBackfaceVisibility: "hidden",
+          backfaceVisibility: "hidden",
+        }}
         aria-label="Primary navigation"
       >
         <div className={`flex items-stretch h-16 ${compact ? "px-1" : "px-1.5"}`}>

@@ -354,6 +354,17 @@ const buildDiamondTitle = (s) => {
     .join(" ");
 };
 
+/* Emerald title: "1.16 Pear ICA Minor"
+ * weight · shape · cert lab · comments (oil treatment). */
+const buildEmeraldTitle = (s) => {
+  const wt =
+    s.weightCt != null && s.weightCt !== "" ? Number(s.weightCt).toFixed(2) : "";
+  const shape = getDisplayShape(s.shape);
+  const lab = s.lab && String(s.lab).toUpperCase() !== "N/A" ? s.lab : "";
+  const comments = s.treatment ? shortTreatment(s.treatment) : "";
+  return [wt, shape, lab, comments].filter(Boolean).join(" ");
+};
+
 /* Many soap_stones rows carry a folder-only image URL (e.g. ".../StoneImages/")
  * with no filename — the Barak export emits the directory even when no photo
  * was uploaded, so the URL 404s and renders as a broken thumbnail. Treat those
@@ -501,7 +512,12 @@ const Line = ({ value }) =>
 
 const GemstoneCard = ({ stone, mode }) => {
   const isDiamond = mode === "diamond";
-  const title = isDiamond ? buildDiamondTitle(stone) : buildTitle(stone);
+  const isEmerald = mode === "emerald";
+  const title = isDiamond
+    ? buildDiamondTitle(stone)
+    : isEmerald
+    ? buildEmeraldTitle(stone)
+    : buildTitle(stone);
   const holder = stone.holder && String(stone.holder).trim() ? String(stone.holder).trim() : null;
   // Precise location + memo flag (see resolveLocation).
   const { label: locationLine, memo: memoOut } = resolveLocation(stone);
@@ -566,9 +582,26 @@ const GemstoneCard = ({ stone, mode }) => {
           </span>
         )}
         <h3 className="text-[14px] font-semibold leading-snug text-app-ink">
-          {title || stone.sku || (isDiamond ? "Diamond" : "Gemstone")}
+          {title || stone.sku || (isDiamond ? "Diamond" : isEmerald ? "Emerald" : "Gemstone")}
         </h3>
-        {isDiamond ? (
+        {isEmerald ? (
+          <>
+            <Line value={treatment} />
+            <Line value={lab} />
+            <Line value={measureLine || null} />
+            <Line value={locationLine} />
+            <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
+            {/* Prices side by side, diamond-style: $/ct left, total right. */}
+            {(ppc || total) && (
+              <div className="mt-1.5 flex items-baseline justify-between gap-x-2 whitespace-nowrap tabular-nums">
+                <span className="text-[11px] text-app-muted">{ppc ? `${ppc}/ct` : ""}</span>
+                {total && (
+                  <span className="text-[12px] font-semibold text-app-ink">{total}</span>
+                )}
+              </div>
+            )}
+          </>
+        ) : isDiamond ? (
           <>
             <Line value={finish || null} />
             <Line value={measureLine || null} />
