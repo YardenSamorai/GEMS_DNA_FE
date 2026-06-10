@@ -56,6 +56,23 @@ const SIZE_PRESETS = [
   { label: "15.00 +", from: "15.00", to: "" },
 ];
 
+/* Price-per-carat quick bands ($). Open-ended on the first/last band. */
+const PPC_PRESETS = [
+  { label: "Up to 1K", from: "", to: "1000" },
+  { label: "1K - 5K", from: "1000", to: "5000" },
+  { label: "5K - 10K", from: "5000", to: "10000" },
+  { label: "10K - 20K", from: "10000", to: "20000" },
+  { label: "20K & Up", from: "20000", to: "" },
+];
+/* Total-price quick bands ($). */
+const TOTAL_PRESETS = [
+  { label: "Up to 5K", from: "", to: "5000" },
+  { label: "5K - 10K", from: "5000", to: "10000" },
+  { label: "10K - 50K", from: "10000", to: "50000" },
+  { label: "50K - 100K", from: "50000", to: "100000" },
+  { label: "100K & Up", from: "100000", to: "" },
+];
+
 /* Diamond colour grades (white) and the fancy-colour sub-filters that replace
  * them when the Fancy segment is active. */
 const COLOR_GRADES = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -95,6 +112,11 @@ const CLARITY_GRADES = [
 ];
 const LAB_OPTIONS = ["GIA", "HRD", "IGI", "EGL"];
 const LOCATION_OPTIONS = ["HK", "IL", "LA", "NY"];
+// Emerald-specific option sets.
+const EMERALD_LAB_OPTIONS = ["GRS", "SSEF", "Gübelin", "GIA", "AGL", "CDC"];
+const TREATMENT_OPTIONS = ["No Oil", "Insignificant", "Minor", "Moderate", "Significant"];
+const ORIGIN_OPTIONS = ["Colombia", "Zambia", "Brazil", "Madagascar"];
+const EMERALD_PARCEL_OPTIONS = ["Single", "Pair", "Set", "Parcel"];
 /* Advanced (collapsed by default) finish grades + fluorescence. */
 const GRADE_EVGF = ["EX", "VG", "G", "F"];
 const FLUOR_OPTIONS = ["None", "Faint", "Med.", "Strong"];
@@ -182,6 +204,63 @@ const inRange = (val, from, to) => {
     if (typeof val !== "number" || val > parseFloat(to)) return false;
   }
   return true;
+};
+
+/* A money facet (custom From/To OR any selected quick band) passes a value.
+ * Inactive (no bounds, no bands) → always true; a value that can't be parsed
+ * fails once the facet is active. */
+const priceOk = (value, from, to, bands, presets) => {
+  if (!from && !to && !bands.length) return true;
+  const n = parseFloat(value);
+  if (isNaN(n)) return false;
+  if (from || to) {
+    const f = from ? parseFloat(from) : -Infinity;
+    const t = to ? parseFloat(to) : Infinity;
+    if (n >= f && n <= t) return true;
+  }
+  return bands.some((label) => {
+    const b = presets.find((p) => p.label === label);
+    if (!b) return false;
+    const f = b.from ? parseFloat(b.from) : -Infinity;
+    const t = b.to ? parseFloat(b.to) : Infinity;
+    return n >= f && n <= t;
+  });
+};
+
+/* Sort facets offered in the Sort sheet (priority follows selection order). */
+const SORT_OPTIONS = [
+  { key: "pricePerCt", label: "Price per ct", type: "num", field: "pricePerCt" },
+  { key: "priceTotal", label: "Total price", type: "num", field: "priceTotal" },
+  { key: "rapPrice", label: "Rap price", type: "num", field: "rapPrice" },
+  { key: "shape", label: "Shape", type: "shape" },
+  { key: "size", label: "Size", type: "num", field: "weightCt" },
+  { key: "color", label: "Color", type: "color" },
+  { key: "clarity", label: "Clarity", type: "clarity" },
+];
+
+/* Comparable value for a stone under a sort option; null = missing (sorts last
+ * regardless of direction). Colour/clarity map to their grade order. */
+const sortValue = (s, opt) => {
+  switch (opt.type) {
+    case "num": {
+      const n = Number(s[opt.field]);
+      return Number.isFinite(n) ? n : null;
+    }
+    case "shape": {
+      const v = getDisplayShape(s.shape);
+      return v ? String(v) : null;
+    }
+    case "color": {
+      const i = COLOR_GRADES.indexOf(norm(s.color)[0]);
+      return i >= 0 ? i : null;
+    }
+    case "clarity": {
+      const i = CLARITY_GRADES.indexOf(norm(s.clarity));
+      return i >= 0 ? i : null;
+    }
+    default:
+      return null;
+  }
 };
 
 /* "Coming soon" fallback shown when a stone has no usable photo (or its URL
@@ -295,6 +374,17 @@ const stoneImage = (s) => {
   return usableImg(firstExtra);
 };
 
+/* The Barak export sets `certificateUrl` to a folder path (".../Certificates/")
+ * for almost every stone even when there is no cert, so its mere presence is
+ * meaningless. A real certificate has a cert number, or a URL that points to an
+ * actual file. */
+const hasCert = (s) =>
+  Boolean(
+    (s.certificateNumber && String(s.certificateNumber).trim()) ||
+      usableImg(s.certificateUrl) ||
+      usableImg(s.certificateImageJpg)
+  );
+
 /* A horizontally-scrolling chip row (scrollbar hidden, bleeds to the sheet
  * edges so chips can scroll under the padding). */
 const ScrollRow = ({ children }) => (
@@ -351,6 +441,56 @@ const Chip = ({ active, onClick, children }) => (
   >
     {children}
   </button>
+);
+
+/* A money range filter: two custom $ inputs over a scrollable row of quick
+ * bands. Custom range and bands are OR'd together by `priceOk`. */
+const PriceRange = ({ from, setFrom, to, setTo, bands, toggleBand, presets }) => (
+  <div>
+    <div className="flex items-center gap-3">
+      {[
+        { val: from, set: setFrom, ph: "From" },
+        { val: to, set: setTo, ph: "To" },
+      ].map((f) => (
+        <label key={f.ph} className="relative flex-1">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-app-soft">
+            $
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={f.val}
+            onChange={(e) => f.set(e.target.value)}
+            placeholder={f.ph}
+            className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-7 pr-3 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+          />
+        </label>
+      ))}
+    </div>
+    <div className="scrollbar-hide -mx-5 mt-3 overflow-x-auto px-5">
+      <div className="flex gap-2">
+        {presets.map((p) => {
+          const active = bands.includes(p.label);
+          return (
+            <button
+              key={p.label}
+              type="button"
+              aria-pressed={active}
+              onClick={() => toggleBand(p.label)}
+              className={`whitespace-nowrap rounded-xl border px-4 py-2.5 text-[13.5px] font-medium transition ${
+                active
+                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
+                  : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+              }`}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  </div>
 );
 
 /* One plain detail line under the title (treatment, lab, measurements, …). */
@@ -472,6 +612,27 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [sortOpen, setSortOpen] = useState(false);
   const [skuQuery, setSkuQuery] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
+  // Multi-level sort: ordered [{ key, dir }]. Tap to add (desc), tap again to
+  // flip to asc, once more to remove.
+  const [sortBy, setSortBy] = useState([]);
+  const toggleSort = (key) =>
+    setSortBy((cur) => {
+      const item = cur.find((x) => x.key === key);
+      if (!item) return [...cur, { key, dir: "desc" }];
+      if (item.dir === "desc") return cur.map((x) => (x.key === key ? { ...x, dir: "asc" } : x));
+      return cur.filter((x) => x.key !== key);
+    });
+  // Reorder a selected sort up/down to change its priority.
+  const moveSort = (key, direction) =>
+    setSortBy((cur) => {
+      const i = cur.findIndex((x) => x.key === key);
+      if (i === -1) return cur;
+      const j = direction === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= cur.length) return cur;
+      const next = [...cur];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
   // Selected diamond shapes (multi-select). Other categories will grow their
   // own filter state alongside this.
   const [shapeSel, setShapeSel] = useState([]);
@@ -484,6 +645,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [sizeBands, setSizeBands] = useState([]);
   const toggleBand = (label) =>
     setSizeBands((cur) => (cur.includes(label) ? cur.filter((l) => l !== label) : [...cur, label]));
+  // Price-per-carat and total-price: custom From/To plus quick bands.
+  const [ppcFrom, setPpcFrom] = useState("");
+  const [ppcTo, setPpcTo] = useState("");
+  const [ppcBands, setPpcBands] = useState([]);
+  const [totalFrom, setTotalFrom] = useState("");
+  const [totalTo, setTotalTo] = useState("");
+  const [totalBands, setTotalBands] = useState([]);
   // Measurements (mm): independent Length and Width From/To ranges.
   const [lenFrom, setLenFrom] = useState("");
   const [lenTo, setLenTo] = useState("");
@@ -500,6 +668,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [claritySel, setClaritySel] = useState([]);
   const [labSel, setLabSel] = useState([]);
   const [locationSel, setLocationSel] = useState([]);
+  // Emerald-only facets.
+  const [treatmentSel, setTreatmentSel] = useState([]);
+  const [originSel, setOriginSel] = useState([]);
   // Basic block (open by default) wraps the primary filters; Advanced
   // (collapsed) holds the finish grades + fluorescence.
   const [basicOpen, setBasicOpen] = useState(true);
@@ -529,6 +700,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setSizeFrom("");
     setSizeTo("");
     setSizeBands([]);
+    setPpcFrom("");
+    setPpcTo("");
+    setPpcBands([]);
+    setTotalFrom("");
+    setTotalTo("");
+    setTotalBands([]);
     setLenFrom("");
     setLenTo("");
     setWidthFrom("");
@@ -542,6 +719,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setClaritySel([]);
     setLabSel([]);
     setLocationSel([]);
+    setTreatmentSel([]);
+    setOriginSel([]);
     setBasicOpen(true);
     setMeasureOpen(false);
     setAdvancedOpen(false);
@@ -554,6 +733,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setOnlyMedia(false);
     setOnlyInStock(false);
     setSkuQuery("");
+    setSortBy([]);
     const load = async () => {
       try {
         setLoading(true);
@@ -616,6 +796,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         if (!ok) return false;
       }
 
+      if (!priceOk(s.pricePerCt, ppcFrom, ppcTo, ppcBands, PPC_PRESETS)) return false;
+      if (!priceOk(s.priceTotal, totalFrom, totalTo, totalBands, TOTAL_PRESETS)) return false;
+
       if (lenFrom || lenTo || widthFrom || widthTo) {
         const [len, wid] = parseDims(s.measurements);
         if (!inRange(len, lenFrom, lenTo)) return false;
@@ -673,6 +856,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         }
       }
 
+      if (treatmentSel.length) {
+        const t = norm(s.treatment);
+        if (!treatmentSel.some((v) => t.includes(norm(v)))) return false;
+      }
+
+      if (originSel.length) {
+        const o = norm(s.origin);
+        if (!originSel.some((v) => o.includes(norm(v)))) return false;
+      }
+
       const gradeOk = (sel, field) => {
         if (!sel.length) return true;
         const val = norm(s[field]);
@@ -691,7 +884,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         if (!parcelSel.some((v) => gt === norm(v))) return false;
       }
 
-      if (onlyCert && !(s.certificateUrl || s.certificateNumber)) return false;
+      if (onlyCert && !hasCert(s)) return false;
       // "Media" = an actual photo, since the card only renders an image. Almost
       // every stone carries a v360 video link, so including video here made the
       // filter meaningless (image-less stones still showed "Coming Soon").
@@ -712,6 +905,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     sizeFrom,
     sizeTo,
     sizeBands,
+    ppcFrom,
+    ppcTo,
+    ppcBands,
+    totalFrom,
+    totalTo,
+    totalBands,
     lenFrom,
     lenTo,
     widthFrom,
@@ -725,6 +924,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     claritySel,
     labSel,
     locationSel,
+    treatmentSel,
+    originSel,
     cutSel,
     polishSel,
     symmetrySel,
@@ -736,16 +937,22 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     skuQuery,
   ]);
 
-  // Reset paging whenever the filtered set changes so the grid starts at top.
+  // Reset paging whenever the result set or its order changes (grid back to top).
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filtered]);
+  }, [filtered, sortBy]);
 
   const resetFilters = () => {
     setShapeSel([]);
     setSizeFrom("");
     setSizeTo("");
     setSizeBands([]);
+    setPpcFrom("");
+    setPpcTo("");
+    setPpcBands([]);
+    setTotalFrom("");
+    setTotalTo("");
+    setTotalBands([]);
     setLenFrom("");
     setLenTo("");
     setWidthFrom("");
@@ -759,6 +966,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setClaritySel([]);
     setLabSel([]);
     setLocationSel([]);
+    setTreatmentSel([]);
+    setOriginSel([]);
     setCutSel([]);
     setPolishSel([]);
     setSymmetrySel([]);
@@ -769,15 +978,36 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setOnlyInStock(false);
   };
 
-  const visibleStones = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
-  const hasMore = visibleCount < filtered.length;
+  // Apply the chosen multi-level sort on top of the filtered set.
+  const sorted = useMemo(() => {
+    if (!sortBy.length) return filtered;
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      for (const { key, dir } of sortBy) {
+        const opt = SORT_OPTIONS.find((o) => o.key === key);
+        if (!opt) continue;
+        const va = sortValue(a, opt);
+        const vb = sortValue(b, opt);
+        if (va === null && vb === null) continue;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        const c = typeof va === "number" ? va - vb : String(va).localeCompare(String(vb));
+        if (c !== 0) return dir === "asc" ? c : -c;
+      }
+      return 0;
+    });
+    return arr;
+  }, [filtered, sortBy]);
+
+  const visibleStones = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
+  const hasMore = visibleCount < sorted.length;
 
   // Infinite scroll — reveal the next batch when the sentinel nears the
   // viewport. `rootMargin` pre-loads slightly before the user hits bottom.
   const sentinelRef = useRef(null);
   const loadMore = useCallback(() => {
-    setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
-  }, [filtered.length]);
+    setVisibleCount((c) => Math.min(c + PAGE_SIZE, sorted.length));
+  }, [sorted.length]);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -959,15 +1189,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               {/* Scrollable body — vertical scroll for the section stack,
                   while individual rows (like Shape) scroll horizontally. */}
               <div className="flex-1 overflow-y-auto px-5 py-4">
-                {mode === "diamond" ? (
+                {mode === "diamond" || mode === "emerald" ? (
                   <div className="space-y-7">
-                  {/* Parcel type — kept above Basic; diamonds use Single / Pair. */}
+                  {/* Parcel type — kept above Basic. Diamonds: Single/Pair;
+                      emeralds also use Set/Parcel. */}
                   <section>
                     <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
                       Parcel type
                     </h3>
                     <ScrollRow>
-                      {PARCEL_OPTIONS.map((p) => (
+                      {(mode === "emerald" ? EMERALD_PARCEL_OPTIONS : PARCEL_OPTIONS).map((p) => (
                         <Chip
                           key={p}
                           active={parcelSel.includes(p)}
@@ -1031,10 +1262,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     </div>
                   </section>
 
-                  {/* Size — custom From/To carat fields plus quick bands. */}
+                  {/* Size — custom From/To carat fields plus quick bands.
+                      Labelled "Weight" under Emeralds. */}
                   <section>
                     <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
-                      Size
+                      {mode === "emerald" ? "Weight" : "Size"}
                     </h3>
                     <div className="flex items-center gap-3">
                       <label className="relative flex-1">
@@ -1094,8 +1326,44 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     </div>
                   </section>
 
+                  {/* Price per carat & Total price — custom From/To plus quick
+                      bands. Emeralds only (diamonds price off RAP). */}
+                  {mode === "emerald" && (
+                    <section>
+                      <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                        Price per carat
+                      </h3>
+                      <PriceRange
+                        from={ppcFrom}
+                        setFrom={setPpcFrom}
+                        to={ppcTo}
+                        setTo={setPpcTo}
+                        bands={ppcBands}
+                        toggleBand={(l) => toggleVal(setPpcBands, l)}
+                        presets={PPC_PRESETS}
+                      />
+                    </section>
+                  )}
+                  {mode === "emerald" && (
+                    <section>
+                      <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                        Total price
+                      </h3>
+                      <PriceRange
+                        from={totalFrom}
+                        setFrom={setTotalFrom}
+                        to={totalTo}
+                        setTo={setTotalTo}
+                        bands={totalBands}
+                        toggleBand={(l) => toggleVal(setTotalBands, l)}
+                        presets={TOTAL_PRESETS}
+                      />
+                    </section>
+                  )}
+
                   {/* Colour — White grades (D–Z) or, under Fancy, intensity +
-                      fancy-colour pickers. All multi-select. */}
+                      fancy-colour pickers. All multi-select. (Diamonds only.) */}
+                  {mode === "diamond" && (
                   <section>
                     <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
                       Color
@@ -1173,8 +1441,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                       </div>
                     )}
                   </section>
+                  )}
 
-                  {/* Clarity — multi-select grade chips. */}
+                  {/* Clarity — multi-select grade chips. (Diamonds only.) */}
+                  {mode === "diamond" && (
                   <section>
                     <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
                       Clarity
@@ -1191,8 +1461,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                       ))}
                     </ScrollRow>
                   </section>
+                  )}
 
-                  {/* Lab — multi-select grading labs. */}
+                  {/* Lab — diamonds show it here in Basic; emeralds move Lab
+                      into Advanced search below. */}
+                  {mode === "diamond" && (
                   <section>
                     <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
                       Lab
@@ -1209,8 +1482,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                       ))}
                     </ScrollRow>
                   </section>
+                  )}
 
-                  {/* Location — multi-select stock locations. */}
+                  {/* Location — diamonds in Basic; emeralds in Advanced search. */}
+                  {mode === "diamond" && (
                   <section>
                     <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
                       Location
@@ -1227,6 +1502,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                       ))}
                     </ScrollRow>
                   </section>
+                  )}
 
                   {/* Quick toggles — keep stones that carry a cert / media. */}
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -1263,14 +1539,15 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                   </>
                   )}
 
-                  {/* Advanced Search — collapsible divider revealing finish
-                      grades (Cut / Polish / Symmetry) and Fluorescence. */}
+                  {/* Advanced Search — diamonds: finish grades (Cut / Polish /
+                      Symmetry) + Fluorescence. Emeralds: Lab, Comments
+                      (treatment), Location, Origin. */}
                   <SectionDivider
                     label="Advanced search"
                     open={advancedOpen}
                     onClick={() => setAdvancedOpen((o) => !o)}
                   />
-                  {advancedOpen && (
+                  {advancedOpen && mode === "diamond" && (
                     <div className="space-y-6">
                       {advancedGroups.map((g) => (
                         <div key={g.title}>
@@ -1290,6 +1567,74 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                           </ScrollRow>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {advancedOpen && mode === "emerald" && (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                          Lab
+                        </h4>
+                        <ScrollRow>
+                          {EMERALD_LAB_OPTIONS.map((l) => (
+                            <Chip
+                              key={l}
+                              active={labSel.includes(l)}
+                              onClick={() => toggleVal(setLabSel, l)}
+                            >
+                              {l}
+                            </Chip>
+                          ))}
+                        </ScrollRow>
+                      </div>
+                      <div>
+                        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                          Comments
+                        </h4>
+                        <ScrollRow>
+                          {TREATMENT_OPTIONS.map((t) => (
+                            <Chip
+                              key={t}
+                              active={treatmentSel.includes(t)}
+                              onClick={() => toggleVal(setTreatmentSel, t)}
+                            >
+                              {t}
+                            </Chip>
+                          ))}
+                        </ScrollRow>
+                      </div>
+                      <div>
+                        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                          Location
+                        </h4>
+                        <ScrollRow>
+                          {LOCATION_OPTIONS.map((loc) => (
+                            <Chip
+                              key={loc}
+                              active={locationSel.includes(loc)}
+                              onClick={() => toggleVal(setLocationSel, loc)}
+                            >
+                              {loc}
+                            </Chip>
+                          ))}
+                        </ScrollRow>
+                      </div>
+                      <div>
+                        <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                          Origin
+                        </h4>
+                        <ScrollRow>
+                          {ORIGIN_OPTIONS.map((o) => (
+                            <Chip
+                              key={o}
+                              active={originSel.includes(o)}
+                              onClick={() => toggleVal(setOriginSel, o)}
+                            >
+                              {o}
+                            </Chip>
+                          ))}
+                        </ScrollRow>
+                      </div>
                     </div>
                   )}
 
@@ -1450,12 +1795,116 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                 </button>
               </div>
 
-              {/* Scrollable body */}
+              {/* Scrollable body — selected sorts float to the top (in priority
+                  order) with a direction arrow; the rest follow. */}
+              <div className="flex-1 overflow-auto px-5 py-4">
+                <p className="mb-3 text-[12px] text-app-soft">
+                  Tap to sort · tap again to flip direction · once more to clear
+                </p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    ...sortBy
+                      .map((s) => {
+                        const opt = SORT_OPTIONS.find((o) => o.key === s.key);
+                        return opt ? { ...opt, dir: s.dir } : null;
+                      })
+                      .filter(Boolean),
+                    ...SORT_OPTIONS.filter((o) => !sortBy.some((s) => s.key === o.key)).map((o) => ({
+                      ...o,
+                      dir: null,
+                    })),
+                  ].map((opt) => {
+                    const active = opt.dir != null;
+                    const rank = sortBy.findIndex((s) => s.key === opt.key);
+
+                    if (!active) {
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => toggleSort(opt.key)}
+                          className="flex items-center justify-between rounded-xl border border-app-line bg-app-surface px-4 py-3 text-left text-[14px] font-medium text-app-graphite transition hover:bg-app-canvas2"
+                        >
+                          <span>{opt.label}</span>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={opt.key}
+                        className="flex items-center gap-2 rounded-xl border border-emerald-500 bg-emerald-500/10 px-2.5 py-2 text-emerald-600"
+                      >
+                        {/* Tap label/arrow to flip direction (or remove). */}
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(opt.key)}
+                          className="flex flex-1 items-center gap-2 text-left text-[14px] font-medium"
+                        >
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-bold text-white">
+                            {rank + 1}
+                          </span>
+                          {opt.label}
+                          <svg
+                            className={`h-5 w-5 transition-transform ${opt.dir === "asc" ? "rotate-180" : ""}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M12 5v14M5 12l7 7 7-7" />
+                          </svg>
+                        </button>
+
+                        {/* Reorder priority. */}
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => moveSort(opt.key, "up")}
+                            disabled={rank === 0}
+                            aria-label="Increase priority"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-emerald-600 transition hover:bg-emerald-500/15 disabled:opacity-30"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveSort(opt.key, "down")}
+                            disabled={rank === sortBy.length - 1}
+                            aria-label="Decrease priority"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-emerald-600 transition hover:bg-emerald-500/15 disabled:opacity-30"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sticky footer — clear all sorts / done. */}
               <div
-                className="flex-1 overflow-auto p-5"
-                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)" }}
+                className="flex shrink-0 items-center gap-3 border-t border-app-line px-5 py-3"
+                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
               >
-                <p className="text-[13px] text-app-soft">No sort options configured yet.</p>
+                <button
+                  type="button"
+                  onClick={() => setSortBy([])}
+                  className="rounded-xl border border-app-line bg-app-surface px-5 py-2.5 text-[13px] font-semibold text-app-graphite transition hover:bg-app-canvas2"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortOpen(false)}
+                  className="flex-1 rounded-xl bg-app-ink px-5 py-2.5 text-[13px] font-semibold text-app-canvas transition active:scale-[0.99]"
+                >
+                  Done
+                </button>
               </div>
             </motion.div>
           </div>
