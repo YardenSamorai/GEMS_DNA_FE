@@ -4,6 +4,7 @@ import { fetchSoapStones } from "../../services/stonesApi";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
 import { DIAMOND_SHAPES } from "./diamondShapes";
+import BarcodeScanner from "../inventory/components/BarcodeScanner";
 
 /* The sales catalog is split into three category surfaces that all share this
  * same card grid. The category map resolves e.g. "Sapphire O" -> ["Sapphire"],
@@ -235,6 +236,34 @@ const money = (n) => {
   return `$${num.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 };
 
+/* In-house location names → clean display labels. Any non-empty location that
+ * is NOT in this map is treated as the stone being out on memo (with a third
+ * party), so we surface a "MEMO OUT" flag to the sales team. Keys are
+ * normalised (upper-case, single-spaced). */
+const LOCATION_MAP = {
+  "EMERALD OFFICE": "IL OFFICE",
+  OFFICE: "IL OFFICE",
+  "ESHED DIAM INC - EY": "Eshed Diam NY",
+  "ESHED DIAM INC - NY": "Eshed Diam NY",
+  "EL - ESHED DIAM INC (LA)": "Eshed Diam LA",
+  "ESHED DIAM HK EMERALDS": "Eshed Diam HK",
+  "ESHED DIAM (HK) LTD": "Eshed Diam HK",
+  "ESHED DESIGNS LTD": "Eshed Designs",
+};
+const normLoc = (v) => String(v || "").trim().replace(/\s+/g, " ").toUpperCase();
+
+/* Resolve the location line + memo flag for a stone.
+ *  - Known in-house location  -> clean label, not on memo.
+ *  - Other (real company)     -> show it, flagged as MEMO OUT.
+ *  - Empty                    -> fall back to branch/city, not on memo. */
+const resolveLocation = (s) => {
+  const raw = s.exactLocation && String(s.exactLocation).trim() ? String(s.exactLocation).trim() : "";
+  if (!raw) return { label: s.location || null, memo: false };
+  const mapped = LOCATION_MAP[normLoc(raw)];
+  if (mapped) return { label: mapped, memo: false };
+  return { label: raw, memo: true };
+};
+
 /* Diamond title: "0.51 Round H SI1 None IGI"
  * weight · shape · color · clarity · fluorescence · cert lab. */
 const buildDiamondTitle = (s) => {
@@ -333,6 +362,9 @@ const Line = ({ value }) =>
 const GemstoneCard = ({ stone, mode }) => {
   const isDiamond = mode === "diamond";
   const title = isDiamond ? buildDiamondTitle(stone) : buildTitle(stone);
+  const holder = stone.holder && String(stone.holder).trim() ? String(stone.holder).trim() : null;
+  // Precise location + memo flag (see resolveLocation).
+  const { label: locationLine, memo: memoOut } = resolveLocation(stone);
   const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : null;
   const treatment = stone.treatment ? shortTreatment(stone.treatment) : null;
   const img = stoneImage(stone);
@@ -347,6 +379,19 @@ const GemstoneCard = ({ stone, mode }) => {
   const rap =
     stone.rapPrice != null && stone.rapPrice !== "" ? `RAP ${stone.rapPrice}%` : null;
   const total = money(stone.priceTotal);
+
+  // Measurements + ratio (ratio falls back to length/width when absent).
+  let ratioVal = parseFloat(stone.ratio);
+  if (!Number.isFinite(ratioVal)) {
+    const [l, w] = parseDims(stone.measurements);
+    if (Number.isFinite(l) && Number.isFinite(w) && w) ratioVal = l / w;
+  }
+  const measureLine = [
+    stone.measurements ? String(stone.measurements).trim() : null,
+    Number.isFinite(ratioVal) ? `Ratio ${ratioVal.toFixed(2)}` : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
 
   return (
     <div className="flex flex-col">
@@ -368,13 +413,26 @@ const GemstoneCard = ({ stone, mode }) => {
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
       <div className="mt-2.5 flex flex-col gap-0.5">
+        {/* HOLD flag — stones currently held show the holder's name in bold red. */}
+        {holder && (
+          <p className="text-[12.5px] font-bold uppercase leading-snug tracking-wide text-red-600">
+            HOLD · {holder}
+          </p>
+        )}
+        {/* MEMO OUT flag — stone is physically out with a third party. */}
+        {memoOut && (
+          <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-amber-700">
+            Memo out
+          </span>
+        )}
         <h3 className="text-[14px] font-semibold leading-snug text-app-ink">
           {title || stone.sku || (isDiamond ? "Diamond" : "Gemstone")}
         </h3>
         {isDiamond ? (
           <>
             <Line value={finish || null} />
-            <Line value={stone.location} />
+            <Line value={measureLine || null} />
+            <Line value={locationLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
             {/* Prices pinned to the bottom on a single, non-wrapping row so the
                 total never drops below the per-ct / RAP figures. */}
@@ -395,7 +453,7 @@ const GemstoneCard = ({ stone, mode }) => {
             <Line value={treatment} />
             <Line value={lab} />
             <Line value={stone.measurements} />
-            <Line value={stone.location} />
+            <Line value={locationLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
           </>
         )}
@@ -412,6 +470,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [skuQuery, setSkuQuery] = useState("");
+  const [scanOpen, setScanOpen] = useState(false);
   // Selected diamond shapes (multi-select). Other categories will grow their
   // own filter state alongside this.
   const [shapeSel, setShapeSel] = useState([]);
@@ -491,6 +551,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setParcelSel([]);
     setOnlyCert(false);
     setOnlyMedia(false);
+    setSkuQuery("");
     const load = async () => {
       try {
         setLoading(true);
@@ -634,6 +695,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       // filter meaningless (image-less stones still showed "Coming Soon").
       if (onlyMedia && !stoneImage(s)) return false;
 
+      if (skuQuery.trim()) {
+        const q = norm(skuQuery);
+        if (!norm(s.sku).includes(q) && !norm(s.pairSku).includes(q)) return false;
+      }
+
       return true;
     });
   }, [
@@ -663,6 +729,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     parcelSel,
     onlyCert,
     onlyMedia,
+    skuQuery,
   ]);
 
   // Reset paging whenever the filtered set changes so the grid starts at top.
@@ -734,6 +801,38 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         >
           Filter
         </button>
+
+        {/* SKU search — sits between Filter and Sort, matches sku / pair sku. */}
+        <label className="relative min-w-0 flex-1">
+          <svg
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-soft"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-4.35-4.35M11 18a7 7 0 110-14 7 7 0 010 14z" />
+          </svg>
+          <input
+            type="search"
+            value={skuQuery}
+            onChange={(e) => setSkuQuery(e.target.value)}
+            placeholder="Search SKU"
+            className="w-full rounded-xl border border-app-line bg-app-surface py-2 pl-9 pr-10 text-sm text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+          />
+          {/* Camera scan — opens the rear camera to read a SKU barcode/QR. */}
+          <button
+            type="button"
+            onClick={() => setScanOpen(true)}
+            aria-label="Scan SKU with camera"
+            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-app-soft transition hover:bg-app-canvas2 hover:text-app-ink"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M3 9V7a2 2 0 012-2h2M3 15v2a2 2 0 002 2h2m10-14h2a2 2 0 012 2v2m0 6v2a2 2 0 01-2 2h-2" />
+              <circle cx="12" cy="12" r="3.2" strokeWidth={1.7} />
+            </svg>
+          </button>
+        </label>
+
         <button
           type="button"
           aria-haspopup="dialog"
@@ -744,6 +843,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
           Sort
         </button>
       </div>
+
+      {/* Camera-based SKU scanner (rear camera; works on iOS Safari). */}
+      <BarcodeScanner
+        isOpen={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onScan={(text) => {
+          setSkuQuery(String(text || "").trim());
+          setScanOpen(false);
+        }}
+      />
 
       {/* Loading skeleton */}
       {loading && (
