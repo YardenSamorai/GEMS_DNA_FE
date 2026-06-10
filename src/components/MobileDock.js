@@ -251,7 +251,7 @@ const MobileDock = ({ navSections = [] }) => {
     <>
       {/* Bottom dock — fixed, glass bar, safe-area padded. Hidden on md+ */}
       <nav
-        className={`md:hidden fixed inset-x-0 bottom-0 z-40 glass-bar dock-bar border-t border-app-line transition-transform duration-200 ease-out ${
+        className={`md:hidden fixed inset-x-0 bottom-0 z-40 dock-bar border-t border-app-line transition-transform duration-200 ease-out ${
           inputFocused ? "translate-y-full" : "translate-y-0"
         }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
