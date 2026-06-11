@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   buildStoneShareText,
   shareStonesOnWhatsApp,
-  prepareCertFiles,
+  prepareShareFiles,
   canShareFiles,
 } from "../../utils/shareStones";
 import { fetchSoapStones } from "../../services/stonesApi";
@@ -91,7 +91,7 @@ const StoneDetail = () => {
   const [error, setError] = useState("");
   const [liked, setLiked] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
-  const [certFiles, setCertFiles] = useState([]);
+  const [shareFiles, setShareFiles] = useState([]);
 
   // Deep-link fallback — no stone in router state, find it by SKU.
   useEffect(() => {
@@ -120,16 +120,16 @@ const StoneDetail = () => {
     };
   }, [stone, sku]);
 
-  // Pre-fetch the certificate image when the action sheet opens, so the share
-  // gesture can attach it without an async hop (keeps iOS user-activation).
+  // Pre-fetch the stone photo + certificate when the action sheet opens, so the
+  // share gesture can attach them without an async hop (keeps iOS activation).
   useEffect(() => {
     if (!actionOpen || !stone) {
-      setCertFiles([]);
+      setShareFiles([]);
       return;
     }
     let alive = true;
-    prepareCertFiles(stone).then((files) => {
-      if (alive) setCertFiles(files);
+    prepareShareFiles(stone).then((files) => {
+      if (alive) setShareFiles(files);
     });
     return () => {
       alive = false;
@@ -546,7 +546,7 @@ const StoneDetail = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(stone, { files: certFiles });
+                    shareStonesOnWhatsApp(stone, { files: shareFiles });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
@@ -559,8 +559,8 @@ const StoneDetail = () => {
                   <span className="min-w-0 flex-1">
                     <span className="block text-[14px] font-semibold tracking-tight text-app-ink">Share on WhatsApp</span>
                     <span className="block text-[12px] text-app-soft">
-                      {canShareFiles(certFiles)
-                        ? "Details + certificate image"
+                      {canShareFiles(shareFiles)
+                        ? `Details + ${shareFiles.length} attachment${shareFiles.length > 1 ? "s" : ""}`
                         : "Send this stone's details"}
                     </span>
                   </span>
@@ -572,17 +572,17 @@ const StoneDetail = () => {
                 {/* Preview of what will be sent. */}
                 <div className="mb-1 mt-4 flex items-center justify-between">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">Preview</p>
-                  {canShareFiles(certFiles) && (
+                  {canShareFiles(shareFiles) && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5h16v14H4z M4 15l4-4 4 4 4-4 4 4" />
                       </svg>
-                      Certificate attached
+                      Photo &amp; certificate attached
                     </span>
                   )}
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(stone, { includeCertLink: !canShareFiles(certFiles) })}
+                  {buildStoneShareText(stone, { includeMediaLinks: !canShareFiles(shareFiles) })}
                 </pre>
               </div>
             </motion.div>
