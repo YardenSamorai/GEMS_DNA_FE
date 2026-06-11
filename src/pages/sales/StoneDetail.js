@@ -11,6 +11,8 @@ import {
   resolveLocation,
   usableImg,
   hasCert,
+  adjustSalesPrices,
+  StonePlaceholder,
 } from "./SalesInventory";
 
 /* ============================================================================
@@ -93,7 +95,9 @@ const StoneDetail = () => {
         const rows = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
         const found = rows.find((s) => norm(s.sku) === norm(sku));
         if (!cancelled) {
-          if (found) setStone(found);
+          // Stones opened from the catalog arrive pre-adjusted via router
+          // state; deep links fetch raw rows, so apply the same price policy.
+          if (found) setStone(adjustSalesPrices(found));
           else setError("Stone not found");
         }
       } catch (err) {
@@ -282,16 +286,8 @@ const StoneDetail = () => {
             )}
           </div>
         ) : (
-          <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-app-canvas2 to-app-canvas text-app-soft">
-            <svg className="h-12 w-12 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.2}
-                d="M4 9h16M9 3.5L6.5 9l5.5 11.5L17.5 9 15 3.5M9 3.5h6M9 3.5L12 9l3-5.5M12 9v11.5"
-              />
-            </svg>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">Coming soon</span>
+          <div className="aspect-square w-full">
+            <StonePlaceholder alt={stone.sku} />
           </div>
         )}
 

@@ -18,6 +18,7 @@ import JewelryDesigns from "./pages/jewelry/Designs";
 import OffersPage from "./pages/offers/OffersPage";
 import SalesInventory from "./pages/sales/SalesInventory";
 import StoneDetail from "./pages/sales/StoneDetail";
+import SelectionPage from "./pages/sales/SelectionPage";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
@@ -35,6 +36,8 @@ import CatalogTiers from "./pages/crm/CatalogTiers";
 import TeamSettings from "./pages/team/TeamSettings";
 import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
+import { SelectionProvider } from "./context/SelectionContext";
+import SelectionFab from "./components/SelectionFab";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import MobileDock from "./components/MobileDock";
@@ -326,6 +329,9 @@ const AppLayout = () => {
               <Outlet />
             </main>
           </div>
+          {/* Floating "Selected" button — appears bottom-right once stones are
+              picked from any catalog, opens the review page. */}
+          <SelectionFab />
           {/* v1.0.5 mobile nav — bottom dock replaces the legacy mobile
               sidebar drawer. Hidden on md+. */}
           <MobileDock navSections={NAV_SECTIONS} />
@@ -444,7 +450,11 @@ function App() {
             an active memo so any inventory view can show an "On memo"
             chip without per-row queries. */}
         <MemoSkusProvider>
-          <AppContent />
+          {/* SelectionProvider backs the cross-category stone pick list (the
+              floating "Selected" button + review page). */}
+          <SelectionProvider>
+            <AppContent />
+          </SelectionProvider>
         </MemoSkusProvider>
       </TeamProvider>
     </ThemeProvider>
@@ -530,6 +540,8 @@ function AppContent() {
             <Route path="/sales/emeralds" element={<SalesInventory mode="emerald" />} />
             {/* Per-stone product page behind the catalog cards. */}
             <Route path="/sales/stone/:sku" element={<StoneDetail />} />
+            {/* Cross-category pick list review page. */}
+            <Route path="/sales/selection" element={<SelectionPage />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>

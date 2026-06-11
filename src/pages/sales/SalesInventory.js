@@ -6,6 +6,8 @@ import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/h
 import { getMappedCategories } from "../../utils/categoryMap";
 import { DIAMOND_SHAPES } from "./diamondShapes";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
+import placeholderImg from "../../assets/stone-placeholder.jpg";
+import { useSelection } from "../../context/SelectionContext";
 
 /* The sales catalog is split into three category surfaces that all share this
  * same card grid. The category map resolves e.g. "Sapphire O" -> ["Sapphire"],
@@ -32,6 +34,16 @@ const MODES = {
     noun: "gemstones",
     test: (m) => !m.includes("Diamond") && !m.includes("Fancy") && !m.includes("Emerald"),
   },
+};
+
+/* Resolve which catalog surface a stone belongs to from its category. Used by
+ * the cross-category selection view, where each picked stone has to render with
+ * its own mode's card layout regardless of which page it was added from. */
+export const modeForStone = (stone) => {
+  const m = getMappedCategories(stone?.category);
+  if (MODES.diamond.test(m)) return "diamond";
+  if (MODES.emerald.test(m)) return "emerald";
+  return "gemstone";
 };
 
 /* ============================================================================
@@ -118,6 +130,67 @@ const EMERALD_LAB_OPTIONS = ["GRS", "SSEF", "Gübelin", "GIA", "AGL", "CDC"];
 const TREATMENT_OPTIONS = ["No Oil", "Insignificant", "Minor", "Moderate", "Significant"];
 const ORIGIN_OPTIONS = ["Colombia", "Zambia", "Brazil", "Madagascar"];
 const EMERALD_PARCEL_OPTIONS = ["Single", "Pair", "Set", "Parcel"];
+// Gemstone-specific option sets. "Other" always means "matches none of the
+// explicitly-listed values above it".
+const GEM_COLORS = [
+  { key: "Green", swatch: "#1f9d57" },
+  { key: "Blue", swatch: "#2563eb" },
+  { key: "Violet", swatch: "#7c3aed" },
+  { key: "Pink", swatch: "#ec4899" },
+  { key: "Red", swatch: "#dc2626" },
+  { key: "Other", swatch: null },
+];
+// Color word roots used to bucket a stone (matched against category + colour
+// fields, since the colour column is mostly empty for coloured stones).
+const GEM_COLOR_ROOTS = {
+  Green: ["GREEN"],
+  Blue: ["BLUE"],
+  Violet: ["VIOLET", "PURPLE"],
+  Pink: ["PINK"],
+  Red: ["RED"],
+};
+const GEM_TYPE_OPTIONS = [
+  "Tourmaline",
+  "Aquamarine",
+  "Rubellite",
+  "Ruby",
+  "Sapphire",
+  "Tanzanite",
+  "Morganite",
+  "Amethyst",
+  "Tsavorite",
+  "Kunzite",
+  "Spinel",
+  "Other",
+];
+const GEM_LAB_OPTIONS = ["AGL", "GRS", "GIA", "ICA", "GWL", "SIG", "Other"];
+const GEM_COMMENTS_OPTIONS = ["Heated", "No Heat", "None"];
+const GEM_ORIGIN_OPTIONS = ["Madagascar", "Vietnam", "Mozambique", "Other"];
+
+/* Neutral (empty) value for every filter facet. Used to hydrate a category's
+ * saved filters and to backfill any keys missing from an older snapshot. */
+const FILTER_DEFAULTS = {
+  shapeSel: [], sizeFrom: "", sizeTo: "", sizeBands: [],
+  ppcFrom: "", ppcTo: "", ppcBands: [], totalFrom: "", totalTo: "", totalBands: [],
+  lenFrom: "", lenTo: "", widthFrom: "", widthTo: "", ratioFrom: "", ratioTo: "",
+  colorMode: "white", colorGrades: [], fancyIntensity: [], fancyColor: [],
+  claritySel: [], labSel: [], locationSel: [], treatmentSel: [], originSel: [],
+  gemColorSel: [], gemTypeSel: [], cutSel: [], polishSel: [], symmetrySel: [],
+  fluorSel: [], parcelSel: [], onlyCert: false, onlyMedia: false, onlyInStock: false,
+  skuQuery: "", sortBy: [],
+};
+/* Per-category filter persistence. Each mode (diamond / emerald / gemstone)
+ * keeps its own snapshot in localStorage, so switching between catalogs — or
+ * leaving and coming back later — restores exactly what was filtered. */
+const filtersKey = (mode) => `salesFilters:v1:${mode}`;
+const loadSavedFilters = (mode) => {
+  try {
+    const raw = localStorage.getItem(filtersKey(mode));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
 /* Advanced (collapsed by default) finish grades + fluorescence. */
 const GRADE_EVGF = ["EX", "VG", "G", "F"];
 const FLUOR_OPTIONS = ["None", "Faint", "Med.", "Strong"];
@@ -186,6 +259,44 @@ const FLUOR_MATCH = {
 };
 
 export const norm = (v) => (v == null ? "" : String(v).trim().toUpperCase());
+
+/* Facet matcher with an "Other" bucket: a stone passes when its text contains
+ * any selected known option, or — if "Other" is selected — none of the known
+ * (non-Other) options. `known` is the full option list (including "Other"). */
+const matchWithOther = (text, selected, known) => {
+  if (!selected.length) return true;
+  const t = norm(text);
+  const knownVals = known.filter((o) => o !== "Other");
+  const hit = (o) => t.includes(norm(o));
+  if (selected.some((o) => o !== "Other" && hit(o))) return true;
+  if (selected.includes("Other") && !knownVals.some(hit)) return true;
+  return false;
+};
+
+/* Gemstone colour bucket: matches the colour-word roots against the combined
+ * category + colour text. "Other" = none of the five colour roots present. */
+const matchGemColor = (s, selected) => {
+  if (!selected.length) return true;
+  const t = norm([s.category, s.color, s.fancyColor, s.fancyIntensity].filter(Boolean).join(" "));
+  const hitColor = (key) => (GEM_COLOR_ROOTS[key] || []).some((r) => t.includes(r));
+  if (selected.some((c) => c !== "Other" && hitColor(c))) return true;
+  if (selected.includes("Other") && !Object.keys(GEM_COLOR_ROOTS).some(hitColor)) return true;
+  return false;
+};
+
+/* Gemstone "Comments" (heat treatment) bucket. Raw values seen: "No Heat",
+ * "H", "None", "" — map them onto the three offered options. */
+const matchGemComments = (treatment, selected) => {
+  if (!selected.length) return true;
+  const t = norm(treatment);
+  return selected.some((opt) => {
+    if (opt === "No Heat") return t.includes("NO HEAT") || t === "NH";
+    if (opt === "Heated")
+      return t === "H" || t.includes("HEATED") || (t.includes("HEAT") && !t.includes("NO HEAT"));
+    if (opt === "None") return t === "" || t === "NONE" || t === "NON" || t === "N/A";
+    return false;
+  });
+};
 
 /* Parse a measurement string ("14.94-11.75-6.62" / "14.94 x 11.75 x 6.62")
  * into [length, width, depth] numbers. */
@@ -264,20 +375,15 @@ const sortValue = (s, opt) => {
   }
 };
 
-/* "Coming soon" fallback shown when a stone has no usable photo (or its URL
- * fails to load). Pure CSS so it's crisp at any size and theme-aware. */
-const ComingSoon = () => (
-  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-app-canvas2 to-app-canvas text-app-soft">
-    <svg className="h-9 w-9 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.2}
-        d="M4 9h16M9 3.5L6.5 9l5.5 11.5L17.5 9 15 3.5M9 3.5h6M9 3.5L12 9l3-5.5M12 9v11.5"
-      />
-    </svg>
-    <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em]">Coming soon</span>
-  </div>
+/* Fallback artwork shown when a stone has no usable photo (or its URL fails
+ * to load): a branded dark-emerald tile with a gold line-art gem. */
+export const StonePlaceholder = ({ alt = "" }) => (
+  <img
+    src={placeholderImg}
+    alt={alt}
+    loading="lazy"
+    className="h-full w-full object-cover"
+  />
 );
 
 /* The clean gem type (Emerald / Sapphire / Ruby …) from the category map,
@@ -389,6 +495,18 @@ export const stoneImage = (s) => {
   if (main) return main;
   const firstExtra = (s.additionalPictures || "").split(";")[0];
   return usableImg(firstExtra);
+};
+
+/* Sales-floor price policy: diamonds are quoted at list price, but emeralds
+ * and all other coloured stones are catalogued at HALF the book price (both
+ * per-carat and total). Applied once at load time so cards, the product page,
+ * the price filters and sorting all see the same adjusted figures. */
+export const adjustSalesPrices = (s) => {
+  const mapped = getMappedCategories(s.category);
+  if (mapped.includes("Diamond") || mapped.includes("Fancy")) return s;
+  const half = (v) =>
+    v != null && v !== "" && isFinite(Number(v)) ? Number(v) / 2 : v;
+  return { ...s, pricePerCt: half(s.pricePerCt), priceTotal: half(s.priceTotal) };
 };
 
 /* The Barak export sets `certificateUrl` to a folder path (".../Certificates/")
@@ -516,7 +634,41 @@ const Line = ({ value }) =>
     <p className="text-[12.5px] leading-snug text-app-muted">{value}</p>
   );
 
-const GemstoneCard = ({ stone, mode }) => {
+/* Round check/add control overlaid on a card's image. Stops the click from
+ * bubbling to the wrapping <Link> so picking a stone never navigates away. */
+const SelectToggle = ({ stone }) => {
+  const { isSelected, toggle } = useSelection();
+  const selected = isSelected(stone);
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggle(stone);
+      }}
+      aria-pressed={selected}
+      aria-label={selected ? "Remove from selection" : "Add to selection"}
+      className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-sm backdrop-blur transition active:scale-90 ${
+        selected
+          ? "border-emerald-600 bg-emerald-600 text-white"
+          : "border-white/70 bg-white/80 text-app-soft hover:text-app-ink"
+      }`}
+    >
+      {selected ? (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 5v14M5 12h14" />
+        </svg>
+      )}
+    </button>
+  );
+};
+
+export const GemstoneCard = ({ stone, mode }) => {
   const isDiamond = mode === "diamond";
   const isEmerald = mode === "emerald";
   const title = isDiamond
@@ -532,6 +684,8 @@ const GemstoneCard = ({ stone, mode }) => {
   const img = stoneImage(stone);
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = img && !imgFailed;
+  const { isSelected } = useSelection();
+  const selected = isSelected(stone);
 
   // Cut / Polish / Symmetry condensed onto one line, values only (no labels).
   const finish = [stone.cut, stone.polish, stone.symmetry]
@@ -559,7 +713,11 @@ const GemstoneCard = ({ stone, mode }) => {
     <div className="flex flex-col">
       {/* Image — shows the photo when present, otherwise a "Coming soon"
           placeholder. Also falls back if a "valid"-looking URL 404s. */}
-      <div className="aspect-square w-full overflow-hidden rounded-xl bg-app-canvas2">
+      <div
+        className={`relative aspect-square w-full overflow-hidden rounded-xl bg-app-canvas2 ${
+          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-app-canvas" : ""
+        }`}
+      >
         {showImage ? (
           <img
             src={img}
@@ -569,8 +727,9 @@ const GemstoneCard = ({ stone, mode }) => {
             className="h-full w-full object-cover"
           />
         ) : (
-          <ComingSoon />
+          <StonePlaceholder />
         )}
+        <SelectToggle stone={stone} />
       </div>
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
@@ -651,6 +810,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [sortOpen, setSortOpen] = useState(false);
   const [skuQuery, setSkuQuery] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
+  // Once the header (Filter / search / Sort) scrolls out of view we surface a
+  // floating Filter button so it stays reachable deep down the grid.
+  const headerRef = useRef(null);
+  const [showFloatingFilter, setShowFloatingFilter] = useState(false);
+  // True for the render immediately after we hydrate a category's saved
+  // filters, so the persistence effect doesn't write stale values back.
+  const justSwitchedRef = useRef(true);
   // Multi-level sort: ordered [{ key, dir }]. Tap to add (desc), tap again to
   // flip to asc, once more to remove.
   const [sortBy, setSortBy] = useState([]);
@@ -710,6 +876,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // Emerald-only facets.
   const [treatmentSel, setTreatmentSel] = useState([]);
   const [originSel, setOriginSel] = useState([]);
+  // Gemstone-only facets (colour bucket + gem type).
+  const [gemColorSel, setGemColorSel] = useState([]);
+  const [gemTypeSel, setGemTypeSel] = useState([]);
   // Basic block (open by default) wraps the primary filters; Advanced
   // (collapsed) holds the finish grades + fluorescence.
   const [basicOpen, setBasicOpen] = useState(true);
@@ -731,48 +900,72 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     { title: "Fluorescence", options: FLUOR_OPTIONS, sel: fluorSel, setter: setFluorSel },
   ];
 
+  // Snapshot of the live filter state — what we persist for each category.
+  const collectFilters = () => ({
+    shapeSel, sizeFrom, sizeTo, sizeBands,
+    ppcFrom, ppcTo, ppcBands, totalFrom, totalTo, totalBands,
+    lenFrom, lenTo, widthFrom, widthTo, ratioFrom, ratioTo,
+    colorMode, colorGrades, fancyIntensity, fancyColor,
+    claritySel, labSel, locationSel, treatmentSel, originSel,
+    gemColorSel, gemTypeSel, cutSel, polishSel, symmetrySel,
+    fluorSel, parcelSel, onlyCert, onlyMedia, onlyInStock,
+    skuQuery, sortBy,
+  });
+  // Push a saved snapshot (or the neutral defaults) back into state. Any key
+  // missing from an older snapshot falls back to its default.
+  const applyFilters = (saved) => {
+    const f = { ...FILTER_DEFAULTS, ...(saved || {}) };
+    setShapeSel(f.shapeSel);
+    setSizeFrom(f.sizeFrom);
+    setSizeTo(f.sizeTo);
+    setSizeBands(f.sizeBands);
+    setPpcFrom(f.ppcFrom);
+    setPpcTo(f.ppcTo);
+    setPpcBands(f.ppcBands);
+    setTotalFrom(f.totalFrom);
+    setTotalTo(f.totalTo);
+    setTotalBands(f.totalBands);
+    setLenFrom(f.lenFrom);
+    setLenTo(f.lenTo);
+    setWidthFrom(f.widthFrom);
+    setWidthTo(f.widthTo);
+    setRatioFrom(f.ratioFrom);
+    setRatioTo(f.ratioTo);
+    setColorMode(f.colorMode);
+    setColorGrades(f.colorGrades);
+    setFancyIntensity(f.fancyIntensity);
+    setFancyColor(f.fancyColor);
+    setClaritySel(f.claritySel);
+    setLabSel(f.labSel);
+    setLocationSel(f.locationSel);
+    setTreatmentSel(f.treatmentSel);
+    setOriginSel(f.originSel);
+    setGemColorSel(f.gemColorSel);
+    setGemTypeSel(f.gemTypeSel);
+    setCutSel(f.cutSel);
+    setPolishSel(f.polishSel);
+    setSymmetrySel(f.symmetrySel);
+    setFluorSel(f.fluorSel);
+    setParcelSel(f.parcelSel);
+    setOnlyCert(f.onlyCert);
+    setOnlyMedia(f.onlyMedia);
+    setOnlyInStock(f.onlyInStock);
+    setSkuQuery(f.skuQuery);
+    setSortBy(f.sortBy);
+  };
+
   useEffect(() => {
     let cancelled = false;
-    // Different categories expose different filters — clear selections so a
-    // shape picked under Diamonds doesn't linger when you hop to Emeralds.
-    setShapeSel([]);
-    setSizeFrom("");
-    setSizeTo("");
-    setSizeBands([]);
-    setPpcFrom("");
-    setPpcTo("");
-    setPpcBands([]);
-    setTotalFrom("");
-    setTotalTo("");
-    setTotalBands([]);
-    setLenFrom("");
-    setLenTo("");
-    setWidthFrom("");
-    setWidthTo("");
-    setRatioFrom("");
-    setRatioTo("");
-    setColorMode("white");
-    setColorGrades([]);
-    setFancyIntensity([]);
-    setFancyColor([]);
-    setClaritySel([]);
-    setLabSel([]);
-    setLocationSel([]);
-    setTreatmentSel([]);
-    setOriginSel([]);
+    // Each category keeps its own filter selections: restore this mode's saved
+    // snapshot (or the neutral defaults the first time) instead of clearing, so
+    // hopping between Diamonds / Emeralds / Gemstones — or returning later —
+    // keeps every page's results. Panels always reopen in the default layout.
+    applyFilters(loadSavedFilters(mode));
     setBasicOpen(true);
     setMeasureOpen(false);
     setAdvancedOpen(false);
-    setCutSel([]);
-    setPolishSel([]);
-    setSymmetrySel([]);
-    setFluorSel([]);
-    setParcelSel([]);
-    setOnlyCert(false);
-    setOnlyMedia(false);
-    setOnlyInStock(false);
-    setSkuQuery("");
-    setSortBy([]);
+    // Skip the persistence write triggered by these hydration setstates.
+    justSwitchedRef.current = true;
     const load = async () => {
       try {
         setLoading(true);
@@ -785,7 +978,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         const data = await fetchSoapStones(undefined, { assignedTo: "all" });
         const rows = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
         if (!cancelled) {
-          setStones(rows.filter((s) => cfg.test(getMappedCategories(s.category))));
+          setStones(
+            rows
+              .filter((s) => cfg.test(getMappedCategories(s.category)))
+              .map(adjustSalesPrices)
+          );
           setVisibleCount(PAGE_SIZE);
         }
       } catch (err) {
@@ -799,6 +996,29 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       cancelled = true;
     };
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist the active filters for this category whenever they change. The
+  // render right after a mode switch is skipped (justSwitchedRef) so we never
+  // overwrite a freshly-restored snapshot with the previous category's values.
+  useEffect(() => {
+    if (justSwitchedRef.current) {
+      justSwitchedRef.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(filtersKey(mode), JSON.stringify(collectFilters()));
+    } catch {
+      /* storage unavailable (private mode / quota) — non-fatal */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    mode, shapeSel, sizeFrom, sizeTo, sizeBands, ppcFrom, ppcTo, ppcBands,
+    totalFrom, totalTo, totalBands, lenFrom, lenTo, widthFrom, widthTo,
+    ratioFrom, ratioTo, colorMode, colorGrades, fancyIntensity, fancyColor,
+    claritySel, labSel, locationSel, treatmentSel, originSel, gemColorSel,
+    gemTypeSel, cutSel, polishSel, symmetrySel, fluorSel, parcelSel,
+    onlyCert, onlyMedia, onlyInStock, skuQuery, sortBy,
+  ]);
 
   // Apply the selected filters to the loaded (category-scoped) stones. Each
   // active facet narrows the result; empty facets are ignored. Diamond mode is
@@ -883,9 +1103,21 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         if (!claritySel.some((v) => cl === norm(v) || parts.includes(norm(v)))) return false;
       }
 
+      // Gemstone-only colour + gem-type buckets.
+      if (mode === "gemstone") {
+        if (!matchGemColor(s, gemColorSel)) return false;
+        if (!matchWithOther(s.category, gemTypeSel, GEM_TYPE_OPTIONS)) return false;
+      }
+
       if (labSel.length) {
-        const lab = norm(s.lab);
-        if (!labSel.some((v) => lab.includes(norm(v)))) return false;
+        // Gemstone labs have an "Other" bucket; emerald/diamond use a plain
+        // substring match against their fixed lab lists.
+        if (mode === "gemstone") {
+          if (!matchWithOther(s.lab, labSel, GEM_LAB_OPTIONS)) return false;
+        } else {
+          const lab = norm(s.lab);
+          if (!labSel.some((v) => lab.includes(norm(v)))) return false;
+        }
       }
 
       if (locationSel.length) {
@@ -896,13 +1128,22 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       }
 
       if (treatmentSel.length) {
-        const t = norm(s.treatment);
-        if (!treatmentSel.some((v) => t.includes(norm(v)))) return false;
+        // For gemstones "treatment" is the Heated / No Heat / None comment.
+        if (mode === "gemstone") {
+          if (!matchGemComments(s.treatment, treatmentSel)) return false;
+        } else {
+          const t = norm(s.treatment);
+          if (!treatmentSel.some((v) => t.includes(norm(v)))) return false;
+        }
       }
 
       if (originSel.length) {
-        const o = norm(s.origin);
-        if (!originSel.some((v) => o.includes(norm(v)))) return false;
+        if (mode === "gemstone") {
+          if (!matchWithOther(s.origin, originSel, GEM_ORIGIN_OPTIONS)) return false;
+        } else {
+          const o = norm(s.origin);
+          if (!originSel.some((v) => o.includes(norm(v)))) return false;
+        }
       }
 
       const gradeOk = (sel, field) => {
@@ -965,6 +1206,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     locationSel,
     treatmentSel,
     originSel,
+    gemColorSel,
+    gemTypeSel,
     cutSel,
     polishSel,
     symmetrySel,
@@ -1007,6 +1250,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setLocationSel([]);
     setTreatmentSel([]);
     setOriginSel([]);
+    setGemColorSel([]);
+    setGemTypeSel([]);
     setCutSel([]);
     setPolishSel([]);
     setSymmetrySel([]);
@@ -1061,11 +1306,106 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
+  // Show the floating Filter button only while the real header is off-screen.
+  useEffect(() => {
+    const node = headerRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => setShowFloatingFilter(!entries[0].isIntersecting),
+      { rootMargin: "-8px 0px 0px 0px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  // Shared filter fragments reused across modes (kept identical everywhere).
+  const togglesControls = (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      {[
+        { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
+        { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
+        { label: "Only in stock", checked: onlyInStock, set: setOnlyInStock },
+      ].map(({ label, checked, set }) => (
+        <label
+          key={label}
+          className="flex cursor-pointer select-none items-center gap-2 text-[13px] font-medium text-app-ink"
+        >
+          <span
+            className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
+              checked
+                ? "border-emerald-500 bg-emerald-500 text-white"
+                : "border-app-line bg-app-surface text-transparent"
+            }`}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
+            </svg>
+          </span>
+          <input type="checkbox" className="sr-only" checked={checked} onChange={() => set((v) => !v)} />
+          {label}
+        </label>
+      ))}
+    </div>
+  );
+
+  const measurementsControls = (
+    <div className="space-y-3">
+      {[
+        { label: "Length", from: lenFrom, setFrom: setLenFrom, to: lenTo, setTo: setLenTo },
+        { label: "Width", from: widthFrom, setFrom: setWidthFrom, to: widthTo, setTo: setWidthTo },
+      ].map((row) => (
+        <div key={row.label} className="flex items-center gap-3">
+          <span className="w-14 shrink-0 text-[12.5px] font-medium text-app-soft">{row.label}</span>
+          {[
+            { v: row.from, set: row.setFrom, ph: "From" },
+            { v: row.to, set: row.setTo, ph: "To" },
+          ].map((f) => (
+            <label key={f.ph} className="relative flex-1">
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={f.v}
+                onChange={(e) => f.set(e.target.value)}
+                placeholder={f.ph}
+                className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-3 pr-9 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-app-soft">
+                mm
+              </span>
+            </label>
+          ))}
+        </div>
+      ))}
+      <div className="flex items-center gap-3">
+        <span className="w-14 shrink-0 text-[12.5px] font-medium text-app-soft">Ratio</span>
+        {[
+          { v: ratioFrom, set: setRatioFrom, ph: "From" },
+          { v: ratioTo, set: setRatioTo, ph: "To" },
+        ].map((f) => (
+          <label key={f.ph} className="flex-1">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={f.v}
+              onChange={(e) => f.set(e.target.value)}
+              placeholder={f.ph}
+              className="w-full rounded-xl border border-app-line bg-app-surface px-3 py-2.5 text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
       {/* No page title — the bottom dock already shows which catalog you're in.
           "Filter" sits top-left, "Sort" top-right, where the title used to be. */}
-      <div className="flex items-center justify-between gap-3">
+      <div ref={headerRef} className="flex items-center justify-between gap-3">
         <button
           type="button"
           aria-haspopup="dialog"
@@ -1117,6 +1457,36 @@ const SalesInventory = ({ mode = "gemstone" }) => {
           Sort
         </button>
       </div>
+
+      {/* Live tally of how many stones match the active filters — sits just
+          under the Filter / Search / Sort row, aligned under Filter. */}
+      {!loading && !error && (
+        <p className="mt-2 pl-1 text-[12px] font-medium text-app-soft">
+          {filtered.length.toLocaleString()}{" "}
+          {filtered.length === 1 ? "result" : "results"}
+        </p>
+      )}
+
+      {/* Floating Filter button — fades in once the header scrolls away so the
+          filters stay one tap away anywhere down the grid. Sits above the
+          mobile dock (safe-area aware) and opens the same sheet. */}
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-label="Open filters"
+        onClick={() => setFiltersOpen(true)}
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
+        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden ${
+          showFloatingFilter
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-4 opacity-0"
+        }`}
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M4 6h16M7 12h10M10 18h4" />
+        </svg>
+        Filter
+      </button>
 
       {/* Camera-based SKU scanner (rear camera; works on iOS Safari). */}
       <BarcodeScanner
@@ -1235,7 +1605,193 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               {/* Scrollable body — vertical scroll for the section stack,
                   while individual rows (like Shape) scroll horizontally. */}
               <div className="flex-1 overflow-y-auto px-5 py-4">
-                {mode === "diamond" || mode === "emerald" ? (
+                {mode === "gemstone" ? (
+                  <div className="space-y-7">
+                    {/* Parcel type */}
+                    <section>
+                      <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                        Parcel type
+                      </h3>
+                      <ScrollRow>
+                        {EMERALD_PARCEL_OPTIONS.map((p) => (
+                          <Chip key={p} active={parcelSel.includes(p)} onClick={() => toggleVal(setParcelSel, p)}>
+                            {p}
+                          </Chip>
+                        ))}
+                      </ScrollRow>
+                    </section>
+
+                    <SectionDivider label="Basic" open={basicOpen} onClick={() => setBasicOpen((o) => !o)} />
+                    {basicOpen && (
+                      <>
+                        {/* Color — labelled swatches in the named colour. */}
+                        <section>
+                          <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                            Color
+                          </h3>
+                          <ScrollRow>
+                            {GEM_COLORS.map(({ key, swatch }) => {
+                              const active = gemColorSel.includes(key);
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => toggleVal(setGemColorSel, key)}
+                                  className={`flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-[13.5px] font-medium transition ${
+                                    active
+                                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
+                                      : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+                                  }`}
+                                >
+                                  <span
+                                    className="h-4 w-4 shrink-0 rounded-[5px] border border-black/10"
+                                    style={
+                                      swatch
+                                        ? { backgroundColor: swatch }
+                                        : {
+                                            backgroundImage:
+                                              "linear-gradient(135deg,#ef4444,#f59e0b,#22c55e,#3b82f6,#a855f7)",
+                                          }
+                                    }
+                                  />
+                                  {key}
+                                </button>
+                              );
+                            })}
+                          </ScrollRow>
+                        </section>
+
+                        {/* Shape — same scrollable icon grid as the other modes. */}
+                        <section>
+                          <div className="mb-2.5 flex items-center justify-between">
+                            <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                              Shape
+                            </h3>
+                            {shapeSel.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setShapeSel([])}
+                                className="text-[12px] font-medium text-app-soft hover:text-app-ink"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
+                            <div className="grid grid-flow-col grid-rows-2 auto-cols-[90px] gap-1.5">
+                              {DIAMOND_SHAPES.map((sh) => {
+                                const active = shapeSel.includes(sh.key);
+                                return (
+                                  <button
+                                    key={sh.key}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => toggleShape(sh.key)}
+                                    className={`flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 transition ${
+                                      active
+                                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
+                                        : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+                                    }`}
+                                  >
+                                    {sh.icon("h-6 w-6")}
+                                    <span className="w-full text-center text-[12px] font-medium leading-tight">
+                                      {sh.label}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </section>
+
+                        {/* Gem type */}
+                        <section>
+                          <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                            Gem type
+                          </h3>
+                          <ScrollRow>
+                            {GEM_TYPE_OPTIONS.map((t) => (
+                              <Chip key={t} active={gemTypeSel.includes(t)} onClick={() => toggleVal(setGemTypeSel, t)}>
+                                {t}
+                              </Chip>
+                            ))}
+                          </ScrollRow>
+                        </section>
+
+                        {/* Price per carat & Total price */}
+                        <section>
+                          <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                            Price per carat
+                          </h3>
+                          <PriceRange
+                            from={ppcFrom}
+                            setFrom={setPpcFrom}
+                            to={ppcTo}
+                            setTo={setPpcTo}
+                            bands={ppcBands}
+                            toggleBand={(l) => toggleVal(setPpcBands, l)}
+                            presets={PPC_PRESETS}
+                          />
+                        </section>
+                        <section>
+                          <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
+                            Total price
+                          </h3>
+                          <PriceRange
+                            from={totalFrom}
+                            setFrom={setTotalFrom}
+                            to={totalTo}
+                            setTo={setTotalTo}
+                            bands={totalBands}
+                            toggleBand={(l) => toggleVal(setTotalBands, l)}
+                            presets={TOTAL_PRESETS}
+                          />
+                        </section>
+
+                        {togglesControls}
+                      </>
+                    )}
+
+                    {/* Advanced search — Lab, Comments, Origin, Location. */}
+                    <SectionDivider
+                      label="Advanced search"
+                      open={advancedOpen}
+                      onClick={() => setAdvancedOpen((o) => !o)}
+                    />
+                    {advancedOpen && (
+                      <div className="space-y-6">
+                        {[
+                          { title: "Lab", options: GEM_LAB_OPTIONS, sel: labSel, setter: setLabSel },
+                          { title: "Comments", options: GEM_COMMENTS_OPTIONS, sel: treatmentSel, setter: setTreatmentSel },
+                          { title: "Origin", options: GEM_ORIGIN_OPTIONS, sel: originSel, setter: setOriginSel },
+                          { title: "Location", options: LOCATION_OPTIONS, sel: locationSel, setter: setLocationSel },
+                        ].map((g) => (
+                          <div key={g.title}>
+                            <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                              {g.title}
+                            </h4>
+                            <ScrollRow>
+                              {g.options.map((opt) => (
+                                <Chip key={opt} active={g.sel.includes(opt)} onClick={() => toggleVal(g.setter, opt)}>
+                                  {opt}
+                                </Chip>
+                              ))}
+                            </ScrollRow>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Measurements */}
+                    <SectionDivider
+                      label="Measurements"
+                      open={measureOpen}
+                      onClick={() => setMeasureOpen((o) => !o)}
+                    />
+                    {measureOpen && measurementsControls}
+                  </div>
+                ) : mode === "diamond" || mode === "emerald" ? (
                   <div className="space-y-7">
                   {/* Parcel type — kept above Basic. Diamonds: Single/Pair;
                       emeralds also use Set/Parcel. */}
