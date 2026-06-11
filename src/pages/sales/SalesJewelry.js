@@ -948,9 +948,7 @@ const Line = ({ value }) =>
 const JewelryCard = ({ item }) => {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = item.image && !imgFailed;
-  const shapeDisp = item.shape ? getDisplayShape(item.shape) : "";
   const centerCt = Number.isFinite(item.centerCarat) ? `${item.centerCarat.toFixed(2)} ct` : null;
-  const totalWt = Number.isFinite(item.jewelryWeight) ? `${parseFloat(item.jewelryWeight.toFixed(2))} g` : null;
   const price = money(item.price);
   return (
     <div className="flex flex-col">
@@ -968,16 +966,15 @@ const JewelryCard = ({ item }) => {
         )}
       </div>
       <div className="mt-2.5 flex flex-col gap-0.5">
-        {/* Center stone weight leads, slightly emphasized. */}
-        <h3 className="text-[14px] font-semibold leading-snug text-app-ink">{centerCt || item.name}</h3>
-        <Line value={totalWt} />
-        <Line value={shapeDisp || null} />
-        <Line value={item.jewelryType || null} />
-        <Line value={item.stoneType || null} />
-        <Line value={item.sku ? `#${item.sku}` : null} />
+        {/* Title leads, then labelled spec lines. */}
+        <h3 className="text-[14px] font-semibold leading-snug text-app-ink">{item.name || item.sku}</h3>
+        <Line value={centerCt ? `Center stone weight: ${centerCt}` : null} />
+        <Line value={item.location ? `Location: ${item.location}` : null} />
+        <Line value={item.style ? `Style: ${item.style}` : null} />
+        <Line value={item.sku ? `SKU: ${item.sku}` : null} />
         {price && (
           <div className="mt-1.5">
-            <span className="text-[14px] font-semibold tabular-nums text-app-ink">{price}</span>
+            <span className="text-[14px] font-semibold tabular-nums text-app-ink">Total: {price}</span>
           </div>
         )}
       </div>
