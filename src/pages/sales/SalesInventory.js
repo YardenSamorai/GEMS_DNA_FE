@@ -656,12 +656,12 @@ const SelectToggle = ({ stone }) => {
       }`}
     >
       {selected ? (
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M5 13l4 4L19 7" />
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.5l2.93 5.94 6.57.96-4.75 4.63 1.12 6.54L12 18.98l-5.87 3.09 1.12-6.54L2.5 9.9l6.57-.96L12 2.5z" />
         </svg>
       ) : (
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 5v14M5 12h14" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2.5l2.93 5.94 6.57.96-4.75 4.63 1.12 6.54L12 18.98l-5.87 3.09 1.12-6.54L2.5 9.9l6.57-.96L12 2.5z" />
         </svg>
       )}
     </button>
