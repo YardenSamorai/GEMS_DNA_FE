@@ -131,8 +131,8 @@ const SALES_SLOTS = [
     // Engagement ring — band with a faceted solitaire on top.
     key: "jewelry",
     label: "Jewelry",
-    to: "/inventory?tab=jewelry",
-    matches: () => false,
+    to: "/sales/jewelry",
+    matches: (path) => path.startsWith("/sales/jewelry"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <circle cx="12" cy="15.25" r="5.75" strokeWidth={1.3} />
@@ -141,6 +141,13 @@ const SALES_SLOTS = [
     ),
   },
 ];
+
+/* Just the catalog categories (no Home / More) — used by the floating tablet
+ * bar that gives iPad users a touch-friendly category switcher, since the
+ * full-width phone dock is hidden at md+ where the sidebar takes over. */
+const SALES_CATEGORY_SLOTS = SALES_SLOTS.filter((s) =>
+  ["diamond", "emerald", "gemstones", "jewelry"].includes(s.key)
+);
 
 const MoreIcon = (cls) => (
   <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -256,6 +263,49 @@ const MobileDock = ({ navSections = [] }) => {
 
   return (
     <>
+      {/* Floating tablet category bar — iPad sits at md+ (where the phone dock
+          is hidden and the sidebar takes over), so we give it a centered,
+          touch-friendly pill to hop between catalog categories. Shown only on
+          /sales pages and only in the tablet width band (md → xl). */}
+      {inSales && (
+        <nav
+          className="hidden md:flex xl:hidden fixed left-1/2 z-40 -translate-x-1/2 dock-bar rounded-full border border-app-line shadow-[0_12px_34px_-10px_rgba(0,0,0,0.45)]"
+          style={{
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)",
+            transform: inputFocused
+              ? "translate3d(-50%, 150%, 0)"
+              : "translate3d(-50%, 0, 0)",
+            transition: "transform 0.2s ease-out",
+            willChange: "transform",
+            WebkitBackfaceVisibility: "hidden",
+            backfaceVisibility: "hidden",
+          }}
+          aria-label="Sales categories"
+        >
+          <div className="flex items-center gap-1 px-2 py-1.5">
+            {SALES_CATEGORY_SLOTS.map((slot) => {
+              const active = slot.matches(location.pathname);
+              return (
+                <Link
+                  key={slot.key}
+                  to={slot.to}
+                  className={`flex flex-col items-center gap-1 rounded-full px-4 py-2 transition-colors ${
+                    active
+                      ? "bg-emerald-500/10 text-emerald-600"
+                      : "text-app-graphite hover:text-app-ink"
+                  }`}
+                >
+                  {slot.icon("w-6 h-6")}
+                  <span className={`text-[11px] leading-none ${active ? "font-bold" : "font-semibold"}`}>
+                    {slot.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
       {/* Bottom dock — fixed, solid bar, safe-area padded. Hidden on md+.
           iOS Safari fails to repaint a thin `position: fixed` bar during
           momentum scroll, leaving it stranded mid-screen until the scroll

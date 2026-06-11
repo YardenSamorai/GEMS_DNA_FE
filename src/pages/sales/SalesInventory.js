@@ -207,7 +207,7 @@ const toggleVal = (setter, val) =>
  * filter key maps to the set of tokens that should match a stone's raw shape
  * code OR its resolved DNA shape name. Shapes with no data equivalent simply
  * match nothing. */
-const SHAPE_MATCH = {
+export const SHAPE_MATCH = {
   Round: ["RD", "BR", "ROUND"],
   Oval: ["OV", "MOVAL", "OVAL"],
   Emerald: ["EC", "EM", "SQEC", "EMERALD"],

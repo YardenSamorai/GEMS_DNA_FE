@@ -17,6 +17,7 @@ import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
 import OffersPage from "./pages/offers/OffersPage";
 import SalesInventory from "./pages/sales/SalesInventory";
+import SalesJewelry from "./pages/sales/SalesJewelry";
 import StoneDetail from "./pages/sales/StoneDetail";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
@@ -213,14 +214,28 @@ const NAV_SECTIONS = [
         ),
       },
       {
-        to: "/sales/inventory",
+        to: "/sales/diamonds",
         label: "Sales Inventory",
-        matches: (path) => path.startsWith("/sales/inventory"),
+        // Highlight across the whole sales catalog (incl. the stone/selection
+        // sub-routes) — but not /offers, which is its own entry below.
+        matches: (path) => path.startsWith("/sales"),
         icon: (cls) => (
           <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10" />
           </svg>
         ),
+        // Desktop category switcher — the mobile dock exposes these as tiles,
+        // the sidebar lists them as sub-items under Sales Inventory.
+        children: [
+          { to: "/sales/diamonds", label: "Diamonds", matches: (p) => p.startsWith("/sales/diamonds") },
+          { to: "/sales/emeralds", label: "Emeralds", matches: (p) => p.startsWith("/sales/emeralds") },
+          {
+            to: "/sales/gemstones",
+            label: "Gemstones",
+            matches: (p) => p.startsWith("/sales/gemstones") || p.startsWith("/sales/inventory"),
+          },
+          { to: "/sales/jewelry", label: "Jewelry", matches: (p) => p.startsWith("/sales/jewelry") },
+        ],
       },
       {
         to: "/offers",
@@ -537,6 +552,8 @@ function AppContent() {
             <Route path="/sales/gemstones" element={<SalesInventory mode="gemstone" />} />
             <Route path="/sales/diamonds" element={<SalesInventory mode="diamond" />} />
             <Route path="/sales/emeralds" element={<SalesInventory mode="emerald" />} />
+            {/* Jewelry sales surface — WooCommerce-fed catalog in the same card grid. */}
+            <Route path="/sales/jewelry" element={<SalesJewelry />} />
             {/* Per-stone product page behind the catalog cards. */}
             <Route path="/sales/stone/:sku" element={<StoneDetail />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
