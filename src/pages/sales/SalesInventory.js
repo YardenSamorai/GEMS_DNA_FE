@@ -503,15 +503,19 @@ export const stoneImage = (s) => {
   return usableImg(firstExtra);
 };
 
-/* Sales-floor price policy: every stone (diamonds included) is catalogued at
- * HALF the stored book price — both per-carat and total — because prices are
- * imported doubled (bruto). Applied once at load time so cards, the product
+/* Sales-floor price policy (applied once at load time so cards, the product
  * page, the price filters, sorting and WhatsApp shares all see the same
- * adjusted figures. */
+ * adjusted figures). Prices are imported doubled (bruto):
+ *   - Diamonds / Fancy → divided by 2  (book price).
+ *   - Emeralds & all other coloured stones → divided by 4  (half of book —
+ *     their sales-floor price is a further 50% off). */
 export const adjustSalesPrices = (s) => {
-  const half = (v) =>
-    v != null && v !== "" && isFinite(Number(v)) ? Number(v) / 2 : v;
-  return { ...s, pricePerCt: half(s.pricePerCt), priceTotal: half(s.priceTotal) };
+  const mapped = getMappedCategories(s.category);
+  const isDiamond = mapped.includes("Diamond") || mapped.includes("Fancy");
+  const divisor = isDiamond ? 2 : 4;
+  const adj = (v) =>
+    v != null && v !== "" && isFinite(Number(v)) ? Number(v) / divisor : v;
+  return { ...s, pricePerCt: adj(s.pricePerCt), priceTotal: adj(s.priceTotal) };
 };
 
 /* The Barak export sets `certificateUrl` to a folder path (".../Certificates/")
