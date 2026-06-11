@@ -19,6 +19,7 @@ import OffersPage from "./pages/offers/OffersPage";
 import SalesInventory from "./pages/sales/SalesInventory";
 import SalesJewelry from "./pages/sales/SalesJewelry";
 import StoneDetail from "./pages/sales/StoneDetail";
+import JewelryDetail from "./pages/sales/JewelryDetail";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
@@ -611,6 +612,8 @@ function AppContent() {
             <Route path="/sales/jewelry" element={<SalesJewelry />} />
             {/* Per-stone product page behind the catalog cards. */}
             <Route path="/sales/stone/:sku" element={<StoneDetail />} />
+            {/* Per-piece jewelry product page — same look as StoneDetail. */}
+            <Route path="/sales/jewelry/:sku" element={<JewelryDetail />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>

@@ -167,12 +167,12 @@ const matchGemType = (stoneType, selected) => {
 };
 
 /* Map a raw jewelry_products row into the flat shape the card + filters use. */
-const mapRow = (row) => {
-  const firstImage =
-    (row.all_pictures_link || "")
-      .split(";")
-      .map((u) => u.trim())
-      .filter(Boolean)[0] || null;
+export const mapRow = (row) => {
+  const images = (row.all_pictures_link || "")
+    .split(";")
+    .map((u) => u.trim())
+    .filter(Boolean);
+  const firstImage = images[0] || null;
   let price = 0;
   try {
     price = row.price ? Number(decryptPrice(row.price)) || 0 : 0;
@@ -204,6 +204,7 @@ const mapRow = (row) => {
       "",
     metal: row.metal_type ? String(row.metal_type).trim() : "",
     image: firstImage,
+    images,
     price: price || 0,
   };
 };
@@ -582,7 +583,8 @@ const SalesJewelry = () => {
             {visibleRows.map((item, idx) => (
               <Link
                 key={item.id ?? item.sku ?? idx}
-                to={`/jewelry/${encodeURIComponent(item.sku || "")}`}
+                to={`/sales/jewelry/${encodeURIComponent(item.sku || "")}`}
+                state={{ item }}
                 className="transition active:opacity-80"
               >
                 <JewelryCard item={item} />
