@@ -123,6 +123,14 @@ const StoneDetail = () => {
     if (!el || !el.clientWidth) return;
     setSlide(Math.round(el.scrollLeft / el.clientWidth));
   };
+  // The video is appended as the last slide. Jumping straight to it saves the
+  // user swiping past every photo (what the V360 shortcut button does).
+  const scrollToSlide = (index) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollTo({ left: el.clientWidth * index, behavior: "smooth" });
+  };
+  const scrollToVideo = () => scrollToSlide(images.length);
 
   if (loading) {
     return (
@@ -327,37 +335,61 @@ const StoneDetail = () => {
           <h1 className="text-[21px] font-semibold leading-snug tracking-tight text-app-ink">
             {title || stone.sku}
           </h1>
-          {(cert || hasCert(stone)) &&
-            (cert ? (
-              <a
-                href={cert}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-0.5 flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 transition active:scale-95"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.8}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Certificate
-              </a>
-            ) : (
-              <span className="mt-0.5 flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-3 py-1.5 text-[12px] font-semibold text-emerald-600/80">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.8}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Certified
-              </span>
-            ))}
+          {/* Quick actions, stacked: Certificate first, then V360 (jumps the
+              carousel straight to the video) when the stone has one. */}
+          {(cert || hasCert(stone) || video) && (
+            <div className="mt-0.5 flex shrink-0 flex-col items-end gap-2">
+              {(cert || hasCert(stone)) &&
+                (cert ? (
+                  <a
+                    href={cert}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 transition active:scale-95"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.8}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Certificate
+                  </a>
+                ) : (
+                  <span className="flex w-full items-center justify-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-3 py-1.5 text-[12px] font-semibold text-emerald-600/80">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.8}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Certified
+                  </span>
+                ))}
+              {video && (
+                <button
+                  type="button"
+                  onClick={scrollToVideo}
+                  aria-label="Play 360° video"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-[12px] font-semibold text-sky-600 transition active:scale-95"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M21 12a9 9 0 11-3.5-7.1M21 4v4h-4"
+                    />
+                  </svg>
+                  V360
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Status flags */}

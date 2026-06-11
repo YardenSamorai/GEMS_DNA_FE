@@ -18,7 +18,6 @@ import JewelryDesigns from "./pages/jewelry/Designs";
 import OffersPage from "./pages/offers/OffersPage";
 import SalesInventory from "./pages/sales/SalesInventory";
 import StoneDetail from "./pages/sales/StoneDetail";
-import SelectionPage from "./pages/sales/SelectionPage";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
@@ -540,8 +539,6 @@ function AppContent() {
             <Route path="/sales/emeralds" element={<SalesInventory mode="emerald" />} />
             {/* Per-stone product page behind the catalog cards. */}
             <Route path="/sales/stone/:sku" element={<StoneDetail />} />
-            {/* Cross-category pick list review page. */}
-            <Route path="/sales/selection" element={<SelectionPage />} />
             {/* Full-page customer profile (no CRM tab chrome) */}
             <Route path="/crm/customers/:id" element={<CustomerProfile />} />
             <Route path="/crm" element={<CrmLayout />}>
