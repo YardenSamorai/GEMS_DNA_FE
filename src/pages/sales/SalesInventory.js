@@ -739,17 +739,13 @@ export const GemstoneCard = ({ stone, mode }) => {
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
       <div className="mt-2.5 flex flex-col gap-0.5">
-        {/* HOLD flag — full/memo_branch viewers see the holder's name in bold
-            red. branch_only viewers only learn it's held (no name). */}
-        {holder ? (
-          <p className="text-[12.5px] font-bold uppercase leading-snug tracking-wide text-red-600">
-            HOLD · {holder}
-          </p>
-        ) : stone.onHold ? (
+        {/* HOLDER flag — the stone is held. We never reveal who holds it,
+            just the generic "HOLDER" word. */}
+        {(holder || stone.onHold) && (
           <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-red-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-red-600">
-            On hold
+            HOLDER
           </span>
-        ) : null}
+        )}
         {/* MEMO OUT flag — stone is physically out with a third party. */}
         {memoOut && (
           <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-amber-700">
