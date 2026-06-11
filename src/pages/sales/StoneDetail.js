@@ -422,14 +422,19 @@ const StoneDetail = () => {
         </div>
 
         {/* Status flags */}
-        {(holder || memoOut) && (
+        {(holder || stone.onHold || memoOut) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            {holder && (
+            {holder ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
                 <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
                 HOLD · {holder}
               </span>
-            )}
+            ) : stone.onHold ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+                On hold
+              </span>
+            ) : null}
             {memoOut && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-500/30">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />

@@ -503,13 +503,12 @@ export const stoneImage = (s) => {
   return usableImg(firstExtra);
 };
 
-/* Sales-floor price policy: diamonds are quoted at list price, but emeralds
- * and all other coloured stones are catalogued at HALF the book price (both
- * per-carat and total). Applied once at load time so cards, the product page,
- * the price filters and sorting all see the same adjusted figures. */
+/* Sales-floor price policy: every stone (diamonds included) is catalogued at
+ * HALF the stored book price — both per-carat and total — because prices are
+ * imported doubled (bruto). Applied once at load time so cards, the product
+ * page, the price filters, sorting and WhatsApp shares all see the same
+ * adjusted figures. */
 export const adjustSalesPrices = (s) => {
-  const mapped = getMappedCategories(s.category);
-  if (mapped.includes("Diamond") || mapped.includes("Fancy")) return s;
   const half = (v) =>
     v != null && v !== "" && isFinite(Number(v)) ? Number(v) / 2 : v;
   return { ...s, pricePerCt: half(s.pricePerCt), priceTotal: half(s.priceTotal) };
@@ -740,12 +739,17 @@ export const GemstoneCard = ({ stone, mode }) => {
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
       <div className="mt-2.5 flex flex-col gap-0.5">
-        {/* HOLD flag — stones currently held show the holder's name in bold red. */}
-        {holder && (
+        {/* HOLD flag — full/memo_branch viewers see the holder's name in bold
+            red. branch_only viewers only learn it's held (no name). */}
+        {holder ? (
           <p className="text-[12.5px] font-bold uppercase leading-snug tracking-wide text-red-600">
             HOLD · {holder}
           </p>
-        )}
+        ) : stone.onHold ? (
+          <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-red-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-red-600">
+            On hold
+          </span>
+        ) : null}
         {/* MEMO OUT flag — stone is physically out with a third party. */}
         {memoOut && (
           <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-amber-700">

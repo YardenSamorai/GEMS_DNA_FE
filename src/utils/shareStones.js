@@ -107,6 +107,19 @@ const buildLinks = (stone) => {
  * Text builders
  * ========================================================================== */
 
+/* Diamonds:
+ *   20.02 PS I VS2 NON GIA              ← weight shape color clarity fluor lab
+ *   Ratio: 1.59
+ *   Location: New York
+ *   SKU: T0644
+ *   p/c: $94,000.00
+ *   Total: $1,881,880.00
+ *
+ *   video: <url>
+ *
+ *   Cert: <url>
+ *
+ *   Image: <url>                         (each link on its own block) */
 const buildDiamondText = (stone) => {
   const isFancy = isFancyStone(stone);
   const wt = Number(stone.weightCt);
@@ -123,18 +136,23 @@ const buildDiamondText = (stone) => {
   if (title) lines.push(title);
 
   const ratio = ratioOf(stone);
-  if (ratio) lines.push(ratio);
+  if (ratio) lines.push(`Ratio: ${ratio}`);
 
   const branch = String(stone.branch || "").trim();
-  if (branch) lines.push(branch);
+  if (branch) lines.push(`Location: ${branch}`);
 
-  if (stone.sku) lines.push(String(stone.sku));
+  if (stone.sku) lines.push(`SKU: ${stone.sku}`);
 
-  lines.push(`p/c - ${usd(stone.pricePerCt)}`);
-  lines.push(`Total - ${usd(stone.priceTotal)}`);
+  lines.push(`p/c: ${usd(stone.pricePerCt)}`);
+  lines.push(`Total: ${usd(stone.priceTotal)}`);
 
-  const links = buildLinks(stone);
-  if (links.length) lines.push("", ...links);
+  // Labelled media links, each preceded by a blank line.
+  const v = videoUrl(stone);
+  if (v) lines.push("", `video: ${v}`);
+  const c = certUrl(stone);
+  if (c) lines.push("", `Cert: ${c}`);
+  const img = stoneImageUrl(stone);
+  if (img) lines.push("", `Image: ${img}`);
 
   return lines.join("\n");
 };
