@@ -266,7 +266,7 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
 
       <div className="mx-3 mb-2 border-t border-app-line" />
 
-      <nav className="flex-1 overflow-y-auto overflow-x-visible px-2 py-1">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-1">
         {visibleSections.map((section, idx) => (
           <div key={section.label || `__top-${idx}`} className={idx > 0 ? "mt-1" : ""}>
             {section.label && (
