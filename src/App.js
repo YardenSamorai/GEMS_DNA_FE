@@ -37,6 +37,7 @@ import TeamSettings from "./pages/team/TeamSettings";
 import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
 import { SelectionProvider } from "./context/SelectionContext";
+import { sectionForPath, firstAllowedLanding } from "./utils/permissions";
 import SelectionFab from "./components/SelectionFab";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -111,6 +112,7 @@ const NAV_SECTIONS = [
   {
     items: [
       {
+        key: "dashboard",
         to: "/dashboard",
         label: "Dashboard",
         matches: (path) => path === "/dashboard",
@@ -129,6 +131,7 @@ const NAV_SECTIONS = [
     dot: "bg-emerald-500",
     items: [
       {
+        key: "inventory",
         to: "/inventory",
         label: "Inventory",
         // Match any /inventory URL (with or without ?tab=) and the legacy
@@ -157,6 +160,7 @@ const NAV_SECTIONS = [
     dot: "bg-pink-500",
     items: [
       {
+        key: "jewelry",
         to: "/jewelry/production",
         label: "Production",
         matches: (path) =>
@@ -204,6 +208,7 @@ const NAV_SECTIONS = [
         // /crm itself now redirects to /dashboard?tab=crm, so we send the
         // sidebar straight into the CRM workspace (contacts list — most-used
         // entry point).
+        key: "crm",
         to: "/crm/contacts",
         label: "CRM",
         matches: (path) => path.startsWith("/crm"),
@@ -214,6 +219,7 @@ const NAV_SECTIONS = [
         ),
       },
       {
+        key: "sales",
         to: "/sales/diamonds",
         label: "Sales Inventory",
         // Highlight across the whole sales catalog (incl. the stone/selection
@@ -238,6 +244,7 @@ const NAV_SECTIONS = [
         ],
       },
       {
+        key: "offers",
         to: "/offers",
         label: "Offers",
         badgeKey: "offers",
@@ -249,6 +256,7 @@ const NAV_SECTIONS = [
         ),
       },
       {
+        key: "team",
         to: "/team",
         label: "Team",
         matches: (path) => path.startsWith("/team"),
@@ -268,6 +276,7 @@ const NAV_SECTIONS = [
     dot: "bg-amber-500",
     items: [
       {
+        key: "tools",
         to: "/qa-data",
         label: "Data Quality",
         matches: (path) => path === "/qa-data" || path === "/qa",
@@ -284,10 +293,22 @@ const NAV_SECTIONS = [
 // Flattened list (top-level items only) for the TopBar title resolver
 const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
+// Roles & permissions — keep only the nav items the member is allowed to see
+// (admins pass everything via `can`). Sections with no surviving items are
+// dropped so the sidebar + mobile dock render a clean, focused nav.
+const navSectionsFor = (sections, can) =>
+  sections
+    .map((s) => ({
+      ...s,
+      items: s.items.filter((it) => !it.key || can(it.key)),
+    }))
+    .filter((s) => s.items.length > 0);
+
 // ---------- App layout: sidebar + topbar + content (for protected app pages) ----------
 const AppLayout = () => {
   const { theme } = useTheme();
   const team = useTeam();
+  const location = useLocation();
   const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
@@ -326,12 +347,28 @@ const AppLayout = () => {
     return <Navigate to="/store-portal" replace />;
   }
 
+  // Roles & permissions — non-admins only see the sections the admin granted
+  // them. The nav is trimmed to match, and direct deep-links into a forbidden
+  // area bounce to their first allowed page. (Data limits are enforced on the
+  // BE; this is the UX layer.)
+  const gated = team?.ready && !team?.isAdmin && !team?.isStoreUser;
+  if (gated) {
+    const allowedLanding = firstAllowedLanding(team.can);
+    // No access to anything at all — show a neutral notice instead of looping.
+    if (!allowedLanding) return <NoAccessScreen />;
+    const sec = sectionForPath(location.pathname);
+    if (sec && !team.can(sec.key)) {
+      return <Navigate to={allowedLanding} replace />;
+    }
+  }
+  const navSections = gated ? navSectionsFor(NAV_SECTIONS, team.can) : NAV_SECTIONS;
+
   return (
     <>
       <SignedIn>
         <div className="flex min-h-screen">
           <Sidebar
-            navSections={NAV_SECTIONS}
+            navSections={navSections}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
           />
@@ -348,7 +385,7 @@ const AppLayout = () => {
           <SelectionFab />
           {/* v1.0.5 mobile nav — bottom dock replaces the legacy mobile
               sidebar drawer. Hidden on md+. */}
-          <MobileDock navSections={NAV_SECTIONS} />
+          <MobileDock navSections={navSections} />
         </div>
       </SignedIn>
       <SignedOut>
@@ -389,6 +426,24 @@ const FullScreenLoader = () => (
   </div>
 );
 
+
+// Shown to a signed-in member whose admin hasn't granted them any section yet.
+// Avoids a redirect loop and tells them what to do.
+const NoAccessScreen = () => (
+  <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="glass-surface-strong rounded-3xl px-8 py-10 max-w-md w-full text-center">
+      <div className="relative w-16 h-16 mx-auto rounded-2xl bg-app-ink flex items-center justify-center">
+        <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+      <h2 className="text-[22px] font-semibold tracking-tight text-app-ink mt-6">No access yet</h2>
+      <p className="text-[14px] text-app-muted mt-2 leading-relaxed">
+        Your account doesn't have any sections enabled. Ask your administrator to grant you access in Team settings.
+      </p>
+    </div>
+  </div>
+);
 
 const AuthPrompt = ({ message }) => (
   <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
@@ -528,16 +583,16 @@ function AppContent() {
                 item detail page) keeps its own dedicated route. */}
             <Route path="/jewelry/items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
             <Route path="/jewelry/items/:id" element={<JewelryItemDetail />} />
-            <Route path="/jewelry/production" element={<OwnerOnly><ProductionBoard /></OwnerOnly>} />
-            <Route path="/jewelry/sold" element={<OwnerOnly><JewelrySoldItems /></OwnerOnly>} />
-            <Route path="/jewelry/designs" element={<OwnerOnly><JewelryDesigns /></OwnerOnly>} />
-            <Route path="/jewelry/settings" element={<OwnerOnly><JewelrySettings /></OwnerOnly>} />
+            <Route path="/jewelry/production" element={<OwnerOnly section="jewelry"><ProductionBoard /></OwnerOnly>} />
+            <Route path="/jewelry/sold" element={<OwnerOnly section="jewelry"><JewelrySoldItems /></OwnerOnly>} />
+            <Route path="/jewelry/designs" element={<OwnerOnly section="jewelry"><JewelryDesigns /></OwnerOnly>} />
+            <Route path="/jewelry/settings" element={<OwnerOnly section="jewelry"><JewelrySettings /></OwnerOnly>} />
 
             {/* Back-compat: old /jewelry-items URLs → new unified inventory */}
             <Route path="/jewelry-items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
             <Route path="/jewelry-items/:id" element={<RedirectJewelryItem />} />
 
-            <Route path="/qa-data" element={<OwnerOnly><QAPage /></OwnerOnly>} />
+            <Route path="/qa-data" element={<OwnerOnly section="tools"><QAPage /></OwnerOnly>} />
             {/* Back-compat: old /qa URL still resolves to the same data-quality page. */}
             <Route path="/qa" element={<Navigate to="/qa-data" replace />} />
             {/* Sprint 3 — sales-rep management (admin) + per-rep KPIs. */}
@@ -638,7 +693,7 @@ const HomeShortcut = ({ to }) => <Navigate to={to} replace />;
 // data, Jewelry settings). Reps that hit these URLs directly land on a
 // friendly screen pointing them back to their CRM workspace instead of
 // rendering the page (and confusing them with admin-only data).
-const OwnerOnly = ({ children }) => {
+const OwnerOnly = ({ children, section }) => {
   const team = useTeam();
   if (team.loading) {
     return (
@@ -648,6 +703,9 @@ const OwnerOnly = ({ children }) => {
     );
   }
   if (team.isOwner) return children;
+  // Roles & permissions — a non-admin may still reach this page if the admin
+  // explicitly granted them its section (AppLayout already gated direct links).
+  if (section && team.can && team.can(section)) return children;
   return (
     <div className="max-w-2xl mx-auto p-8 text-center">
       <div className="glass-surface rounded-3xl px-8 py-10">

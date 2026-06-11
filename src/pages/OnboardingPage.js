@@ -1,7 +1,9 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { motion } from "framer-motion";
+import { useTeam } from "../context/TeamContext";
+import { firstAllowedLanding } from "../utils/permissions";
 
 /**
  * v1.0.5 — Public landing page.
@@ -423,6 +425,13 @@ const BentoItem = ({ icon, title, copy, className = "" }) => (
 /* -------------------------------------------------------------------------- */
 
 const OnboardingPage = () => {
+  const team = useTeam();
+  // Roles & permissions — non-admins skip the marketing landing and go to the
+  // first section the admin granted them (AppLayout shows a notice if none).
+  if (team?.ready && !team?.isAdmin && !team?.isStoreUser) {
+    return <Navigate to={firstAllowedLanding(team.can) || "/dashboard"} replace />;
+  }
+
   return (
     <div className="min-h-screen app-canvas relative overflow-hidden">
       {/* ============================== HERO ============================== */}

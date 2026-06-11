@@ -9,6 +9,25 @@ import React, {
 import { useUser } from "@clerk/clerk-react";
 import { fetchTeamMe, colorFromSeed } from "../services/teamApi";
 
+// Nav sections the admin can grant per-user. Keep in sync with the BE
+// NAV_SECTION_KEYS and the PERMISSION_SECTIONS config in App.js.
+export const ALL_SECTION_KEYS = [
+  "dashboard", "inventory", "jewelry", "crm", "sales", "offers", "team", "tools",
+];
+// Admins implicitly get everything.
+const ADMIN_PERMISSIONS = { sections: [...ALL_SECTION_KEYS], locationView: "full" };
+
+const normalizePermissions = (raw) => {
+  const p = raw && typeof raw === "object" ? raw : {};
+  const sections = Array.isArray(p.sections)
+    ? p.sections.filter((s) => ALL_SECTION_KEYS.includes(s))
+    : [];
+  const locationView = ["full", "memo_branch", "branch_only"].includes(p.locationView)
+    ? p.locationView
+    : "branch_only";
+  return { sections, locationView };
+};
+
 /**
  * TeamContext — single source of truth for "who am I, and who's on my team?".
  *
@@ -34,9 +53,16 @@ const TeamContext = createContext({
   tenantUserId: null,
   actorUserId: null,
   role: null,
+  permissions: ADMIN_PERMISSIONS,
+  locationView: "full",
   isOwner: true,
+  isAdmin: true,
+  isManager: false,
+  isSalesman: false,
   isStoreUser: false,
   companyId: null,
+  can: () => true,
+  canViewExactLocation: true,
   refresh: () => {},
 });
 
@@ -50,6 +76,7 @@ export const TeamProvider = ({ children }) => {
     tenantUserId: null,
     actorUserId: null,
     role: null,
+    permissions: null,
     isOwner: true,
     isStoreUser: false,
     companyId: null,
@@ -79,6 +106,7 @@ export const TeamProvider = ({ children }) => {
         tenantUserId: data?.tenantUserId || actor.id,
         actorUserId: data?.actorUserId || actor.id,
         role: data?.role || "owner",
+        permissions: data?.permissions || data?.me?.permissions || null,
         isOwner: data?.isOwner !== undefined ? !!data.isOwner : true,
         isStoreUser: !!data?.isStoreUser,
         companyId: data?.companyId || null,
@@ -94,6 +122,7 @@ export const TeamProvider = ({ children }) => {
         tenantUserId: actor.id,
         actorUserId: actor.id,
         role: "owner",
+        permissions: ADMIN_PERMISSIONS,
         isOwner: true,
         isStoreUser: false,
         companyId: null,
@@ -110,9 +139,30 @@ export const TeamProvider = ({ children }) => {
       membersById[m.id] = m;
       if (m.clerk_user_id) membersByClerkId[m.clerk_user_id] = m;
     }
+    // Normalised role helpers. The workspace owner *is* the admin. A legacy
+    // 'rep' is treated as a salesman. Store users are handled separately.
+    const isAdmin = !!state.isOwner || state.role === "owner" || state.role === "admin";
+    const isManager = state.role === "manager";
+    const isSalesman = !isAdmin && (state.role === "salesman" || state.role === "rep");
+
+    // Per-user permissions. Admins implicitly get everything; everyone else
+    // uses the set the admin configured (normalised so unknown keys can't slip
+    // in). `can(section)` gates nav/routes; `locationView` gates memo detail.
+    const permissions = isAdmin ? ADMIN_PERMISSIONS : normalizePermissions(state.permissions);
+    const can = (section) => isAdmin || permissions.sections.includes(section);
+    const locationView = permissions.locationView;
+    const canViewExactLocation = locationView === "full";
+
     return {
       ...state,
       actor,
+      isAdmin,
+      isManager,
+      isSalesman,
+      permissions,
+      locationView,
+      canViewExactLocation,
+      can,
       membersById,
       membersByClerkId,
       refresh,

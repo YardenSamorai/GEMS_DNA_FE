@@ -8,6 +8,7 @@ import {
   canShareFiles,
 } from "../../utils/shareStones";
 import { fetchSoapStones } from "../../services/stonesApi";
+import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
 import {
@@ -84,6 +85,9 @@ const BLANK = "-";
 
 const StoneDetail = () => {
   const { sku } = useParams();
+  // Scope deep-link lookups by role: a salesman can't pull a stone outside
+  // their region even by guessing the SKU URL (the BE enforces it).
+  const { actor } = useTeam();
   const navigate = useNavigate();
   const routerState = useLocation().state;
   const [stone, setStone] = useState(routerState?.stone || null);
@@ -100,7 +104,7 @@ const StoneDetail = () => {
     (async () => {
       try {
         setLoading(true);
-        const data = await fetchSoapStones(undefined, { assignedTo: "all" });
+        const data = await fetchSoapStones(actor, { assignedTo: "all" });
         const rows = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
         const found = rows.find((s) => norm(s.sku) === norm(sku));
         if (!cancelled) {
@@ -118,7 +122,7 @@ const StoneDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [stone, sku]);
+  }, [stone, sku, actor?.id]);
 
   // Pre-fetch the stone photo + certificate when the action sheet opens, so the
   // share gesture can attach them without an async hop (keeps iOS activation).

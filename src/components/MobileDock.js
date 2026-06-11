@@ -149,6 +149,21 @@ const SALES_CATEGORY_SLOTS = SALES_SLOTS.filter((s) =>
   ["diamond", "emerald", "gemstones", "jewelry"].includes(s.key)
 );
 
+// Maps a dock tile to the permission section it belongs to, so we can hide
+// tiles a member isn't allowed to open. The sales category tiles all live
+// under the "sales" section.
+const SLOT_SECTION = {
+  dashboard: "dashboard",
+  home: "dashboard",
+  inventory: "inventory",
+  sales: "sales",
+  crm: "crm",
+  diamond: "sales",
+  emerald: "sales",
+  gemstones: "sales",
+  jewelry: "sales",
+};
+
 const MoreIcon = (cls) => (
   <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 12h16M4 18h16" />
@@ -253,9 +268,27 @@ const MobileDock = ({ navSections = [] }) => {
     return flat;
   })();
 
+  // Roles & permissions — non-admins only get the dock tiles for sections the
+  // admin granted them.
+  const gated = team?.ready && !team?.isAdmin && !team?.isStoreUser;
+  const canSection = (key) => team?.isAdmin || (team?.can ? team.can(key) : true);
+  const roleLabel = team?.isAdmin
+    ? "Admin"
+    : team?.isManager
+    ? "Manager"
+    : team?.isSalesman
+    ? "Salesman"
+    : "Member";
+
   // On the sales catalog, swap the generic rail for category shortcuts.
   const inSales = location.pathname.startsWith("/sales");
-  const slots = inSales ? SALES_SLOTS : PRIMARY_SLOTS;
+  const baseSlots = inSales ? SALES_SLOTS : PRIMARY_SLOTS;
+  const slots = gated
+    ? baseSlots.filter((s) => {
+        const sec = SLOT_SECTION[s.key];
+        return !sec || canSection(sec);
+      })
+    : baseSlots;
   // 5 shortcuts + "More" = 6 tiles, so tighten the layout to fit on phones.
   const compact = slots.length > 4;
 
@@ -377,27 +410,37 @@ const MobileDock = ({ navSections = [] }) => {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 pb-4">
-                {/* Actor row — who am I, current role, quick path into team mgmt */}
-                {team?.ready && team?.me && (
-                  <Link
-                    to="/team"
-                    onClick={() => setSheetOpen(false)}
-                    className="flex items-center gap-3 rounded-2xl bg-app-canvas2 border border-app-line px-3 py-2.5 mb-4 active:bg-app-line transition"
-                  >
-                    <MemberAvatar member={team.me} size="sm" ring={false} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold tracking-tight text-app-ink truncate">
-                        {team.me?.name || "You"}
+                {/* Actor row — who am I, current role, quick path into team
+                    mgmt. Non-admins can't open /team, so their row is static. */}
+                {team?.ready && team?.me && (() => {
+                  const canTeam = canSection("team");
+                  const RowTag = canTeam ? Link : "div";
+                  const rowProps = canTeam
+                    ? { to: "/team", onClick: () => setSheetOpen(false) }
+                    : {};
+                  return (
+                    <RowTag
+                      {...rowProps}
+                      className="flex items-center gap-3 rounded-2xl bg-app-canvas2 border border-app-line px-3 py-2.5 mb-4 active:bg-app-line transition"
+                    >
+                      <MemberAvatar member={team.me} size="sm" ring={false} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-semibold tracking-tight text-app-ink truncate">
+                          {team.me?.name || "You"}
+                        </div>
+                        <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">
+                          {roleLabel}
+                          {canTeam && team.members?.length > 1 ? ` · ${team.members.length} members` : ""}
+                        </div>
                       </div>
-                      <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-app-muted">
-                        {team.isOwner ? "Admin" : "Rep"} {team.members?.length > 1 ? `· ${team.members.length} members` : ""}
-                      </div>
-                    </div>
-                    <svg className="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                )}
+                      {canTeam && (
+                        <svg className="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
+                    </RowTag>
+                  );
+                })()}
 
                 {/* Long-tail nav — single-list, solid rows. Workshop (now
                     demoted from the dock) appears here as a normal group with

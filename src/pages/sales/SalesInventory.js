@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
+import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
 import { DIAMOND_SHAPES } from "./diamondShapes";
@@ -449,7 +450,12 @@ const normLoc = (v) => String(v || "").trim().replace(/\s+/g, " ").toUpperCase()
  *  - Empty                    -> fall back to branch/city, not on memo. */
 export const resolveLocation = (s) => {
   const raw = s.exactLocation && String(s.exactLocation).trim() ? String(s.exactLocation).trim() : "";
-  if (!raw) return { label: s.location || null, memo: false };
+  if (!raw) {
+    // No exact place: either there genuinely isn't one, or the server hid it
+    // for a restricted viewer (permissions). Fall back to the branch and trust
+    // the server-provided `onMemo` flag for the MEMO OUT badge.
+    return { label: s.location || s.branch || null, memo: !!s.onMemo };
+  }
   const mapped = LOCATION_MAP[normLoc(raw)];
   if (mapped) return { label: mapped, memo: false };
   return { label: raw, memo: true };
@@ -802,6 +808,10 @@ export const GemstoneCard = ({ stone, mode }) => {
 
 const SalesInventory = ({ mode = "gemstone" }) => {
   const cfg = MODES[mode] || MODES.gemstone;
+  // The signed-in actor — passed to /api/soap-stones so the BE can apply
+  // role-based scoping. Admin + manager get the full catalog; a salesman is
+  // server-side restricted to the branches in their assigned region.
+  const { actor } = useTeam();
   const [stones, setStones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -970,12 +980,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       try {
         setLoading(true);
         setError("");
-        // Sales Inventory is a shared catalog of every stone we hold, so we
-        // intentionally do NOT pass the current actor: /api/soap-stones scopes
-        // reps to their own + unassigned stones, which made the page show 0
-        // for salespeople while owners saw everything. Calling with no actor
-        // returns the full inventory consistently for everyone.
-        const data = await fetchSoapStones(undefined, { assignedTo: "all" });
+        // Pass the actor so /api/soap-stones can scope by role: admin/manager
+        // see the whole catalog; a salesman only sees stones whose branch is
+        // inside their assigned region (the real security boundary lives on
+        // the server). assignedTo:"all" just means "no per-rep assignment
+        // filter" — region scoping is applied independently.
+        const data = await fetchSoapStones(actor, { assignedTo: "all" });
         const rows = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
         if (!cancelled) {
           setStones(
@@ -995,7 +1005,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     return () => {
       cancelled = true;
     };
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, actor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist the active filters for this category whenever they change. The
   // render right after a mode switch is skipped (justSwitchedRef) so we never

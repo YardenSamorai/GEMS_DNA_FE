@@ -49,16 +49,127 @@ const timeAgo = (iso) => {
   return `${mo} month${mo === 1 ? "" : "s"} ago`;
 };
 
-const RoleBadge = ({ role }) => (
-  <span
-    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-      role === "owner"
-        ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200"
-        : "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
-    }`}
-  >
-    {role === "owner" ? "Admin" : "Sales rep"}
-  </span>
+// Per-user permissions, set by the admin. `sections` = which nav areas the
+// member can open; `locationView` = how much stone-location detail they get.
+// Keep keys in sync with TeamContext.ALL_SECTION_KEYS / BE NAV_SECTION_KEYS.
+const SECTION_OPTIONS = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "inventory", label: "Inventory" },
+  { key: "jewelry", label: "Jewelry workshop" },
+  { key: "crm", label: "CRM" },
+  { key: "sales", label: "Sales Inventory" },
+  { key: "offers", label: "Offers" },
+  { key: "team", label: "Team" },
+  { key: "tools", label: "Data Quality" },
+];
+const LOCATION_VIEW_OPTIONS = [
+  { value: "full", label: "Full", hint: "Exact location + holder + memo" },
+  { value: "memo_branch", label: "Memo + Branch", hint: "Shows it's on memo, branch only" },
+  { value: "branch_only", label: "Branch only", hint: "Branch only — no memo, no exact" },
+];
+const LOCATION_VIEW_LABEL = {
+  full: "Full location",
+  memo_branch: "Memo + Branch",
+  branch_only: "Branch only",
+};
+const DEFAULT_PERMS = { sections: ["sales"], locationView: "branch_only" };
+const permsOf = (m) => {
+  const p = m?.permissions && typeof m.permissions === "object" ? m.permissions : {};
+  return {
+    sections: Array.isArray(p.sections) ? p.sections : [...DEFAULT_PERMS.sections],
+    locationView: p.locationView || DEFAULT_PERMS.locationView,
+  };
+};
+
+const isAdminRole = (role) => role === "owner" || role === "admin";
+const roleLabelFor = (role) =>
+  isAdminRole(role) ? "Admin" : role === "manager" ? "Manager" : "Salesman";
+
+const RoleBadge = ({ role }) => {
+  const tint = isAdminRole(role)
+    ? "bg-amber-100 text-amber-700 ring-amber-200"
+    : role === "manager"
+    ? "bg-sky-100 text-sky-700 ring-sky-200"
+    : "bg-emerald-100 text-emerald-700 ring-emerald-200";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ${tint}`}
+    >
+      {roleLabelFor(role)}
+    </span>
+  );
+};
+
+// Reusable permissions editor — section checkboxes + memo-visibility radio.
+// Used by both the invite form and the inline member editor.
+const PermissionsEditor = ({ sections, locationView, onToggleSection, onLocationView }) => (
+  <div className="space-y-3">
+    <div>
+      <span className="block text-[11px] uppercase tracking-wider font-medium text-stone-500 mb-1.5">
+        Visible sections
+      </span>
+      <div className="grid grid-cols-2 gap-1.5">
+        {SECTION_OPTIONS.map((s) => {
+          const on = sections.includes(s.key);
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => onToggleSection(s.key)}
+              className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12.5px] transition ${
+                on
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+              }`}
+            >
+              <span
+                className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded ${
+                  on ? "bg-emerald-600 text-white" : "bg-stone-200 text-transparent"
+                }`}
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+    <div>
+      <span className="block text-[11px] uppercase tracking-wider font-medium text-stone-500 mb-1.5">
+        Stone location visibility
+      </span>
+      <div className="flex flex-col gap-1.5">
+        {LOCATION_VIEW_OPTIONS.map((o) => {
+          const on = locationView === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onLocationView(o.value)}
+              className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-left transition ${
+                on ? "border-sky-300 bg-sky-50" : "border-stone-200 bg-white hover:bg-stone-50"
+              }`}
+            >
+              <span
+                className={`mt-0.5 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
+                  on ? "border-sky-600" : "border-stone-300"
+                }`}
+              >
+                {on && <span className="h-2 w-2 rounded-full bg-sky-600" />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[12.5px] font-medium text-stone-800">{o.label}</span>
+                <span className="block text-[11px] text-stone-500 leading-tight">{o.hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  </div>
 );
 
 const PendingBadge = () => (
@@ -73,8 +184,27 @@ const TeamSettings = () => {
   const [showInvite, setShowInvite] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({ name: "", commissionPct: "", quotaMonthly: "" });
+  const [draft, setDraft] = useState({
+    name: "", commissionPct: "", quotaMonthly: "", role: "salesman",
+    sections: [...DEFAULT_PERMS.sections], locationView: DEFAULT_PERMS.locationView,
+  });
   const [resendingId, setResendingId] = useState(null);
+  // Invite form — controlled so we can carry the per-user permission set.
+  const [inviteRole, setInviteRole] = useState("salesman");
+  const [inviteSections, setInviteSections] = useState([...DEFAULT_PERMS.sections]);
+  const [inviteLocationView, setInviteLocationView] = useState(DEFAULT_PERMS.locationView);
+
+  const toggleInviteSection = (key) =>
+    setInviteSections((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  const toggleDraftSection = (key) =>
+    setDraft((d) => ({
+      ...d,
+      sections: d.sections.includes(key)
+        ? d.sections.filter((k) => k !== key)
+        : [...d.sections, key],
+    }));
 
   const loadLeaderboard = useCallback(async () => {
     if (!team.actor?.id) return;
@@ -126,7 +256,8 @@ const TeamSettings = () => {
     const payload = {
       email: String(fd.get("email") || "").trim().toLowerCase(),
       name: String(fd.get("name") || "").trim(),
-      role: "rep",
+      role: inviteRole,
+      permissions: { sections: inviteSections, locationView: inviteLocationView },
       commissionPct: Number(fd.get("commissionPct") || 0),
       quotaMonthly: Number(fd.get("quotaMonthly") || 0),
     };
@@ -150,6 +281,9 @@ const TeamSettings = () => {
         toast.success(`${payload.name} added (email delivery failed — try Resend later)`);
       }
       try { formEl?.reset(); } catch { /* form may have unmounted already */ }
+      setInviteRole("salesman");
+      setInviteSections([...DEFAULT_PERMS.sections]);
+      setInviteLocationView(DEFAULT_PERMS.locationView);
       setShowInvite(false);
       await team.refresh();
       await loadLeaderboard();
@@ -175,21 +309,32 @@ const TeamSettings = () => {
   };
 
   const startEdit = (m) => {
+    const perms = permsOf(m);
     setEditingId(m.id);
     setDraft({
       name: m.name || "",
       commissionPct: m.commission_pct ?? "",
       quotaMonthly: m.quota_monthly ?? "",
+      role: m.role === "rep" ? "salesman" : m.role || "salesman",
+      sections: perms.sections,
+      locationView: perms.locationView,
     });
   };
 
   const saveEdit = async (m) => {
+    // The owner row stays admin — never reassign its role or permissions.
+    const editingRole = m.role === "owner" ? "owner" : draft.role;
     try {
-      await updateTeamMember(team.actor, m.id, {
+      const patch = {
         name: draft.name || m.name,
         commissionPct: Number(draft.commissionPct) || 0,
         quotaMonthly: Number(draft.quotaMonthly) || 0,
-      });
+      };
+      if (m.role !== "owner") {
+        patch.role = editingRole;
+        patch.permissions = { sections: draft.sections, locationView: draft.locationView };
+      }
+      await updateTeamMember(team.actor, m.id, patch);
       toast.success("Saved");
       setEditingId(null);
       await team.refresh();
@@ -221,8 +366,8 @@ const TeamSettings = () => {
               Team &amp; Sales Reps
             </h1>
             <p className="text-stone-500 text-xs sm:text-sm mt-1">
-              Invite up to 10 reps. Each rep sees only the contacts, deals, jewelry items
-              and loose stones (diamonds &amp; gemstones) they're assigned to.
+              Invite team members and choose exactly what each one sees — which sections they can open
+              and how much stone-location detail (full, memo&nbsp;+&nbsp;branch, or branch only).
             </p>
           </div>
           <div className="hidden sm:block text-right text-xs text-stone-500 shrink-0">
@@ -290,6 +435,16 @@ const TeamSettings = () => {
                   autoComplete="off"
                   className="input-base" />
               </Field>
+              <Field label="Role" required>
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  className="input-base"
+                >
+                  <option value="salesman">Salesman</option>
+                  <option value="manager">Manager</option>
+                </select>
+              </Field>
               <Field label="Commission %">
                 <input name="commissionPct" type="number" inputMode="decimal" step="0.5" min="0" max="100" placeholder="10"
                   className="input-base" />
@@ -299,8 +454,17 @@ const TeamSettings = () => {
                   className="input-base" />
               </Field>
             </div>
-            <p className="text-[11px] text-stone-500 mt-2 leading-relaxed">
-              The rep will be linked automatically the first time they sign in with this email.
+            <div className="mt-4 border-t border-stone-100 pt-4">
+              <PermissionsEditor
+                sections={inviteSections}
+                locationView={inviteLocationView}
+                onToggleSection={toggleInviteSection}
+                onLocationView={setInviteLocationView}
+              />
+            </div>
+            <p className="text-[11px] text-stone-500 mt-3 leading-relaxed">
+              The member is linked automatically the first time they sign in with this email.
+              Tick exactly which sections they can open and how much stone-location detail they see.
             </p>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3">
               <button type="button" onClick={() => setShowInvite(false)}
@@ -345,7 +509,7 @@ const TeamSettings = () => {
                   )}
                   <div className="text-xs text-stone-500 truncate">{m.email}</div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <RoleBadge role={m.role} />
+                    <RoleBadge role={m.role} region={m.region} />
                     {isPending && <PendingBadge />}
                   </div>
                   {isPending && lastInviteIso && (
@@ -358,6 +522,18 @@ const TeamSettings = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-3 pt-3 border-t border-stone-100">
+                {isEditing && m.role !== "owner" && (
+                  <MobileStat label="Role">
+                    <select
+                      value={draft.role}
+                      onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))}
+                      className="input-base"
+                    >
+                      <option value="salesman">Salesman</option>
+                      <option value="manager">Manager</option>
+                    </select>
+                  </MobileStat>
+                )}
                 <MobileStat label="Commission">
                   {isEditing ? (
                     <input
@@ -404,6 +580,23 @@ const TeamSettings = () => {
                   </div>
                 </MobileStat>
               </div>
+
+              {isEditing && m.role !== "owner" && (
+                <div className="mt-3 pt-3 border-t border-stone-100">
+                  <PermissionsEditor
+                    sections={draft.sections}
+                    locationView={draft.locationView}
+                    onToggleSection={toggleDraftSection}
+                    onLocationView={(v) => setDraft((d) => ({ ...d, locationView: v }))}
+                  />
+                </div>
+              )}
+              {!isEditing && m.role !== "owner" && (
+                <div className="mt-2 text-[11px] text-stone-500">
+                  {permsOf(m).sections.length} section{permsOf(m).sections.length === 1 ? "" : "s"} ·{" "}
+                  {LOCATION_VIEW_LABEL[permsOf(m).locationView]}
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-stone-100">
                 {isEditing ? (
@@ -521,7 +714,35 @@ const TeamSettings = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3"><RoleBadge role={m.role} /></td>
+                    <td className="px-3 py-3 align-top">
+                      {isEditing && m.role !== "owner" ? (
+                        <div className="flex flex-col gap-2 min-w-[240px]">
+                          <select
+                            value={draft.role}
+                            onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))}
+                            className="input-base w-40"
+                          >
+                            <option value="salesman">Salesman</option>
+                            <option value="manager">Manager</option>
+                          </select>
+                          <PermissionsEditor
+                            sections={draft.sections}
+                            locationView={draft.locationView}
+                            onToggleSection={toggleDraftSection}
+                            onLocationView={(v) => setDraft((d) => ({ ...d, locationView: v }))}
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <RoleBadge role={m.role} />
+                          {m.role !== "owner" && (
+                            <div className="text-[10.5px] text-stone-500">
+                              {permsOf(m).sections.length} sec · {LOCATION_VIEW_LABEL[permsOf(m).locationView]}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-3">
                       {isEditing ? (
                         <input
