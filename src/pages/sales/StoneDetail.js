@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  buildStoneShareText,
+  shareStonesOnWhatsApp,
+  prepareCertFiles,
+  canShareFiles,
+} from "../../utils/shareStones";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
@@ -83,6 +90,8 @@ const StoneDetail = () => {
   const [loading, setLoading] = useState(!routerState?.stone);
   const [error, setError] = useState("");
   const [liked, setLiked] = useState(false);
+  const [actionOpen, setActionOpen] = useState(false);
+  const [certFiles, setCertFiles] = useState([]);
 
   // Deep-link fallback — no stone in router state, find it by SKU.
   useEffect(() => {
@@ -110,6 +119,22 @@ const StoneDetail = () => {
       cancelled = true;
     };
   }, [stone, sku]);
+
+  // Pre-fetch the certificate image when the action sheet opens, so the share
+  // gesture can attach it without an async hop (keeps iOS user-activation).
+  useEffect(() => {
+    if (!actionOpen || !stone) {
+      setCertFiles([]);
+      return;
+    }
+    let alive = true;
+    prepareCertFiles(stone).then((files) => {
+      if (alive) setCertFiles(files);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [actionOpen, stone]);
 
   // ---- Media carousel ------------------------------------------------------
   const images = useMemo(() => (stone ? stoneImages(stone) : []), [stone]);
@@ -458,11 +483,112 @@ const StoneDetail = () => {
           </div>
         )}
 
+        {/* Primary action — opens the action sheet (Share to WhatsApp, …). */}
+        <button
+          type="button"
+          onClick={() => setActionOpen(true)}
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-app-ink py-3.5 text-[14px] font-semibold text-app-canvas transition active:scale-[0.99]"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 5v.01M12 12v.01M12 19v.01" />
+          </svg>
+          Action
+        </button>
+
         {/* SKU footer */}
         <p className="mt-4 text-center text-[12px] uppercase tracking-[0.14em] text-app-soft">
           SKU <span className="font-bold text-app-muted">{stone.sku}</span>
         </p>
       </div>
+
+      {/* Action sheet — bottom sheet with the available actions for this stone. */}
+      <AnimatePresence>
+        {actionOpen && (
+          <div className="fixed inset-0 z-50">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setActionOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 320 }}
+              className="absolute inset-x-0 bottom-0 flex max-h-[80vh] flex-col rounded-t-3xl border-t border-app-line bg-app-surface"
+              style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+              role="dialog"
+              aria-label="Stone actions"
+            >
+              <div className="flex justify-center pt-3" aria-hidden>
+                <span className="h-1.5 w-10 rounded-full bg-app-line" />
+              </div>
+              <div className="flex items-center justify-between px-5 py-3">
+                <h2 className="text-[16px] font-semibold tracking-tight text-app-ink">Action</h2>
+                <button
+                  type="button"
+                  onClick={() => setActionOpen(false)}
+                  aria-label="Close"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-app-soft transition hover:bg-app-canvas2 hover:text-app-ink"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="px-5 pb-2">
+                {/* Share on WhatsApp */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    shareStonesOnWhatsApp(stone, { files: certFiles });
+                    setActionOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white">
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.8 14.13c-.24.68-1.42 1.32-1.96 1.36-.5.05-.96.23-3.23-.67-2.72-1.07-4.45-3.85-4.59-4.03-.13-.18-1.1-1.46-1.1-2.79 0-1.32.7-1.97.94-2.24.25-.27.54-.34.72-.34l.52.01c.17.01.4-.06.62.47.24.57.81 1.97.88 2.11.07.14.12.31.02.49-.09.18-.14.29-.27.45-.14.16-.29.36-.41.48-.14.14-.28.29-.12.56.16.27.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.21 1.37.27.14.43.12.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.61-.13.25.09 1.6.75 1.87.89.27.14.45.2.52.32.07.11.07.66-.17 1.34z" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold tracking-tight text-app-ink">Share on WhatsApp</span>
+                    <span className="block text-[12px] text-app-soft">
+                      {canShareFiles(certFiles)
+                        ? "Details + certificate image"
+                        : "Send this stone's details"}
+                    </span>
+                  </span>
+                  <svg className="h-4 w-4 text-app-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                {/* Preview of what will be sent. */}
+                <div className="mb-1 mt-4 flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">Preview</p>
+                  {canShareFiles(certFiles) && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5h16v14H4z M4 15l4-4 4 4 4-4 4 4" />
+                      </svg>
+                      Certificate attached
+                    </span>
+                  )}
+                </div>
+                <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
+                  {buildStoneShareText(stone, { includeCertLink: !canShareFiles(certFiles) })}
+                </pre>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
