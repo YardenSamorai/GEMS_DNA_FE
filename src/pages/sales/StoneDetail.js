@@ -582,7 +582,7 @@ const StoneDetail = () => {
                   )}
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(stone, { includeMediaLinks: !canShareFiles(shareFiles) })}
+                  {buildStoneShareText(stone)}
                 </pre>
               </div>
             </motion.div>

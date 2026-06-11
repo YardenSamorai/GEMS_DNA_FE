@@ -180,9 +180,14 @@ const mapRow = (row) => {
     price = 0;
   }
   return {
+    kind: "jewelry",
     id: row.model_number,
     sku: row.model_number || "",
     name: sanitizeText(row.title) || row.model_number || "Untitled",
+    location: row.shipping_from ? String(row.shipping_from).trim() : "",
+    videoUrl: row.video_link ? String(row.video_link).trim() : "",
+    certificateUrl: row.certificate_link ? String(row.certificate_link).trim() : "",
+    certificateNumber: row.certificate_number ? String(row.certificate_number).trim() : "",
     jewelryType: row.jewelry_type ? String(row.jewelry_type).trim() : "",
     style: row.style ? String(row.style).trim() : "",
     stoneType: row.stone_type ? String(row.stone_type).trim() : "",

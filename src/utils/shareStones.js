@@ -1,20 +1,28 @@
 import { getMappedCategories } from "./categoryMap";
-import { getDisplayShape, getDisplayColor, shortTreatment } from "../pages/inventory/helpers/constants";
-import { money, resolveLocation, parseDims, fluorDisplay, usableImg } from "../pages/sales/SalesInventory";
+import { getDisplayShape, shortTreatment } from "../pages/inventory/helpers/constants";
+import { parseDims, usableImg, resolveLocation } from "../pages/sales/SalesInventory";
 
 /* ============================================================================
  * shareStones — build a WhatsApp-friendly text summary for one or many stones
  * and hand it off to WhatsApp.
  *
- * Two delivery paths:
- *   1) "Smart share" via the Web Share API (navigator.share) — lets us attach
- *      the stone photo + the certificate as real files. Works on mobile in a
- *      secure (HTTPS) context.
- *   2) Fallback — a plain wa.me text link (text only; photo + cert as URLs) for
- *      desktop / unsupported / non-secure contexts.
+ * Message layout (per stone):
+ *   <weight> <shape> <color> <clarity> <fluorescence> <lab>   ← title
+ *   <ratio>
+ *   <branch>
+ *   <sku>
+ *   p/c - <price per carat>
+ *   Total - <total price>
+ *
+ *   <video link>
+ *   <certificate link>
+ *   <image link>
+ *
+ * Delivery:
+ *   - Smart share via the Web Share API attaches the stone photo + certificate
+ *     as real files (mobile + HTTPS). The links above stay in the text too.
+ *   - Fallback: a plain wa.me text link for desktop / unsupported contexts.
  * ========================================================================== */
-
-const SHARE_BASE = "gems-dna.com";
 
 const isDiamondStone = (stone) => {
   const m = getMappedCategories(stone?.category);
@@ -24,30 +32,11 @@ const isFancyStone = (stone) => getMappedCategories(stone?.category).includes("F
 
 /* ---- small formatters ---------------------------------------------------- */
 
-const dash = (v) => {
-  const s = String(v ?? "").trim();
-  return s || "-";
-};
-
 /* "$2,726.88" — always two decimals; dash when empty/NaN. */
 const usd = (n) => {
   const num = Number(n);
   if (n == null || n === "" || !Number.isFinite(num)) return "-";
   return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const pctText = (n) => {
-  const num = Number(n);
-  if (n == null || n === "" || !Number.isFinite(num)) return "-";
-  return `${num.toFixed(2)}%`;
-};
-
-/* "8.64-7.52-5.68" → "8.64 x 7.52 x 5.68" */
-const measurementsText = (m) => {
-  const dims = parseDims(m);
-  if (dims.length >= 3) return dims.slice(0, 3).map((d) => d.toFixed(2)).join(" x ");
-  const raw = String(m || "").trim();
-  return raw || "-";
 };
 
 /* Diamond-trade fluorescence abbreviations (N → NON, etc.). */
@@ -60,7 +49,16 @@ const FLUOR_ABBR = {
 };
 const fluorAbbr = (v) => {
   const k = String(v ?? "").trim().toUpperCase();
-  return FLUOR_ABBR[k] || k || "-";
+  return FLUOR_ABBR[k] || k || "";
+};
+
+const ratioOf = (stone) => {
+  let ratio = parseFloat(stone?.ratio);
+  if (!Number.isFinite(ratio)) {
+    const [l, w] = parseDims(stone?.measurements);
+    if (Number.isFinite(l) && Number.isFinite(w) && w) ratio = l / w;
+  }
+  return Number.isFinite(ratio) ? ratio.toFixed(2) : "";
 };
 
 /* ---- media URL helpers --------------------------------------------------- */
@@ -72,13 +70,19 @@ const httpUrl = (u) => {
 };
 
 const stoneImageUrl = (stone) => {
-  const urls = [stone?.imageUrl, ...String(stone?.additionalPictures || "").split(";")];
+  const urls = [
+    stone?.imageUrl,
+    stone?.image, // jewelry items carry the first picture here
+    ...String(stone?.additionalPictures || "").split(";"),
+  ];
   for (const u of urls) {
     const ok = httpUrl(u);
     if (ok) return ok;
   }
   return null;
 };
+
+const videoUrl = (stone) => httpUrl(stone?.videoUrl) || httpUrl(stone?.additionalVideos);
 
 /* Prefer a real certificate image; fall back to the (often PDF) cert file. */
 const certUrl = (stone) => {
@@ -87,104 +91,134 @@ const certUrl = (stone) => {
   return httpUrl(stone?.certificateUrl) || jpg || null;
 };
 
-const publicUrl = (stone) => (stone?.sku ? `${SHARE_BASE}/sales/stone/${stone.sku}` : null);
+/* video, certificate, image — in that order, only those present. */
+const buildLinks = (stone) => {
+  const out = [];
+  const v = videoUrl(stone);
+  if (v) out.push(v);
+  const c = certUrl(stone);
+  if (c) out.push(c);
+  const img = stoneImageUrl(stone);
+  if (img) out.push(img);
+  return out;
+};
 
 /* ============================================================================
  * Text builders
  * ========================================================================== */
 
-/* Diamonds — exact field list / order requested by sales. */
-const buildDiamondText = (stone, { includeMediaLinks }) => {
+const buildDiamondText = (stone) => {
   const isFancy = isFancyStone(stone);
-  const wt = stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt).toFixed(2) : "-";
-  const color = isFancy ? [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(" ") : stone.color;
-
-  const lines = [
-    `Stock No: ${dash(stone.sku)}`,
-    `Shape: ${dash(stone.shape)}`,
-    `Carats: ${wt}`,
-    `Color: ${dash(color)}`,
-    `Clarity: ${dash(stone.clarity)}`,
-    `Cut: ${dash(stone.cut)}`,
-    `Polish: ${dash(stone.polish)}`,
-    `Symmetry: ${dash(stone.symmetry)}`,
-    `Fluorescence: ${fluorAbbr(stone.fluorescence)}`,
-    `Measurements: ${measurementsText(stone.measurements)}`,
-    `Table %: ${pctText(stone.tablePercent)}`,
-    `Depth %: ${pctText(stone.depthPercent)}`,
-    `Rap ($): ${usd(stone.rapListPrice)}`,
-    `Public URL: ${publicUrl(stone) || "-"}`,
-    `Pr/Ct: ${usd(stone.pricePerCt)}`,
-    `Amt ($): ${usd(stone.priceTotal)}`,
-  ];
-
-  if (includeMediaLinks) {
-    const photo = stoneImageUrl(stone);
-    if (photo) lines.push(`Photo: ${photo}`);
-    const cert = certUrl(stone);
-    if (cert) lines.push(`Certificate: ${cert}`);
-  }
-
-  return lines.join("\n");
-};
-
-/* Non-diamonds (emerald / gemstone / jewelry) — generic default for now,
- * pending the per-category formats. */
-const buildGenericText = (stone, { includeMediaLinks }) => {
-  const wt = stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt).toFixed(2) : "";
-  const shape = getDisplayShape(stone.shape);
+  const wt = Number(stone.weightCt);
+  const wtStr = Number.isFinite(wt) ? wt.toFixed(2) : "";
+  const color = isFancy
+    ? [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(" ")
+    : stone.color;
   const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : "";
-  const treatment = stone.treatment ? shortTreatment(stone.treatment) : "";
-  const title = [wt, shape, lab, treatment].filter(Boolean).join(" ");
+  const fl = stone.fluorescence ? fluorAbbr(stone.fluorescence) : "";
 
-  const { label: locationLabel, memo } = resolveLocation(stone);
-  const ppc = money(stone.pricePerCt);
-  const total = money(stone.priceTotal);
-  const holder = stone.holder && String(stone.holder).trim() ? String(stone.holder).trim() : null;
+  const title = [wtStr, stone.shape, color, stone.clarity, fl, lab].filter(Boolean).join(" ");
 
-  const lines = [`*${title || stone.sku || "Stone"}*`];
-  if (holder) lines.push(`HOLD · ${holder}`);
-  else if (memo) lines.push("MEMO OUT");
+  const lines = [];
+  if (title) lines.push(title);
 
-  const color = getDisplayColor(stone);
-  if (color) lines.push(`Color: ${color}`);
-  if (stone.origin && String(stone.origin).toUpperCase() !== "N/A") lines.push(`Origin: ${stone.origin}`);
+  const ratio = ratioOf(stone);
+  if (ratio) lines.push(ratio);
 
-  const meas = measurementsText(stone.measurements);
-  if (meas !== "-") lines.push(`Measurements: ${meas}`);
-  if (locationLabel) lines.push(`Location: ${locationLabel}`);
+  const branch = String(stone.branch || "").trim();
+  if (branch) lines.push(branch);
 
-  const priceParts = [];
-  if (ppc) priceParts.push(`${ppc}/ct`);
-  if (total) priceParts.push(`Total ${total}`);
-  if (priceParts.length) lines.push(priceParts.join("  |  "));
-  if (stone.sku) lines.push(`SKU: ${stone.sku}`);
-  const pub = publicUrl(stone);
-  if (pub) lines.push(`Public URL: ${pub}`);
+  if (stone.sku) lines.push(String(stone.sku));
 
-  if (includeMediaLinks) {
-    const photo = stoneImageUrl(stone);
-    if (photo) lines.push(`Photo: ${photo}`);
-    const cert = certUrl(stone);
-    if (cert) lines.push(`Certificate: ${cert}`);
-  }
+  lines.push(`p/c - ${usd(stone.pricePerCt)}`);
+  lines.push(`Total - ${usd(stone.priceTotal)}`);
+
+  const links = buildLinks(stone);
+  if (links.length) lines.push("", ...links);
 
   return lines.join("\n");
 };
 
-/* One stone → a text block. includeMediaLinks=false when files are attached. */
-export const buildStoneShareText = (stone, { includeMediaLinks = true } = {}) => {
+/* Coloured stones (emeralds + other gemstones):
+ *   <weight> <shape> <comment> <lab>
+ *   Ratio : <ratio>
+ *   <location>
+ *   <sku>
+ *   p/c: <price per carat>
+ *   total: <total price>
+ *   …links */
+const buildColoredStoneText = (stone) => {
+  const wt = Number(stone.weightCt);
+  const wtStr = Number.isFinite(wt) ? wt.toFixed(2) : "";
+  const shape = getDisplayShape(stone.shape) || stone.shape || "";
+  const comment = stone.treatment ? shortTreatment(stone.treatment) : "";
+  const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : "";
+
+  const title = [wtStr, shape, comment, lab].filter(Boolean).join(" ");
+
+  const lines = [];
+  if (title) lines.push(title);
+
+  const ratio = ratioOf(stone);
+  if (ratio) lines.push(`Ratio : ${ratio}`);
+
+  const { label: location } = resolveLocation(stone);
+  if (location) lines.push(String(location));
+
+  if (stone.sku) lines.push(String(stone.sku));
+
+  lines.push(`p/c: ${usd(stone.pricePerCt)}`);
+  lines.push(`total: ${usd(stone.priceTotal)}`);
+
+  const links = buildLinks(stone);
+  if (links.length) lines.push("", ...links);
+
+  return lines.join("\n");
+};
+
+/* Jewelry:
+ *   <title>
+ *   <center stone weight>
+ *   <style>
+ *   <sku>
+ *   <location>
+ *   …links */
+const buildJewelryText = (item) => {
+  const lines = [];
+
+  const title = String(item.name || item.title || "").trim();
+  if (title) lines.push(title);
+
+  const cc = Number(item.centerCarat);
+  if (Number.isFinite(cc)) lines.push(`${cc.toFixed(2)} ct`);
+
+  const style = String(item.style || "").trim();
+  if (style) lines.push(style);
+
+  if (item.sku) lines.push(String(item.sku));
+
+  const location = String(item.location || "").trim();
+  if (location) lines.push(location);
+
+  const links = buildLinks(item);
+  if (links.length) lines.push("", ...links);
+
+  return lines.join("\n");
+};
+
+/* One stone → a text block. Jewelry, diamonds, and coloured stones each have
+ * their own field list. */
+export const buildStoneShareText = (stone) => {
   if (!stone) return "";
-  return isDiamondStone(stone)
-    ? buildDiamondText(stone, { includeMediaLinks })
-    : buildGenericText(stone, { includeMediaLinks });
+  if (stone.kind === "jewelry") return buildJewelryText(stone);
+  return isDiamondStone(stone) ? buildDiamondText(stone) : buildColoredStoneText(stone);
 };
 
 /* Many stones → blocks separated by a divider. */
-export const buildStonesMessage = (stones, opts) =>
+export const buildStonesMessage = (stones) =>
   (Array.isArray(stones) ? stones : [stones])
     .filter(Boolean)
-    .map((s) => buildStoneShareText(s, opts))
+    .map(buildStoneShareText)
     .join("\n\n— — —\n\n");
 
 /* ============================================================================
@@ -193,9 +227,7 @@ export const buildStonesMessage = (stones, opts) =>
 
 const fileNameFor = (url, fallback) => {
   const clean = String(url).split("?")[0];
-  let name = clean.split("/").pop() || "";
-  if (!name) name = fallback;
-  return name;
+  return clean.split("/").pop() || fallback;
 };
 
 const fetchAsFile = async (url, fallbackName, fallbackType) => {
@@ -245,11 +277,11 @@ export const canShareFiles = (files) =>
 
 export const shareStonesOnWhatsApp = async (stones, { files } = {}) => {
   const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
+  const text = buildStonesMessage(arr);
 
   if (canShareFiles(files)) {
     try {
-      // Photo + cert are attached as files → don't repeat them as links.
-      await navigator.share({ files, text: buildStonesMessage(arr, { includeMediaLinks: false }) });
+      await navigator.share({ files, text });
       return;
     } catch (err) {
       if (err && err.name === "AbortError") return; // user cancelled the sheet
@@ -257,6 +289,5 @@ export const shareStonesOnWhatsApp = async (stones, { files } = {}) => {
     }
   }
 
-  const url = `https://wa.me/?text=${encodeURIComponent(buildStonesMessage(arr, { includeMediaLinks: true }))}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
 };
