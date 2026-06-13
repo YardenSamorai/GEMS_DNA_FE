@@ -1333,7 +1333,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
 
   // Shared filter fragments reused across modes (kept identical everywhere).
   const togglesControls = (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+    <div className="flex flex-nowrap items-center justify-between gap-x-2">
       {[
         { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
         { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
@@ -1341,16 +1341,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       ].map(({ label, checked, set }) => (
         <label
           key={label}
-          className="flex cursor-pointer select-none items-center gap-2 text-[13px] font-medium text-app-ink"
+          className="flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-app-ink"
         >
           <span
-            className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
+            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
               checked
                 ? "border-emerald-500 bg-emerald-500 text-white"
                 : "border-app-line bg-app-surface text-transparent"
             }`}
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
             </svg>
           </span>
@@ -2120,7 +2120,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                   )}
 
                   {/* Quick toggles — keep stones that carry a cert / media. */}
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <div className="flex flex-nowrap items-center justify-between gap-x-2">
                     {[
                       { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
                       { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
@@ -2128,16 +2128,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     ].map(({ label, checked, set }) => (
                       <label
                         key={label}
-                        className="flex cursor-pointer select-none items-center gap-2 text-[13px] font-medium text-app-ink"
+                        className="flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-app-ink"
                       >
                         <span
-                          className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
+                          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
                             checked
                               ? "border-emerald-500 bg-emerald-500 text-white"
                               : "border-app-line bg-app-surface text-transparent"
                           }`}
                         >
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
                           </svg>
                         </span>
