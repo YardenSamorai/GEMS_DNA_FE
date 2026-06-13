@@ -760,8 +760,8 @@ export const GemstoneCard = ({ stone, mode }) => {
         </h3>
         {isEmerald ? (
           <>
-            <Line value={treatment} />
-            <Line value={lab} />
+            {/* Comment + lab intentionally omitted here — both are already part
+                of the emerald title (buildEmeraldTitle). */}
             <Line value={measureLine || null} />
             <Line value={locationLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
