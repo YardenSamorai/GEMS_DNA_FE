@@ -6,7 +6,7 @@ import { decryptPrice } from "../../utils/decrypt";
 import { sanitizeText, normalizeJewelryCategory } from "../../utils/helper";
 import { getDisplayShape } from "../inventory/helpers/constants";
 import { DIAMOND_SHAPES } from "./diamondShapes";
-import { StonePlaceholder, SHAPE_MATCH, norm } from "./SalesInventory";
+import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle } from "./SalesInventory";
 
 /* ============================================================================
  * SalesJewelry — the jewelry surface of the sales catalog.
@@ -173,11 +173,22 @@ export const mapRow = (row) => {
     .map((u) => u.trim())
     .filter(Boolean);
   const firstImage = images[0] || null;
+  // The WooCommerce feed sends `price` as a plain number ("1000", "10000"),
+  // but some older rows may still be AES-encrypted. Try a direct numeric parse
+  // first and only fall back to decryption when that isn't a finite number.
   let price = 0;
-  try {
-    price = row.price ? Number(decryptPrice(row.price)) || 0 : 0;
-  } catch {
-    price = 0;
+  const rawPrice = row.price;
+  if (rawPrice != null && String(rawPrice).trim() !== "") {
+    const direct = Number(rawPrice);
+    if (Number.isFinite(direct)) {
+      price = direct;
+    } else {
+      try {
+        price = Number(decryptPrice(rawPrice)) || 0;
+      } catch {
+        price = 0;
+      }
+    }
   }
   return {
     kind: "jewelry",
@@ -947,14 +958,14 @@ const Line = ({ value }) =>
 /* Catalog card — square image, then each spec stacked on its own line:
  *   center-stone weight, total weight (g), Shape, Jewelry type, Gem type,
  *   then SKU, then price. */
-const JewelryCard = ({ item }) => {
+export const JewelryCard = ({ item }) => {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = item.image && !imgFailed;
   const centerCt = Number.isFinite(item.centerCarat) ? `${item.centerCarat.toFixed(2)} ct` : null;
   const price = money(item.price);
   return (
     <div className="flex flex-col">
-      <div className="aspect-square w-full overflow-hidden rounded-xl bg-app-canvas2">
+      <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-app-canvas2">
         {showImage ? (
           <img
             src={item.image}
@@ -966,6 +977,7 @@ const JewelryCard = ({ item }) => {
         ) : (
           <StonePlaceholder alt={item.name} />
         )}
+        <SelectToggle stone={item} />
       </div>
       <div className="mt-2.5 flex flex-col gap-0.5">
         {/* Title leads, then labelled spec lines. */}

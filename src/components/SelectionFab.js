@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelection } from "../context/SelectionContext";
 import { GemstoneCard, modeForStone } from "../pages/sales/SalesInventory";
+import { JewelryCard } from "../pages/sales/SalesJewelry";
 
 /* Floating "selection" button — bottom-right counterpart to the catalog's
  * bottom-left filter FAB. Appears once at least one stone is picked, shows the
@@ -118,17 +119,27 @@ const SelectionFab = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-                    {items.map((stone, idx) => (
-                      <Link
-                        key={stone.id ?? stone.sku ?? idx}
-                        to={`/sales/stone/${encodeURIComponent(stone.sku || "")}`}
-                        state={{ stone }}
-                        onClick={() => setOpen(false)}
-                        className="transition active:opacity-80"
-                      >
-                        <GemstoneCard stone={stone} mode={modeForStone(stone)} />
-                      </Link>
-                    ))}
+                    {items.map((stone, idx) => {
+                      const isJewelry = stone.kind === "jewelry";
+                      const to = isJewelry
+                        ? `/sales/jewelry/${encodeURIComponent(stone.sku || "")}`
+                        : `/sales/stone/${encodeURIComponent(stone.sku || "")}`;
+                      return (
+                        <Link
+                          key={stone.id ?? stone.sku ?? idx}
+                          to={to}
+                          state={isJewelry ? { item: stone } : { stone }}
+                          onClick={() => setOpen(false)}
+                          className="transition active:opacity-80"
+                        >
+                          {isJewelry ? (
+                            <JewelryCard item={stone} />
+                          ) : (
+                            <GemstoneCard stone={stone} mode={modeForStone(stone)} />
+                          )}
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
               </div>

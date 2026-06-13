@@ -644,7 +644,7 @@ const Line = ({ value }) =>
 
 /* Round check/add control overlaid on a card's image. Stops the click from
  * bubbling to the wrapping <Link> so picking a stone never navigates away. */
-const SelectToggle = ({ stone }) => {
+export const SelectToggle = ({ stone }) => {
   const { isSelected, toggle } = useSelection();
   const selected = isSelected(stone);
   return (
