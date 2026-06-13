@@ -1337,7 +1337,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       {[
         { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
         { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
-        { label: "Only in stock", checked: onlyInStock, set: setOnlyInStock },
+        { label: "Guaranteed available", checked: onlyInStock, set: setOnlyInStock },
       ].map(({ label, checked, set }) => (
         <label
           key={label}
@@ -2124,7 +2124,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     {[
                       { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
                       { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
-                      { label: "Only in stock", checked: onlyInStock, set: setOnlyInStock },
+                      { label: "Guaranteed available", checked: onlyInStock, set: setOnlyInStock },
                     ].map(({ label, checked, set }) => (
                       <label
                         key={label}
