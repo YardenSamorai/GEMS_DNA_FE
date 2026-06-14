@@ -676,6 +676,107 @@ export const SelectToggle = ({ stone }) => {
   );
 };
 
+/* Manager/admin-only cost peek. A small tag button overlaid on the card's
+ * image (top-left, mirroring the selection star). Renders nothing for salesmen
+ * or when the stone carries no cost. Tapping opens a small dialog with the
+ * internal cost — kept off the card face so it's never shown to a client over
+ * the rep's shoulder. */
+const CostButton = ({ stone }) => {
+  const { isAdmin, isManager } = useTeam();
+  const [open, setOpen] = useState(false);
+  const costPerCt = Number(stone?.costPerCt);
+  const allowed = (isAdmin || isManager) && Number.isFinite(costPerCt) && costPerCt > 0;
+  if (!allowed) return null;
+
+  const weight = Number(stone.weightCt);
+  const totalCost = Number.isFinite(weight) ? costPerCt * weight : null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        aria-label="View cost"
+        className="absolute left-2 top-2 z-10 flex h-8 items-center gap-1 rounded-full border border-white/70 bg-white/85 px-2.5 text-[11px] font-bold uppercase tracking-wide text-app-graphite shadow-sm backdrop-blur transition active:scale-90 hover:text-app-ink"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h.01M7 3h5.6a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-4.6 4.6a2 2 0 01-2.8 0L6.6 11.6A2 2 0 016 10.2V4a1 1 0 011-1z" />
+        </svg>
+        Cost
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-5"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+              onClick={() => setOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 6 }}
+              transition={{ type: "spring", damping: 26, stiffness: 320 }}
+              role="dialog"
+              aria-label="Stone cost"
+              className="relative w-full max-w-[300px] rounded-3xl border border-app-line bg-app-surface p-5 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
+                    Internal cost
+                  </p>
+                  <p className="mt-0.5 truncate text-[13px] font-medium text-app-muted">
+                    {stone.sku || "Stone"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="-mr-1 -mt-1 flex h-8 w-8 items-center justify-center rounded-full text-app-soft transition hover:bg-app-canvas2 hover:text-app-ink"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-[13px] text-app-muted">Cost / ct</span>
+                  <span className="text-[17px] font-semibold tabular-nums text-app-ink">{money(costPerCt)}</span>
+                </div>
+                {totalCost != null && (
+                  <div className="flex items-baseline justify-between gap-3 border-t border-app-line pt-2.5">
+                    <span className="text-[13px] text-app-muted">Total cost</span>
+                    <span className="text-[17px] font-semibold tabular-nums text-app-ink">{money(totalCost)}</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
 export const GemstoneCard = ({ stone, mode }) => {
   const isDiamond = mode === "diamond";
   const isEmerald = mode === "emerald";
@@ -738,6 +839,7 @@ export const GemstoneCard = ({ stone, mode }) => {
           <StonePlaceholder />
         )}
         <SelectToggle stone={stone} />
+        <CostButton stone={stone} />
       </div>
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
