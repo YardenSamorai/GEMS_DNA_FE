@@ -96,6 +96,8 @@ const StoneDetail = () => {
   const [liked, setLiked] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
   const [shareFiles, setShareFiles] = useState([]);
+  // Salesman can choose whether the WhatsApp message includes prices.
+  const [withPrice, setWithPrice] = useState(true);
 
   // Deep-link fallback — no stone in router state, find it by SKU.
   useEffect(() => {
@@ -546,11 +548,39 @@ const StoneDetail = () => {
               </div>
 
               <div className="px-5 pb-2">
+                {/* Include prices toggle — flips whether p/c + total appear in
+                    the WhatsApp message (and the preview below). */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={withPrice}
+                  onClick={() => setWithPrice((v) => !v)}
+                  className="mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3 text-left transition active:scale-[0.99]"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold tracking-tight text-app-ink">Include prices</span>
+                    <span className="block text-[12px] text-app-soft">
+                      {withPrice ? "Message will show p/c & total" : "Prices hidden from the message"}
+                    </span>
+                  </span>
+                  <span
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                      withPrice ? "bg-emerald-500" : "bg-app-line"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        withPrice ? "translate-x-[22px]" : "translate-x-0.5"
+                      }`}
+                    />
+                  </span>
+                </button>
+
                 {/* Share on WhatsApp */}
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(stone, { files: shareFiles, actor });
+                    shareStonesOnWhatsApp(stone, { files: shareFiles, actor, withPrice });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
@@ -586,7 +616,7 @@ const StoneDetail = () => {
                   )}
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(stone)}
+                  {buildStoneShareText(stone, { withPrice })}
                 </pre>
               </div>
             </motion.div>

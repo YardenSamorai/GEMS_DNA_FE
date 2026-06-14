@@ -121,7 +121,7 @@ const buildLinks = (stone) => {
  *   Cert: <url>
  *
  *   Image: <url>                         (each link on its own block) */
-const buildDiamondText = (stone) => {
+const buildDiamondText = (stone, { withPrice = true } = {}) => {
   const isFancy = isFancyStone(stone);
   const wt = Number(stone.weightCt);
   const wtStr = Number.isFinite(wt) ? wt.toFixed(2) : "";
@@ -144,8 +144,10 @@ const buildDiamondText = (stone) => {
 
   if (stone.sku) lines.push(`SKU: ${stone.sku}`);
 
-  lines.push(`p/c: ${usd(stone.pricePerCt)}`);
-  lines.push(`Total: ${usd(stone.priceTotal)}`);
+  if (withPrice) {
+    lines.push(`p/c: ${usd(stone.pricePerCt)}`);
+    lines.push(`Total: ${usd(stone.priceTotal)}`);
+  }
 
   // Labelled media links, each preceded by a blank line.
   const v = videoUrl(stone);
@@ -166,7 +168,7 @@ const buildDiamondText = (stone) => {
  *   p/c: <price per carat>
  *   total: <total price>
  *   …links */
-const buildColoredStoneText = (stone) => {
+const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
   const wt = Number(stone.weightCt);
   const wtStr = Number.isFinite(wt) ? wt.toFixed(2) : "";
   const shape = getDisplayShape(stone.shape) || stone.shape || "";
@@ -186,8 +188,10 @@ const buildColoredStoneText = (stone) => {
 
   if (stone.sku) lines.push(String(stone.sku));
 
-  lines.push(`p/c: ${usd(stone.pricePerCt)}`);
-  lines.push(`total: ${usd(stone.priceTotal)}`);
+  if (withPrice) {
+    lines.push(`p/c: ${usd(stone.pricePerCt)}`);
+    lines.push(`total: ${usd(stone.priceTotal)}`);
+  }
 
   const links = buildLinks(stone);
   if (links.length) lines.push("", ...links);
@@ -227,17 +231,19 @@ const buildJewelryText = (item) => {
 
 /* One stone → a text block. Jewelry, diamonds, and coloured stones each have
  * their own field list. */
-export const buildStoneShareText = (stone) => {
+export const buildStoneShareText = (stone, opts = {}) => {
   if (!stone) return "";
   if (stone.kind === "jewelry") return buildJewelryText(stone);
-  return isDiamondStone(stone) ? buildDiamondText(stone) : buildColoredStoneText(stone);
+  return isDiamondStone(stone)
+    ? buildDiamondText(stone, opts)
+    : buildColoredStoneText(stone, opts);
 };
 
 /* Many stones → blocks separated by a divider. */
-export const buildStonesMessage = (stones) =>
+export const buildStonesMessage = (stones, opts = {}) =>
   (Array.isArray(stones) ? stones : [stones])
     .filter(Boolean)
-    .map(buildStoneShareText)
+    .map((s) => buildStoneShareText(s, opts))
     .join("\n\n— — —\n\n");
 
 /* ============================================================================
@@ -294,9 +300,9 @@ export const canShareFiles = (files) =>
  * Entry point
  * ========================================================================== */
 
-export const shareStonesOnWhatsApp = async (stones, { files, actor } = {}) => {
+export const shareStonesOnWhatsApp = async (stones, { files, actor, withPrice = true } = {}) => {
   const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
-  const text = buildStonesMessage(arr);
+  const text = buildStonesMessage(arr, { withPrice });
 
   // Record the send for the sales Dashboard (best effort, never blocks).
   logShareEvents(actor, arr, "whatsapp");
