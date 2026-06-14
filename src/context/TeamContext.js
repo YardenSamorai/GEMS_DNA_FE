@@ -14,18 +14,23 @@ import { fetchTeamMe, colorFromSeed } from "../services/teamApi";
 export const ALL_SECTION_KEYS = [
   "dashboard", "inventory", "crm", "sales", "team", "tools",
 ];
+// Stone-location visibility tiers. Keep in sync with BE LOCATION_VIEWS and
+// teamUtils.LOCATION_VIEW_OPTIONS.
+const LOCATION_VIEWS = ["full", "memo_branch", "branch_only", "status_only", "hidden"];
 // Admins implicitly get everything.
-const ADMIN_PERMISSIONS = { sections: [...ALL_SECTION_KEYS], locationView: "full" };
+const ADMIN_PERMISSIONS = { sections: [...ALL_SECTION_KEYS], locationView: "full", canViewCost: true };
 
 const normalizePermissions = (raw) => {
   const p = raw && typeof raw === "object" ? raw : {};
   const sections = Array.isArray(p.sections)
     ? p.sections.filter((s) => ALL_SECTION_KEYS.includes(s))
     : [];
-  const locationView = ["full", "memo_branch", "branch_only"].includes(p.locationView)
+  const locationView = LOCATION_VIEWS.includes(p.locationView)
     ? p.locationView
     : "branch_only";
-  return { sections, locationView };
+  const out = { sections, locationView };
+  if (typeof p.canViewCost === "boolean") out.canViewCost = p.canViewCost;
+  return out;
 };
 
 /**
@@ -57,12 +62,14 @@ const TeamContext = createContext({
   locationView: "full",
   isOwner: true,
   isAdmin: true,
+  isWorkshopOwner: true,
   isManager: false,
   isSalesman: false,
   isStoreUser: false,
   companyId: null,
   can: () => true,
   canViewExactLocation: true,
+  canViewCost: true,
   refresh: () => {},
 });
 
@@ -142,6 +149,9 @@ export const TeamProvider = ({ children }) => {
     // Normalised role helpers. The workspace owner *is* the admin. A legacy
     // 'rep' is treated as a salesman. Store users are handled separately.
     const isAdmin = !!state.isOwner || state.role === "owner" || state.role === "admin";
+    // The single workshop owner — distinct from a granted 'admin' (who has the
+    // same powers but can be demoted/removed and isn't the billing owner).
+    const isWorkshopOwner = !!state.isOwner && state.role !== "admin";
     const isManager = state.role === "manager";
     const isSalesman = !isAdmin && (state.role === "salesman" || state.role === "rep");
 
@@ -152,16 +162,28 @@ export const TeamProvider = ({ children }) => {
     const can = (section) => isAdmin || permissions.sections.includes(section);
     const locationView = permissions.locationView;
     const canViewExactLocation = locationView === "full";
+    // Cost / margin visibility mirrors the BE rule: admin always; explicit
+    // boolean wins; absent => role default (managers see it, salesmen don't).
+    const canViewCost = isAdmin
+      || permissions.canViewCost === true
+      || (permissions.canViewCost !== false && isManager);
 
     return {
       ...state,
       actor,
       isAdmin,
+      // `isOwner` is the app-wide "owner-level access" flag every gate keys off
+      // (claim any stone, reassign records, see all nav/tabs). A granted admin
+      // gets the same powers as the workshop owner, so fold them in here. Use
+      // `isWorkshopOwner` when you specifically need the single real owner.
+      isOwner: isAdmin,
+      isWorkshopOwner,
       isManager,
       isSalesman,
       permissions,
       locationView,
       canViewExactLocation,
+      canViewCost,
       can,
       membersById,
       membersByClerkId,
