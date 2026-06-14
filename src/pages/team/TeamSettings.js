@@ -604,16 +604,17 @@ const TeamSettings = () => {
       <style>{`
         .team-input {
           width: 100%;
-          border: 1px solid #e7e5e4;
-          background: #fff;
+          border: 1px solid rgb(var(--app-line));
+          background: rgb(var(--app-surface));
           border-radius: 8px;
           padding: 0.45rem 0.65rem;
           font-size: 0.875rem;
-          color: #1c1917;
+          color: rgb(var(--app-ink));
         }
+        .team-input::placeholder { color: rgb(var(--app-soft)); }
         .team-input:focus {
-          outline: 2px solid #10b98155;
-          border-color: #10b981;
+          outline: 2px solid rgb(var(--brand-emerald) / 0.35);
+          border-color: rgb(var(--brand-emerald));
         }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
