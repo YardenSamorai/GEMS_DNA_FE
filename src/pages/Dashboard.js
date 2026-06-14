@@ -118,7 +118,7 @@ const Dashboard = () => {
           switch tabs without scrolling back up. Inactive items are quiet
           glass; the active tab gets the ink fill (same idiom as the portal
           sub-nav). The bookmark hint sits to the right at md+. */}
-      <div className="sticky top-12 z-20 glass-bar">
+      <div className="sticky top-0 z-20 glass-bar md:top-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3">
           <nav
             className="flex gap-1 overflow-x-auto scrollbar-hide rounded-full glass-surface px-1.5 py-1"

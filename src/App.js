@@ -13,6 +13,7 @@ import OfferViewPage from "./pages/share/OfferViewPage";
 import SignaturePage from "./pages/sign/SignaturePage";
 import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
 import LoginSheet from "./components/LoginSheet";
+import { motion } from "framer-motion";
 import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
@@ -457,22 +458,37 @@ const NoAccessScreen = () => (
   </div>
 );
 
+// Bottom sheet that slides up to ~50% of the viewport — the gate shown to
+// signed-out visitors who land on a protected page. It's pinned to the bottom
+// (not dismissible: there's nothing behind to return to) and mirrors the
+// LoginSheet's slide-up motion + glass-white chrome.
 const AuthPrompt = ({ message }) => (
-  <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
-    <div className="glass-surface-strong rounded-3xl px-8 py-10 max-w-md w-full text-center">
-      <div className="relative w-16 h-16 mx-auto rounded-2xl bg-app-ink flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(0,0,0,0.45)]">
-        <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-        <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
-      </div>
-      <h2 className="text-[24px] font-semibold tracking-tight text-app-ink mt-6">Access Required</h2>
-      <p className="text-[14px] text-app-muted mt-2 leading-relaxed">{message}</p>
-      <LoginSheet>
-        <button className="btn-primary mt-6">Sign In to Continue</button>
-      </LoginSheet>
+  <motion.div
+    initial={{ y: "100%" }}
+    animate={{ y: 0 }}
+    transition={{ type: "spring", damping: 30, stiffness: 320 }}
+    className="fixed inset-x-0 bottom-0 z-30 flex h-[50vh] flex-col items-center justify-center rounded-t-3xl border-t border-app-line bg-app-surface px-6 text-center shadow-[0_-24px_60px_-30px_rgba(0,0,0,0.5)]"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Access required"
+  >
+    {/* Decorative grab handle. */}
+    <div className="absolute inset-x-0 top-3 flex justify-center">
+      <div className="h-1.5 w-10 rounded-full bg-app-line2" />
     </div>
-  </div>
+
+    <div className="relative h-16 w-16 rounded-2xl bg-app-ink flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(0,0,0,0.45)]">
+      <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+      <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
+    </div>
+    <h2 className="mt-6 text-[24px] font-semibold tracking-tight text-app-ink">Access Required</h2>
+    <p className="mt-2 text-[14px] leading-relaxed text-app-muted">{message}</p>
+    <LoginSheet>
+      <button className="btn-primary mt-6">Sign In to Continue</button>
+    </LoginSheet>
+  </motion.div>
 );
 
 // ---------- Marketing/landing layout (used by `/`, public pages) ----------

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, Navigate } from "react-router-dom";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import LoginSheet from "../components/LoginSheet";
 import { motion } from "framer-motion";
 import { useTeam } from "../context/TeamContext";
 import { firstAllowedLanding } from "../utils/permissions";
@@ -469,14 +470,14 @@ const OnboardingPage = () => {
                 </Link>
               </SignedIn>
               <SignedOut>
-                <SignInButton mode="modal">
+                <LoginSheet>
                   <button className="btn-primary">
                     Request access
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
                   </button>
-                </SignInButton>
+                </LoginSheet>
               </SignedOut>
               <a href="#features" className="btn-secondary">
                 See what&apos;s inside
@@ -733,11 +734,11 @@ const OnboardingPage = () => {
                 </Link>
               </SignedIn>
               <SignedOut>
-                <SignInButton mode="modal">
+                <LoginSheet>
                   <button className="btn-primary">
                     Request access
                   </button>
-                </SignInButton>
+                </LoginSheet>
               </SignedOut>
             </div>
           </div>
