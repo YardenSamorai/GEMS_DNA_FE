@@ -9,6 +9,7 @@ import { DIAMOND_SHAPES } from "./diamondShapes";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import placeholderImg from "../../assets/stone-placeholder.jpg";
 import { useSelection } from "../../context/SelectionContext";
+import { trackCategoryView, trackSearch, trackFilter } from "../../utils/activityLog";
 
 /* The sales catalog is split into three category surfaces that all share this
  * same card grid. The category map resolves e.g. "Sapphire O" -> ["Sapphire"],
@@ -177,13 +178,13 @@ const FILTER_DEFAULTS = {
   colorMode: "white", colorGrades: [], fancyIntensity: [], fancyColor: [],
   claritySel: [], labSel: [], locationSel: [], treatmentSel: [], originSel: [],
   gemColorSel: [], gemTypeSel: [], cutSel: [], polishSel: [], symmetrySel: [],
-  fluorSel: [], parcelSel: [], onlyCert: false, onlyMedia: false, onlyInStock: false,
+  fluorSel: [], parcelSel: ["Single"], onlyCert: false, onlyMedia: false, onlyInStock: false,
   skuQuery: "", sortBy: [],
 };
 /* Per-category filter persistence. Each mode (diamond / emerald / gemstone)
  * keeps its own snapshot in localStorage, so switching between catalogs — or
  * leaving and coming back later — restores exactly what was filtered. */
-const filtersKey = (mode) => `salesFilters:v1:${mode}`;
+const filtersKey = (mode) => `salesFilters:v2:${mode}`;
 const loadSavedFilters = (mode) => {
   try {
     const raw = localStorage.getItem(filtersKey(mode));
@@ -1015,7 +1016,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [polishSel, setPolishSel] = useState([]);
   const [symmetrySel, setSymmetrySel] = useState([]);
   const [fluorSel, setFluorSel] = useState([]);
-  const [parcelSel, setParcelSel] = useState([]);
+  const [parcelSel, setParcelSel] = useState(["Single"]);
   // Quick toggles: restrict to stones that carry a certificate / any media.
   const [onlyCert, setOnlyCert] = useState(false);
   const [onlyMedia, setOnlyMedia] = useState(false);
@@ -1083,6 +1084,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
 
   useEffect(() => {
     let cancelled = false;
+    trackCategoryView(cfg.noun || mode);
     // Each category keeps its own filter selections: restore this mode's saved
     // snapshot (or the neutral defaults the first time) instead of clearing, so
     // hopping between Diamonds / Emeralds / Gemstones — or returning later —
@@ -1123,6 +1125,15 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       cancelled = true;
     };
   }, [mode, actor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track SKU searches for the Team activity feed — debounced so we log the
+  // settled query, not every keystroke.
+  useEffect(() => {
+    const q = skuQuery.trim();
+    if (!q) return undefined;
+    const t = setTimeout(() => trackSearch(q), 900);
+    return () => clearTimeout(t);
+  }, [skuQuery]);
 
   // Persist the active filters for this category whenever they change. The
   // render right after a mode switch is skipped (justSwitchedRef) so we never
@@ -1383,7 +1394,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setPolishSel([]);
     setSymmetrySel([]);
     setFluorSel([]);
-    setParcelSel([]);
+    setParcelSel(["Single"]);
     setOnlyCert(false);
     setOnlyMedia(false);
     setOnlyInStock(false);
@@ -1528,6 +1539,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     </div>
   );
 
+  // Any facet filter differs from its default? (SKU search + sort excluded —
+  // they have their own controls.) Drives the top-bar Reset button.
+  const activeFilterState = collectFilters();
+  const hasActiveFilters = Object.keys(FILTER_DEFAULTS).some(
+    (k) =>
+      k !== "sortBy" &&
+      k !== "skuQuery" &&
+      JSON.stringify(activeFilterState[k]) !== JSON.stringify(FILTER_DEFAULTS[k])
+  );
+
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
       {/* No page title — the bottom dock already shows which catalog you're in.
@@ -1586,12 +1607,27 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       </div>
 
       {/* Live tally of how many stones match the active filters — sits just
-          under the Filter / Search / Sort row, aligned under Filter. */}
+          under the Filter / Search / Sort row, aligned under Filter. The Reset
+          button appears here only while at least one facet filter is active. */}
       {!loading && !error && (
-        <p className="mt-2 pl-1 text-[12px] font-medium text-app-soft">
-          {filtered.length.toLocaleString()}{" "}
-          {filtered.length === 1 ? "result" : "results"}
-        </p>
+        <div className="mt-2 flex items-center justify-between gap-3 pl-1">
+          <p className="text-[12px] font-medium text-app-soft">
+            {filtered.length.toLocaleString()}{" "}
+            {filtered.length === 1 ? "result" : "results"}
+          </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-app-line bg-app-surface px-3 py-1.5 text-[12px] font-semibold text-app-ink transition hover:bg-app-canvas2 active:scale-95"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-14.3-3.4L4 7M4 15a8 8 0 0014.3 3.4L20 17" />
+              </svg>
+              Reset
+            </button>
+          )}
+        </div>
       )}
 
       {/* Floating Filter button — fades in once the header scrolls away so the
@@ -2470,7 +2506,19 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFiltersOpen(false)}
+                  onClick={() => {
+                    if (hasActiveFilters) {
+                      const active = Object.keys(FILTER_DEFAULTS).filter(
+                        (k) =>
+                          k !== "sortBy" &&
+                          k !== "skuQuery" &&
+                          JSON.stringify(activeFilterState[k]) !==
+                            JSON.stringify(FILTER_DEFAULTS[k])
+                      );
+                      trackFilter({ mode, facets: active, results: filtered.length });
+                    }
+                    setFiltersOpen(false);
+                  }}
                   className="flex-1 rounded-xl bg-app-ink px-5 py-2.5 text-[13px] font-semibold text-app-canvas transition active:scale-[0.99]"
                 >
                   Show {filtered.length} {filtered.length === 1 ? "result" : "results"}

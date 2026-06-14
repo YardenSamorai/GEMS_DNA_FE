@@ -44,6 +44,7 @@ import SelectionFab from "./components/SelectionFab";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import MobileDock from "./components/MobileDock";
+import ActivityTracker from "./components/ActivityTracker";
 import SpinningGem from "./components/SpinningGem";
 import BrandMark from "./components/BrandMark";
 import { RouteLoadingProvider } from "./components/RouteLoadingContext";
@@ -394,6 +395,8 @@ const AppLayout = () => {
           {/* v1.0.5 mobile nav — bottom dock replaces the legacy mobile
               sidebar drawer. Hidden on md+. */}
           <MobileDock navSections={navSections} />
+          {/* Invisible — records rep activity + presence heartbeat. */}
+          <ActivityTracker />
         </div>
       </SignedIn>
       <SignedOut>

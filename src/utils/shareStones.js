@@ -2,6 +2,7 @@ import { getMappedCategories } from "./categoryMap";
 import { getDisplayShape, shortTreatment } from "../pages/inventory/helpers/constants";
 import { parseDims, usableImg, resolveLocation } from "../pages/sales/SalesInventory";
 import { logShareEvents } from "../services/stonesApi";
+import { trackShare } from "./activityLog";
 
 /* ============================================================================
  * shareStones — build a WhatsApp-friendly text summary for one or many stones
@@ -314,6 +315,8 @@ export const shareStonesOnWhatsApp = async (stones, { files, actor, withPrice = 
 
   // Record the send for the sales Dashboard (best effort, never blocks).
   logShareEvents(actor, arr, "whatsapp");
+  // Mirror into the Team activity feed.
+  trackShare(arr);
 
   if (canShareFiles(files)) {
     try {

@@ -12,6 +12,7 @@ import { getDisplayShape } from "../inventory/helpers/constants";
 import { norm, money, usableImg, StonePlaceholder } from "./SalesInventory";
 import { mapRow as mapJewelryRow } from "./SalesJewelry";
 import { useTeam } from "../../context/TeamContext";
+import { trackStoneView } from "../../utils/activityLog";
 
 /* ============================================================================
  * JewelryDetail — the per-piece product page behind the sales jewelry cards.
@@ -104,6 +105,11 @@ const JewelryDetail = () => {
       cancelled = true;
     };
   }, [item, sku]);
+
+  // Record the jewelry view for the manager's Team activity feed.
+  useEffect(() => {
+    if (item?.sku) trackStoneView(item.sku, "Jewelry");
+  }, [item?.sku]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pre-fetch photo + certificate when the action sheet opens (keeps iOS
   // user-activation intact for the share gesture).

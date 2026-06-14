@@ -11,6 +11,7 @@ import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
+import { trackStoneView } from "../../utils/activityLog";
 import {
   norm,
   parseDims,
@@ -125,6 +126,12 @@ const StoneDetail = () => {
       cancelled = true;
     };
   }, [stone, sku, actor?.id]);
+
+  // Record the stone view for the manager's Team activity feed (deduped per
+  // SKU per session by the logger).
+  useEffect(() => {
+    if (stone?.sku) trackStoneView(stone.sku, stone.category);
+  }, [stone?.sku]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pre-fetch the stone photo + certificate when the action sheet opens, so the
   // share gesture can attach them without an async hop (keeps iOS activation).
