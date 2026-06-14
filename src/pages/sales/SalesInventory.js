@@ -506,12 +506,15 @@ export const stoneImage = (s) => {
 /* Sales-floor price policy (applied once at load time so cards, the product
  * page, the price filters, sorting and WhatsApp shares all see the same
  * adjusted figures). The DB now stores real prices, so:
- *   - Diamonds / Fancy → shown as-is (full price).
- *   - Emeralds & all other coloured stones → divided by 2 (half off). */
+ *   - Diamonds / Fancy / Emeralds → shown as-is (full price, straight from DB).
+ *   - Other coloured gemstones → divided by 2 (half off). */
 export const adjustSalesPrices = (s) => {
   const mapped = getMappedCategories(s.category);
-  const isDiamond = mapped.includes("Diamond") || mapped.includes("Fancy");
-  const divisor = isDiamond ? 1 : 2;
+  const showAsIs =
+    mapped.includes("Diamond") ||
+    mapped.includes("Fancy") ||
+    mapped.includes("Emerald");
+  const divisor = showAsIs ? 1 : 2;
   const adj = (v) =>
     v != null && v !== "" && isFinite(Number(v)) ? Number(v) / divisor : v;
   return { ...s, pricePerCt: adj(s.pricePerCt), priceTotal: adj(s.priceTotal) };
