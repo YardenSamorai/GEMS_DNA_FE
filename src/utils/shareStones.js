@@ -1,6 +1,7 @@
 import { getMappedCategories } from "./categoryMap";
 import { getDisplayShape, shortTreatment } from "../pages/inventory/helpers/constants";
 import { parseDims, usableImg, resolveLocation } from "../pages/sales/SalesInventory";
+import { logShareEvents } from "../services/stonesApi";
 
 /* ============================================================================
  * shareStones — build a WhatsApp-friendly text summary for one or many stones
@@ -293,9 +294,12 @@ export const canShareFiles = (files) =>
  * Entry point
  * ========================================================================== */
 
-export const shareStonesOnWhatsApp = async (stones, { files } = {}) => {
+export const shareStonesOnWhatsApp = async (stones, { files, actor } = {}) => {
   const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
   const text = buildStonesMessage(arr);
+
+  // Record the send for the sales Dashboard (best effort, never blocks).
+  logShareEvents(actor, arr, "whatsapp");
 
   if (canShareFiles(files)) {
     try {

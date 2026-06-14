@@ -11,6 +11,7 @@ import { fetchJewelryCatalog } from "../../services/jewelryApi";
 import { getDisplayShape } from "../inventory/helpers/constants";
 import { norm, money, usableImg, StonePlaceholder } from "./SalesInventory";
 import { mapRow as mapJewelryRow } from "./SalesJewelry";
+import { useTeam } from "../../context/TeamContext";
 
 /* ============================================================================
  * JewelryDetail — the per-piece product page behind the sales jewelry cards.
@@ -70,6 +71,7 @@ const BLANK = "-";
 const JewelryDetail = () => {
   const { sku } = useParams();
   const navigate = useNavigate();
+  const { actor } = useTeam();
   const routerState = useLocation().state;
   const [item, setItem] = useState(routerState?.item || null);
   const [loading, setLoading] = useState(!routerState?.item);
@@ -419,7 +421,7 @@ const JewelryDetail = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(item, { files: shareFiles });
+                    shareStonesOnWhatsApp(item, { files: shareFiles, actor });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"

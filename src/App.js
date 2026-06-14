@@ -20,6 +20,7 @@ import SalesInventory from "./pages/sales/SalesInventory";
 import SalesJewelry from "./pages/sales/SalesJewelry";
 import StoneDetail from "./pages/sales/StoneDetail";
 import JewelryDetail from "./pages/sales/JewelryDetail";
+import SalesDashboard from "./pages/sales/SalesDashboard";
 import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
@@ -604,6 +605,8 @@ function AppContent() {
             {/* Salesperson-focused stone browser (built incrementally). The
                 catalog is split into disjoint category surfaces that share the
                 same card grid: gemstones (default), diamonds and emeralds. */}
+            {/* Sales "Home" — what the rep has sent to clients (WhatsApp shares). */}
+            <Route path="/sales/dashboard" element={<SalesDashboard />} />
             <Route path="/sales/inventory" element={<SalesInventory mode="gemstone" />} />
             <Route path="/sales/gemstones" element={<SalesInventory mode="gemstone" />} />
             <Route path="/sales/diamonds" element={<SalesInventory mode="diamond" />} />

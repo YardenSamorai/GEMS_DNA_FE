@@ -75,6 +75,43 @@ const teamHeaders = (user) => ({
  * filter, so the UI can always pass the user-selected filter without
  * worrying about leaking other reps' piles.
  */
+/* POST /api/share-events
+ *   body: { stones: [{ sku, category, kind, title }], channel }
+ *
+ * Logs a WhatsApp share (one row per stone) for the sales Dashboard. Best
+ * effort — failures are swallowed so a logging hiccup never blocks a share.
+ */
+export const logShareEvents = (user, stones, channel = "whatsapp") => {
+  const list = (Array.isArray(stones) ? stones : [stones]).filter(Boolean).map((s) => ({
+    sku: s.sku || "",
+    category: s.category || "",
+    kind: s.kind || "",
+    title: s.name || s.title || "",
+  }));
+  if (!list.length) return Promise.resolve({ ok: false, skipped: true });
+  return fetch(`${API_BASE}/api/share-events`, {
+    method: "POST",
+    headers: teamHeaders(user),
+    body: JSON.stringify({ stones: list, channel }),
+  })
+    .then(json)
+    .catch(() => ({ ok: false }));
+};
+
+/* GET /api/share-events
+ *   -> { scope, count, uniqueStones, events: [...] }
+ *
+ * Salesmen get only their own sends; owners + managers get everyone's.
+ */
+export const fetchShareEvents = (user, opts = {}) => {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return fetch(`${API_BASE}/api/share-events${qs}`, {
+    headers: teamHeaders(user),
+  }).then(json);
+};
+
 export const fetchSoapStones = (user, opts = {}) => {
   const params = new URLSearchParams();
   if (user?.id) params.set("userId", user.id);

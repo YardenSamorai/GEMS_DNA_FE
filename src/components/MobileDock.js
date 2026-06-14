@@ -81,9 +81,9 @@ const PRIMARY_SLOTS = [
 const SALES_SLOTS = [
   {
     key: "home",
-    label: "Home",
-    to: "/dashboard",
-    matches: (path) => path === "/dashboard" || path.startsWith("/dashboard"),
+    label: "Dashboard",
+    to: "/sales/dashboard",
+    matches: (path) => path.startsWith("/sales/dashboard"),
     icon: (cls) => (
       <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3.5 11.25L12 4l8.5 7.25M5.5 9.6V19a1 1 0 001 1h3.5v-5.75h4V20h3.5a1 1 0 001-1V9.6" />
@@ -154,7 +154,7 @@ const SALES_CATEGORY_SLOTS = SALES_SLOTS.filter((s) =>
 // under the "sales" section.
 const SLOT_SECTION = {
   dashboard: "dashboard",
-  home: "dashboard",
+  home: "sales",
   inventory: "inventory",
   sales: "sales",
   crm: "crm",

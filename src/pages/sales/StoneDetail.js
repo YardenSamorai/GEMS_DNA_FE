@@ -550,7 +550,7 @@ const StoneDetail = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(stone, { files: shareFiles });
+                    shareStonesOnWhatsApp(stone, { files: shareFiles, actor });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
