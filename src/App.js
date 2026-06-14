@@ -368,17 +368,23 @@ const AppLayout = () => {
   return (
     <>
       <SignedIn>
-        <div className="flex min-h-screen">
+        {/* Mobile shell is pinned to the viewport (100dvh) and clips its own
+            overflow, so the *document* never scrolls — only <main> does.
+            This is what keeps the fixed MobileDock rock-solid: iOS Safari
+            strands `position: fixed` bars mid-screen during momentum scroll
+            of the document, but never when the scroll lives in an inner
+            container. Desktop (md+) reverts to the normal document flow. */}
+        <div className="flex h-[100dvh] overflow-hidden md:h-auto md:min-h-screen md:overflow-visible">
           <Sidebar
             navSections={navSections}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
           />
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <TopBar navItems={NAV_ITEMS} />
-            {/* Bottom padding on mobile makes room for the fixed
-                MobileDock. Desktop falls through to the regular flow. */}
-            <main className="flex-1 min-w-0 pb-28 md:pb-0">
+            {/* On mobile this is the scroll container; bottom padding clears
+                the fixed MobileDock. Desktop falls through to document flow. */}
+            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-28 md:overflow-visible md:pb-0">
               <Outlet />
             </main>
           </div>
