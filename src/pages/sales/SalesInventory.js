@@ -848,11 +848,11 @@ export const GemstoneCard = ({ stone, mode }) => {
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
       <div className="mt-2.5 flex flex-col gap-0.5">
-        {/* HOLDER flag — the stone is held. We never reveal who holds it,
-            just the generic "HOLDER" word. */}
+        {/* HOLD flag — the stone is held. We never reveal who holds it,
+            just the generic "HOLD" word. */}
         {(holder || stone.onHold) && (
           <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-red-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-red-600">
-            HOLDER
+            HOLD
           </span>
         )}
         {/* MEMO OUT flag — stone is physically out with a third party. */}
