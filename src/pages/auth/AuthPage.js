@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation, useSearchParams, Navigate } from "react-router-dom";
 import { SignIn, SignUp, SignedIn, SignedOut } from "@clerk/clerk-react";
+import sharedClerkAppearance from "../../theme/clerkAppearance";
 
 /**
  * Shared brand chrome for the standalone auth pages (/sign-in, /sign-up).
@@ -59,16 +60,15 @@ const AuthShell = ({ title, subtitle, children, footer }) => (
   </div>
 );
 
-// Clerk's SignIn / SignUp components ship with their own theme. We strip
-// their default card so they sit cleanly inside our glass shell, and lock
-// the primary button to the v1.0.5 ink pill — matching the rest of the
-// system's call-to-action buttons.
+// Reuse the shared Clerk theme (same as the sign-in modal), but since the
+// routed page already lives inside our own glass shell with its own big title,
+// we strip Clerk's card chrome + duplicate header so it sits flush.
 const clerkAppearance = {
+  ...sharedClerkAppearance,
   elements: {
-    rootBox: "w-full",
-    card: "shadow-none border-0 bg-transparent",
-    formButtonPrimary:
-      "bg-app-ink hover:bg-app-graphite text-app-canvas text-[13px] font-medium tracking-tight rounded-full px-5 py-2.5",
+    ...sharedClerkAppearance.elements,
+    cardBox: "w-full shadow-none",
+    card: "bg-transparent border-0 shadow-none px-0 py-0",
     headerTitle: "hidden",
     headerSubtitle: "hidden",
   },

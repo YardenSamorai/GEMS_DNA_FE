@@ -5,6 +5,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { ClerkProvider } from '@clerk/clerk-react'
 import { Theme } from "@radix-ui/themes";
+import clerkAppearance from './theme/clerkAppearance';
 
 const phublishKey = process.env.REACT_APP_PUBLISHABLE_KEY;
 if (!phublishKey) {
@@ -15,7 +16,7 @@ if (!phublishKey) {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={phublishKey} afterSignOutUrl="/">
+    <ClerkProvider publishableKey={phublishKey} afterSignOutUrl="/" appearance={clerkAppearance}>
         <App />
     </ClerkProvider>
   </React.StrictMode>
