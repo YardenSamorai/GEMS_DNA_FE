@@ -163,11 +163,14 @@ const buildDiamondText = (stone, { withPrice = true } = {}) => {
 /* Coloured stones (emeralds + other gemstones):
  *   <weight> <shape> <comment> <lab>
  *   Ratio : <ratio>
- *   <location>
- *   <sku>
+ *   Location: <location>
+ *   SKU: <sku>
  *   p/c: <price per carat>
  *   total: <total price>
- *   …links */
+ *
+ *   video: <url>
+ *   Cert: <url>
+ *   image: <url> */
 const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
   const wt = Number(stone.weightCt);
   const wtStr = Number.isFinite(wt) ? wt.toFixed(2) : "";
@@ -184,17 +187,22 @@ const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
   if (ratio) lines.push(`Ratio : ${ratio}`);
 
   const { label: location } = resolveLocation(stone);
-  if (location) lines.push(String(location));
+  if (location) lines.push(`Location: ${location}`);
 
-  if (stone.sku) lines.push(String(stone.sku));
+  if (stone.sku) lines.push(`SKU: ${stone.sku}`);
 
   if (withPrice) {
     lines.push(`p/c: ${usd(stone.pricePerCt)}`);
     lines.push(`total: ${usd(stone.priceTotal)}`);
   }
 
-  const links = buildLinks(stone);
-  if (links.length) lines.push("", ...links);
+  // Labelled media links, each preceded by a blank line.
+  const v = videoUrl(stone);
+  if (v) lines.push("", `video: ${v}`);
+  const c = certUrl(stone);
+  if (c) lines.push("", `Cert: ${c}`);
+  const img = stoneImageUrl(stone);
+  if (img) lines.push("", `image: ${img}`);
 
   return lines.join("\n");
 };
