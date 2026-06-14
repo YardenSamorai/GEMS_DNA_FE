@@ -907,6 +907,15 @@ export const GemstoneCard = ({ stone, mode }) => {
             <Line value={stone.measurements} />
             <Line value={locationLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
+            {/* Prices side by side, diamond-style: $/ct left, total right. */}
+            {(ppc || total) && (
+              <div className="mt-1.5 flex items-baseline justify-between gap-x-2 whitespace-nowrap tabular-nums">
+                <span className="text-[11px] text-app-muted">{ppc ? `${ppc}/ct` : ""}</span>
+                {total && (
+                  <span className="text-[12px] font-semibold text-app-ink">{total}</span>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
