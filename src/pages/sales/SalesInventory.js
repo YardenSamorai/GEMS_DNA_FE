@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
@@ -936,6 +936,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  // Drag-to-dismiss for the bottom sheets: gestures start only from the grab
+  // handle / header (via dragControls) so they never fight the body scroll.
+  const filterDrag = useDragControls();
+  const sortDrag = useDragControls();
   const [skuQuery, setSkuQuery] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
   // Once the header (Filter / search / Sort) scrolls out of view we surface a
@@ -1740,22 +1744,40 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 320 }}
+              drag="y"
+              dragControls={filterDrag}
+              dragListener={false}
+              dragConstraints={{ top: 0 }}
+              dragElastic={{ top: 0, bottom: 0.2 }}
+              dragSnapToOrigin
+              onDragEnd={(e, info) => {
+                if (info.offset.y > 120 || info.velocity.y > 600) setFiltersOpen(false);
+              }}
               className="absolute inset-x-0 bottom-0 flex h-[70vh] flex-col rounded-t-3xl border-t border-app-line bg-app-surface"
               role="dialog"
               aria-modal="true"
               aria-label="Filters"
             >
-              {/* Drag handle */}
-              <div className="flex shrink-0 justify-center pt-3 pb-1">
+              {/* Drag-to-dismiss zone — the whole top area (handle + header) is
+                  grabbable so a downward finger swipe from anywhere up here
+                  closes the sheet, iOS-style. Only the × button opts out. */}
+              <div
+                onPointerDown={(e) => filterDrag.start(e)}
+                className="flex shrink-0 cursor-grab touch-none justify-center pt-3 pb-2 active:cursor-grabbing"
+              >
                 <div className="h-1.5 w-12 rounded-full bg-app-line2" />
               </div>
 
               {/* Sheet header */}
-              <div className="flex shrink-0 items-center justify-between border-b border-app-line px-5 py-3">
+              <div
+                onPointerDown={(e) => filterDrag.start(e)}
+                className="flex shrink-0 cursor-grab touch-none items-center justify-between border-b border-app-line px-5 py-3 active:cursor-grabbing"
+              >
                 <h2 className="text-base font-semibold tracking-tight text-app-ink">Filter</h2>
                 <button
                   type="button"
                   onClick={() => setFiltersOpen(false)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   aria-label="Close"
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-app-muted transition hover:bg-app-canvas2 hover:text-app-ink"
                 >
@@ -2547,22 +2569,38 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 320 }}
+              drag="y"
+              dragControls={sortDrag}
+              dragListener={false}
+              dragConstraints={{ top: 0 }}
+              dragElastic={{ top: 0, bottom: 0.2 }}
+              dragSnapToOrigin
+              onDragEnd={(e, info) => {
+                if (info.offset.y > 120 || info.velocity.y > 600) setSortOpen(false);
+              }}
               className="absolute inset-x-0 bottom-0 flex max-h-[70vh] flex-col rounded-t-3xl border-t border-app-line bg-app-surface"
               role="dialog"
               aria-modal="true"
               aria-label="Sort"
             >
               {/* Drag handle */}
-              <div className="flex shrink-0 justify-center pt-3 pb-1">
+              <div
+                onPointerDown={(e) => sortDrag.start(e)}
+                className="flex shrink-0 cursor-grab touch-none justify-center pt-3 pb-1 active:cursor-grabbing"
+              >
                 <div className="h-1.5 w-12 rounded-full bg-app-line2" />
               </div>
 
               {/* Sheet header */}
-              <div className="flex shrink-0 items-center justify-between border-b border-app-line px-5 py-3">
+              <div
+                onPointerDown={(e) => sortDrag.start(e)}
+                className="flex shrink-0 cursor-grab touch-none items-center justify-between border-b border-app-line px-5 py-3 active:cursor-grabbing"
+              >
                 <h2 className="text-base font-semibold tracking-tight text-app-ink">Sort</h2>
                 <button
                   type="button"
                   onClick={() => setSortOpen(false)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   aria-label="Close"
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-app-muted transition hover:bg-app-canvas2 hover:text-app-ink"
                 >

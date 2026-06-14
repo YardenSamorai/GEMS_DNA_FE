@@ -337,6 +337,34 @@ const StoneDetail = () => {
           </div>
         )}
 
+        {/* Prev / next arrows — sit above the media (z-10) so they keep working
+            even on the interactive 360° video slide, whose iframe swallows
+            swipe gestures and otherwise traps the user on the last slide. */}
+        {slideCount > 1 && slide > 0 && (
+          <button
+            type="button"
+            onClick={() => scrollToSlide(slide - 1)}
+            aria-label="Previous"
+            className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-app-surface/85 text-app-ink shadow-[0_2px_12px_-2px_rgba(0,0,0,0.25)] backdrop-blur-md transition active:scale-95"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+        {slideCount > 1 && slide < slideCount - 1 && (
+          <button
+            type="button"
+            onClick={() => scrollToSlide(slide + 1)}
+            aria-label="Next"
+            className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-app-surface/85 text-app-ink shadow-[0_2px_12px_-2px_rgba(0,0,0,0.25)] backdrop-blur-md transition active:scale-95"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
+
         {/* Slide dots — lifted above the sheet overlap; the video slide gets a
             play glyph instead of a dot. */}
         {slideCount > 1 && (
@@ -436,7 +464,7 @@ const StoneDetail = () => {
             {(holder || stone.onHold) && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
                 <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
-                HOLDER
+                HOLD
               </span>
             )}
             {memoOut && (
