@@ -124,24 +124,58 @@ export default function LoginSheet({ children }) {
     }
   };
 
+  const finishSignIn = async (result) => {
+    if (result.status === "complete") {
+      await setActive({ session: result.createdSessionId });
+      navigate("/dashboard", { replace: true });
+      return true;
+    }
+    return false;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isLoaded || submitting) return;
     setError("");
     setSubmitting(true);
     try {
-      const result = await signIn.create({
-        identifier: identifier.trim(),
-        password,
-      });
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        navigate("/dashboard", { replace: true });
-      } else {
-        // needs_first_factor / needs_second_factor (e.g. 2FA, email code) —
-        // not handled in this lightweight form. Send them to the full page.
-        setError("Extra verification is required — please use the full sign-in page.");
+      // Step 1 — identify the user and discover which first factors the
+      // instance supports for them. Passing `password` here lets Clerk
+      // complete in one shot when it can.
+      let attempt = await signIn.create({ identifier: identifier.trim(), password });
+
+      if (await finishSignIn(attempt)) return;
+
+      // Step 2 — if Clerk still wants a first factor, explicitly attempt the
+      // password strategy (the create call above doesn't always consume it).
+      if (attempt.status === "needs_first_factor") {
+        const factors = attempt.supportedFirstFactors || [];
+        const hasPassword = factors.some((f) => f.strategy === "password");
+
+        if (hasPassword) {
+          attempt = await signIn.attemptFirstFactor({ strategy: "password", password });
+          if (await finishSignIn(attempt)) return;
+        } else {
+          // Account has no password (e.g. Google-only). Point them at the
+          // right method instead of a dead end.
+          const hasGoogle = factors.some((f) => f.strategy === "oauth_google");
+          setError(
+            hasGoogle
+              ? "This account has no password — use \u201CContinue with Google\u201D above."
+              : "This account can't sign in with a password. Try another method."
+          );
+          return;
+        }
       }
+
+      // Step 3 — 2FA. We don't render an OTP input in this lightweight sheet.
+      if (attempt.status === "needs_second_factor") {
+        setError("Two-factor authentication is on for this account — please use the full sign-in page.");
+        return;
+      }
+
+      // Any other non-complete status.
+      setError("Couldn't complete sign-in. Please try again or use another method.");
     } catch (err) {
       setError(clerkErrorMessage(err));
     } finally {
