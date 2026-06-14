@@ -55,10 +55,8 @@ const timeAgo = (iso) => {
 const SECTION_OPTIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "inventory", label: "Inventory" },
-  { key: "jewelry", label: "Jewelry workshop" },
   { key: "crm", label: "CRM" },
   { key: "sales", label: "Sales Inventory" },
-  { key: "offers", label: "Offers" },
   { key: "team", label: "Team" },
   { key: "tools", label: "Data Quality" },
 ];

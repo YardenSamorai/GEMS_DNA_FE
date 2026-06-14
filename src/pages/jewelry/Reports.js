@@ -231,7 +231,7 @@ const Reports = () => {
       <section className="rounded-xl glass-surface p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-stone-900">Recent sold pieces · profit margin</h2>
-          <Link to="/jewelry/sold" className="text-xs font-medium text-emerald-700 hover:underline">
+          <Link to="/dashboard?tab=jewelry" className="text-xs font-medium text-emerald-700 hover:underline">
             View all sold →
           </Link>
         </div>

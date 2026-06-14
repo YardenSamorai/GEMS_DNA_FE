@@ -215,7 +215,7 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
       badge: (k.tasks_today?.overdue || 0) > 0 ? k.tasks_today.overdue : null,
     },
     {
-      to: "/jewelry/production",
+      to: "/dashboard?tab=jewelry",
       label: "Items ready",
       value: fmtCount(k.items_ready?.count),
       sub: "awaiting handoff",

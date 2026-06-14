@@ -14,7 +14,6 @@ import { sanitizeText } from "../../utils/helper";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
-import CreateOfferModal from "./components/CreateOfferModal";
 import StoneUsagePanel from "../../components/StoneUsagePanel";
 import ItemTierManager from "../../components/catalog/ItemTierManager";
 import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL, fetchSoapStones, assignStone } from "../../services/stonesApi";
@@ -5552,7 +5551,6 @@ const StoneSearchPage = () => {
   const [showNiimbotPrint, setShowNiimbotPrint] = useState(false);
   const [niimbotPrintStones, setNiimbotPrintStones] = useState([]);
   const [showSendToCrm, setShowSendToCrm] = useState(false);
-  const [showCreateOffer, setShowCreateOffer] = useState(false);
   const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -7722,17 +7720,6 @@ const StoneSearchPage = () => {
                           </div>
                           <span className="font-medium">WhatsApp DNA</span>
                         </button>
-                        <button
-                          onClick={() => setShowCreateOffer(true)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors border-t border-stone-100"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
-                            </svg>
-                          </div>
-                          <span className="font-medium">Create offer</span>
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -7889,21 +7876,6 @@ const StoneSearchPage = () => {
                           <p className="text-xs text-stone-500">Send DNA links via WhatsApp</p>
                         </div>
                       </button>
-
-                      <button
-                        onClick={() => setShowCreateOffer(true)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors border-t border-stone-100"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Create offer</span>
-                          <p className="text-xs text-stone-500">Anonymous link to send a buyer</p>
-                        </div>
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -7957,9 +7929,7 @@ const StoneSearchPage = () => {
           )}
           {inventoryMode === 'jewelry' && !jewelryLoading && jewelryItems.length === 0 && (
             <div className="mb-4 p-4 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-600">
-              No jewelry items yet. Add a workshop piece from the{" "}
-              <Link to="/jewelry/production" className="font-semibold underline">Production Board</Link>
-              {" "}or import a WooCommerce catalog CSV from the{" "}
+              No jewelry items yet. Import a WooCommerce catalog CSV from the{" "}
               <Link to="/dashboard?tab=jewelry" className="font-semibold underline">Jewelry dashboard</Link>.
             </div>
           )}
@@ -8631,15 +8601,6 @@ const StoneSearchPage = () => {
           onClose={() => setShowSendToCrm(false)}
         />
       )}
-
-      {/* Create anonymous offer */}
-      <CreateOfferModal
-        open={showCreateOffer}
-        onClose={() => setShowCreateOffer(false)}
-        stones={allItems.filter(s => selectedStones.has(s.id))}
-        userId={user?.id}
-        defaultAlias={user?.firstName || user?.fullName || ""}
-      />
 
       {/* Scan Success Toast */}
       <AnimatePresence>

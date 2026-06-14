@@ -93,7 +93,7 @@ const ExecutiveSummary = () => {
       label: "Jewelry in WIP",
       value: data.jewelry?.wip_count ?? 0,
       sub: `${data.jewelry?.ready_count ?? 0} ready · ${data.jewelry?.qc_count ?? 0} in QC`,
-      to: "/jewelry/production",
+      to: "/dashboard?tab=jewelry",
       tone: "violet",
       icon: (
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -105,7 +105,7 @@ const ExecutiveSummary = () => {
       label: "Sold this month",
       value: data.jewelry?.sold_month_count ?? 0,
       sub: fmtMoney(Number(data.jewelry?.sold_month_value || 0)) + " gross",
-      to: "/jewelry/sold",
+      to: "/dashboard?tab=jewelry",
       tone: "amber",
       icon: (
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

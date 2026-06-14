@@ -442,9 +442,8 @@ const MobileDock = ({ navSections = [] }) => {
                   );
                 })()}
 
-                {/* Long-tail nav — single-list, solid rows. Workshop (now
-                    demoted from the dock) appears here as a normal group with
-                    its Production Board / Sold / Designs / Settings children. */}
+                {/* Long-tail nav — single-list, solid rows for every section
+                    that isn't pinned to the bottom dock. */}
                 <div className="mb-5">
                   <div className="flex items-center gap-2 mb-2 px-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-app-line2" />

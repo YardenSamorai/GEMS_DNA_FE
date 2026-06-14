@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
-import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet, useParams } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet } from "react-router-dom";
 import { SignedIn, SignedOut, UserButton, useAuth, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
 import Dashboard from "./pages/Dashboard";
@@ -7,23 +7,16 @@ import JewelryPage from "./pages/JewelryPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import { Toaster } from "react-hot-toast";
 import InventoryHub from "./pages/InventoryHub";
-import JewelryItemDetail from "./pages/jewelry/JewelryItemDetail";
 import CustomerSharePage from "./pages/share/CustomerSharePage";
-import OfferViewPage from "./pages/share/OfferViewPage";
 import SignaturePage from "./pages/sign/SignaturePage";
 import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
 import LoginSheet from "./components/LoginSheet";
 import { motion } from "framer-motion";
-import ProductionBoard from "./pages/jewelry/ProductionBoard";
-import JewelrySoldItems from "./pages/jewelry/SoldItems";
-import JewelryDesigns from "./pages/jewelry/Designs";
-import OffersPage from "./pages/offers/OffersPage";
 import SalesInventory from "./pages/sales/SalesInventory";
 import SalesJewelry from "./pages/sales/SalesJewelry";
 import StoneDetail from "./pages/sales/StoneDetail";
 import JewelryDetail from "./pages/sales/JewelryDetail";
 import SalesDashboard from "./pages/sales/SalesDashboard";
-import JewelrySettings from "./pages/jewelry/JewelrySettings";
 import QAPage from "./pages/QAPage";
 import CrmLayout from "./pages/crm/CrmLayout";
 import CrmContacts from "./pages/crm/CrmContacts";
@@ -157,53 +150,6 @@ const NAV_SECTIONS = [
       },
     ],
   },
-  // JEWELRY section — workflow surfaces only. Inventory moved up to the
-  // unified hub (Sprint 1.B), Dashboard + Reports moved into /dashboard tabs
-  // (Sprint 1.A). This section is now the workshop's working space.
-  {
-    label: "JEWELRY",
-    dot: "bg-pink-500",
-    items: [
-      {
-        key: "jewelry",
-        to: "/jewelry/production",
-        label: "Production",
-        matches: (path) =>
-          path === "/jewelry/production" ||
-          path === "/jewelry/sold" ||
-          path === "/jewelry/designs" ||
-          path === "/jewelry/settings" ||
-          path.startsWith("/jewelry/items/"),
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 3l3.057-3 4.886 0L16 3l4 5-8 13L4 8l1-5z" />
-          </svg>
-        ),
-        children: [
-          {
-            to: "/jewelry/production",
-            label: "Production Board",
-            matches: (p) => p === "/jewelry/production",
-          },
-          {
-            to: "/jewelry/sold",
-            label: "Sold Items",
-            matches: (p) => p === "/jewelry/sold",
-          },
-          {
-            to: "/jewelry/designs",
-            label: "Designs",
-            matches: (p) => p === "/jewelry/designs",
-          },
-          {
-            to: "/jewelry/settings",
-            label: "Settings",
-            matches: (p) => p === "/jewelry/settings",
-          },
-        ],
-      },
-    ],
-  },
   // SALES section
   {
     label: "SALES",
@@ -247,18 +193,6 @@ const NAV_SECTIONS = [
           },
           { to: "/sales/jewelry", label: "Jewelry", matches: (p) => p.startsWith("/sales/jewelry") },
         ],
-      },
-      {
-        key: "offers",
-        to: "/offers",
-        label: "Offers",
-        badgeKey: "offers",
-        matches: (path) => path.startsWith("/offers"),
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
-          </svg>
-        ),
       },
       {
         key: "team",
@@ -594,8 +528,9 @@ function AppContent() {
             {/* Sprint 1.B merge — InventoryHub fans out into Stones / Jewelry tabs. */}
             <Route path="/inventory" element={<InventoryHub />} />
 
-            {/* Jewelry sub-system */}
-            <Route path="/jewelry" element={<Navigate to="/inventory?tab=jewelry" replace />} />
+            {/* Jewelry sub-system — the jewelry inventory/workshop surfaces were
+                retired; /jewelry now lands on the stones inventory. */}
+            <Route path="/jewelry" element={<Navigate to="/inventory" replace />} />
             {/* Back-compat: old jewelry-domain dashboards fold into the global
                 Dashboard tabs. */}
             <Route
@@ -606,28 +541,19 @@ function AppContent() {
               path="/jewelry/reports"
               element={<Navigate to="/dashboard?tab=reports" replace />}
             />
-            {/* Back-compat: the jewelry inventory grid moved into the unified
-                /inventory?tab=jewelry surface, but /jewelry/items/:id (single
-                item detail page) keeps its own dedicated route. */}
-            <Route path="/jewelry/items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
-            <Route path="/jewelry/items/:id" element={<JewelryItemDetail />} />
-            <Route path="/jewelry/production" element={<OwnerOnly section="jewelry"><ProductionBoard /></OwnerOnly>} />
-            <Route path="/jewelry/sold" element={<OwnerOnly section="jewelry"><JewelrySoldItems /></OwnerOnly>} />
-            <Route path="/jewelry/designs" element={<OwnerOnly section="jewelry"><JewelryDesigns /></OwnerOnly>} />
-            <Route path="/jewelry/settings" element={<OwnerOnly section="jewelry"><JewelrySettings /></OwnerOnly>} />
-
-            {/* Back-compat: old /jewelry-items URLs → new unified inventory */}
-            <Route path="/jewelry-items" element={<Navigate to="/inventory?tab=jewelry" replace />} />
-            <Route path="/jewelry-items/:id" element={<RedirectJewelryItem />} />
+            {/* Back-compat: the legacy jewelry inventory / workshop URLs are
+                retired (the jewelry grid + production workflow were removed).
+                Anything that still points here lands on the stones inventory. */}
+            <Route path="/jewelry/items" element={<Navigate to="/inventory" replace />} />
+            <Route path="/jewelry/items/:id" element={<Navigate to="/inventory" replace />} />
+            <Route path="/jewelry-items" element={<Navigate to="/inventory" replace />} />
+            <Route path="/jewelry-items/:id" element={<Navigate to="/inventory" replace />} />
 
             <Route path="/qa-data" element={<OwnerOnly section="tools"><QAPage /></OwnerOnly>} />
             {/* Back-compat: old /qa URL still resolves to the same data-quality page. */}
             <Route path="/qa" element={<Navigate to="/qa-data" replace />} />
             {/* Sprint 3 — sales-rep management (admin) + per-rep KPIs. */}
             <Route path="/team" element={<TeamSettings />} />
-            {/* Anonymous stone offers — salesperson tracks links they sent. */}
-            <Route path="/offers" element={<OffersPage />} />
-            <Route path="/offers/:id" element={<OffersPage />} />
             {/* Salesperson-focused stone browser (built incrementally). The
                 catalog is split into disjoint category surfaces that share the
                 same card grid: gemstones (default), diamonds and emeralds. */}
@@ -689,10 +615,6 @@ function AppContent() {
               workshop sends to the buyer. Rendered outside <AppLayout> so
               the customer never sees our sidebar / TopBar / Clerk gates. */}
           <Route path="/share/:token" element={<CustomerSharePage />} />
-
-          {/* Anonymous, unbranded stone offer — salesperson sends this opaque
-              link to a buyer. No app chrome, no brand, noindex. */}
-          <Route path="/o/:token" element={<OfferViewPage />} />
 
           {/* Public memo-signature endpoint — token URLs the supplier
               sends to a store over WhatsApp/email when the store doesn't
@@ -770,13 +692,6 @@ const OwnerOnly = ({ children, section }) => {
       </div>
     </div>
   );
-};
-
-// Redirect old /jewelry-items/:id → /jewelry/items/:id
-const RedirectJewelryItem = () => {
-  const { id } = useParams();
-  const { search } = useLocation();
-  return <Navigate to={`/jewelry/items/${id}${search}`} replace />;
 };
 
 export default App;

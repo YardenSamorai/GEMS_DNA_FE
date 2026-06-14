@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useTeam } from "../context/TeamContext";
 import BrandMark from "./BrandMark";
-import useOffersUnseen from "../hooks/useOffersUnseen";
 
 /**
  * Sidebar monogram — v1.1 emerald brilliant-cut mark (shared BrandMark
@@ -52,8 +51,7 @@ const Sidebar = ({ navSections = [], collapsed, onToggleCollapse, mobileOpen, on
   const location = useLocation();
   const team = useTeam();
   // Red notification badge counts for nav items that opt in via `badgeKey`.
-  const offersUnseen = useOffersUnseen();
-  const badgeFor = (item) => (item.badgeKey === "offers" ? offersUnseen : 0);
+  const badgeFor = () => 0;
   // The sidebar uses theme-aware `app-*` tokens throughout, so we no longer
   // need to branch on theme — every fill, border, and label flips through
   // the `data-theme="dark|light"` CSS variables defined in src/index.css.

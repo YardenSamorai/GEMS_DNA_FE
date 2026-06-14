@@ -24,16 +24,8 @@ export const PERMISSION_SECTIONS = [
       p === "/jewelry-items" ||
       p.startsWith("/jewelry-items/"),
   },
-  {
-    key: "jewelry",
-    label: "Jewelry workshop",
-    landing: "/jewelry/production",
-    // Workshop surfaces only — the unified inventory grid lives under `inventory`.
-    match: (p) => p.startsWith("/jewelry/") && !p.startsWith("/jewelry/items"),
-  },
   { key: "crm", label: "CRM", landing: "/crm/contacts", match: (p) => p.startsWith("/crm") },
   { key: "sales", label: "Sales Inventory", landing: "/sales/emeralds", match: (p) => p.startsWith("/sales") },
-  { key: "offers", label: "Offers", landing: "/offers", match: (p) => p.startsWith("/offers") },
   { key: "team", label: "Team", landing: "/team", match: (p) => p.startsWith("/team") },
   { key: "tools", label: "Data Quality", landing: "/qa-data", match: (p) => p === "/qa-data" || p === "/qa" },
 ];
