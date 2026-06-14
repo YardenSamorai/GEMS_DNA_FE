@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTeam } from "../../context/TeamContext";
 import { fetchShareEvents } from "../../services/stonesApi";
 import { fetchTeamActivity, fetchRepActivity } from "../../services/activityApi";
@@ -251,49 +252,80 @@ const ActivityFeed = ({ events }) => {
     );
   }
   return (
+    // initial={false} keeps the first paint calm (no cascade on load); items
+    // added afterwards — live arrivals — slide in from the top with a fade,
+    // while `layout` makes the existing rows ease down to make room.
     <ul className="space-y-1.5">
-      {events.map((ev) => {
-        const meta = ACTIVITY_META[ev.type] || { label: ev.type, chip: "bg-stone-100 text-stone-600" };
-        const summary = eventSummary(ev);
-        const to = eventLink(ev);
-        const Row = (
-          <>
-            <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10.5px] font-semibold ${meta.chip}`}>
-              {meta.label}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] text-app-ink">
-                <span className="font-semibold">{ev.actor_name || "Someone"}</span>
-                {summary ? <span className="text-app-muted"> · {summary}</span> : null}
-              </p>
-            </div>
-            <span className="shrink-0 text-[11.5px] tabular-nums text-app-soft">{relTime(ev.created_at)}</span>
-          </>
-        );
-        return (
-          <li key={ev.id}>
-            {to ? (
-              <Link
-                to={to}
-                className="flex items-center gap-2.5 rounded-xl border border-app-line bg-app-surface px-3 py-2.5 transition hover:bg-app-canvas2"
-              >
-                {Row}
-              </Link>
-            ) : (
-              <div className="flex items-center gap-2.5 rounded-xl border border-app-line bg-app-surface px-3 py-2.5">
-                {Row}
+      <AnimatePresence initial={false}>
+        {events.map((ev) => {
+          const meta = ACTIVITY_META[ev.type] || { label: ev.type, chip: "bg-stone-100 text-stone-600" };
+          const summary = eventSummary(ev);
+          const to = eventLink(ev);
+          const Row = (
+            <>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10.5px] font-semibold ${meta.chip}`}>
+                {meta.label}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] text-app-ink">
+                  <span className="font-semibold">{ev.actor_name || "Someone"}</span>
+                  {summary ? <span className="text-app-muted"> · {summary}</span> : null}
+                </p>
               </div>
-            )}
-          </li>
-        );
-      })}
+              <span className="shrink-0 text-[11.5px] tabular-nums text-app-soft">{relTime(ev.created_at)}</span>
+            </>
+          );
+          const rowClass =
+            "flex items-center gap-2.5 rounded-xl border border-app-line bg-app-surface px-3 py-2.5 transition hover:bg-app-canvas2";
+          return (
+            <motion.li
+              key={ev.id}
+              layout
+              initial={{ opacity: 0, y: -16, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ type: "spring", stiffness: 480, damping: 34 }}
+            >
+              {to ? (
+                <Link to={to} className={rowClass}>
+                  {Row}
+                </Link>
+              ) : (
+                <div className={rowClass}>{Row}</div>
+              )}
+            </motion.li>
+          );
+        })}
+      </AnimatePresence>
     </ul>
   );
 };
 
+/* Page size for the activity feeds — keeps each request + the rendered list
+ * small no matter how big rep_activity grows. "Load more" walks older pages via
+ * keyset cursor (nextCursor), so it never slows down as you go deeper. */
+const FEED_PAGE = 50;
+
+const LoadMore = ({ onClick, loading }) => (
+  <div className="mt-3 flex justify-center">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="rounded-xl border border-app-line bg-app-surface px-5 py-2.5 text-[13px] font-semibold text-app-graphite transition hover:bg-app-canvas2 disabled:opacity-50"
+    >
+      {loading ? "Loading…" : "Load more"}
+    </button>
+  </div>
+);
+
 const RepDetail = ({ actor, repId, fallbackRep, onBack }) => {
-  const [data, setData] = useState(null);
+  const [rep, setRep] = useState(fallbackRep || null);
+  const [breakdown, setBreakdown] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [cursor, setCursor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -302,8 +334,12 @@ const RepDetail = ({ actor, repId, fallbackRep, onBack }) => {
       try {
         setLoading(true);
         setError("");
-        const res = await fetchRepActivity(actor, repId, { limit: 500 });
-        if (alive) setData(res);
+        const res = await fetchRepActivity(actor, repId, { limit: FEED_PAGE });
+        if (!alive) return;
+        if (res.rep) setRep(res.rep);
+        setBreakdown(res.breakdown || []);
+        setEvents(res.events || []);
+        setCursor(res.nextCursor || null);
       } catch (err) {
         if (alive) setError(err.message || "Failed to load rep history");
       } finally {
@@ -315,9 +351,19 @@ const RepDetail = ({ actor, repId, fallbackRep, onBack }) => {
     };
   }, [actor?.id, repId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rep = data?.rep || fallbackRep || {};
-  const breakdown = data?.breakdown || [];
-  const events = data?.events || [];
+  const loadMore = async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetchRepActivity(actor, repId, { limit: FEED_PAGE, before: cursor });
+      setEvents((prev) => [...prev, ...(res.events || [])]);
+      setCursor(res.nextCursor || null);
+    } catch (_) {
+      /* keep what we have */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <div className="mt-5">
@@ -330,7 +376,7 @@ const RepDetail = ({ actor, repId, fallbackRep, onBack }) => {
       </button>
 
       <div className="rounded-2xl border border-app-line bg-app-surface px-4 py-4">
-        <RepIdentity rep={rep} big />
+        <RepIdentity rep={rep || {}} big />
       </div>
 
       {error && (
@@ -370,47 +416,111 @@ const RepDetail = ({ actor, repId, fallbackRep, onBack }) => {
           ))}
         </div>
       ) : (
-        <ActivityFeed events={events} />
+        <>
+          <ActivityFeed events={events} />
+          {cursor && <LoadMore onClick={loadMore} loading={loadingMore} />}
+        </>
       )}
     </div>
   );
 };
 
 const TeamActivityView = ({ actor }) => {
-  const [data, setData] = useState(null);
+  const [reps, setReps] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [cursor, setCursor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [selectedRep, setSelectedRep] = useState(null);
+  // Newest loaded event id — lets the live poll ask for "only newer than this"
+  // without stale closures.
+  const latestIdRef = useRef(0);
+  useEffect(() => {
+    latestIdRef.current = events[0]?.id || 0;
+  }, [events]);
 
-  const load = useMemo(
-    () => async (silent) => {
-      try {
-        if (!silent) setLoading(true);
-        setError("");
-        const res = await fetchTeamActivity(actor, { limit: 200 });
-        setData(res);
-      } catch (err) {
-        setError(err.message || "Failed to load team activity");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [actor?.id] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
+  // First load: newest page of events + the per-rep rollup.
   useEffect(() => {
     let alive = true;
-    load(false);
-    // Refresh every 30s so "online now" and the feed stay current.
-    const t = setInterval(() => alive && load(true), 30000);
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await fetchTeamActivity(actor, { limit: FEED_PAGE });
+        if (!alive) return;
+        setReps(res.reps || []);
+        setEvents(res.events || []);
+        setCursor(res.nextCursor || null);
+      } catch (err) {
+        if (alive) setError(err.message || "Failed to load team activity");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
     return () => {
       alive = false;
-      clearInterval(t);
     };
-  }, [load]);
+  }, [actor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const reps = data?.reps || [];
-  const events = data?.events || [];
+  // Live updates without a manual refresh:
+  //   • feed poll (~6s) pulls ONLY events newer than what we have (tiny payload)
+  //     and prepends them — loaded "Load more" pages stay put.
+  //   • presence poll (~12s) refreshes just the online/last-seen rollup.
+  useEffect(() => {
+    if (loading) return undefined;
+    let alive = true;
+
+    const pollFeed = async () => {
+      try {
+        const sinceId = latestIdRef.current;
+        const res = await fetchTeamActivity(
+          actor,
+          sinceId ? { after: sinceId, limit: FEED_PAGE } : { limit: FEED_PAGE }
+        );
+        if (!alive || !res.events?.length) return;
+        setEvents((prev) => {
+          const topId = prev[0]?.id || 0;
+          const fresh = res.events.filter((e) => e.id > topId);
+          return fresh.length ? [...fresh, ...prev] : prev;
+        });
+      } catch (_) {
+        /* transient — keep current view */
+      }
+    };
+
+    const pollPresence = async () => {
+      try {
+        const res = await fetchTeamActivity(actor, { repsOnly: 1 });
+        if (alive && res.reps) setReps(res.reps);
+      } catch (_) {
+        /* transient */
+      }
+    };
+
+    const feedTimer = setInterval(pollFeed, 6000);
+    const presenceTimer = setInterval(pollPresence, 12000);
+    return () => {
+      alive = false;
+      clearInterval(feedTimer);
+      clearInterval(presenceTimer);
+    };
+  }, [actor?.id, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMore = async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetchTeamActivity(actor, { limit: FEED_PAGE, before: cursor });
+      setEvents((prev) => [...prev, ...(res.events || [])]);
+      setCursor(res.nextCursor || null);
+    } catch (_) {
+      /* keep what we have */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const onlineCount = reps.filter((r) => r.online).length;
 
   if (selectedRep) {
@@ -467,8 +577,14 @@ const TeamActivityView = ({ actor }) => {
         </div>
       )}
 
-      <h2 className="mb-2 mt-7 text-[13px] font-semibold uppercase tracking-[0.1em] text-app-soft">Live feed</h2>
+      <h2 className="mb-2 mt-7 text-[13px] font-semibold uppercase tracking-[0.1em] text-app-soft">
+        Live feed
+        <span className="ml-2 text-[11px] font-normal normal-case tracking-normal text-app-soft">
+          (open it on a rep to see their full history)
+        </span>
+      </h2>
       <ActivityFeed events={events} />
+      {cursor && <LoadMore onClick={loadMore} loading={loadingMore} />}
     </>
   );
 };

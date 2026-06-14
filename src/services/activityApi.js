@@ -69,16 +69,23 @@ const getJson = (url, user) =>
     return res.json();
   });
 
+/* opts: { limit, before, after }
+ *   before → older page (Load more), after → only newer events (incremental). */
 export const fetchTeamActivity = (user, opts = {}) => {
   const params = new URLSearchParams();
   if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.before != null) params.set("before", String(opts.before));
+  if (opts.after != null) params.set("after", String(opts.after));
+  if (opts.repsOnly) params.set("repsOnly", "1");
   const qs = params.toString() ? `?${params.toString()}` : "";
   return getJson(`${API_BASE}/api/team/activity${qs}`, user);
 };
 
+/* opts: { limit, before } — before fetches the next older page. */
 export const fetchRepActivity = (user, actorId, opts = {}) => {
   const params = new URLSearchParams();
   if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.before != null) params.set("before", String(opts.before));
   const qs = params.toString() ? `?${params.toString()}` : "";
   return getJson(`${API_BASE}/api/team/rep/${encodeURIComponent(actorId)}${qs}`, user);
 };
