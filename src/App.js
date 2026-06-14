@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet, useParams } from "react-router-dom";
-import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, UserButton, useAuth, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
 import Dashboard from "./pages/Dashboard";
 import JewelryPage from "./pages/JewelryPage";
@@ -12,6 +12,7 @@ import CustomerSharePage from "./pages/share/CustomerSharePage";
 import OfferViewPage from "./pages/share/OfferViewPage";
 import SignaturePage from "./pages/sign/SignaturePage";
 import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
+import LoginSheet from "./components/LoginSheet";
 import ProductionBoard from "./pages/jewelry/ProductionBoard";
 import JewelrySoldItems from "./pages/jewelry/SoldItems";
 import JewelryDesigns from "./pages/jewelry/Designs";
@@ -467,9 +468,9 @@ const AuthPrompt = ({ message }) => (
       </div>
       <h2 className="text-[24px] font-semibold tracking-tight text-app-ink mt-6">Access Required</h2>
       <p className="text-[14px] text-app-muted mt-2 leading-relaxed">{message}</p>
-      <SignInButton mode="modal">
+      <LoginSheet>
         <button className="btn-primary mt-6">Sign In to Continue</button>
-      </SignInButton>
+      </LoginSheet>
     </div>
   </div>
 );
@@ -493,14 +494,14 @@ const MarketingHeader = () => {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <SignedOut>
-              <SignInButton mode="modal">
+              <LoginSheet>
                 <button className="btn-primary">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                   </svg>
                   Sign In
                 </button>
-              </SignInButton>
+              </LoginSheet>
             </SignedOut>
             <SignedIn>
               <UserButton afterSignOutUrl={location.pathname} appearance={{ elements: { avatarBox: "w-9 h-9 ring-1 ring-app-line ring-offset-2 ring-offset-transparent" } }} />
@@ -692,6 +693,19 @@ function AppContent() {
               steps, so we mount them with a trailing /* wildcard. */}
           <Route path="/sign-in/*" element={<SignInPage />} />
           <Route path="/sign-up/*" element={<SignUpPage />} />
+
+          {/* OAuth landing — Clerk finishes the Google handshake here and then
+              forwards to redirectUrlComplete (/dashboard). Used by the custom
+              LoginSheet's "Continue with Google" flow. */}
+          <Route
+            path="/sso-callback"
+            element={
+              <AuthenticateWithRedirectCallback
+                signInForceRedirectUrl="/dashboard"
+                signUpForceRedirectUrl="/dashboard"
+              />
+            }
+          />
 
           <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
           <Route path="/:stone_id" element={<DiamondCard />} />
