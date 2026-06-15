@@ -42,6 +42,16 @@ const LOCATION_VIEW_VALUES = LOCATION_VIEW_OPTIONS.map((o) => o.value);
 
 export const DEFAULT_PERMS = { sections: ["sales"], locationView: "branch_only" };
 
+// The backend mints a synthetic placeholder email for the owner row before a
+// real Clerk address is known (e.g. "owner-user_3F8...@local"). It's not a real
+// address and should never be shown to the team.
+export const isPlaceholderEmail = (email) =>
+  !email || /@local$/i.test(String(email).trim());
+
+// A member's real email, or null when all we have is the internal placeholder.
+export const cleanEmail = (member) =>
+  isPlaceholderEmail(member?.email) ? null : member.email;
+
 // Resolve a member's effective "see internal cost / margin" flag. Mirrors the
 // BE rule: explicit boolean wins; absent => role default (manager yes, else no).
 export const canViewCostOf = (m) => {

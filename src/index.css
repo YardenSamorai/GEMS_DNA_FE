@@ -757,6 +757,26 @@ body {
 [data-theme="dark"] .ring-stone-100,
 [data-theme="dark"] .ring-stone-200   { --tw-ring-color: rgb(var(--app-line)); }
 
+/* ---- D) Visible neutral borders in dark mode ----
+   Opaque neutral borders (`--app-line` ≈ #38383A) sit too close to the
+   dark surfaces they outline, so chips / inputs / cards lose their edge
+   (e.g. the filter sheet fields). Render neutral borders as a subtle
+   LIGHT edge instead — the standard dark-mode treatment — so every
+   field and tile reads as a defined control. Accent borders (emerald,
+   blue, …) keep their colour from section C above. */
+[data-theme="dark"] .border-app-line,
+[data-theme="dark"] .border-stone-100, [data-theme="dark"] .border-stone-200,
+[data-theme="dark"] .border-slate-100, [data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-gray-100,  [data-theme="dark"] .border-gray-200 { border-color: rgba(255, 255, 255, 0.16); }
+
+[data-theme="dark"] .border-app-line-2,
+[data-theme="dark"] .border-stone-300, [data-theme="dark"] .border-slate-300,
+[data-theme="dark"] .border-gray-300 { border-color: rgba(255, 255, 255, 0.24); }
+
+[data-theme="dark"] .divide-app-line > * + *,
+[data-theme="dark"] .divide-stone-100 > * + *,
+[data-theme="dark"] .divide-stone-200 > * + * { border-color: rgba(255, 255, 255, 0.14); }
+
 /* ============================================================
    iOS safe-area helpers
    ------------------------------------------------------------

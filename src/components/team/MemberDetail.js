@@ -10,6 +10,7 @@ import {
   ACTIVITY_META,
   ASSIGNABLE_ROLES,
   LOCATION_VIEW_LABEL,
+  cleanEmail,
   eventLink,
   eventSummary,
   fmtMoney,
@@ -252,7 +253,9 @@ const MemberDetail = ({ actor, member, kpis = {}, presence = {}, onChanged, onCl
               <h2 className="truncate text-lg font-bold text-stone-800">{member.name}</h2>
               <RoleBadge role={member.role} />
             </div>
-            <div className="truncate text-sm text-stone-500">{member.email}</div>
+            {cleanEmail(member)
+              ? <div className="truncate text-sm text-stone-500">{cleanEmail(member)}</div>
+              : isOwner && <div className="truncate text-sm text-stone-500">Workshop owner · full access</div>}
             <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-stone-500">
               {!isOwner && <PresenceDot online={online} />}
               <span>

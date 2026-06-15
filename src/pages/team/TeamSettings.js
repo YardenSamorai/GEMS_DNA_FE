@@ -13,6 +13,7 @@ import PermissionsEditor from "../../components/team/PermissionsEditor";
 import {
   ASSIGNABLE_ROLES,
   DEFAULT_PERMS,
+  cleanEmail,
   fmtMoney,
   isAdminRole,
   roleLabelFor,
@@ -232,7 +233,9 @@ const MemberRow = ({ member, kpis, presence, selected, onSelect }) => {
           <span className="truncate text-sm font-semibold text-stone-800">{member.name}</span>
           <RoleBadge role={member.role} />
         </div>
-        <div className="truncate text-[11.5px] text-stone-500">{member.email}</div>
+        <div className="truncate text-[11.5px] text-stone-500">
+          {cleanEmail(member) || (isOwner ? "Workshop owner" : "")}
+        </div>
       </div>
       <div className="shrink-0 text-right">
         {isPending ? (
@@ -612,6 +615,7 @@ const TeamSettings = () => {
           color: rgb(var(--app-ink));
         }
         .team-input::placeholder { color: rgb(var(--app-soft)); }
+        [data-theme="dark"] .team-input { border-color: rgba(255, 255, 255, 0.16); }
         .team-input:focus {
           outline: 2px solid rgb(var(--brand-emerald) / 0.35);
           border-color: rgb(var(--brand-emerald));
