@@ -630,6 +630,12 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
 
                       {errorBox}
 
+                      {/* Clerk Smart CAPTCHA (bot protection) renders here.
+                          Required for custom sign-up flows — without this
+                          element Clerk falls back to an invisible CAPTCHA that
+                          can fail to load ("Error loading CAPTCHA"). */}
+                      <div id="clerk-captcha" className="flex justify-center empty:hidden" />
+
                       <button
                         type="submit"
                         disabled={submitting || !signUpLoaded}
