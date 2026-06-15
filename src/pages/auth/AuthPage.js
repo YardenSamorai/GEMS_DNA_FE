@@ -161,9 +161,9 @@ export const SignUpPage = () => {
         >
           <div className="flex w-full flex-col items-center gap-3 py-2 text-center">
             <p className="text-[13px] leading-relaxed text-app-muted">
-              Tap below to finish setting up your account.
+              Tap below to choose a password and finish setting up your account.
             </p>
-            <LoginSheet>
+            <LoginSheet initialView="signup" initialEmail={email}>
               <button type="button" className="btn-primary">
                 Set up your account
               </button>

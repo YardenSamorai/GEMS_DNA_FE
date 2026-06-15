@@ -107,9 +107,9 @@ const signUpErrorMessage = (err) => {
   return clerkErrorMessage(err);
 };
 
-export default function LoginSheet({ children }) {
+export default function LoginSheet({ children, initialView = "signin", initialEmail = "" }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState("signin"); // "signin" | "signup"
+  const [view, setView] = useState(initialView); // "signin" | "signup"
   const drag = useDragControls();
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -122,23 +122,30 @@ export default function LoginSheet({ children }) {
   const [showPassword, setShowPassword] = useState(false);
 
   // Sign-in
-  const [identifier, setIdentifier] = useState("");
+  const [identifier, setIdentifier] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [passkeyLoading, setPasskeyLoading] = useState(false);
 
   // Sign-up
-  const [suEmail, setSuEmail] = useState("");
+  const [suEmail, setSuEmail] = useState(initialEmail);
   const [suPassword, setSuPassword] = useState("");
   const [suCode, setSuCode] = useState("");
   const [pendingCode, setPendingCode] = useState(false);
   const [ticket, setTicket] = useState(null);
 
-  // Invitation links land here with `__clerk_ticket` in the query — open the
-  // sheet straight into the Create-account view so invited users get the same
-  // polished surface instead of Clerk's hosted page.
+  // Invitation links land here with `__clerk_ticket` (and usually `email`) in
+  // the query — open the sheet straight into the Create-account view, prefill
+  // the invited email, and complete sign-up with the ticket. This gives invited
+  // users the same polished surface instead of Clerk's hosted page.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const t = new URLSearchParams(window.location.search).get("__clerk_ticket");
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("__clerk_ticket");
+    const e = params.get("email");
+    if (e) {
+      setSuEmail(e);
+      setIdentifier(e);
+    }
     if (t) {
       setTicket(t);
       setView("signup");
@@ -162,6 +169,13 @@ export default function LoginSheet({ children }) {
   const trigger = cloneElement(children, {
     onClick: (e) => {
       children.props.onClick?.(e);
+      // Open in the caller's intended view (e.g. the invitation page opens
+      // straight into "Create account"), prefilling the invited email.
+      setView(initialView);
+      if (initialEmail) {
+        setSuEmail((v) => v || initialEmail);
+        setIdentifier((v) => v || initialEmail);
+      }
       setOpen(true);
     },
   });
@@ -573,22 +587,28 @@ export default function LoginSheet({ children }) {
                     )}
 
                     <form onSubmit={handleSignUp} className="flex flex-col gap-4">
-                      {!ticket && (
-                        <div className="flex flex-col gap-1.5">
-                          <label htmlFor="signup-email" className="text-[13px] font-medium text-app-graphite">
-                            Email address
-                          </label>
-                          <input
-                            id="signup-email"
-                            type="email"
-                            autoComplete="email"
-                            value={suEmail}
-                            onChange={(ev) => setSuEmail(ev.target.value)}
-                            placeholder="you@example.com"
-                            className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
-                          />
-                        </div>
-                      )}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="signup-email" className="text-[13px] font-medium text-app-graphite">
+                          Email address
+                        </label>
+                        <input
+                          id="signup-email"
+                          type="email"
+                          autoComplete="email"
+                          value={suEmail}
+                          onChange={(ev) => setSuEmail(ev.target.value)}
+                          readOnly={!!ticket}
+                          placeholder="you@example.com"
+                          className={`w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none${
+                            ticket ? " cursor-not-allowed opacity-70" : ""
+                          }`}
+                        />
+                        {ticket ? (
+                          <p className="text-[12px] text-app-soft">
+                            This is the email your invitation was sent to.
+                          </p>
+                        ) : null}
+                      </div>
 
                       <div className="flex flex-col gap-1.5">
                         <label htmlFor="signup-password" className="text-[13px] font-medium text-app-graphite">
