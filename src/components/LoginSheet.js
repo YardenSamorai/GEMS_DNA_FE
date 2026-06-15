@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { useSignIn, useSignUp } from "@clerk/clerk-react";
+import { fetchSessionPeers, revokeOtherSessions, revokeSession } from "../services/sessionApi";
 
 /* ============================================================================
  * LoginSheet — a fully custom auth surface with two views: Sign in & Create
@@ -126,6 +127,11 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
   const [password, setPassword] = useState("");
   const [passkeyLoading, setPasskeyLoading] = useState(false);
 
+  // Single-active-session takeover. When sign-in succeeds but the user already
+  // has live sessions on other devices, we hold the new (not-yet-activated)
+  // session here and ask them to confirm signing out elsewhere.
+  const [pendingTakeover, setPendingTakeover] = useState(null); // { sessionId, others }
+
   // Sign-up
   const [suEmail, setSuEmail] = useState(initialEmail);
   const [suUsername, setSuUsername] = useState("");
@@ -158,6 +164,7 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
     setOpen(false);
     setError("");
     setPendingCode(false);
+    setPendingTakeover(null);
   };
 
   const switchTo = (next) => {
@@ -205,10 +212,7 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
     setPasskeyLoading(true);
     try {
       const result = await signIn.authenticateWithPasskey({ flow: "discoverable" });
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        navigate("/dashboard", { replace: true });
-      } else {
+      if (!(await finishSignIn(result))) {
         setError("Couldn't complete passkey sign-in — please try another method.");
       }
     } catch (err) {
@@ -218,13 +222,56 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
     }
   };
 
+  // Activate a Clerk session and route into the app.
+  const activateSession = async (sessionId) => {
+    await setActive({ session: sessionId });
+    navigate("/dashboard", { replace: true });
+  };
+
+  // Completes a sign-in attempt. Enforces the single-active-session policy:
+  // if the user is already signed in on another device, we pause and ask them
+  // to confirm the takeover instead of activating right away.
   const finishSignIn = async (result) => {
-    if (result.status === "complete") {
-      await setActive({ session: result.createdSessionId });
-      navigate("/dashboard", { replace: true });
-      return true;
+    if (result.status !== "complete") return false;
+    const sessionId = result.createdSessionId;
+    try {
+      const peers = await fetchSessionPeers(sessionId);
+      if (peers && peers.count > 0) {
+        setPendingTakeover({ sessionId, others: peers.others || [] });
+        return true; // handled — show the confirmation step
+      }
+    } catch (_) {
+      // Don't block sign-in if the session check fails.
     }
-    return false;
+    await activateSession(sessionId);
+    return true;
+  };
+
+  // User confirmed: sign out the other device(s), then continue here.
+  const confirmTakeover = async () => {
+    if (!pendingTakeover || submitting) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      await revokeOtherSessions(pendingTakeover.sessionId);
+      await activateSession(pendingTakeover.sessionId);
+      setPendingTakeover(null);
+    } catch (err) {
+      setError("Couldn't switch sessions. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // User cancelled: drop the just-created session and stay on the sign-in form.
+  const cancelTakeover = async () => {
+    const sid = pendingTakeover?.sessionId;
+    setPendingTakeover(null);
+    setPassword("");
+    setError("You're still signed in on your other device. This sign-in was cancelled.");
+    if (sid) {
+      try { await revokeSession(sid); } catch (_) {}
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -360,18 +407,22 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
   };
 
   const isSignUp = view === "signup";
-  const title = isSignUp
-    ? ticket
-      ? "Accept your invitation"
-      : "Create your account"
-    : "Sign in to GEMS DNA";
-  const subtitle = isSignUp
-    ? pendingCode
-      ? "Enter the verification code we just emailed you"
-      : ticket
-        ? "Set a password to finish setting up your account"
-        : "Create your GEMS DNA account to get started"
-    : "Welcome back — please sign in to continue";
+  const title = pendingTakeover
+    ? "You're already signed in"
+    : isSignUp
+      ? ticket
+        ? "Accept your invitation"
+        : "Create your account"
+      : "Sign in to GEMS DNA";
+  const subtitle = pendingTakeover
+    ? "Your account is active on another device"
+    : isSignUp
+      ? pendingCode
+        ? "Enter the verification code we just emailed you"
+        : ticket
+          ? "Set a password to finish setting up your account"
+          : "Create your GEMS DNA account to get started"
+      : "Welcome back — please sign in to continue";
 
   const errorBox = error ? (
     <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] text-red-600">{error}</p>
@@ -463,7 +514,49 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
               <div className="mx-auto w-full max-w-[400px]">
-                {!isSignUp ? (
+                {pendingTakeover ? (
+                  /* ----------------------- SESSION TAKEOVER ------------------------ */
+                  <div className="flex flex-col gap-4">
+                    <div className="rounded-xl border border-app-line bg-app-canvas2 px-4 py-3.5">
+                      <p className="text-[13.5px] leading-relaxed text-app-graphite">
+                        This account is currently signed in on another device
+                        {pendingTakeover.others?.[0]?.label ? (
+                          <>
+                            {" "}(
+                            <span className="font-medium text-app-ink">
+                              {pendingTakeover.others[0].label}
+                            </span>
+                            )
+                          </>
+                        ) : null}
+                        . Only one active session is allowed at a time.
+                      </p>
+                      <p className="mt-2 text-[13.5px] leading-relaxed text-app-graphite">
+                        Continue here and we&apos;ll sign you out on the other device.
+                      </p>
+                    </div>
+
+                    {errorBox}
+
+                    <button
+                      type="button"
+                      onClick={confirmTakeover}
+                      disabled={submitting}
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-app-ink py-3 text-[14.5px] font-semibold tracking-tight text-app-canvas shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] transition hover:bg-app-graphite active:scale-[0.99] disabled:opacity-60"
+                    >
+                      {submitting ? <Spinner className="h-4 w-4 text-app-canvas" /> : null}
+                      Continue here &amp; sign out the other device
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelTakeover}
+                      disabled={submitting}
+                      className="flex w-full items-center justify-center rounded-xl border border-app-line bg-app-surface py-2.5 text-[13.5px] font-medium text-app-graphite transition hover:bg-app-canvas2 active:scale-[0.99] disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : !isSignUp ? (
                   /* ---------------------------- SIGN IN ---------------------------- */
                   <>
                     <button
