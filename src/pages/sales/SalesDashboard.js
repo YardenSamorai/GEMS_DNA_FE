@@ -596,11 +596,16 @@ const SalesDashboard = () => {
   const canSeeTeam = isAdmin || isManager;
   const [tab, setTab] = useState("shares");
 
+  const firstName = (actor?.name || "").trim().split(/\s+/)[0] || "";
+
   return (
     <div className="mx-auto w-full max-w-[1000px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-app-ink">Dashboard</h1>
+          <h1 className="flex items-center gap-2 text-[22px] font-semibold tracking-tight text-app-ink">
+            <span>Hi{firstName ? ` ${firstName}` : ""}</span>
+            <span className="animate-wave" aria-hidden>👋</span>
+          </h1>
           <p className="mt-0.5 text-[13px] text-app-muted">
             {tab === "team"
               ? "Who's active and what the team is doing"

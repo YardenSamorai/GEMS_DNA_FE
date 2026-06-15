@@ -810,6 +810,24 @@ body {
 }
 @keyframes shimmer  { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
+/* Friendly iPhone-style waving hand for the dashboard greeting. Waves a
+   couple of times on load, then rests. */
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30%      { transform: rotate(14deg); }
+  20%           { transform: rotate(-8deg); }
+  40%           { transform: rotate(-4deg); }
+  50%           { transform: rotate(10deg); }
+}
+.animate-wave {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: wave 2.2s ease-in-out 0.3s 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-wave { animation: none; }
+}
+
 /* Optional spin for the emerald BrandMark logo (off by default). A flat-SVG
    coin-flip around Y reads as the gem turning in place. */
 @keyframes brandmark-spin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
