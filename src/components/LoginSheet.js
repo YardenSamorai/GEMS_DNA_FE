@@ -288,13 +288,17 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
           res = await signUp.update({ password: suPassword });
         }
 
-        // A username is required by the instance → derive one from the email.
+        // A username is required by the instance → derive a valid one from the
+        // email so invited users never have to invent one. Clerk here wants
+        // lowercase alphanumeric/underscore, 4–64 chars, not all-numeric.
         if (res.status !== "complete" && missingFields().includes("username")) {
-          const base = (suEmail || res.emailAddress || "")
+          const local = (suEmail || res.emailAddress || "")
             .split("@")[0]
-            .replace(/[^a-zA-Z0-9_]/g, "")
-            .slice(0, 20) || `user${Date.now().toString().slice(-6)}`;
-          res = await signUp.update({ username: base });
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, "");
+          let username = local.length >= 4 ? local.slice(0, 24) : `${local}user`.slice(0, 12);
+          if (!username) username = `user${Date.now().toString().slice(-6)}`;
+          res = await signUp.update({ username });
         }
 
         // Email somehow still unverified → fall back to an email code.
