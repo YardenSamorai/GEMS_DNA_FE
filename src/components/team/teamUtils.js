@@ -142,11 +142,39 @@ export const relTime = (iso) => {
 // read the same way.
 export const ACTIVITY_META = {
   session_start: { label: "Opened the app", chip: "bg-emerald-100 text-emerald-700" },
-  stone_view:    { label: "Viewed",        chip: "bg-cyan-100 text-cyan-700" },
-  category_view: { label: "Browsed",       chip: "bg-violet-100 text-violet-700" },
-  search:        { label: "Searched",      chip: "bg-sky-100 text-sky-700" },
-  filter_apply:  { label: "Filtered",      chip: "bg-amber-100 text-amber-700" },
-  share:         { label: "Shared",        chip: "bg-rose-100 text-rose-700" },
+  session_end:   { label: "Left the app",   chip: "bg-stone-100 text-stone-600" },
+  stone_view:    { label: "Viewed",         chip: "bg-cyan-100 text-cyan-700" },
+  stone_dwell:   { label: "Studied",        chip: "bg-teal-100 text-teal-700" },
+  category_view: { label: "Browsed",        chip: "bg-violet-100 text-violet-700" },
+  search:        { label: "Searched",       chip: "bg-sky-100 text-sky-700" },
+  filter_apply:  { label: "Filtered",       chip: "bg-amber-100 text-amber-700" },
+  sort:          { label: "Sorted",         chip: "bg-indigo-100 text-indigo-700" },
+  zero_results:  { label: "No results",     chip: "bg-stone-200 text-stone-700" },
+  media_view:    { label: "Opened media",   chip: "bg-fuchsia-100 text-fuchsia-700" },
+  price_view:    { label: "Viewed price",   chip: "bg-yellow-100 text-yellow-800" },
+  export:        { label: "Exported",       chip: "bg-orange-100 text-orange-700" },
+  denied:        { label: "Blocked",        chip: "bg-red-100 text-red-700" },
+  share:         { label: "Shared",         chip: "bg-rose-100 text-rose-700" },
+};
+
+// "2m 5s" / "45s" / "1h 3m"
+const fmtDuration = (ms) => {
+  const s = Math.round((Number(ms) || 0) / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs ? `${m}m ${rs}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h}h ${rm}m` : `${h}h`;
+};
+
+const PRETTY_MEDIA = { video_360: "360° video", certificate: "certificate", image: "photo" };
+const PRETTY_EXPORT = {
+  labels_print: "labels printed",
+  label_print: "label printed",
+  label_png: "label image",
+  labels_png: "label images",
 };
 
 export const eventSummary = (ev) => {
@@ -155,14 +183,31 @@ export const eventSummary = (ev) => {
     case "stone_view":
     case "share":
       return ev.sku ? `${ev.sku}${ev.category ? ` · ${ev.category}` : ""}` : ev.category || "";
+    case "stone_dwell":
+      return `${ev.sku || ""}${meta.ms ? ` · ${fmtDuration(meta.ms)}` : ""}`;
     case "category_view":
       return ev.category || "";
     case "search":
       return meta.q ? `"${meta.q}"` : "";
-    case "filter_apply":
-      return Array.isArray(meta.facets) && meta.facets.length
-        ? `${meta.facets.length} filter${meta.facets.length === 1 ? "" : "s"} · ${meta.results ?? "?"} results`
-        : `${meta.results ?? ""} results`;
+    case "sort":
+      return meta.sortBy || "";
+    case "zero_results":
+      return meta.q ? `"${meta.q}" · no matches` : "no matches";
+    case "media_view":
+      return `${ev.sku || ""}${meta.media ? ` · ${PRETTY_MEDIA[meta.media] || meta.media}` : ""}`;
+    case "price_view":
+      return `${ev.sku || ""}${meta.context === "cost" ? " · cost / margin" : ""}`;
+    case "export":
+      return `${meta.count ?? ""} ${PRETTY_EXPORT[meta.kind] || meta.kind || "items"}`.trim();
+    case "session_end":
+      return meta.ms ? `${fmtDuration(meta.ms)} in app` : "";
+    case "denied":
+      return `tried to open ${meta.resource || "a blocked area"}`;
+    case "filter_apply": {
+      const n = Array.isArray(meta.facets) ? meta.facets.length : 0;
+      const head = n ? `${n} filter${n === 1 ? "" : "s"}` : "filtered";
+      return `${head} · ${meta.results ?? "?"} results`;
+    }
     default:
       return "";
   }

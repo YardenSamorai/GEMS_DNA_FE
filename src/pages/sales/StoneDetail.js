@@ -11,7 +11,12 @@ import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
-import { trackStoneView } from "../../utils/activityLog";
+import {
+  trackStoneView,
+  trackStoneDwell,
+  trackMedia,
+  trackPriceView,
+} from "../../utils/activityLog";
 import {
   norm,
   parseDims,
@@ -128,9 +133,23 @@ const StoneDetail = () => {
   }, [stone, sku, actor?.id]);
 
   // Record the stone view for the manager's Team activity feed (deduped per
-  // SKU per session by the logger).
+  // SKU per session by the logger). Also log that the rep saw the price.
   useEffect(() => {
-    if (stone?.sku) trackStoneView(stone.sku, stone.category);
+    if (!stone?.sku) return;
+    trackStoneView(stone.sku, stone.category);
+    if (stone.priceTotal != null || stone.pricePerCt != null) {
+      trackPriceView(stone.sku, "price", stone.category);
+    }
+  }, [stone?.sku]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dwell time — how long the rep actually studied this stone. Captured on
+  // unmount / SKU change (sub-2s glances are dropped by the logger).
+  useEffect(() => {
+    if (!stone?.sku) return undefined;
+    const sku = stone.sku;
+    const cat = stone.category;
+    const startedAt = Date.now();
+    return () => trackStoneDwell(sku, Date.now() - startedAt, cat);
   }, [stone?.sku]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pre-fetch the stone photo + certificate when the action sheet opens, so the
@@ -159,7 +178,12 @@ const StoneDetail = () => {
   const onTrackScroll = () => {
     const el = trackRef.current;
     if (!el || !el.clientWidth) return;
-    setSlide(Math.round(el.scrollLeft / el.clientWidth));
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setSlide(idx);
+    // Landed on the 360° video slide (appended last) → log a media open.
+    if (video && idx === images.length && stone?.sku) {
+      trackMedia(stone.sku, "video_360", stone.category);
+    }
   };
   // The video is appended as the last slide. Jumping straight to it saves the
   // user swiping past every photo (what the V360 shortcut button does).
@@ -411,6 +435,7 @@ const StoneDetail = () => {
                     href={cert}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={() => trackMedia(stone.sku, "certificate", stone.category)}
                     className="flex w-full items-center justify-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 transition active:scale-95"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -439,7 +464,10 @@ const StoneDetail = () => {
               {video && (
                 <button
                   type="button"
-                  onClick={scrollToVideo}
+                  onClick={() => {
+                    trackMedia(stone.sku, "video_360", stone.category);
+                    scrollToVideo();
+                  }}
                   aria-label="Play 360° video"
                   className="flex w-full items-center justify-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-[12px] font-semibold text-sky-600 transition active:scale-95"
                 >

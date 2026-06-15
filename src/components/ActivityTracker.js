@@ -4,6 +4,7 @@ import { sendHeartbeat } from "../services/activityApi";
 import {
   setActivityActor,
   trackSessionStart,
+  trackSessionEnd,
   flushActivity,
 } from "../utils/activityLog";
 
@@ -26,7 +27,10 @@ const ActivityTracker = () => {
 
     const hb = setInterval(() => sendHeartbeat(actor), HEARTBEAT_MS);
 
-    const onHide = () => flushActivity();
+    const onHide = () => {
+      trackSessionEnd(); // records duration, then flushes
+      flushActivity();
+    };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flushActivity();
       else sendHeartbeat(actor);

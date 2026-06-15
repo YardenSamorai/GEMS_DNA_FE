@@ -30,6 +30,7 @@ import {
   subscribe,
   isBluetoothAvailable,
 } from "../services/niimbotPrint";
+import { trackExport } from "../utils/activityLog";
 
 const PREVIEW_SCALE = 2.5;
 
@@ -858,6 +859,9 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
           setPrintProgress(p => ({ ...p, current: q * stones.length + cur }));
         });
       }
+      trackExport("labels_print", stones.length * quantity, {
+        skus: stones.map((s) => s.sku).filter(Boolean).slice(0, 60),
+      });
       toast.success(`Printed ${stones.length * quantity} labels!`);
       onClose();
     } catch (err) { toast.error(err.message || "Print failed"); }
@@ -870,6 +874,7 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
     try {
       const canvas = await renderLabel(currentStone, { template: currentElements, labelSize });
       await printCanvas(canvas, quantity);
+      trackExport("label_print", quantity, { sku: currentStone.sku || null });
       toast.success("Label printed!");
     } catch (err) { toast.error(err.message || "Print failed"); }
     finally { setPrinting(false); }
@@ -886,6 +891,7 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
         a.download = `label-${currentStone.sku || "unknown"}.png`;
         a.click();
         URL.revokeObjectURL(url);
+        trackExport("label_png", 1, { sku: currentStone.sku || null });
         toast.success("Label image downloaded!");
       }, "image/png");
     } catch (err) { toast.error(err.message || "Download failed"); }
@@ -909,6 +915,9 @@ const NiimbotPrintDialog = ({ isOpen, onClose, stones = [] }) => {
           }, "image/png");
         });
       }
+      trackExport("labels_png", stones.length, {
+        skus: stones.map((s) => s.sku).filter(Boolean).slice(0, 60),
+      });
       toast.success(`Downloaded ${stones.length} label image(s)!`);
     } catch (err) { toast.error(err.message || "Download failed"); }
     finally { setPrinting(false); }

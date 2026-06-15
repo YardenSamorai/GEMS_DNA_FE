@@ -12,7 +12,7 @@ import { getDisplayShape } from "../inventory/helpers/constants";
 import { norm, money, usableImg, StonePlaceholder } from "./SalesInventory";
 import { mapRow as mapJewelryRow } from "./SalesJewelry";
 import { useTeam } from "../../context/TeamContext";
-import { trackStoneView } from "../../utils/activityLog";
+import { trackStoneView, trackStoneDwell, trackPriceView } from "../../utils/activityLog";
 
 /* ============================================================================
  * JewelryDetail — the per-piece product page behind the sales jewelry cards.
@@ -106,9 +106,22 @@ const JewelryDetail = () => {
     };
   }, [item, sku]);
 
-  // Record the jewelry view for the manager's Team activity feed.
+  // Record the jewelry view for the manager's Team activity feed, plus a
+  // price view when the piece carries a price.
   useEffect(() => {
-    if (item?.sku) trackStoneView(item.sku, "Jewelry");
+    if (!item?.sku) return;
+    trackStoneView(item.sku, "Jewelry");
+    if (item.price != null && item.price !== "") {
+      trackPriceView(item.sku, "price", "Jewelry");
+    }
+  }, [item?.sku]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dwell time — captured on unmount / SKU change.
+  useEffect(() => {
+    if (!item?.sku) return undefined;
+    const sku = item.sku;
+    const startedAt = Date.now();
+    return () => trackStoneDwell(sku, Date.now() - startedAt, "Jewelry");
   }, [item?.sku]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pre-fetch photo + certificate when the action sheet opens (keeps iOS

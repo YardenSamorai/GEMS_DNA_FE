@@ -315,8 +315,9 @@ export const shareStonesOnWhatsApp = async (stones, { files, actor, withPrice = 
 
   // Record the send for the sales Dashboard (best effort, never blocks).
   logShareEvents(actor, arr, "whatsapp");
-  // Mirror into the Team activity feed.
-  trackShare(arr);
+  // Mirror into the Team activity feed, with the medium and whether prices
+  // were included so the manager view can show what actually went out.
+  trackShare(arr, { medium: "whatsapp", priceIncluded: !!withPrice });
 
   if (canShareFiles(files)) {
     try {

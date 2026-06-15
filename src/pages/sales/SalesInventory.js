@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
@@ -9,7 +9,13 @@ import { DIAMOND_SHAPES } from "./diamondShapes";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import placeholderImg from "../../assets/stone-placeholder.jpg";
 import { useSelection } from "../../context/SelectionContext";
-import { trackCategoryView, trackSearch, trackFilter } from "../../utils/activityLog";
+import {
+  trackCategoryView,
+  trackSearch,
+  trackFilter,
+  trackSort,
+  trackZeroResults,
+} from "../../utils/activityLog";
 
 /* The sales catalog is split into three category surfaces that all share this
  * same card grid. The category map resolves e.g. "Sapphire O" -> ["Sapphire"],
@@ -930,6 +936,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // role-based scoping. Admin + manager get the full catalog; a salesman is
   // server-side restricted to the branches in their assigned region.
   const { actor } = useTeam();
+  // A manager can "re-run" a logged search from the activity feed — the filter
+  // criteria + sort + query arrive via router state and override the saved
+  // snapshot on mount. Read once into a ref so it applies exactly once.
+  const replayRef = useRef(useLocation().state?.replayFilters || null);
   const [stones, setStones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1093,7 +1103,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     // snapshot (or the neutral defaults the first time) instead of clearing, so
     // hopping between Diamonds / Emeralds / Gemstones — or returning later —
     // keeps every page's results. Panels always reopen in the default layout.
-    applyFilters(loadSavedFilters(mode));
+    // A re-run from the activity feed wins over the saved snapshot (once).
+    if (replayRef.current) {
+      applyFilters(replayRef.current);
+      replayRef.current = null;
+    } else {
+      applyFilters(loadSavedFilters(mode));
+    }
     setBasicOpen(true);
     setMeasureOpen(false);
     setAdvancedOpen(false);
@@ -1138,6 +1154,23 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     const t = setTimeout(() => trackSearch(q), 900);
     return () => clearTimeout(t);
   }, [skuQuery]);
+
+  // Track sort changes — fire when the sort sheet closes with an active sort,
+  // so we log the settled order (a readable label) rather than every toggle.
+  const prevSortOpenRef = useRef(false);
+  useEffect(() => {
+    if (prevSortOpenRef.current && !sortOpen && sortBy.length) {
+      const label = sortBy
+        .map(({ key, dir }) => {
+          const opt = SORT_OPTIONS.find((o) => o.key === key);
+          return `${opt?.label || key} ${dir === "asc" ? "↑" : "↓"}`;
+        })
+        .join(", ");
+      trackSort(label, mode);
+    }
+    prevSortOpenRef.current = sortOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortOpen]);
 
   // Persist the active filters for this category whenever they change. The
   // render right after a mode switch is skipped (justSwitchedRef) so we never
@@ -1552,6 +1585,67 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       k !== "skuQuery" &&
       JSON.stringify(activeFilterState[k]) !== JSON.stringify(FILTER_DEFAULTS[k])
   );
+
+  // Build the full, replayable snapshot of the current search for the activity
+  // log: only the non-default filter values, the sort, the search text, the
+  // result count, and a compact sample of the stones that came back (so a
+  // manager can see exactly what the rep searched and got).
+  const buildSearchSnapshot = () => {
+    const criteria = {};
+    for (const k of Object.keys(FILTER_DEFAULTS)) {
+      if (k === "sortBy" || k === "skuQuery") continue;
+      if (JSON.stringify(activeFilterState[k]) !== JSON.stringify(FILTER_DEFAULTS[k])) {
+        criteria[k] = activeFilterState[k];
+      }
+    }
+    const sample = sorted.slice(0, 30).map((s) => ({
+      sku: s.sku || null,
+      wt: s.weightCt ?? null,
+      shape: s.shape || null,
+      color: s.color || null,
+      clarity: s.clarity || null,
+      lab: s.lab || null,
+      ppc: s.pricePerCt ?? null,
+      total: s.priceTotal ?? null,
+    }));
+    return {
+      mode,
+      criteria,
+      facets: Object.keys(criteria),
+      sort: sortBy,
+      q: skuQuery || "",
+      results: sorted.length,
+      zeroResults: sorted.length === 0,
+      sample,
+    };
+  };
+
+  // Demand signal: a search/filter that returns nothing. Fired once per
+  // empty-result state (resets when results come back) and only when the
+  // catalog actually loaded, so an empty initial load isn't mislogged.
+  const zeroFiredRef = useRef(false);
+  useEffect(() => {
+    const q = skuQuery.trim();
+    const hasCriteria = !!q || hasActiveFilters;
+    if (sorted.length === 0 && hasCriteria && stones.length > 0) {
+      if (zeroFiredRef.current) return undefined;
+      zeroFiredRef.current = true;
+      const t = setTimeout(() => {
+        const criteria = {};
+        for (const k of Object.keys(FILTER_DEFAULTS)) {
+          if (k === "sortBy" || k === "skuQuery") continue;
+          if (JSON.stringify(activeFilterState[k]) !== JSON.stringify(FILTER_DEFAULTS[k])) {
+            criteria[k] = activeFilterState[k];
+          }
+        }
+        trackZeroResults({ q, mode, criteria });
+      }, 1200);
+      return () => clearTimeout(t);
+    }
+    zeroFiredRef.current = false;
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sorted.length, skuQuery, hasActiveFilters]);
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
@@ -2529,15 +2623,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    if (hasActiveFilters) {
-                      const active = Object.keys(FILTER_DEFAULTS).filter(
-                        (k) =>
-                          k !== "sortBy" &&
-                          k !== "skuQuery" &&
-                          JSON.stringify(activeFilterState[k]) !==
-                            JSON.stringify(FILTER_DEFAULTS[k])
-                      );
-                      trackFilter({ mode, facets: active, results: filtered.length });
+                    if (hasActiveFilters && sorted.length > 0) {
+                      // Replayable snapshot (criteria + sort + result sample).
+                      // Zero-result applies are captured by the dedicated
+                      // zero_results signal instead.
+                      trackFilter(buildSearchSnapshot());
                     }
                     setFiltersOpen(false);
                   }}

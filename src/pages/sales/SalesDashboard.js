@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTeam } from "../../context/TeamContext";
 import { fetchShareEvents } from "../../services/stonesApi";
@@ -168,11 +168,39 @@ const SharesView = ({ actor, isAdmin, isManager }) => {
 
 const ACTIVITY_META = {
   session_start: { label: "Opened the app", chip: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
+  session_end: { label: "Left the app", chip: "bg-stone-100 text-stone-600", dot: "bg-stone-400" },
   stone_view: { label: "Viewed", chip: "bg-cyan-100 text-cyan-700", dot: "bg-cyan-500" },
+  stone_dwell: { label: "Studied", chip: "bg-teal-100 text-teal-700", dot: "bg-teal-500" },
   category_view: { label: "Browsed", chip: "bg-violet-100 text-violet-700", dot: "bg-violet-500" },
   search: { label: "Searched", chip: "bg-sky-100 text-sky-700", dot: "bg-sky-500" },
   filter_apply: { label: "Filtered", chip: "bg-amber-100 text-amber-700", dot: "bg-amber-500" },
+  sort: { label: "Sorted", chip: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500" },
+  zero_results: { label: "No results", chip: "bg-stone-200 text-stone-700", dot: "bg-stone-500" },
+  media_view: { label: "Opened media", chip: "bg-fuchsia-100 text-fuchsia-700", dot: "bg-fuchsia-500" },
+  price_view: { label: "Viewed price", chip: "bg-yellow-100 text-yellow-800", dot: "bg-yellow-500" },
+  export: { label: "Exported", chip: "bg-orange-100 text-orange-700", dot: "bg-orange-500" },
+  denied: { label: "Blocked", chip: "bg-red-100 text-red-700", dot: "bg-red-500" },
   share: { label: "Shared", chip: "bg-rose-100 text-rose-700", dot: "bg-rose-500" },
+};
+
+// "2m 5s" / "45s" / "1h 3m"
+const fmtDuration = (ms) => {
+  const s = Math.round((Number(ms) || 0) / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs ? `${m}m ${rs}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h}h ${rm}m` : `${h}h`;
+};
+
+const PRETTY_MEDIA = { video_360: "360° video", certificate: "certificate", image: "photo" };
+const PRETTY_EXPORT = {
+  labels_print: "labels printed",
+  label_print: "label printed",
+  label_png: "label image",
+  labels_png: "label images",
 };
 
 const eventSummary = (ev) => {
@@ -181,21 +209,71 @@ const eventSummary = (ev) => {
     case "stone_view":
     case "share":
       return ev.sku ? `${ev.sku}${ev.category ? ` · ${ev.category}` : ""}` : ev.category || "";
+    case "stone_dwell":
+      return `${ev.sku || ""}${meta.ms ? ` · ${fmtDuration(meta.ms)}` : ""}`;
     case "category_view":
       return ev.category || "";
     case "search":
       return meta.q ? `"${meta.q}"` : "";
-    case "filter_apply":
-      return Array.isArray(meta.facets) && meta.facets.length
-        ? `${meta.facets.length} filter${meta.facets.length === 1 ? "" : "s"} · ${meta.results ?? "?"} results`
-        : `${meta.results ?? ""} results`;
+    case "sort":
+      return meta.sortBy || "";
+    case "zero_results":
+      return meta.q ? `"${meta.q}" · no matches` : "no matches";
+    case "media_view":
+      return `${ev.sku || ""}${meta.media ? ` · ${PRETTY_MEDIA[meta.media] || meta.media}` : ""}`;
+    case "price_view":
+      return `${ev.sku || ""}${meta.context === "cost" ? " · cost / margin" : ""}`;
+    case "export":
+      return `${meta.count ?? ""} ${PRETTY_EXPORT[meta.kind] || meta.kind || "items"}`.trim();
+    case "session_end":
+      return meta.ms ? `${fmtDuration(meta.ms)} in app` : "";
+    case "denied":
+      return `tried to open ${meta.resource || "a blocked area"}`;
+    case "filter_apply": {
+      const n = Array.isArray(meta.facets) ? meta.facets.length : 0;
+      const head = n ? `${n} filter${n === 1 ? "" : "s"}` : "filtered";
+      return `${head} · ${meta.results ?? "?"} results · tap to view`;
+    }
     default:
       return "";
   }
 };
 
 const eventLink = (ev) =>
-  (ev.type === "stone_view" || ev.type === "share") && ev.sku ? detailPath(ev) : null;
+  (ev.type === "stone_view" || ev.type === "share" || ev.type === "stone_dwell" ||
+    ev.type === "media_view" || ev.type === "price_view") && ev.sku
+    ? detailPath(ev)
+    : null;
+
+// Events whose full detail (search criteria + result stones) opens in a modal.
+const isReplayable = (ev) => ev.type === "filter_apply" || ev.type === "zero_results";
+
+// Human labels for the persisted filter keys (must mirror FILTER_DEFAULTS in
+// SalesInventory). Anything unmapped falls back to the raw key.
+const FILTER_LABELS = {
+  shapeSel: "Shape", sizeFrom: "Min carat", sizeTo: "Max carat", sizeBands: "Carat bands",
+  ppcFrom: "Min $/ct", ppcTo: "Max $/ct", ppcBands: "$/ct bands",
+  totalFrom: "Min total", totalTo: "Max total", totalBands: "Total bands",
+  lenFrom: "Min length", lenTo: "Max length", widthFrom: "Min width", widthTo: "Max width",
+  ratioFrom: "Min ratio", ratioTo: "Max ratio", colorMode: "Color mode", colorGrades: "Color",
+  fancyIntensity: "Fancy intensity", fancyColor: "Fancy color", claritySel: "Clarity",
+  labSel: "Lab", locationSel: "Location", treatmentSel: "Treatment", originSel: "Origin",
+  gemColorSel: "Gem color", gemTypeSel: "Gem type", cutSel: "Cut", polishSel: "Polish",
+  symmetrySel: "Symmetry", fluorSel: "Fluorescence", parcelSel: "Parcel",
+  onlyCert: "Certified only", onlyMedia: "With media", onlyInStock: "In stock only",
+};
+
+const fmtCriteriaValue = (v) => {
+  if (Array.isArray(v)) return v.join(", ");
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  return String(v);
+};
+
+const MODE_PATH = {
+  diamond: "/sales/diamonds",
+  emerald: "/sales/emeralds",
+  gemstone: "/sales/gemstones",
+};
 
 const RepIdentity = ({ rep, big }) => (
   <div className="flex items-center gap-2.5">
@@ -245,7 +323,177 @@ const RepCard = ({ rep, onClick }) => (
   </button>
 );
 
+/* Detail sheet for a logged search/filter — shows the exact criteria the rep
+ * used, the result count, the snapshot of stones they got back, and a button
+ * to re-run the same search live in the catalog. */
+const SearchDetailModal = ({ ev, onClose }) => {
+  const navigate = useNavigate();
+  const meta = ev?.meta || {};
+  const criteria = meta.criteria && typeof meta.criteria === "object" ? meta.criteria : {};
+  const criteriaKeys = Object.keys(criteria);
+  const sample = Array.isArray(meta.sample) ? meta.sample : [];
+  const sort = Array.isArray(meta.sort) ? meta.sort : [];
+
+  const reRun = () => {
+    const modePath = MODE_PATH[meta.mode] || "/sales/gemstones";
+    navigate(modePath, {
+      state: {
+        replayFilters: { ...criteria, sortBy: sort, skuQuery: meta.q || "" },
+      },
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 30, stiffness: 320 }}
+        className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[85vh] w-full max-w-[680px] flex-col rounded-t-3xl border-t border-app-line bg-app-canvas"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+        role="dialog"
+        aria-label="Search detail"
+      >
+        <div className="flex justify-center pt-3" aria-hidden>
+          <span className="h-1.5 w-10 rounded-full bg-app-line" />
+        </div>
+        <div className="flex items-center justify-between px-5 py-3">
+          <div className="min-w-0">
+            <h2 className="text-[16px] font-semibold tracking-tight text-app-ink">
+              {ev.type === "zero_results" ? "Search — no results" : "Search detail"}
+            </h2>
+            <p className="truncate text-[12px] text-app-soft">
+              {ev.actor_name || "Someone"} · {relTime(ev.created_at)}
+              {meta.mode ? ` · ${meta.mode}` : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-app-soft transition hover:bg-app-canvas2 hover:text-app-ink"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 pb-2">
+          {/* What they searched */}
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">
+            What they searched
+          </p>
+          {meta.q ? (
+            <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-app-line bg-app-surface px-3 py-2">
+              <span className="text-[12px] text-app-soft">Search text</span>
+              <span className="truncate text-[13px] font-semibold text-app-ink">"{meta.q}"</span>
+            </div>
+          ) : null}
+          {criteriaKeys.length ? (
+            <div className="divide-y divide-app-line/60 rounded-xl border border-app-line bg-app-surface px-3">
+              {criteriaKeys.map((k) => (
+                <div key={k} className="flex items-baseline justify-between gap-4 py-2">
+                  <span className="shrink-0 text-[12px] text-app-soft">{FILTER_LABELS[k] || k}</span>
+                  <span className="min-w-0 text-right text-[13px] font-semibold text-app-ink">
+                    {fmtCriteriaValue(criteria[k])}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : !meta.q ? (
+            <p className="text-[13px] text-app-soft">No specific filters — browsed the full catalog.</p>
+          ) : null}
+          {sort.length ? (
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-app-line bg-app-surface px-3 py-2">
+              <span className="text-[12px] text-app-soft">Sorted by</span>
+              <span className="truncate text-[13px] font-semibold text-app-ink">
+                {sort
+                  .map((s) => `${s.key} ${s.dir === "asc" ? "↑" : "↓"}`)
+                  .join(", ")}
+              </span>
+            </div>
+          ) : null}
+
+          {/* What they got back */}
+          <div className="mb-2 mt-5 flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">
+              Stones returned
+            </p>
+            <span className="text-[12px] font-semibold text-app-ink">{meta.results ?? sample.length}</span>
+          </div>
+          {sample.length ? (
+            <ul className="space-y-1.5">
+              {sample.map((s, i) => {
+                const line = [
+                  s.wt != null ? `${Number(s.wt).toFixed?.(2) ?? s.wt}ct` : null,
+                  s.shape,
+                  s.color,
+                  s.clarity,
+                  s.lab,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <li key={`${s.sku || i}`}>
+                    <Link
+                      to={`/sales/stone/${encodeURIComponent(s.sku || "")}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-app-line bg-app-surface px-3 py-2 transition hover:bg-app-canvas2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold text-app-ink">{s.sku || "—"}</p>
+                        {line ? <p className="truncate text-[11.5px] text-app-muted">{line}</p> : null}
+                      </div>
+                      {s.total != null && (
+                        <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-app-ink">
+                          ${Number(s.total).toLocaleString()}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+              {meta.results > sample.length && (
+                <li className="px-1 pt-1 text-[12px] text-app-soft">
+                  + {meta.results - sample.length} more — re-run to see all
+                </li>
+              )}
+            </ul>
+          ) : (
+            <p className="text-[13px] text-app-soft">No stones matched this search.</p>
+          )}
+        </div>
+
+        {/* Re-run */}
+        <div className="border-t border-app-line px-5 pt-3">
+          <button
+            type="button"
+            onClick={reRun}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-app-ink py-3 text-[14px] font-semibold text-app-canvas transition active:scale-[0.99]"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 00-14.9-2M4 16a8 8 0 0014.9 2" />
+            </svg>
+            Re-run this search live
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const ActivityFeed = ({ events }) => {
+  const [detailEv, setDetailEv] = useState(null);
   if (!events?.length) {
     return (
       <div className="rounded-2xl glass-surface p-8 text-center text-[13px] text-app-soft">No activity yet.</div>
@@ -261,6 +509,7 @@ const ActivityFeed = ({ events }) => {
           const meta = ACTIVITY_META[ev.type] || { label: ev.type, chip: "bg-stone-100 text-stone-600" };
           const summary = eventSummary(ev);
           const to = eventLink(ev);
+          const replayable = isReplayable(ev);
           const Row = (
             <>
               <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10.5px] font-semibold ${meta.chip}`}>
@@ -276,7 +525,7 @@ const ActivityFeed = ({ events }) => {
             </>
           );
           const rowClass =
-            "flex items-center gap-2.5 rounded-xl border border-app-line bg-app-surface px-3 py-2.5 transition hover:bg-app-canvas2";
+            "flex w-full items-center gap-2.5 rounded-xl border border-app-line bg-app-surface px-3 py-2.5 text-left transition hover:bg-app-canvas2";
           return (
             <motion.li
               key={ev.id}
@@ -286,7 +535,11 @@ const ActivityFeed = ({ events }) => {
               exit={{ opacity: 0, scale: 0.97 }}
               transition={{ type: "spring", stiffness: 480, damping: 34 }}
             >
-              {to ? (
+              {replayable ? (
+                <button type="button" onClick={() => setDetailEv(ev)} className={rowClass}>
+                  {Row}
+                </button>
+              ) : to ? (
                 <Link to={to} className={rowClass}>
                   {Row}
                 </Link>
@@ -296,6 +549,9 @@ const ActivityFeed = ({ events }) => {
             </motion.li>
           );
         })}
+      </AnimatePresence>
+      <AnimatePresence>
+        {detailEv && <SearchDetailModal ev={detailEv} onClose={() => setDetailEv(null)} />}
       </AnimatePresence>
     </ul>
   );

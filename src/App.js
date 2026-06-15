@@ -40,6 +40,7 @@ import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import MobileDock from "./components/MobileDock";
 import ActivityTracker from "./components/ActivityTracker";
+import { trackDenied } from "./utils/activityLog";
 import SpinningGem from "./components/SpinningGem";
 import BrandMark from "./components/BrandMark";
 import { RouteLoadingProvider } from "./components/RouteLoadingContext";
@@ -300,7 +301,12 @@ const AppLayout = () => {
     if (!allowedLanding) return <NoAccessScreen />;
     const sec = sectionForPath(location.pathname);
     if (sec && !team.can(sec.key)) {
-      return <Navigate to={allowedLanding} replace />;
+      return (
+        <>
+          <DeniedLogger resource={sec.key} path={location.pathname} />
+          <Navigate to={allowedLanding} replace />
+        </>
+      );
     }
   }
   const navSections = gated ? navSectionsFor(NAV_SECTIONS, team.can) : NAV_SECTIONS;
@@ -376,6 +382,17 @@ const FullScreenLoader = () => (
   </div>
 );
 
+
+// Logs a permission-denied attempt (a gated member deep-linking into a section
+// they're not allowed to open) exactly once, then renders nothing — the sibling
+// <Navigate> does the redirect. Kept as a tiny effect component so we never fire
+// a side effect during render.
+const DeniedLogger = ({ resource, path }) => {
+  useEffect(() => {
+    trackDenied(resource, { path });
+  }, [resource, path]);
+  return null;
+};
 
 // Shown to a signed-in member whose admin hasn't granted them any section yet.
 // Avoids a redirect loop and tells them what to do.
