@@ -128,6 +128,7 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
 
   // Sign-up
   const [suEmail, setSuEmail] = useState(initialEmail);
+  const [suUsername, setSuUsername] = useState("");
   const [suPassword, setSuPassword] = useState("");
   const [suCode, setSuCode] = useState("");
   const [pendingCode, setPendingCode] = useState(false);
@@ -288,17 +289,15 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
           res = await signUp.update({ password: suPassword });
         }
 
-        // A username is required by the instance → derive a valid one from the
-        // email so invited users never have to invent one. Clerk here wants
-        // lowercase alphanumeric/underscore, 4–64 chars, not all-numeric.
+        // A username is required by the instance → use the one the invitee
+        // chose in the form.
         if (res.status !== "complete" && missingFields().includes("username")) {
-          const local = (suEmail || res.emailAddress || "")
-            .split("@")[0]
-            .toLowerCase()
-            .replace(/[^a-z0-9_]/g, "");
-          let username = local.length >= 4 ? local.slice(0, 24) : `${local}user`.slice(0, 12);
-          if (!username) username = `user${Date.now().toString().slice(-6)}`;
-          res = await signUp.update({ username });
+          const uname = suUsername.trim();
+          if (!uname) {
+            setError("Please choose a username to finish setting up your account.");
+            return;
+          }
+          res = await signUp.update({ username: uname });
         }
 
         // Email somehow still unverified → fall back to an email code.
@@ -326,7 +325,11 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
         return;
       }
 
-      await signUp.create({ emailAddress: suEmail.trim(), password: suPassword });
+      await signUp.create({
+        emailAddress: suEmail.trim(),
+        password: suPassword,
+        ...(suUsername.trim() ? { username: suUsername.trim() } : {}),
+      });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingCode(true);
     } catch (err) {
@@ -638,6 +641,24 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
                             This is the email your invitation was sent to.
                           </p>
                         ) : null}
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="signup-username" className="text-[13px] font-medium text-app-graphite">
+                          Username
+                        </label>
+                        <input
+                          id="signup-username"
+                          type="text"
+                          autoComplete="username"
+                          value={suUsername}
+                          onChange={(ev) => setSuUsername(ev.target.value)}
+                          placeholder="Choose a username"
+                          className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
+                        />
+                        <p className="text-[12px] text-app-soft">
+                          At least 4 characters — letters, numbers or underscores.
+                        </p>
                       </div>
 
                       <div className="flex flex-col gap-1.5">
