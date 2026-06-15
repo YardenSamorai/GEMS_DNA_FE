@@ -1,6 +1,6 @@
 import React, { useState, cloneElement } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { useSignIn } from "@clerk/clerk-react";
 
@@ -384,16 +384,9 @@ export default function LoginSheet({ children }) {
                   Sign in with a passkey
                 </button>
 
-                {/* Footer */}
+                {/* Footer — access is invite-only; no public sign-up. */}
                 <p className="mt-6 text-center text-[13px] text-app-muted">
-                  Don't have an account?{" "}
-                  <Link
-                    to="/sign-up"
-                    onClick={close}
-                    className="font-semibold text-app-ink hover:underline"
-                  >
-                    Sign up
-                  </Link>
+                  Access is by invitation only. Ask your workshop admin to invite you.
                 </p>
               </div>
             </div>

@@ -74,6 +74,18 @@ const clerkAppearance = {
   },
 };
 
+// Sign-in widget: access is invite-only, so hide Clerk's built-in
+// "Don't have an account? Sign up" footer link to avoid advertising a
+// self-serve sign-up that Restricted mode would reject anyway.
+const signInAppearance = {
+  ...clerkAppearance,
+  elements: {
+    ...clerkAppearance.elements,
+    footerAction: "hidden",
+    footerAction__signUp: "hidden",
+  },
+};
+
 function useEmailFromQuery() {
   const [params] = useSearchParams();
   const raw = params.get("email") || "";
@@ -85,7 +97,6 @@ function useEmailFromQuery() {
 
 export const SignInPage = () => {
   const email = useEmailFromQuery();
-  const { search } = useLocation();
   // If they're already signed in, just bounce them straight to /dashboard.
   return (
     <>
@@ -101,22 +112,13 @@ export const SignInPage = () => {
               : "Sign in to your GEMS DNA workshop."
           }
           footer={
-            <>
-              New here?{" "}
-              <Link
-                to={`/sign-up${search}`}
-                className="font-medium text-app-ink hover:underline"
-              >
-                Create an account
-              </Link>
-            </>
+            <>Access is by invitation only. Ask your workshop admin to invite you.</>
           }
         >
           <SignIn
-            appearance={clerkAppearance}
+            appearance={signInAppearance}
             routing="path"
             path="/sign-in"
-            signUpUrl={`/sign-up${search}`}
             forceRedirectUrl="/dashboard"
             fallbackRedirectUrl="/dashboard"
             initialValues={email ? { emailAddress: email } : undefined}
@@ -137,11 +139,11 @@ export const SignUpPage = () => {
       </SignedIn>
       <SignedOut>
         <AuthShell
-          title="Set up your account"
+          title="Accept your invitation"
           subtitle={
             email
               ? `You were invited to GEMS DNA. Use ${email} so we can link this account to your team.`
-              : "Create your GEMS DNA account to get started."
+              : "GEMS DNA is invite-only. Open the link from your invitation email to finish setting up your account."
           }
           footer={
             <>
