@@ -1,24 +1,21 @@
-import React, { useState, cloneElement } from "react";
+import React, { useState, useEffect, cloneElement } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
-import { useSignIn } from "@clerk/clerk-react";
+import { useSignIn, useSignUp } from "@clerk/clerk-react";
 
 /* ============================================================================
- * LoginSheet — a fully custom sign-in surface.
+ * LoginSheet — a fully custom auth surface with two views: Sign in & Create
+ * account. Both slide up from the bottom (~70% of the viewport) and share the
+ * exact same design language; Clerk only powers the logic behind the scenes
+ * via the `useSignIn` / `useSignUp` hooks. No Clerk chrome.
  *
- * Everything you see here is OURS (v1.0.5 design language); Clerk only powers
- * the logic behind the scenes via the `useSignIn` hook. No Clerk chrome, no
- * "Secured by Clerk", no "Development mode" badge.
- *
- * It slides up from the bottom to ~70% of the viewport and is dismissible with
- * a downward finger drag from the header, exactly like the Filter / Sort sheets
- * in SalesInventory. It's portalled to <body> so it escapes the marketing
- * header's backdrop-filter context.
- *
- * Supported flows:
- *   - Google OAuth (redirect → /sso-callback → /dashboard)
- *   - email/username + password
+ * Access is invite-only (Clerk "Restricted mode"):
+ *   - Invited users arrive via an email link carrying `__clerk_ticket`. We
+ *     detect it, auto-open in the Create-account view, and complete sign-up
+ *     with the ticket (their email is pre-verified — they only set a password).
+ *   - Anyone without an invitation who tries to create an account gets a clear
+ *     "invitation only" message from Clerk.
  *
  * Usage — wrap any trigger element; we attach the open handler via cloneElement
  * so there's no nested <button>:
@@ -57,29 +54,101 @@ const Spinner = ({ className = "" }) => (
   </svg>
 );
 
+// Eye / eye-off toggle used by the password inputs.
+const EyeToggle = ({ shown, onToggle }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-label={shown ? "Hide password" : "Show password"}
+    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-app-soft transition hover:text-app-ink"
+  >
+    {shown ? (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A9.5 9.5 0 0112 5c5 0 9 4 9 7a11 11 0 01-2.3 3.2M6.6 6.6A11 11 0 003 12c0 3 4 7 9 7a9.5 9.5 0 003.5-.7" />
+      </svg>
+    ) : (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" />
+        <circle cx="12" cy="12" r="2.5" strokeWidth={1.6} />
+      </svg>
+    )}
+  </button>
+);
+
 // Pull the friendliest message out of a Clerk error.
 const clerkErrorMessage = (err) =>
   err?.errors?.[0]?.longMessage ||
   err?.errors?.[0]?.message ||
   "Something went wrong. Please try again.";
 
+// Sign-up errors get a tailored message when Clerk blocks an uninvited user
+// (Restricted mode), so the dead-end reads as policy, not a bug.
+const signUpErrorMessage = (err) => {
+  const e0 = err?.errors?.[0];
+  const code = (e0?.code || "").toLowerCase();
+  const msg = (e0?.longMessage || e0?.message || "").toLowerCase();
+  if (
+    code.includes("not_allowed") ||
+    code.includes("restricted") ||
+    msg.includes("not allowed") ||
+    msg.includes("restricted") ||
+    msg.includes("invitation")
+  ) {
+    return "Sign-up is by invitation only. Ask your workshop admin to invite you, then open the link in your email.";
+  }
+  return clerkErrorMessage(err);
+};
+
 export default function LoginSheet({ children }) {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState("signin"); // "signin" | "signup"
   const drag = useDragControls();
   const navigate = useNavigate();
   const { isLoaded, signIn, setActive } = useSignIn();
+  const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
 
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  // Shared
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Sign-in
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+
+  // Sign-up
+  const [suEmail, setSuEmail] = useState("");
+  const [suPassword, setSuPassword] = useState("");
+  const [suCode, setSuCode] = useState("");
+  const [pendingCode, setPendingCode] = useState(false);
+  const [ticket, setTicket] = useState(null);
+
+  // Invitation links land here with `__clerk_ticket` in the query — open the
+  // sheet straight into the Create-account view so invited users get the same
+  // polished surface instead of Clerk's hosted page.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = new URLSearchParams(window.location.search).get("__clerk_ticket");
+    if (t) {
+      setTicket(t);
+      setView("signup");
+      setOpen(true);
+    }
+  }, []);
 
   const close = () => {
     setOpen(false);
     setError("");
+    setPendingCode(false);
+  };
+
+  const switchTo = (next) => {
+    setError("");
+    setPendingCode(false);
+    setShowPassword(false);
+    setView(next);
   };
 
   const trigger = cloneElement(children, {
@@ -89,6 +158,8 @@ export default function LoginSheet({ children }) {
     },
   });
 
+  // OAuth handles both sign-in and sign-up (Clerk auto-creates when allowed;
+  // Restricted mode blocks uninvited new accounts).
   const handleGoogle = async () => {
     if (!isLoaded || googleLoading) return;
     setError("");
@@ -139,15 +210,9 @@ export default function LoginSheet({ children }) {
     setError("");
     setSubmitting(true);
     try {
-      // Step 1 — identify the user and discover which first factors the
-      // instance supports for them. Passing `password` here lets Clerk
-      // complete in one shot when it can.
       let attempt = await signIn.create({ identifier: identifier.trim(), password });
-
       if (await finishSignIn(attempt)) return;
 
-      // Step 2 — if Clerk still wants a first factor, explicitly attempt the
-      // password strategy (the create call above doesn't always consume it).
       if (attempt.status === "needs_first_factor") {
         const factors = attempt.supportedFirstFactors || [];
         const hasPassword = factors.some((f) => f.strategy === "password");
@@ -156,8 +221,6 @@ export default function LoginSheet({ children }) {
           attempt = await signIn.attemptFirstFactor({ strategy: "password", password });
           if (await finishSignIn(attempt)) return;
         } else {
-          // Account has no password (e.g. Google-only). Point them at the
-          // right method instead of a dead end.
           const hasGoogle = factors.some((f) => f.strategy === "oauth_google");
           setError(
             hasGoogle
@@ -168,13 +231,11 @@ export default function LoginSheet({ children }) {
         }
       }
 
-      // Step 3 — 2FA. We don't render an OTP input in this lightweight sheet.
       if (attempt.status === "needs_second_factor") {
         setError("Two-factor authentication is on for this account — please use the full sign-in page.");
         return;
       }
 
-      // Any other non-complete status.
       setError("Couldn't complete sign-in. Please try again or use another method.");
     } catch (err) {
       setError(clerkErrorMessage(err));
@@ -182,6 +243,77 @@ export default function LoginSheet({ children }) {
       setSubmitting(false);
     }
   };
+
+  // Create account. Two paths:
+  //   - With a ticket (invited): consume the invitation, set a password, done.
+  //   - Without a ticket: email + password, then an email-code verification.
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    if (!signUpLoaded || submitting) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      if (ticket) {
+        let res = await signUp.create({ strategy: "ticket", ticket });
+        if (res.status !== "complete" && suPassword) {
+          res = await signUp.update({ password: suPassword });
+        }
+        if (res.status === "complete") {
+          await setSignUpActive({ session: res.createdSessionId });
+          navigate("/dashboard", { replace: true });
+          return;
+        }
+        setError("Couldn't finish setting up your account. Please open the link in your invitation email again.");
+        return;
+      }
+
+      await signUp.create({ emailAddress: suEmail.trim(), password: suPassword });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setPendingCode(true);
+    } catch (err) {
+      setError(signUpErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    if (!signUpLoaded || submitting) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      const res = await signUp.attemptEmailAddressVerification({ code: suCode.trim() });
+      if (res.status === "complete") {
+        await setSignUpActive({ session: res.createdSessionId });
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+      setError("That code didn't work. Please check it and try again.");
+    } catch (err) {
+      setError(clerkErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isSignUp = view === "signup";
+  const title = isSignUp
+    ? ticket
+      ? "Accept your invitation"
+      : "Create your account"
+    : "Sign in to GEMS DNA";
+  const subtitle = isSignUp
+    ? pendingCode
+      ? "Enter the verification code we just emailed you"
+      : ticket
+        ? "Set a password to finish setting up your account"
+        : "Create your GEMS DNA account to get started"
+    : "Welcome back — please sign in to continue";
+
+  const errorBox = error ? (
+    <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] text-red-600">{error}</p>
+  ) : null;
 
   const sheet = (
     <AnimatePresence>
@@ -216,13 +348,10 @@ export default function LoginSheet({ children }) {
             className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col rounded-t-3xl border-t border-app-line bg-app-surface shadow-[0_-24px_60px_-30px_rgba(0,0,0,0.5)]"
             role="dialog"
             aria-modal="true"
-            aria-label="Sign in"
+            aria-label={isSignUp ? "Create account" : "Sign in"}
           >
-            {/* Header — an elegant, centred emblem with a soft ambient glow.
-                The whole zone is grabbable (iOS-style); only × opts out. A
-                faint top wash gives it a touch of depth. */}
+            {/* Header */}
             <div className="relative shrink-0 overflow-hidden">
-              {/* Soft gradient wash behind the header. */}
               <div
                 className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-app-canvas2/70 to-transparent"
                 aria-hidden
@@ -248,146 +377,246 @@ export default function LoginSheet({ children }) {
                 </svg>
               </button>
 
-              {/* Emblem + title — centred, drag zone. */}
+              {/* Emblem + title. */}
               <div
                 onPointerDown={(ev) => drag.start(ev)}
                 className="relative flex cursor-grab touch-none flex-col items-center px-6 pb-5 pt-3 text-center active:cursor-grabbing"
               >
                 <div className="relative mb-3.5">
-                  <span
-                    className="absolute -inset-2.5 rounded-[20px] bg-app-ink/10 blur-xl"
-                    aria-hidden
-                  />
+                  <span className="absolute -inset-2.5 rounded-[20px] bg-app-ink/10 blur-xl" aria-hidden />
                   <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-[18px] bg-app-ink shadow-[0_12px_28px_-10px_rgba(0,0,0,0.55)]">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="white" />
+                      <path d="M12 2L2 9L12 22L22 9L12 2Z" fill="rgb(var(--app-canvas))" />
                       <path d="M2 9H22" stroke="rgba(255,255,255,0.45)" strokeWidth="0.6" />
-                      <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="white" fillOpacity="0.25" />
+                      <path d="M12 2L8 9L12 22L16 9L12 2Z" fill="rgb(var(--app-canvas))" fillOpacity="0.25" />
                     </svg>
                     <span className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-inset ring-white/15" aria-hidden />
                   </span>
                 </div>
-                <h2 className="text-[20px] font-semibold tracking-tight text-app-ink">
-                  Sign in to GEMS DNA
-                </h2>
-                <p className="mt-1 text-[13px] leading-relaxed text-app-muted">
-                  Welcome back — please sign in to continue
-                </p>
+                <h2 className="text-[20px] font-semibold tracking-tight text-app-ink">{title}</h2>
+                <p className="mt-1 text-[13px] leading-relaxed text-app-muted">{subtitle}</p>
               </div>
             </div>
 
-            {/* Scrollable body holds the custom form. */}
+            {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
               <div className="mx-auto w-full max-w-[400px]">
-                {/* Google */}
-                <button
-                  type="button"
-                  onClick={handleGoogle}
-                  disabled={googleLoading || !isLoaded}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-app-line bg-app-surface py-3 text-[14px] font-medium text-app-ink transition hover:bg-app-canvas2 active:scale-[0.99] disabled:opacity-60"
-                >
-                  {googleLoading ? <Spinner className="h-4 w-4 text-app-ink" /> : <GoogleGlyph />}
-                  Continue with Google
-                </button>
+                {!isSignUp ? (
+                  /* ---------------------------- SIGN IN ---------------------------- */
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleGoogle}
+                      disabled={googleLoading || !isLoaded}
+                      className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-app-line bg-app-surface py-3 text-[14px] font-medium text-app-ink transition hover:bg-app-canvas2 active:scale-[0.99] disabled:opacity-60"
+                    >
+                      {googleLoading ? <Spinner className="h-4 w-4 text-app-ink" /> : <GoogleGlyph />}
+                      Continue with Google
+                    </button>
 
-                {/* Divider */}
-                <div className="my-5 flex items-center gap-3">
-                  <span className="h-px flex-1 bg-app-line" />
-                  <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-app-soft">
-                    or
-                  </span>
-                  <span className="h-px flex-1 bg-app-line" />
-                </div>
+                    <div className="my-5 flex items-center gap-3">
+                      <span className="h-px flex-1 bg-app-line" />
+                      <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-app-soft">or</span>
+                      <span className="h-px flex-1 bg-app-line" />
+                    </div>
 
-                {/* Email / password */}
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="login-identifier" className="text-[13px] font-medium text-app-graphite">
-                      Email address or username
-                    </label>
-                    <input
-                      id="login-identifier"
-                      type="text"
-                      autoComplete="username"
-                      value={identifier}
-                      onChange={(ev) => setIdentifier(ev.target.value)}
-                      placeholder="Enter email or username"
-                      className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
-                    />
-                  </div>
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="login-identifier" className="text-[13px] font-medium text-app-graphite">
+                          Email address or username
+                        </label>
+                        <input
+                          id="login-identifier"
+                          type="text"
+                          autoComplete="username"
+                          value={identifier}
+                          onChange={(ev) => setIdentifier(ev.target.value)}
+                          placeholder="Enter email or username"
+                          className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
+                        />
+                      </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="login-password" className="text-[13px] font-medium text-app-graphite">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        value={password}
-                        onChange={(ev) => setPassword(ev.target.value)}
-                        placeholder="Enter your password"
-                        className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 pr-11 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
-                      />
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="login-password" className="text-[13px] font-medium text-app-graphite">
+                          Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            id="login-password"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            value={password}
+                            onChange={(ev) => setPassword(ev.target.value)}
+                            placeholder="Enter your password"
+                            className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 pr-11 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
+                          />
+                          <EyeToggle shown={showPassword} onToggle={() => setShowPassword((s) => !s)} />
+                        </div>
+                      </div>
+
+                      {errorBox}
+
+                      <button
+                        type="submit"
+                        disabled={submitting || !isLoaded}
+                        className="mt-1 flex w-full items-center justify-center gap-2 rounded-full bg-app-ink py-3 text-[14.5px] font-semibold tracking-tight text-app-canvas shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] transition hover:bg-app-graphite active:scale-[0.99] disabled:opacity-60"
+                      >
+                        {submitting ? <Spinner className="h-4 w-4 text-app-canvas" /> : null}
+                        Continue
+                      </button>
+                    </form>
+
+                    <button
+                      type="button"
+                      onClick={handlePasskey}
+                      disabled={passkeyLoading || !isLoaded}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-app-line bg-app-surface py-2.5 text-[13.5px] font-medium text-app-graphite transition hover:bg-app-canvas2 active:scale-[0.99] disabled:opacity-60"
+                    >
+                      {passkeyLoading ? (
+                        <Spinner className="h-4 w-4 text-app-graphite" />
+                      ) : (
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                          <circle cx="9" cy="8" r="4" strokeWidth={1.6} />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M2.5 20a6.5 6.5 0 0 1 10.5-5.1M19 12.5l3 3-2 2-1-1m0 0-1.6 1.6a2.8 2.8 0 1 1-2-2L17 14.5" />
+                        </svg>
+                      )}
+                      Sign in with a passkey
+                    </button>
+
+                    <p className="mt-6 text-center text-[13px] text-app-muted">
+                      Have an invitation?{" "}
                       <button
                         type="button"
-                        onClick={() => setShowPassword((s) => !s)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-app-soft transition hover:text-app-ink"
+                        onClick={() => switchTo("signup")}
+                        className="font-semibold text-app-ink hover:underline"
                       >
-                        {showPassword ? (
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A9.5 9.5 0 0112 5c5 0 9 4 9 7a11 11 0 01-2.3 3.2M6.6 6.6A11 11 0 003 12c0 3 4 7 9 7a9.5 9.5 0 003.5-.7" />
-                          </svg>
-                        ) : (
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" />
-                            <circle cx="12" cy="12" r="2.5" strokeWidth={1.6} />
-                          </svg>
-                        )}
+                        Create your account
                       </button>
-                    </div>
-                  </div>
-
-                  {error ? (
-                    <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] text-red-600">
-                      {error}
                     </p>
-                  ) : null}
+                  </>
+                ) : pendingCode ? (
+                  /* ------------------------ VERIFY EMAIL CODE ----------------------- */
+                  <form onSubmit={handleVerify} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor="signup-code" className="text-[13px] font-medium text-app-graphite">
+                        Verification code
+                      </label>
+                      <input
+                        id="signup-code"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={suCode}
+                        onChange={(ev) => setSuCode(ev.target.value)}
+                        placeholder="Enter the 6-digit code"
+                        className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-center text-[18px] tracking-[0.3em] text-app-ink placeholder:tracking-normal placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
+                      />
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={submitting || !isLoaded}
-                    className="mt-1 flex w-full items-center justify-center gap-2 rounded-full bg-app-ink py-3 text-[14.5px] font-semibold tracking-tight text-app-canvas shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] transition hover:bg-app-graphite active:scale-[0.99] disabled:opacity-60"
-                  >
-                    {submitting ? <Spinner className="h-4 w-4 text-app-canvas" /> : null}
-                    Continue
-                  </button>
-                </form>
+                    {errorBox}
 
-                {/* Passkey */}
-                <button
-                  type="button"
-                  onClick={handlePasskey}
-                  disabled={passkeyLoading || !isLoaded}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-app-line bg-app-surface py-2.5 text-[13.5px] font-medium text-app-graphite transition hover:bg-app-canvas2 active:scale-[0.99] disabled:opacity-60"
-                >
-                  {passkeyLoading ? (
-                    <Spinner className="h-4 w-4 text-app-graphite" />
-                  ) : (
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                      <circle cx="9" cy="8" r="4" strokeWidth={1.6} />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M2.5 20a6.5 6.5 0 0 1 10.5-5.1M19 12.5l3 3-2 2-1-1m0 0-1.6 1.6a2.8 2.8 0 1 1-2-2L17 14.5" />
-                    </svg>
-                  )}
-                  Sign in with a passkey
-                </button>
+                    <button
+                      type="submit"
+                      disabled={submitting || !signUpLoaded}
+                      className="mt-1 flex w-full items-center justify-center gap-2 rounded-full bg-app-ink py-3 text-[14.5px] font-semibold tracking-tight text-app-canvas shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] transition hover:bg-app-graphite active:scale-[0.99] disabled:opacity-60"
+                    >
+                      {submitting ? <Spinner className="h-4 w-4 text-app-canvas" /> : null}
+                      Verify &amp; continue
+                    </button>
 
-                {/* Footer — access is invite-only; no public sign-up. */}
-                <p className="mt-6 text-center text-[13px] text-app-muted">
-                  Access is by invitation only. Ask your workshop admin to invite you.
-                </p>
+                    <p className="mt-2 text-center text-[13px] text-app-muted">
+                      <button
+                        type="button"
+                        onClick={() => switchTo("signup")}
+                        className="font-semibold text-app-ink hover:underline"
+                      >
+                        Back
+                      </button>
+                    </p>
+                  </form>
+                ) : (
+                  /* ---------------------------- CREATE ACCOUNT ---------------------- */
+                  <>
+                    {!ticket && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleGoogle}
+                          disabled={googleLoading || !isLoaded}
+                          className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-app-line bg-app-surface py-3 text-[14px] font-medium text-app-ink transition hover:bg-app-canvas2 active:scale-[0.99] disabled:opacity-60"
+                        >
+                          {googleLoading ? <Spinner className="h-4 w-4 text-app-ink" /> : <GoogleGlyph />}
+                          Continue with Google
+                        </button>
+
+                        <div className="my-5 flex items-center gap-3">
+                          <span className="h-px flex-1 bg-app-line" />
+                          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-app-soft">or</span>
+                          <span className="h-px flex-1 bg-app-line" />
+                        </div>
+                      </>
+                    )}
+
+                    <form onSubmit={handleSignUp} className="flex flex-col gap-4">
+                      {!ticket && (
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="signup-email" className="text-[13px] font-medium text-app-graphite">
+                            Email address
+                          </label>
+                          <input
+                            id="signup-email"
+                            type="email"
+                            autoComplete="email"
+                            value={suEmail}
+                            onChange={(ev) => setSuEmail(ev.target.value)}
+                            placeholder="you@example.com"
+                            className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="signup-password" className="text-[13px] font-medium text-app-graphite">
+                          {ticket ? "Choose a password" : "Password"}
+                        </label>
+                        <div className="relative">
+                          <input
+                            id="signup-password"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="new-password"
+                            value={suPassword}
+                            onChange={(ev) => setSuPassword(ev.target.value)}
+                            placeholder="Create a password"
+                            className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 pr-11 text-[16px] text-app-ink placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
+                          />
+                          <EyeToggle shown={showPassword} onToggle={() => setShowPassword((s) => !s)} />
+                        </div>
+                      </div>
+
+                      {errorBox}
+
+                      <button
+                        type="submit"
+                        disabled={submitting || !signUpLoaded}
+                        className="mt-1 flex w-full items-center justify-center gap-2 rounded-full bg-app-ink py-3 text-[14.5px] font-semibold tracking-tight text-app-canvas shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] transition hover:bg-app-graphite active:scale-[0.99] disabled:opacity-60"
+                      >
+                        {submitting ? <Spinner className="h-4 w-4 text-app-canvas" /> : null}
+                        Continue
+                      </button>
+                    </form>
+
+                    <p className="mt-6 text-center text-[13px] text-app-muted">
+                      Already have an account?{" "}
+                      <button
+                        type="button"
+                        onClick={() => switchTo("signin")}
+                        className="font-semibold text-app-ink hover:underline"
+                      >
+                        Sign in
+                      </button>
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

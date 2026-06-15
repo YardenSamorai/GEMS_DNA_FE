@@ -415,7 +415,7 @@ const AuthPrompt = ({ message }) => (
     </div>
 
     <div className="relative h-16 w-16 rounded-2xl bg-app-ink flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(0,0,0,0.45)]">
-      <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="h-7 w-7 text-app-canvas" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
       </svg>
       <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/15 pointer-events-none" aria-hidden />
