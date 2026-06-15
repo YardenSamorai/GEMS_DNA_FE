@@ -333,6 +333,12 @@ const SearchDetailModal = ({ ev, onClose }) => {
   const criteriaKeys = Object.keys(criteria);
   const sample = Array.isArray(meta.sample) ? meta.sample : [];
   const sort = Array.isArray(meta.sort) ? meta.sort : [];
+  // Older events only stored the facet *names* (not values) — show them as a
+  // read-only fallback so the row isn't blank.
+  const facetNames = Array.isArray(meta.facets) ? meta.facets : [];
+  // Can we actually replay this search? Only when we captured real values.
+  const canReplay = criteriaKeys.length > 0 || !!meta.q;
+  const isZero = ev.type === "zero_results" || meta.results === 0;
 
   const reRun = () => {
     const modePath = MODE_PATH[meta.mode] || "/sales/gemstones";
@@ -411,6 +417,16 @@ const SearchDetailModal = ({ ev, onClose }) => {
                 </div>
               ))}
             </div>
+          ) : facetNames.length ? (
+            // Older log — only the facet names were stored, not their values.
+            <div className="rounded-xl border border-app-line bg-app-surface px-3 py-2.5">
+              <p className="text-[13px] text-app-ink">
+                {facetNames.map((k) => FILTER_LABELS[k] || k).join(", ")}
+              </p>
+              <p className="mt-1 text-[11.5px] text-app-soft">
+                Older log — exact filter values weren't recorded.
+              </p>
+            </div>
           ) : !meta.q ? (
             <p className="text-[13px] text-app-soft">No specific filters — browsed the full catalog.</p>
           ) : null}
@@ -469,12 +485,18 @@ const SearchDetailModal = ({ ev, onClose }) => {
                 </li>
               )}
             </ul>
-          ) : (
+          ) : isZero ? (
             <p className="text-[13px] text-app-soft">No stones matched this search.</p>
+          ) : (
+            // results > 0 but no snapshot → an older log from before snapshots.
+            <p className="text-[13px] text-app-soft">
+              This older log didn't capture the stone list. Tap Re-run to see the current matches.
+            </p>
           )}
         </div>
 
-        {/* Re-run */}
+        {/* Re-run — only meaningful when we captured real criteria; otherwise it
+            just opens the catalog, so label it honestly. */}
         <div className="border-t border-app-line px-5 pt-3">
           <button
             type="button"
@@ -484,7 +506,7 @@ const SearchDetailModal = ({ ev, onClose }) => {
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 00-14.9-2M4 16a8 8 0 0014.9 2" />
             </svg>
-            Re-run this search live
+            {canReplay ? "Re-run this search live" : `Open ${meta.mode || "catalog"} catalog`}
           </button>
         </div>
       </motion.div>

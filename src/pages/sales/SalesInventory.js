@@ -938,8 +938,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const { actor } = useTeam();
   // A manager can "re-run" a logged search from the activity feed — the filter
   // criteria + sort + query arrive via router state and override the saved
-  // snapshot on mount. Read once into a ref so it applies exactly once.
-  const replayRef = useRef(useLocation().state?.replayFilters || null);
+  // snapshot on mount. We read the live location in the effect (not a one-shot
+  // ref initializer) so it works whether the page mounts fresh or is reused.
+  const location = useLocation();
+  const replayAppliedRef = useRef(false);
   const [stones, setStones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1104,9 +1106,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     // hopping between Diamonds / Emeralds / Gemstones — or returning later —
     // keeps every page's results. Panels always reopen in the default layout.
     // A re-run from the activity feed wins over the saved snapshot (once).
-    if (replayRef.current) {
-      applyFilters(replayRef.current);
-      replayRef.current = null;
+    const replay = location.state?.replayFilters;
+    if (replay && !replayAppliedRef.current) {
+      replayAppliedRef.current = true;
+      applyFilters(replay);
     } else {
       applyFilters(loadSavedFilters(mode));
     }
