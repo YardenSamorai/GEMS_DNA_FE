@@ -1,7 +1,8 @@
 import React from "react";
-import { Link, useLocation, useSearchParams, Navigate } from "react-router-dom";
-import { SignIn, SignUp, SignedIn, SignedOut } from "@clerk/clerk-react";
+import { Link, useSearchParams, Navigate } from "react-router-dom";
+import { SignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
 import sharedClerkAppearance from "../../theme/clerkAppearance";
+import LoginSheet from "../../components/LoginSheet";
 
 /**
  * Shared brand chrome for the standalone auth pages (/sign-in, /sign-up).
@@ -131,7 +132,11 @@ export const SignInPage = () => {
 
 export const SignUpPage = () => {
   const email = useEmailFromQuery();
-  const { search } = useLocation();
+  // Invitation links arrive here with `__clerk_ticket` in the URL. We hand the
+  // whole flow to our own bottom sheet (LoginSheet), which auto-opens on the
+  // ticket and completes sign-up via the `useSignUp` hook. This replaces
+  // Clerk's hosted <SignUp/> component, which was dead-ending invited users
+  // on an error screen under Restricted mode.
   return (
     <>
       <SignedIn>
@@ -148,24 +153,22 @@ export const SignUpPage = () => {
           footer={
             <>
               Already have an account?{" "}
-              <Link
-                to={`/sign-in${search}`}
-                className="font-medium text-app-ink hover:underline"
-              >
+              <Link to="/sign-in" className="font-medium text-app-ink hover:underline">
                 Sign in
               </Link>
             </>
           }
         >
-          <SignUp
-            appearance={clerkAppearance}
-            routing="path"
-            path="/sign-up"
-            signInUrl={`/sign-in${search}`}
-            forceRedirectUrl="/dashboard"
-            fallbackRedirectUrl="/dashboard"
-            initialValues={email ? { emailAddress: email } : undefined}
-          />
+          <div className="flex w-full flex-col items-center gap-3 py-2 text-center">
+            <p className="text-[13px] leading-relaxed text-app-muted">
+              Tap below to finish setting up your account.
+            </p>
+            <LoginSheet>
+              <button type="button" className="btn-primary">
+                Set up your account
+              </button>
+            </LoginSheet>
+          </div>
         </AuthShell>
       </SignedOut>
     </>

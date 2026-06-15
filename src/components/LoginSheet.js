@@ -87,12 +87,20 @@ const signUpErrorMessage = (err) => {
   const e0 = err?.errors?.[0];
   const code = (e0?.code || "").toLowerCase();
   const msg = (e0?.longMessage || e0?.message || "").toLowerCase();
+  // Account already exists → they should sign in, not sign up.
+  if (code.includes("identifier_exists") || msg.includes("already exists") || msg.includes("taken")) {
+    return "This email already has an account. Use \u201CSign in\u201D below instead.";
+  }
+  // Stale / revoked / expired invitation ticket.
+  if (code.includes("ticket") || code.includes("invitation") || msg.includes("ticket")) {
+    return "This invitation link is no longer valid or has expired. Ask your workshop admin to resend the invite.";
+  }
+  // Restricted mode blocked an uninvited sign-up.
   if (
     code.includes("not_allowed") ||
     code.includes("restricted") ||
     msg.includes("not allowed") ||
-    msg.includes("restricted") ||
-    msg.includes("invitation")
+    msg.includes("restricted")
   ) {
     return "Sign-up is by invitation only. Ask your workshop admin to invite you, then open the link in your email.";
   }
@@ -254,7 +262,14 @@ export default function LoginSheet({ children }) {
     setSubmitting(true);
     try {
       if (ticket) {
-        let res = await signUp.create({ strategy: "ticket", ticket });
+        // Accept the invitation. Pass the password up front so Clerk can
+        // complete in one shot when a password is required; fall back to an
+        // explicit update if it still reports missing requirements.
+        let res = await signUp.create({
+          strategy: "ticket",
+          ticket,
+          ...(suPassword ? { password: suPassword } : {}),
+        });
         if (res.status !== "complete" && suPassword) {
           res = await signUp.update({ password: suPassword });
         }
@@ -263,7 +278,7 @@ export default function LoginSheet({ children }) {
           navigate("/dashboard", { replace: true });
           return;
         }
-        setError("Couldn't finish setting up your account. Please open the link in your invitation email again.");
+        setError("Almost there — choose a password above to finish setting up your account.");
         return;
       }
 
