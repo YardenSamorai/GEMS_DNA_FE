@@ -25,12 +25,7 @@ export const decryptPrice = (encrypted) => {
     const decrypted = bytes.toString(CryptoJS.enc.Utf8);
     const num = parseFloat(decrypted);
     if (!Number.isFinite(num)) {
-      warnOnce(
-        '🔐 Price decryption failed — most likely the FE secret ' +
-        '(REACT_APP_ENCRYPT_SECRET in Vercel) does not match the BE secret ' +
-        '(ENCRYPT_SECRET in Render). Both must be the IDENTICAL 32-char string.',
-        { secretLength: secret.length, encryptedSample: String(encrypted).slice(0, 20) + '…' }
-      );
+      warnOnce('🔐 Price decryption failed — FE/BE secret mismatch.');
       return 0;
     }
     return num;
