@@ -775,10 +775,16 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
                       {errorBox}
 
                       {/* Clerk Smart CAPTCHA (bot protection) renders here.
-                          Required for custom sign-up flows — without this
-                          element Clerk falls back to an invisible CAPTCHA that
-                          can fail to load ("Error loading CAPTCHA"). */}
-                      <div id="clerk-captcha" className="flex justify-center empty:hidden" />
+                          Must stay visible in the layout: Cloudflare Turnstile
+                          cannot initialize inside a `display:none` element, so
+                          `empty:hidden` made it "fail to load". We reserve a
+                          little height instead and let the widget fill it. */}
+                      <div
+                        id="clerk-captcha"
+                        data-cl-theme="auto"
+                        data-cl-size="flexible"
+                        className="flex min-h-[70px] items-center justify-center"
+                      />
 
                       <button
                         type="submit"
