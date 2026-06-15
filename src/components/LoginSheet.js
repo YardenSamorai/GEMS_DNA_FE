@@ -276,23 +276,49 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
     setSubmitting(true);
     try {
       if (ticket) {
-        // Accept the invitation. Pass the password up front so Clerk can
-        // complete in one shot when a password is required; fall back to an
-        // explicit update if it still reports missing requirements.
-        let res = await signUp.create({
-          strategy: "ticket",
-          ticket,
-          ...(suPassword ? { password: suPassword } : {}),
-        });
-        if (res.status !== "complete" && suPassword) {
+        // Accept the invitation (email comes pre-verified from the ticket).
+        let res = await signUp.create({ strategy: "ticket", ticket });
+
+        // Fulfill whatever the instance still requires.
+        const missingFields = () => res.missingFields || [];
+        const unverified = () => res.unverifiedFields || [];
+
+        // Password (most common requirement).
+        if (res.status !== "complete" && suPassword && missingFields().includes("password")) {
           res = await signUp.update({ password: suPassword });
         }
+
+        // A username is required by the instance → derive one from the email.
+        if (res.status !== "complete" && missingFields().includes("username")) {
+          const base = (suEmail || res.emailAddress || "")
+            .split("@")[0]
+            .replace(/[^a-zA-Z0-9_]/g, "")
+            .slice(0, 20) || `user${Date.now().toString().slice(-6)}`;
+          res = await signUp.update({ username: base });
+        }
+
+        // Email somehow still unverified → fall back to an email code.
+        if (res.status !== "complete" && unverified().includes("email_address")) {
+          await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+          setPendingCode(true);
+          return;
+        }
+
         if (res.status === "complete") {
           await setSignUpActive({ session: res.createdSessionId });
           navigate("/dashboard", { replace: true });
           return;
         }
-        setError("Almost there — choose a password above to finish setting up your account.");
+
+        // Still incomplete — surface exactly what's missing so we can fix it.
+        // eslint-disable-next-line no-console
+        console.warn("[signup ticket] incomplete:", res.status, "missing:", res.missingFields, "unverified:", res.unverifiedFields);
+        const needs = [...missingFields(), ...unverified().map((f) => `${f} (unverified)`)];
+        setError(
+          needs.length
+            ? `Couldn't finish — your workshop's Clerk settings still require: ${needs.join(", ")}.`
+            : `Couldn't finish setting up your account (status: ${res.status}).`
+        );
         return;
       }
 
