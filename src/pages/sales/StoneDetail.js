@@ -647,7 +647,7 @@ const StoneDetail = () => {
         </AnimatePresence>
 
         {/* Price panel — dark ink block, echoing the primary action buttons. */}
-        {(ppc || total || (isDiamond && stone.rapPrice)) && (
+        {(ppc || total || (isDiamond && !isFancy && stone.rapPrice)) && (
           <div className="mt-7 overflow-hidden rounded-2xl bg-app-ink text-app-canvas">
             <div className="divide-y divide-white/10 px-5 tabular-nums">
               {ppc && (
@@ -658,7 +658,7 @@ const StoneDetail = () => {
                   <span className="text-[14.5px] font-semibold">{ppc}</span>
                 </div>
               )}
-              {isDiamond && stone.rapPrice != null && stone.rapPrice !== "" && (
+              {isDiamond && !isFancy && stone.rapPrice != null && stone.rapPrice !== "" && (
                 <div className="flex items-baseline justify-between py-3">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.1em] opacity-60">
                     RAP
@@ -765,9 +765,9 @@ const StoneDetail = () => {
                   </span>
                 </button>
 
-                {/* Include Rap % — diamonds & fancy only. Adds a "Rap %" line
-                    just above the prices in the WhatsApp message. */}
-                {isDiamond && (
+                {/* Include Rap % — regular diamonds only (not fancy). Adds a
+                    "Rap %" line just above the prices in the WhatsApp message. */}
+                {isDiamond && !isFancy && (
                   <button
                     type="button"
                     role="switch"
