@@ -9,6 +9,7 @@ import {
 } from "../../utils/shareStones";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
+import { useSelection } from "../../context/SelectionContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
 import {
@@ -100,7 +101,9 @@ const StoneDetail = () => {
   const [stone, setStone] = useState(routerState?.stone || null);
   const [loading, setLoading] = useState(!routerState?.stone);
   const [error, setError] = useState("");
-  const [liked, setLiked] = useState(false);
+  // The top-right star adds/removes this stone from the shared selection — same
+  // behaviour as the catalog card's star (useSelection).
+  const { isSelected, toggle } = useSelection();
   const [actionOpen, setActionOpen] = useState(false);
   const [shareFiles, setShareFiles] = useState([]);
   // Salesman can choose whether the WhatsApp message includes prices.
@@ -268,6 +271,8 @@ const StoneDetail = () => {
   const totalCost = Number.isFinite(weightNum) ? costPerCt * weightNum : null;
   const showCost = canViewCost && Number.isFinite(costPerCt) && costPerCt > 0;
 
+  const selected = isSelected(stone);
+
   // Spec groups — same fields, same order as the legacy diamond card.
   const stoneSpecs = isDiamond
     ? [
@@ -321,22 +326,22 @@ const StoneDetail = () => {
         </button>
         <button
           type="button"
-          onClick={() => setLiked((v) => !v)}
-          aria-label="Favorite"
-          aria-pressed={liked}
+          onClick={() => toggle(stone)}
+          aria-label={selected ? "Remove from selection" : "Add to selection"}
+          aria-pressed={selected}
           className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-app-surface/85 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.25)] backdrop-blur-md transition active:scale-95"
         >
           <svg
-            className={`h-5 w-5 transition-colors ${liked ? "text-emerald-500" : "text-app-graphite"}`}
-            fill={liked ? "currentColor" : "none"}
+            className={`h-5 w-5 transition-colors ${selected ? "text-emerald-500" : "text-app-graphite"}`}
+            fill={selected ? "currentColor" : "none"}
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={1.8}
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              strokeWidth={2}
+              d="M12 2.5l2.93 5.94 6.57.96-4.75 4.63 1.12 6.54L12 18.98l-5.87 3.09 1.12-6.54L2.5 9.9l6.57-.96L12 2.5z"
             />
           </svg>
         </button>
@@ -431,86 +436,79 @@ const StoneDetail = () => {
 
       {/* ---- Content sheet — rides up over the media like our bottom sheets. */}
       <div className="relative z-10 -mt-6 rounded-t-3xl border-t border-app-line bg-app-canvas px-5 pb-4 pt-5">
-        {/* Title row, with the cert action snugged to the right. */}
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-[21px] font-semibold leading-snug tracking-tight text-app-ink">
-            {title || stone.sku}
-          </h1>
-          {/* Quick actions, stacked: Certificate first, then V360 (jumps the
-              carousel straight to the video) when the stone has one. */}
-          {(cert || hasCert(stone) || video) && (
-            <div className="mt-0.5 flex shrink-0 flex-col items-end gap-2">
-              {(cert || hasCert(stone)) &&
-                (cert ? (
-                  <a
-                    href={cert}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => trackMedia(stone.sku, "certificate", stone.category)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 transition active:scale-95"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.8}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Certificate
-                  </a>
-                ) : (
-                  <span className="flex w-full items-center justify-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-3 py-1.5 text-[12px] font-semibold text-emerald-600/80">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.8}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Certified
-                  </span>
-                ))}
-              {video && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    trackMedia(stone.sku, "video_360", stone.category);
-                    scrollToVideo();
-                  }}
-                  aria-label="Play 360° video"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-[12px] font-semibold text-sky-600 transition active:scale-95"
+        {/* Title — stands on its own line. */}
+        <h1 className="text-[21px] font-semibold leading-snug tracking-tight text-app-ink">
+          {title || stone.sku}
+        </h1>
+
+        {/* Tags row — all chips together under the title: status flags (HOLD /
+            Memo out) plus the quick actions (Certificate, V360). */}
+        {(holder || stone.onHold || memoOut || cert || hasCert(stone) || video) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {(holder || stone.onHold) && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+                HOLD
+              </span>
+            )}
+            {memoOut && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-500/30">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Memo out
+              </span>
+            )}
+            {(cert || hasCert(stone)) &&
+              (cert ? (
+                <a
+                  href={cert}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => trackMedia(stone.sku, "certificate", stone.category)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 transition active:scale-95"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={1.8}
-                      d="M21 12a9 9 0 11-3.5-7.1M21 4v4h-4"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  V360
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Status flags */}
-        {(holder || stone.onHold || memoOut) && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            {(holder || stone.onHold) && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
-                HOLD
-              </span>
-            )}
-            {memoOut && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-[11.5px] font-bold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-500/30">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Memo out
-              </span>
+                  Certificate
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-3 py-1.5 text-[12px] font-semibold text-emerald-600/80">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Certified
+                </span>
+              ))}
+            {video && (
+              <button
+                type="button"
+                onClick={() => {
+                  trackMedia(stone.sku, "video_360", stone.category);
+                  scrollToVideo();
+                }}
+                aria-label="Play 360° video"
+                className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-[12px] font-semibold text-sky-600 transition active:scale-95"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                    d="M21 12a9 9 0 11-3.5-7.1M21 4v4h-4"
+                  />
+                </svg>
+                V360
+              </button>
             )}
           </div>
         )}
