@@ -234,6 +234,7 @@ const StoneDetail = () => {
   const mapped = getMappedCategories(stone.category);
   const isDiamond = mapped.includes("Diamond") || mapped.includes("Fancy");
   const isFancy = mapped.includes("Fancy");
+  const isEmerald = mapped.includes("Emerald");
 
   const wt = stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt).toFixed(2) : "";
   const shape = getDisplayShape(stone.shape);
@@ -330,6 +331,16 @@ const StoneDetail = () => {
     ["Table", pct(stone.tablePercent) || BLANK],
     // Cut only appears when it actually has a value (no empty "-" row).
     ...(stone.cut && String(stone.cut).trim() ? [["Cut", String(stone.cut).trim()]] : []),
+    ["Branch", stone.branch || BLANK],
+    ["Location", locationLabel || BLANK],
+  ];
+
+  // Emeralds use one flat spec list too (no section headers).
+  const emeraldSpecs = [
+    ["SKU", stone.sku || BLANK],
+    ["Origin", stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : BLANK],
+    ["L/W/D (mm)", lwd || BLANK],
+    ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : BLANK],
     ["Branch", stone.branch || BLANK],
     ["Location", locationLabel || BLANK],
   ];
@@ -543,6 +554,12 @@ const StoneDetail = () => {
         {isDiamond ? (
           <div className="mt-4 divide-y divide-app-line/60">
             {diamondSpecs.map(([label, value]) => (
+              <SpecRow key={label} label={label} value={value} />
+            ))}
+          </div>
+        ) : isEmerald ? (
+          <div className="mt-4 divide-y divide-app-line/60">
+            {emeraldSpecs.map(([label, value]) => (
               <SpecRow key={label} label={label} value={value} />
             ))}
           </div>
