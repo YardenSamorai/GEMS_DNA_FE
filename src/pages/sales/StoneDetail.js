@@ -93,7 +93,8 @@ const StoneDetail = () => {
   const { sku } = useParams();
   // Scope deep-link lookups by role: a salesman can't pull a stone outside
   // their region even by guessing the SKU URL (the BE enforces it).
-  const { actor } = useTeam();
+  // canViewCost gates the internal-cost reveal lower down the page.
+  const { actor, canViewCost } = useTeam();
   const navigate = useNavigate();
   const routerState = useLocation().state;
   const [stone, setStone] = useState(routerState?.stone || null);
@@ -104,6 +105,9 @@ const StoneDetail = () => {
   const [shareFiles, setShareFiles] = useState([]);
   // Salesman can choose whether the WhatsApp message includes prices.
   const [withPrice, setWithPrice] = useState(true);
+  // Internal cost is hidden behind a tap (managers/admins only) so it's never
+  // shown to a client over the rep's shoulder when the page first opens.
+  const [costOpen, setCostOpen] = useState(false);
 
   // Deep-link fallback — no stone in router state, find it by SKU.
   useEffect(() => {
@@ -256,6 +260,13 @@ const StoneDetail = () => {
   const cert = certLink(stone);
   const ppc = money(stone.pricePerCt);
   const total = money(stone.priceTotal);
+
+  // Internal cost (manager/admin only). Mirrors the old catalog Cost button,
+  // now living inside the product page, just under the location.
+  const costPerCt = Number(stone.costPerCt);
+  const weightNum = Number(stone.weightCt);
+  const totalCost = Number.isFinite(weightNum) ? costPerCt * weightNum : null;
+  const showCost = canViewCost && Number.isFinite(costPerCt) && costPerCt > 0;
 
   // Spec groups — same fields, same order as the legacy diamond card.
   const stoneSpecs = isDiamond
@@ -519,6 +530,57 @@ const StoneDetail = () => {
             <SpecRow key={label} label={label} value={value} />
           ))}
         </div>
+
+        {/* Internal cost — manager/admin only, right under the location. Hidden
+            behind a tap so it's never visible at a glance. */}
+        {showCost && (
+          <div className="mt-3">
+            {!costOpen ? (
+              <button
+                type="button"
+                onClick={() => setCostOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-[13px] font-semibold text-emerald-600 transition active:scale-[0.99]"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                    d="M7 7h.01M7 3h5.6a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-4.6 4.6a2 2 0 01-2.8 0L6.6 11.6A2 2 0 016 10.2V4a1 1 0 011-1z"
+                  />
+                </svg>
+                View internal cost
+              </button>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/5">
+                <div className="flex items-center justify-between px-4 pt-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
+                    Internal cost
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCostOpen(false)}
+                    className="text-[12px] font-semibold text-app-soft transition hover:text-app-ink"
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="divide-y divide-emerald-500/15 px-4 pb-3 tabular-nums">
+                  <div className="flex items-baseline justify-between py-2">
+                    <span className="text-[13px] text-app-muted">Cost / ct</span>
+                    <span className="text-[15px] font-semibold text-app-ink">{money(costPerCt)}</span>
+                  </div>
+                  {totalCost != null && (
+                    <div className="flex items-baseline justify-between py-2">
+                      <span className="text-[13px] text-app-muted">Total cost</span>
+                      <span className="text-[15px] font-semibold text-app-ink">{money(totalCost)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Price panel — dark ink block, echoing the primary action buttons. */}
         {(ppc || total || (isDiamond && stone.rapPrice)) && (
