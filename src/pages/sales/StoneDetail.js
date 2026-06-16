@@ -242,7 +242,14 @@ const StoneDetail = () => {
   // "5.05 Cushion Fancy Intense Green Yellow GIA" (fancy)
   // "0.51 Round H SI1 None IGI" (white) / "1.16 Pear ICA Minor" (colored)
   const title = isDiamond
-    ? [wt, shape, isFancy ? fancyDesc : stone.color, isFancy ? "" : stone.clarity, lab]
+    ? [
+        wt,
+        shape,
+        isFancy ? fancyDesc : stone.color,
+        isFancy ? "" : stone.clarity,
+        lab,
+        fluorDisplay(stone.fluorescence),
+      ]
         .filter(Boolean)
         .join(" ")
     : [wt, shape, lab, treatment].filter(Boolean).join(" ");
@@ -306,6 +313,22 @@ const StoneDetail = () => {
       : []),
     ["Certificate", lab || BLANK],
     ["Cert. Num.", stone.certificateNumber || BLANK],
+    ["Location", locationLabel || BLANK],
+  ];
+
+  // Diamonds use one flat spec list (no section headers). Weight, color, shape,
+  // clarity, cert lab and fluorescence already live in the title above.
+  const diamondSpecs = [
+    ["SKU", stone.sku || BLANK],
+    ["Polish", stone.polish || BLANK],
+    ["Sym.", stone.symmetry || BLANK],
+    ["L/W/D (mm)", lwd || BLANK],
+    ["Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : BLANK],
+    ["Depth", pct(stone.depthPercent) || BLANK],
+    ["Table", pct(stone.tablePercent) || BLANK],
+    // Cut only appears when it actually has a value (no empty "-" row).
+    ...(stone.cut && String(stone.cut).trim() ? [["Cut", String(stone.cut).trim()]] : []),
+    ["Branch", stone.branch || BLANK],
     ["Location", locationLabel || BLANK],
   ];
 
@@ -513,21 +536,31 @@ const StoneDetail = () => {
           </div>
         )}
 
-        {/* Spec sheet — airy hairline rows under tracked section labels,
-            same fields and order as before. */}
-        <SectionLabel>The stone</SectionLabel>
-        <div className="divide-y divide-app-line/60">
-          {stoneSpecs.map(([label, value]) => (
-            <SpecRow key={label} label={label} value={value} />
-          ))}
-        </div>
+        {/* Spec sheet — diamonds get one flat list (no section headers); the
+            other categories keep the grouped "stone" + "certificate" sections. */}
+        {isDiamond ? (
+          <div className="mt-4 divide-y divide-app-line/60">
+            {diamondSpecs.map(([label, value]) => (
+              <SpecRow key={label} label={label} value={value} />
+            ))}
+          </div>
+        ) : (
+          <>
+            <SectionLabel>The stone</SectionLabel>
+            <div className="divide-y divide-app-line/60">
+              {stoneSpecs.map(([label, value]) => (
+                <SpecRow key={label} label={label} value={value} />
+              ))}
+            </div>
 
-        <SectionLabel>Certificate &amp; location</SectionLabel>
-        <div className="divide-y divide-app-line/60">
-          {paperSpecs.map(([label, value]) => (
-            <SpecRow key={label} label={label} value={value} />
-          ))}
-        </div>
+            <SectionLabel>Certificate &amp; location</SectionLabel>
+            <div className="divide-y divide-app-line/60">
+              {paperSpecs.map(([label, value]) => (
+                <SpecRow key={label} label={label} value={value} />
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Internal cost — manager/admin only, right under the location. Hidden
             behind a tap so it's never visible at a glance. */}

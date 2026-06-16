@@ -695,8 +695,11 @@ export const GemstoneCard = ({ stone, mode }) => {
     ? buildEmeraldTitle(stone)
     : buildTitle(stone);
   const holder = stone.holder && String(stone.holder).trim() ? String(stone.holder).trim() : null;
-  // Precise location + memo flag (see resolveLocation).
-  const { label: locationLine, memo: memoOut } = resolveLocation(stone);
+  // Catalog cards show only the Branch — the precise location stays inside the
+  // product page. We still read resolveLocation for the MEMO OUT flag.
+  const { memo: memoOut } = resolveLocation(stone);
+  const branchLine =
+    stone.branch && String(stone.branch).trim() ? String(stone.branch).trim() : null;
   const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : null;
   const treatment = stone.treatment ? shortTreatment(stone.treatment) : null;
   const img = stoneImage(stone);
@@ -773,7 +776,7 @@ export const GemstoneCard = ({ stone, mode }) => {
             {/* Comment + lab intentionally omitted here — both are already part
                 of the emerald title (buildEmeraldTitle). */}
             <Line value={measureLine || null} />
-            <Line value={locationLine} />
+            <Line value={branchLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
             {/* Prices side by side, diamond-style: $/ct left, total right. */}
             {(ppc || total) && (
@@ -789,7 +792,7 @@ export const GemstoneCard = ({ stone, mode }) => {
           <>
             <Line value={finish || null} />
             <Line value={measureLine || null} />
-            <Line value={locationLine} />
+            <Line value={branchLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
             {/* Prices pinned to the bottom on a single, non-wrapping row so the
                 total never drops below the per-ct / RAP figures. */}
@@ -810,7 +813,7 @@ export const GemstoneCard = ({ stone, mode }) => {
             <Line value={treatment} />
             <Line value={lab} />
             <Line value={stone.measurements} />
-            <Line value={locationLine} />
+            <Line value={branchLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
             {/* Prices side by side, diamond-style: $/ct left, total right. */}
             {(ppc || total) && (
