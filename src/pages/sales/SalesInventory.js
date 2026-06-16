@@ -411,13 +411,14 @@ const gemType = (s) => {
   return mapped[0] || "";
 };
 
-/* "Green, Emerald, Pear, 8.74 ct" — colour, type, shape, weight. */
+/* "1.15 Aquamarine Round EGL" — weight · gem type · shape · cert lab · comment. */
 const buildTitle = (s) => {
-  const color = getDisplayColor(s);
+  const wt = s.weightCt != null && s.weightCt !== "" ? Number(s.weightCt).toFixed(2) : "";
   const type = gemType(s);
   const shape = getDisplayShape(s.shape);
-  const ct = s.weightCt != null && s.weightCt !== "" ? `${s.weightCt} ct` : "";
-  return [color, type, shape, ct].filter(Boolean).join(", ");
+  const lab = s.lab && String(s.lab).toUpperCase() !== "N/A" ? s.lab : "";
+  const comment = s.treatment ? shortTreatment(s.treatment) : "";
+  return [wt, type, shape, lab, comment].filter(Boolean).join(" ");
 };
 
 /* Human-readable fluorescence from the Barak single-letter codes. */

@@ -241,9 +241,13 @@ const StoneDetail = () => {
   const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : "";
   const treatment = stone.treatment ? shortTreatment(stone.treatment) : "";
   const fancyDesc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(" ");
+  // Clean gem type (Aquamarine / Kunzite / Tanzanite …) for non-emerald stones.
+  const gemTypeName =
+    mapped.filter((c) => !["Empty", "Diamond", "Fancy", "Emerald"].includes(c))[0] || "";
 
   // "5.05 Cushion Fancy Intense Green Yellow GIA" (fancy)
-  // "0.51 Round H SI1 None IGI" (white) / "1.16 Pear ICA Minor" (colored)
+  // "0.51 Round H SI1 None IGI" (white) / "1.16 Pear ICA Minor" (emerald)
+  // "1.15 Aquamarine Round EGL" (other gemstones)
   const title = isDiamond
     ? [
         wt,
@@ -255,7 +259,9 @@ const StoneDetail = () => {
       ]
         .filter(Boolean)
         .join(" ")
-    : [wt, shape, lab, treatment].filter(Boolean).join(" ");
+    : isEmerald
+    ? [wt, shape, lab, treatment].filter(Boolean).join(" ")
+    : [wt, gemTypeName, shape, lab, treatment].filter(Boolean).join(" ");
 
   const holder = stone.holder && String(stone.holder).trim() ? String(stone.holder).trim() : null;
   const { label: locationLabel, memo: memoOut } = resolveLocation(stone);
