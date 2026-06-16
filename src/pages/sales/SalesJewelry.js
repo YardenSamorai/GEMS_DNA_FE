@@ -345,12 +345,14 @@ const SalesJewelry = () => {
   }, []);
 
   // Does a row's jewelry_type fall under any of the picked headline kinds?
+  // Match on whole words only — a bare `includes` made "EARRINGS" contain the
+  // substring "RING", so the Rings filter wrongly returned earrings too.
   const matchesJewelry = (row) => {
     if (!jewelrySel.length) return true;
-    const t = norm(row.jewelryType);
+    const words = norm(row.jewelryType).split(/[^A-Z0-9]+/).filter(Boolean);
     return jewelrySel.some((key) => {
       const kind = JEWELRY_KINDS.find((j) => j.key === key);
-      return kind && kind.match.some((m) => t === m || t.includes(m));
+      return kind && kind.match.some((m) => words.includes(m));
     });
   };
 
