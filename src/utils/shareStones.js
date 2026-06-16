@@ -1,6 +1,6 @@
 import { getMappedCategories } from "./categoryMap";
 import { getDisplayShape, shortTreatment } from "../pages/inventory/helpers/constants";
-import { parseDims, usableImg, resolveLocation } from "../pages/sales/SalesInventory";
+import { parseDims, usableImg } from "../pages/sales/SalesInventory";
 import { logShareEvents } from "../services/stonesApi";
 import { trackShare } from "./activityLog";
 
@@ -112,7 +112,7 @@ const buildLinks = (stone) => {
 /* Diamonds:
  *   20.02 PS I VS2 NON GIA              ← weight shape color clarity fluor lab
  *   Ratio: 1.59
- *   Location: New York
+ *   Branch: New York
  *   SKU: T0644
  *   p/c: $94,000.00
  *   Total: $1,881,880.00
@@ -141,7 +141,7 @@ const buildDiamondText = (stone, { withPrice = true } = {}) => {
   if (ratio) lines.push(`Ratio: ${ratio}`);
 
   const branch = String(stone.branch || "").trim();
-  if (branch) lines.push(`Location: ${branch}`);
+  if (branch) lines.push(`Branch: ${branch}`);
 
   if (stone.sku) lines.push(`SKU: ${stone.sku}`);
 
@@ -164,7 +164,7 @@ const buildDiamondText = (stone, { withPrice = true } = {}) => {
 /* Coloured stones (emeralds + other gemstones):
  *   <weight> <shape> <comment> <lab>
  *   Ratio : <ratio>
- *   Location: <location>
+ *   Branch: <branch>
  *   SKU: <sku>
  *   p/c: <price per carat>
  *   total: <total price>
@@ -187,8 +187,8 @@ const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
   const ratio = ratioOf(stone);
   if (ratio) lines.push(`Ratio : ${ratio}`);
 
-  const { label: location } = resolveLocation(stone);
-  if (location) lines.push(`Location: ${location}`);
+  const branch = String(stone.branch || "").trim();
+  if (branch) lines.push(`Branch: ${branch}`);
 
   if (stone.sku) lines.push(`SKU: ${stone.sku}`);
 
@@ -213,7 +213,7 @@ const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
  *   <center stone weight>
  *   <style>
  *   <sku>
- *   <location>
+ *   Branch: <branch>
  *   …links */
 const buildJewelryText = (item) => {
   const lines = [];
@@ -229,8 +229,8 @@ const buildJewelryText = (item) => {
 
   if (item.sku) lines.push(String(item.sku));
 
-  const location = String(item.location || "").trim();
-  if (location) lines.push(location);
+  const branch = String(item.branch || "").trim();
+  if (branch) lines.push(`Branch: ${branch}`);
 
   const links = buildLinks(item);
   if (links.length) lines.push("", ...links);
