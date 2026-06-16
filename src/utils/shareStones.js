@@ -114,6 +114,7 @@ const buildLinks = (stone) => {
  *   Ratio: 1.59
  *   Branch: New York
  *   SKU: T0644
+ *   Rap %: -15                          ← only when withRap is enabled
  *   p/c: $94,000.00
  *   Total: $1,881,880.00
  *
@@ -122,7 +123,7 @@ const buildLinks = (stone) => {
  *   Cert: <url>
  *
  *   Image: <url>                         (each link on its own block) */
-const buildDiamondText = (stone, { withPrice = true } = {}) => {
+const buildDiamondText = (stone, { withPrice = true, withRap = false } = {}) => {
   const isFancy = isFancyStone(stone);
   const wt = Number(stone.weightCt);
   const wtStr = Number.isFinite(wt) ? wt.toFixed(2) : "";
@@ -144,6 +145,12 @@ const buildDiamondText = (stone, { withPrice = true } = {}) => {
   if (branch) lines.push(`Branch: ${branch}`);
 
   if (stone.sku) lines.push(`SKU: ${stone.sku}`);
+
+  // Rap % (diamonds/fancy only) sits just above the price block when enabled.
+  if (withRap) {
+    const rap = String(stone.rapPrice ?? "").trim();
+    if (rap !== "") lines.push(`Rap %: ${rap}`);
+  }
 
   if (withPrice) {
     lines.push(`p/c: ${usd(stone.pricePerCt)}`);
@@ -309,9 +316,12 @@ export const canShareFiles = (files) =>
  * Entry point
  * ========================================================================== */
 
-export const shareStonesOnWhatsApp = async (stones, { files, actor, withPrice = true } = {}) => {
+export const shareStonesOnWhatsApp = async (
+  stones,
+  { files, actor, withPrice = true, withRap = false } = {}
+) => {
   const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
-  const text = buildStonesMessage(arr, { withPrice });
+  const text = buildStonesMessage(arr, { withPrice, withRap });
 
   // Record the send for the sales Dashboard (best effort, never blocks).
   logShareEvents(actor, arr, "whatsapp");

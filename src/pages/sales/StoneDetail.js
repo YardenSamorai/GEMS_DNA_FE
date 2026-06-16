@@ -108,6 +108,8 @@ const StoneDetail = () => {
   const [shareFiles, setShareFiles] = useState([]);
   // Salesman can choose whether the WhatsApp message includes prices.
   const [withPrice, setWithPrice] = useState(true);
+  // Diamonds/fancy only: optionally include the Rap % line in the message.
+  const [withRap, setWithRap] = useState(false);
   // Internal cost is hidden behind a tap (managers/admins only) so it's never
   // shown to a client over the rep's shoulder when the page first opens.
   const [costOpen, setCostOpen] = useState(false);
@@ -763,11 +765,41 @@ const StoneDetail = () => {
                   </span>
                 </button>
 
+                {/* Include Rap % — diamonds & fancy only. Adds a "Rap %" line
+                    just above the prices in the WhatsApp message. */}
+                {isDiamond && (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={withRap}
+                    onClick={() => setWithRap((v) => !v)}
+                    className="mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3 text-left transition active:scale-[0.99]"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-semibold tracking-tight text-app-ink">Include Rap %</span>
+                      <span className="block text-[12px] text-app-soft">
+                        {withRap ? "Message will show the Rap %" : "Rap % hidden from the message"}
+                      </span>
+                    </span>
+                    <span
+                      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        withRap ? "bg-emerald-500" : "bg-app-line"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                          withRap ? "translate-x-[22px]" : "translate-x-0.5"
+                        }`}
+                      />
+                    </span>
+                  </button>
+                )}
+
                 {/* Share on WhatsApp */}
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(stone, { files: shareFiles, actor, withPrice });
+                    shareStonesOnWhatsApp(stone, { files: shareFiles, actor, withPrice, withRap });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
@@ -803,7 +835,7 @@ const StoneDetail = () => {
                   )}
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(stone, { withPrice })}
+                  {buildStoneShareText(stone, { withPrice, withRap })}
                 </pre>
               </div>
             </motion.div>

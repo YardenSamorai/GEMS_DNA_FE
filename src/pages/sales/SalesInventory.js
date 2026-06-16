@@ -7,7 +7,7 @@ import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/h
 import { getMappedCategories } from "../../utils/categoryMap";
 import { DIAMOND_SHAPES } from "./diamondShapes";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
-import placeholderImg from "../../assets/stone-placeholder.jpg";
+import placeholderImg from "../../assets/stone-placeholder-eshed.png";
 import { useSelection } from "../../context/SelectionContext";
 import {
   trackCategoryView,
@@ -385,13 +385,20 @@ const sortValue = (s, opt) => {
 
 /* Fallback artwork shown when a stone has no usable photo (or its URL fails
  * to load): a branded dark-emerald tile with a gold line-art gem. */
+/* Internal-only placeholder shown when a stone has no photo: the ESHED brand
+ * mark on a clean backdrop. This image is never used as a shareable photo —
+ * the WhatsApp builders only read real stone image URLs — so it stays visible
+ * solely inside the app. `object-contain` keeps the full logo readable in any
+ * card shape. */
 export const StonePlaceholder = ({ alt = "" }) => (
-  <img
-    src={placeholderImg}
-    alt={alt}
-    loading="lazy"
-    className="h-full w-full object-cover"
-  />
+  <div className="flex h-full w-full items-center justify-center bg-[#f5f5f4] p-4">
+    <img
+      src={placeholderImg}
+      alt={alt}
+      loading="lazy"
+      className="max-h-full max-w-full object-contain"
+    />
+  </div>
 );
 
 /* The clean gem type (Emerald / Sapphire / Ruby …) from the category map,
