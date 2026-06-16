@@ -533,52 +533,83 @@ const StoneDetail = () => {
             behind a tap so it's never visible at a glance. */}
         {showCost && (
           <div className="mt-3">
-            {!costOpen ? (
-              <button
-                type="button"
-                onClick={() => setCostOpen(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-[13px] font-semibold text-emerald-600 transition active:scale-[0.99]"
+            <button
+              type="button"
+              onClick={() => setCostOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-app-line bg-app-surface px-3 py-1.5 text-[12px] font-semibold text-app-graphite shadow-sm transition active:scale-95 hover:text-app-ink"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M7 7h.01M7 3h5.6a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-4.6 4.6a2 2 0 01-2.8 0L6.6 11.6A2 2 0 016 10.2V4a1 1 0 011-1z"
+                />
+              </svg>
+              View internal cost
+            </button>
+          </div>
+        )}
+
+        {/* Internal-cost dialog — small centered modal, opened by the button. */}
+        <AnimatePresence>
+          {showCost && costOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+                onClick={() => setCostOpen(false)}
+                aria-hidden
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 6 }}
+                transition={{ type: "spring", damping: 26, stiffness: 320 }}
+                role="dialog"
+                aria-label="Internal cost"
+                className="relative w-full max-w-[300px] rounded-3xl border border-app-line bg-app-surface p-5 shadow-2xl"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.8}
-                    d="M7 7h.01M7 3h5.6a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-4.6 4.6a2 2 0 01-2.8 0L6.6 11.6A2 2 0 016 10.2V4a1 1 0 011-1z"
-                  />
-                </svg>
-                View internal cost
-              </button>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/5">
-                <div className="flex items-center justify-between px-4 pt-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
-                    Internal cost
-                  </span>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">
+                      Internal cost
+                    </p>
+                    <p className="mt-0.5 truncate text-[13px] font-medium text-app-muted">
+                      {stone.sku || "Stone"}
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setCostOpen(false)}
-                    className="text-[12px] font-semibold text-app-soft transition hover:text-app-ink"
+                    aria-label="Close"
+                    className="-mr-1 -mt-1 flex h-8 w-8 items-center justify-center rounded-full text-app-soft transition hover:bg-app-canvas2 hover:text-app-ink"
                   >
-                    Hide
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+                    </svg>
                   </button>
                 </div>
-                <div className="divide-y divide-emerald-500/15 px-4 pb-3 tabular-nums">
-                  <div className="flex items-baseline justify-between py-2">
+
+                <div className="mt-4 space-y-2.5 tabular-nums">
+                  <div className="flex items-baseline justify-between gap-3">
                     <span className="text-[13px] text-app-muted">Cost / ct</span>
-                    <span className="text-[15px] font-semibold text-app-ink">{money(costPerCt)}</span>
+                    <span className="text-[17px] font-semibold text-app-ink">{money(costPerCt)}</span>
                   </div>
                   {totalCost != null && (
-                    <div className="flex items-baseline justify-between py-2">
+                    <div className="flex items-baseline justify-between gap-3 border-t border-app-line pt-2.5">
                       <span className="text-[13px] text-app-muted">Total cost</span>
-                      <span className="text-[15px] font-semibold text-app-ink">{money(totalCost)}</span>
+                      <span className="text-[17px] font-semibold text-app-ink">{money(totalCost)}</span>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Price panel — dark ink block, echoing the primary action buttons. */}
         {(ppc || total || (isDiamond && stone.rapPrice)) && (
