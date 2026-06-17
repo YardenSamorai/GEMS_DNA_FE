@@ -708,8 +708,6 @@ export const GemstoneCard = ({ stone, mode }) => {
   const { memo: memoOut } = resolveLocation(stone);
   const branchLine =
     stone.branch && String(stone.branch).trim() ? String(stone.branch).trim() : null;
-  const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : null;
-  const treatment = stone.treatment ? shortTreatment(stone.treatment) : null;
   const img = stoneImage(stone);
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = img && !imgFailed;
@@ -839,9 +837,10 @@ export const GemstoneCard = ({ stone, mode }) => {
           </>
         ) : (
           <>
-            <Line value={treatment} />
-            <Line value={lab} />
+            {/* Comment + lab live in the title already; show measurements,
+                ratio, branch and stock no. */}
             <Line value={stone.measurements} />
+            <Line value={Number.isFinite(ratioVal) ? `Ratio ${ratioVal.toFixed(2)}` : null} />
             <Line value={branchLine} />
             <Line value={stone.sku ? `Stock #${stone.sku}` : null} />
             {/* Prices side by side, diamond-style: $/ct left, total right. */}

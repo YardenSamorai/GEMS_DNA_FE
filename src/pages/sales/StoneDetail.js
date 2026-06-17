@@ -63,17 +63,6 @@ const stoneImages = (s) => {
 const certLink = (s) =>
   usableImg(s.certificateUrl) || usableImg(s.certificateImageJpg) || null;
 
-/* Hairline section label — the non-interactive sibling of the filter sheet's
- * SectionDivider: tiny tracked uppercase title running into a hairline. */
-const SectionLabel = ({ children }) => (
-  <div className="flex items-center gap-3 pb-1 pt-7">
-    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-muted">
-      {children}
-    </span>
-    <span className="h-px flex-1 bg-app-line" />
-  </div>
-);
-
 /* One spec line: tracked uppercase label left, bold value right. Hidden when
  * the value is empty so the list stays tight. */
 const SpecRow = ({ label, value }) =>
@@ -289,42 +278,6 @@ const StoneDetail = () => {
 
   const selected = isSelected(stone);
 
-  // Spec groups — same fields, same order as the legacy diamond card.
-  const stoneSpecs = isDiamond
-    ? [
-        ["Carat Weight", wt],
-        ["Color", isFancy ? stone.fancyColor || BLANK : stone.color || BLANK],
-        ["Shape", shape || BLANK],
-        ...(isFancy ? [["Intensity", stone.fancyIntensity || BLANK]] : []),
-        ["Clarity", stone.clarity || BLANK],
-        ["Cut", stone.cut || BLANK],
-        ["Polish", stone.polish || BLANK],
-        ["Sym.", stone.symmetry || BLANK],
-        ["Fluorescence", fluorDisplay(stone.fluorescence) || BLANK],
-      ]
-    : [
-        ["Carat Weight", wt],
-        ["Color", getDisplayColor(stone) || BLANK],
-        ["Shape", shape || BLANK],
-        ["Comments", treatment || BLANK],
-        ["Origin", stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : BLANK],
-      ];
-
-  const paperSpecs = [
-    ["SKU", stone.sku || BLANK],
-    ["L/W/D (mm)", lwd || BLANK],
-    ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : BLANK],
-    ...(isDiamond
-      ? [
-          ["Depth %", pct(stone.depthPercent) || BLANK],
-          ["Table %", pct(stone.tablePercent) || BLANK],
-        ]
-      : []),
-    ["Certificate", lab || BLANK],
-    ["Cert. Num.", stone.certificateNumber || BLANK],
-    ["Location", locationLabel || BLANK],
-  ];
-
   // Diamonds use one flat spec list (no section headers). Weight, color, shape,
   // clarity, cert lab and fluorescence already live in the title above.
   const diamondSpecs = [
@@ -344,6 +297,18 @@ const StoneDetail = () => {
   // Emeralds use one flat spec list too (no section headers).
   const emeraldSpecs = [
     ["SKU", stone.sku || BLANK],
+    ["Origin", stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : BLANK],
+    ["L/W/D (mm)", lwd || BLANK],
+    ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : BLANK],
+    ["Branch", stone.branch || BLANK],
+    ["Location", locationLabel || BLANK],
+  ];
+
+  // Other gemstones — flat list too. Weight, gem type, shape, lab and comment
+  // already live in the title above, so they're dropped here.
+  const gemstoneSpecs = [
+    ["SKU", stone.sku || BLANK],
+    ["Color", getDisplayColor(stone) || BLANK],
     ["Origin", stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : BLANK],
     ["L/W/D (mm)", lwd || BLANK],
     ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : BLANK],
@@ -583,21 +548,11 @@ const StoneDetail = () => {
             ))}
           </div>
         ) : (
-          <>
-            <SectionLabel>The stone</SectionLabel>
-            <div className="divide-y divide-app-line/60">
-              {stoneSpecs.map(([label, value]) => (
-                <SpecRow key={label} label={label} value={value} />
-              ))}
-            </div>
-
-            <SectionLabel>Certificate &amp; location</SectionLabel>
-            <div className="divide-y divide-app-line/60">
-              {paperSpecs.map(([label, value]) => (
-                <SpecRow key={label} label={label} value={value} />
-              ))}
-            </div>
-          </>
+          <div className="mt-4 divide-y divide-app-line/60">
+            {gemstoneSpecs.map(([label, value]) => (
+              <SpecRow key={label} label={label} value={value} />
+            ))}
+          </div>
         )}
 
         {/* Internal cost — manager/admin only, right under the location. Hidden
