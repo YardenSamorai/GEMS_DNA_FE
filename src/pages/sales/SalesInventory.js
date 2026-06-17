@@ -498,6 +498,16 @@ const buildEmeraldTitle = (s) => {
   return [wt, shape, lab, comments].filter(Boolean).join(" ");
 };
 
+/* App-consistent display title for any stone (diamond/emerald/gemstone). Used by
+ * the catalog cards and the PDF export so they always read the same. */
+export const stoneTitle = (stone) => {
+  if (!stone) return "";
+  const m = modeForStone(stone);
+  if (m === "diamond") return buildDiamondTitle(stone);
+  if (m === "emerald") return buildEmeraldTitle(stone);
+  return buildTitle(stone);
+};
+
 /* Many soap_stones rows carry a folder-only image URL (e.g. ".../StoneImages/")
  * with no filename — the Barak export emits the directory even when no photo
  * was uploaded, so the URL 404s and renders as a broken thumbnail. Treat those
