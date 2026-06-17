@@ -764,36 +764,38 @@ export const GemstoneCard = ({ stone, mode }) => {
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
       <div className="mt-2.5 flex flex-col gap-0.5">
-        {/* HOLD flag — the stone is held. We never reveal who holds it,
-            just the generic "HOLD" word. */}
-        {(holder || stone.onHold) && (
-          <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-red-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-red-600">
-            HOLD
-          </span>
-        )}
-        {/* MEMO OUT flag — stone is physically out with a third party. */}
-        {memoOut && (
-          <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-amber-700">
-            Memo out
-          </span>
-        )}
-        {/* IN JEWELRY flag — stone is set in a jewelry model. Tapping it jumps
-            to that jewelry product page (stops the card's own navigation). */}
-        {stone.jewelryModel && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              navigate(`/sales/jewelry/${encodeURIComponent(stone.jewelryModel)}`);
-            }}
-            className="mb-0.5 inline-flex w-fit items-center gap-1 rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-indigo-700 transition active:scale-95 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300"
-          >
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.4 6.3l2.6-3 2.6 3L12 9 9.4 6.3zM4 9h16l-8 11L4 9z" />
-            </svg>
-            In Jewelry
-          </button>
+        {/* Status flags sit together on one wrapping row (never stacked):
+            HOLD / Memo out / In Jewelry. In Jewelry jumps to the jewelry page
+            and stops the card's own navigation. */}
+        {(holder || stone.onHold || memoOut || stone.jewelryModel) && (
+          <div className="mb-0.5 flex flex-wrap items-center gap-1">
+            {(holder || stone.onHold) && (
+              <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-red-600">
+                HOLD
+              </span>
+            )}
+            {memoOut && (
+              <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-amber-700">
+                Memo out
+              </span>
+            )}
+            {stone.jewelryModel && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate(`/sales/jewelry/${encodeURIComponent(stone.jewelryModel)}`);
+                }}
+                className="inline-flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-indigo-700 transition active:scale-95 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300"
+              >
+                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.4 6.3l2.6-3 2.6 3L12 9 9.4 6.3zM4 9h16l-8 11L4 9z" />
+                </svg>
+                In Jewelry
+              </button>
+            )}
+          </div>
         )}
         <h3 className="text-[14px] font-semibold leading-snug text-app-ink">
           {title || stone.sku || (isDiamond ? "Diamond" : isEmerald ? "Emerald" : "Gemstone")}

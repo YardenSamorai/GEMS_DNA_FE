@@ -486,15 +486,15 @@ const StoneDetail = () => {
         {/* Tags row — all chips together under the title: status flags (HOLD /
             Memo out) plus the quick actions (Certificate, V360). */}
         {(holder || stone.onHold || memoOut || stone.jewelryModel || cert || hasCert(stone) || video) && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {(holder || stone.onHold) && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-600/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
                 <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
                 HOLD
               </span>
             )}
             {memoOut && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-500/30">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-500/30">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 Memo out
               </span>
@@ -504,9 +504,9 @@ const StoneDetail = () => {
               <button
                 type="button"
                 onClick={() => navigate(`/sales/jewelry/${encodeURIComponent(stone.jewelryModel)}`)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-indigo-600 ring-1 ring-inset ring-indigo-500/30 transition active:scale-95 hover:bg-indigo-500/20 dark:text-indigo-300"
+                className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-600 ring-1 ring-inset ring-indigo-500/30 transition active:scale-95 hover:bg-indigo-500/20 dark:text-indigo-300"
               >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.4 6.3l2.6-3 2.6 3L12 9 9.4 6.3zM4 9h16l-8 11L4 9z" />
                 </svg>
                 In Jewelry
@@ -519,9 +519,9 @@ const StoneDetail = () => {
                   target="_blank"
                   rel="noreferrer"
                   onClick={() => trackMedia(stone.sku, "certificate", stone.category)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 transition active:scale-95"
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 transition active:scale-95"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -532,8 +532,8 @@ const StoneDetail = () => {
                   Certificate
                 </a>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-3 py-1.5 text-[12px] font-semibold text-emerald-600/80">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600/80">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -552,9 +552,9 @@ const StoneDetail = () => {
                   scrollToVideo();
                 }}
                 aria-label="Play 360° video"
-                className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-[12px] font-semibold text-sky-600 transition active:scale-95"
+                className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600 transition active:scale-95"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
