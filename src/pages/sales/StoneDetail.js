@@ -485,7 +485,7 @@ const StoneDetail = () => {
 
         {/* Tags row — all chips together under the title: status flags (HOLD /
             Memo out) plus the quick actions (Certificate, V360). */}
-        {(holder || stone.onHold || memoOut || cert || hasCert(stone) || video) && (
+        {(holder || stone.onHold || memoOut || stone.jewelryModel || cert || hasCert(stone) || video) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {(holder || stone.onHold) && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
@@ -498,6 +498,19 @@ const StoneDetail = () => {
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 Memo out
               </span>
+            )}
+            {/* In Jewelry — this stone is set in a jewelry model; jump to it. */}
+            {stone.jewelryModel && (
+              <button
+                type="button"
+                onClick={() => navigate(`/sales/jewelry/${encodeURIComponent(stone.jewelryModel)}`)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-wide text-indigo-600 ring-1 ring-inset ring-indigo-500/30 transition active:scale-95 hover:bg-indigo-500/20 dark:text-indigo-300"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.4 6.3l2.6-3 2.6 3L12 9 9.4 6.3zM4 9h16l-8 11L4 9z" />
+                </svg>
+                In Jewelry
+              </button>
             )}
             {(cert || hasCert(stone)) &&
               (cert ? (

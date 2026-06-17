@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
@@ -715,6 +715,7 @@ export const GemstoneCard = ({ stone, mode }) => {
   const showImage = img && !imgFailed;
   const { isSelected } = useSelection();
   const selected = isSelected(stone);
+  const navigate = useNavigate();
 
   // Cut / Polish / Symmetry condensed onto one line, values only (no labels).
   const finish = [stone.cut, stone.polish, stone.symmetry]
@@ -775,6 +776,24 @@ export const GemstoneCard = ({ stone, mode }) => {
           <span className="mb-0.5 inline-flex w-fit items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-amber-700">
             Memo out
           </span>
+        )}
+        {/* IN JEWELRY flag — stone is set in a jewelry model. Tapping it jumps
+            to that jewelry product page (stops the card's own navigation). */}
+        {stone.jewelryModel && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate(`/sales/jewelry/${encodeURIComponent(stone.jewelryModel)}`);
+            }}
+            className="mb-0.5 inline-flex w-fit items-center gap-1 rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-indigo-700 transition active:scale-95 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.4 6.3l2.6-3 2.6 3L12 9 9.4 6.3zM4 9h16l-8 11L4 9z" />
+            </svg>
+            In Jewelry
+          </button>
         )}
         <h3 className="text-[14px] font-semibold leading-snug text-app-ink">
           {title || stone.sku || (isDiamond ? "Diamond" : isEmerald ? "Emerald" : "Gemstone")}
