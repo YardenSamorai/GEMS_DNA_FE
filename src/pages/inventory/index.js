@@ -377,7 +377,10 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
     } catch (e) { return null; }
   };
 
+  const isJewelryItem = (stone) => stone.category === 'Jewelry';
+
   const getCategoryLabel = (stone) => {
+    if (isJewelryItem(stone)) return (stone.jewelryType || 'Jewelry').toUpperCase();
     const mapped = getMappedCategories(stone.category);
     if (mapped.includes('Emerald')) return 'EMERALD';
     if (mapped.includes('Diamond')) return 'DIAMOND';
@@ -394,6 +397,38 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
       clarity: isEmeraldType ? (stone.treatment || '-') : (stone.clarity || '-'),
       lab: stone.lab || '-',
       sku: stone.sku || '-',
+    };
+  };
+
+  // Compact metal label so it fits a narrow cell: "18K White Gold" -> "18K WG".
+  const shortMetal = (m) => {
+    if (!m) return '-';
+    return String(m)
+      .replace(/\bWhite Gold\b/i, 'WG')
+      .replace(/\bYellow Gold\b/i, 'YG')
+      .replace(/\bRose Gold\b/i, 'RG')
+      .replace(/\bPlatinum\b/i, 'Plat')
+      .replace(/\bGold\b/i, 'Gold')
+      .replace(/\s+/g, ' ')
+      .trim() || '-';
+  };
+
+  // Per-card spec columns. Stones show Shape/Color/Clarity/Lab; jewelry shows
+  // the data that actually matters for a piece: metal, center stone shape +
+  // carat, and center colour (clarity/lab are dropped — almost always empty).
+  const getSpecFields = (stone) => {
+    if (isJewelryItem(stone)) {
+      const center = getDisplayShape(stone.shape) || stone.stoneType || '-';
+      const ctrCt = stone.centerStoneCarat ? `${Number(stone.centerStoneCarat)}ct` : '-';
+      return {
+        cols: ['Metal', 'Center', 'Ctr ct', 'Color'],
+        vals: [shortMetal(stone.metalType), center, ctrCt, stone.color || '-'],
+      };
+    }
+    const d = getStoneDetails(stone);
+    return {
+      cols: ['Shape', 'Color', 'Clarity', 'Lab'],
+      vals: [d.shape, d.color, shortenClarity(d.clarity), d.lab],
     };
   };
 
@@ -610,15 +645,11 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
         const rightEdge = pageWidth - margin;
         const textWidth = rightEdge - textX;
 
-        // Specs row (Shape | Color | Clarity | Lab | SKU) — labels gray, values black
-        const specCols = ['Shape', 'Color', 'Clarity', 'Lab', 'SKU'];
-        const specVals = [
-          details.shape,
-          details.color,
-          shortenClarity(details.clarity),
-          details.lab,
-          details.sku,
-        ];
+        // Specs row — stones: Shape | Color | Clarity | Lab | SKU;
+        // jewelry: Metal | Center | Ctr ct | Color | SKU (labels gray, values black)
+        const baseSpec = getSpecFields(stone);
+        const specCols = [...baseSpec.cols, 'SKU'];
+        const specVals = [...baseSpec.vals, details.sku];
         const sColW = textWidth / specCols.length;
         const labelY = y + 5;
         const valY = labelY + 5.5;
@@ -786,8 +817,7 @@ const generatePDFCatalog = async (selectedStones, options = {}) => {
 
         // ---------- Specs row (Shape | Color | Clarity | Lab) ----------
         const specsY = imgY + imgH + 8;
-        const specCols = ['Shape', 'Color', 'Clarity', 'Lab'];
-        const specVals = [details.shape, details.color, shortenClarity(details.clarity), details.lab];
+        const { cols: specCols, vals: specVals } = getSpecFields(stone);
         const sColW = colWidth / specCols.length;
 
         pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
@@ -1665,27 +1695,37 @@ const ExportModal = ({
 
   if (!isOpen) return null;
 
+  // Base $/ct for a row. Jewelry is priced as a flat total with no per-carat
+  // figure, so we derive one from total ÷ carat — otherwise its price would
+  // collapse to $0 in the PDF (everything here is computed off $/ct).
+  const basePricePerCt = (stone) => {
+    if (stone.pricePerCt && stone.pricePerCt > 0) return stone.pricePerCt;
+    const wt = stone.weightCt || 0;
+    const total = stone.priceTotal || 0;
+    return wt > 0 ? total / wt : 0;
+  };
+
   // Calculate adjusted prices (based on Price Per Carat)
   const getAdjustedPricePerCt = (stone) => {
     if (priceOverrides[stone.id] !== undefined) {
       return priceOverrides[stone.id];
     }
-    const original = stone.pricePerCt || 0;
-    return original * (1 + globalMarkup / 100);
+    return basePricePerCt(stone) * (1 + globalMarkup / 100);
   };
 
   const getAdjustedTotal = (stone) => {
-    const pricePerCt = getAdjustedPricePerCt(stone);
     const weight = stone.weightCt || 0;
-    return pricePerCt * weight;
+    if (weight > 0) return getAdjustedPricePerCt(stone) * weight;
+    // No carat weight (some jewelry): scale the stored total directly so the
+    // price survives instead of becoming $0.
+    return (stone.priceTotal || 0) * (1 + globalMarkup / 100);
   };
 
   // Apply global markup to all
   const applyGlobalMarkup = () => {
     const newOverrides = {};
     selectedStones.forEach((stone) => {
-      const original = stone.pricePerCt || 0;
-      newOverrides[stone.id] = original * (1 + globalMarkup / 100);
+      newOverrides[stone.id] = basePricePerCt(stone) * (1 + globalMarkup / 100);
     });
     setPriceOverrides(newOverrides);
   };
@@ -1808,7 +1848,7 @@ const ExportModal = ({
             {/* Mobile Cards View */}
             <div className="sm:hidden divide-y divide-stone-100">
               {selectedStones.map((stone, index) => {
-                const originalPricePerCt = stone.pricePerCt || 0;
+                const originalPricePerCt = basePricePerCt(stone);
                 const adjustedPricePerCt = getAdjustedPricePerCt(stone);
                 const adjustedTotal = getAdjustedTotal(stone);
                 const priceDiff = adjustedPricePerCt - originalPricePerCt;
@@ -1897,7 +1937,7 @@ const ExportModal = ({
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {selectedStones.map((stone, index) => {
-                  const originalPricePerCt = stone.pricePerCt || 0;
+                  const originalPricePerCt = basePricePerCt(stone);
                   const adjustedPricePerCt = getAdjustedPricePerCt(stone);
                   const adjustedTotal = getAdjustedTotal(stone);
                   const priceDiff = adjustedPricePerCt - originalPricePerCt;
@@ -2225,7 +2265,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
 };
 
 /* ---------------- DNA Drawer (Stone Preview) ---------------- */
-const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel }) => {
+const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel, priceMode = 'neto' }) => {
   const [activeTab, setActiveTab] = useState('details');
   const [activeImgIdx, setActiveImgIdx] = useState(0);
 
@@ -2516,20 +2556,20 @@ const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel }) => {
                     <div className="flex justify-between items-center mb-3 pb-3 border-b border-app-line">
                       <span className="text-app-muted text-sm">Price per Carat</span>
                       <span className="text-lg font-semibold tracking-tight text-app-ink">
-                        ${stone.pricePerCt?.toLocaleString() || 'N/A'}
+                        {stone.pricePerCt ? `$${Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString()}` : 'N/A'}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between items-center">
                     <span className="text-app-muted text-sm">Total Price</span>
                     <span className="text-2xl font-semibold tracking-tight text-app-ink">
-                      {stone.currency && stone.currency !== 'USD' ? stone.currency : '$'}{stone.priceTotal?.toLocaleString() || 'N/A'}
+                      {stone.priceTotal ? `${stone.currency && stone.currency !== 'USD' ? stone.currency : '$'}${Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString()}` : 'N/A'}
                     </span>
                   </div>
                 </div>
                 {!isJewelry && (
                   <p className="text-xs text-app-soft text-center">
-                    {stone.weightCt}ct \u00d7 ${stone.pricePerCt?.toLocaleString()}/ct
+                    {stone.weightCt}ct \u00d7 ${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : 'N/A'}/ct
                   </p>
                 )}
               </div>
@@ -4030,6 +4070,22 @@ const StoneAssignmentChip = ({ stone, onAssign, busy }) => {
   );
 };
 
+/* Per-stone display multiplier for the regular inventory page (NOT sales).
+ * Prices are stored in the DB; the screen scales them per category + mode:
+ *   - Diamonds (incl. Fancy) → always shown as-is (×1); no Neto/Bruto here.
+ *   - Jewelry                → always shown as-is (×1).
+ *   - Gemstones (emeralds &   → Neto = DB (×1), Bruto = DB ×2.
+ *     other coloured stones)
+ * The Neto⇆Bruto toggle only appears on the Gemstones tab, so the 2× gap
+ * between the two modes is preserved (Bruto = 2 × Neto). This is intentionally
+ * independent of the sales inventory's `adjustSalesPrices`. */
+const inventoryPriceScale = (stone, priceMode) => {
+  const mapped = getMappedCategories(stone?.category);
+  if (mapped.includes("Diamond")) return 1;
+  if (stone?.category === "Jewelry") return 1;
+  return priceMode === "bruto" ? 2 : 1;
+};
+
 const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, priceMode, onAssign, assigningSku }) => (
   <motion.div
     layout
@@ -4082,8 +4138,8 @@ const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection,
             </span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-stone-500">
-            <span><span className="text-stone-400">Total:</span> <span className="font-semibold text-stone-800">${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</span></span>
-            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</span>
+            <span><span className="text-stone-400">Total:</span> <span className="font-semibold text-stone-800">${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</span></span>
+            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</span>
             <span><span className="text-stone-400">Measurements:</span> {stone.measurements || 'N/A'}</span>
             <span><span className="text-stone-400">Ratio:</span> {stone.ratio || 'N/A'}</span>
             <span><span className="text-stone-400">Clarity:</span> {shortTreatment(stone.treatment)}</span>
@@ -4417,8 +4473,8 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
         </div>
         {/* Price */}
         <div className="pt-1">
-          <span className="text-base font-bold text-stone-900">${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</span>
-          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}/ct)</span>
+          <span className="text-base font-bold text-stone-900">${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</span>
+          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}/ct)</span>
         </div>
       </div>
       {/* View DNA button */}
@@ -4436,8 +4492,10 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
 
   // Calculate combined weight
   const combinedWeight = ((stoneA.weightCt || 0) + (stoneB ? stoneB.weightCt || 0 : 0)).toFixed(2);
-  const rawCombinedPrice = ((stoneA.priceTotal || 0) + (stoneB ? stoneB.priceTotal || 0 : 0));
-  const combinedPrice = priceMode === 'neto' ? Math.round(rawCombinedPrice / 2) : rawCombinedPrice;
+  const rawCombinedPrice =
+    (stoneA.priceTotal || 0) * inventoryPriceScale(stoneA, priceMode) +
+    (stoneB ? (stoneB.priceTotal || 0) * inventoryPriceScale(stoneB, priceMode) : 0);
+  const combinedPrice = Math.round(rawCombinedPrice);
 
   return (
     <motion.div
@@ -4941,8 +4999,8 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'origin': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.origin || ''}</span></td>;
       case 'fluorescence': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.fluorescence || ''}</span></td>;
       case 'lab': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.lab || ''}</span></td>;
-      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</td>;
-      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</td>;
+      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</td>;
+      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</td>;
       case 'location': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.location || ''}</span></td>;
       case 'title': return <td key={colId} className="px-3 py-2 max-w-[200px]"><span className="text-xs text-stone-700 truncate block">{sanitizeText(stone.title) || '-'}</span></td>;
       case 'jewelryType': return (
@@ -5054,10 +5112,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-stone-900">
-                    ${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}
+                    ${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}
                   </p>
                   <p className="text-xs text-stone-500">
-                    ${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}/ct
+                    ${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}/ct
                   </p>
                 </div>
               </div>
@@ -5717,12 +5775,15 @@ const StoneSearchPage = () => {
   useEffect(() => { fetchJewelry(); }, [fetchJewelry]);
 
   const applyPriceMode = useCallback((stonesArr) => {
-    if (priceMode === 'bruto') return stonesArr;
-    return stonesArr.map(s => ({
-      ...s,
-      pricePerCt: s.pricePerCt ? s.pricePerCt / 2 : s.pricePerCt,
-      priceTotal: s.priceTotal ? s.priceTotal / 2 : s.priceTotal,
-    }));
+    return stonesArr.map(s => {
+      const scale = inventoryPriceScale(s, priceMode);
+      if (scale === 1) return s;
+      return {
+        ...s,
+        pricePerCt: s.pricePerCt ? s.pricePerCt * scale : s.pricePerCt,
+        priceTotal: s.priceTotal ? s.priceTotal * scale : s.priceTotal,
+      };
+    });
   }, [priceMode]);
 
   // Toggle Neto ⇆ Bruto. The price filters (Total + PPC) are entered in the
@@ -7269,8 +7330,9 @@ const StoneSearchPage = () => {
           if (!matches) return false;
         }
       }
-      const effectiveTotal = priceMode === 'neto' && stone.priceTotal != null ? stone.priceTotal / 2 : stone.priceTotal;
-      const effectivePPC = priceMode === 'neto' && stone.pricePerCt != null ? stone.pricePerCt / 2 : stone.pricePerCt;
+      const priceScale = inventoryPriceScale(stone, priceMode);
+      const effectiveTotal = stone.priceTotal != null ? stone.priceTotal * priceScale : stone.priceTotal;
+      const effectivePPC = stone.pricePerCt != null ? stone.pricePerCt * priceScale : stone.pricePerCt;
       if (filters.minPrice && effectiveTotal != null && effectiveTotal < Number(filters.minPrice)) return false;
       if (filters.maxPrice && effectiveTotal != null && effectiveTotal > Number(filters.maxPrice)) return false;
       if (filters.minPricePerCt && effectivePPC != null && effectivePPC < Number(filters.minPricePerCt)) return false;
@@ -7366,7 +7428,7 @@ const StoneSearchPage = () => {
           if (w == null || w < ss.weight - tolerance || w > ss.weight + tolerance) return false;
         }
         if (ss.pricePerCt) {
-          const ppc = priceMode === 'neto' && stone.pricePerCt != null ? stone.pricePerCt / 2 : stone.pricePerCt;
+          const ppc = stone.pricePerCt != null ? stone.pricePerCt * inventoryPriceScale(stone, priceMode) : stone.pricePerCt;
           if (ppc == null || ppc < ss.pricePerCt.min || ppc > ss.pricePerCt.max) return false;
         }
         if (ss.clarities.length > 0) {
@@ -8581,6 +8643,7 @@ const StoneSearchPage = () => {
         isOpen={!!drawerStone}
         onClose={() => setDrawerStone(null)}
         stone={drawerStone}
+        priceMode={priceMode}
         onPrintLabel={(stone) => {
           setNiimbotPrintStones([stone]);
           setShowNiimbotPrint(true);
@@ -8696,7 +8759,7 @@ const StoneSearchPage = () => {
       <CompareModal
         isOpen={showCompare}
         onClose={() => setShowCompare(false)}
-        stones={allItems.filter(s => selectedStones.has(s.id))}
+        stones={applyPriceMode(allItems.filter(s => selectedStones.has(s.id)))}
       />
     </>
   );
