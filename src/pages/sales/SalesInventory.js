@@ -243,9 +243,9 @@ export const SHAPE_MATCH = {
   EuropeanCut: ["EUROPEAN", "EUR"],
   Flanders: ["FLANDERS"],
   SquareRadiant: ["SQRAD", "SQUARE RADIANT"],
-  CushionBrilliant: ["CUSHION BRILLIANT"],
-  CushionModified: ["CUSHION MODIFIED"],
-  OldMine: ["OM", "OMB", "OLD MINE"],
+  CushionBrilliant: ["CB", "CUSHION BRILLIANT"],
+  CushionModified: ["CMB", "CUSHION MODIFIED"],
+  OldMine: ["OM", "OMB", "OLD MINE", "OLD MINE BRILLIANT"],
 };
 const LOCATION_MATCH = {
   HK: ["HK", "HONG KONG"],
