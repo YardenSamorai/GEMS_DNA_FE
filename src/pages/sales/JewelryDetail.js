@@ -46,15 +46,6 @@ const itemImages = (item) => {
 
 const certLink = (item) => usableImg(item.certificateUrl) || null;
 
-const SectionLabel = ({ children }) => (
-  <div className="flex items-center gap-3 pb-1 pt-7">
-    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-muted">
-      {children}
-    </span>
-    <span className="h-px flex-1 bg-app-line" />
-  </div>
-);
-
 const SpecRow = ({ label, value }) =>
   value == null || value === "" ? null : (
     <div className="flex items-baseline justify-between gap-4 py-[9px]">
@@ -195,21 +186,19 @@ const JewelryDetail = () => {
   const cert = certLink(item);
   const total = money(item.price);
 
-  const pieceSpecs = [
-    ["Center stone", centerCt || BLANK],
+  // Flat spec list (no section dividers) — matches the diamond / emerald /
+  // gemstone product pages. Jewelry only carries a single geographic field
+  // (shipping_from), so Location and Branch surface the same value.
+  const specs = [
+    ["SKU", item.sku || BLANK],
+    ["Center stone weight", centerCt || BLANK],
     ["Total weight", totalWt || BLANK],
     ["Total carat", totalCt || BLANK],
-    ["Shape", shape || BLANK],
-    ["Jewelry type", item.jewelryType || BLANK],
-    ["Gem type", item.stoneType || BLANK],
+    ["Center stone shape", shape || BLANK],
     ["Style", item.style || BLANK],
     ["Metal", item.metal || BLANK],
-  ];
-
-  const paperSpecs = [
-    ["SKU", item.sku || BLANK],
-    ["Cert. Num.", item.certificateNumber || BLANK],
     ["Location", item.location || BLANK],
+    ["Branch", item.location || BLANK],
   ];
 
   return (
@@ -381,16 +370,8 @@ const JewelryDetail = () => {
           )}
         </div>
 
-        <SectionLabel>The piece</SectionLabel>
-        <div className="divide-y divide-app-line/60">
-          {pieceSpecs.map(([label, value]) => (
-            <SpecRow key={label} label={label} value={value} />
-          ))}
-        </div>
-
-        <SectionLabel>Certificate &amp; location</SectionLabel>
-        <div className="divide-y divide-app-line/60">
-          {paperSpecs.map(([label, value]) => (
+        <div className="mt-5 divide-y divide-app-line/60">
+          {specs.map(([label, value]) => (
             <SpecRow key={label} label={label} value={value} />
           ))}
         </div>

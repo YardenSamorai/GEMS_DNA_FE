@@ -19,7 +19,7 @@ const S = (children) => (cls) =>
     </svg>
   );
 
-export const DIAMOND_SHAPES = [
+const ALL_SHAPES = [
   {
     key: "Round",
     label: "Round",
@@ -356,5 +356,43 @@ export const DIAMOND_SHAPES = [
     ),
   },
 ];
+
+/* Display order for the Shape filter, ranked by how popular / searched each cut
+ * is in the diamond inventory (most-used first, rarest last). The cushion / old
+ * mine specialty cuts are grouped relatively near the top — right after the
+ * mainstream brilliants. Shapes omitted from this list (e.g. Flanders, European
+ * Cut, Square Radiant, Bullets) are intentionally hidden from the filter. */
+const SHAPE_ORDER = [
+  "Radiant",
+  "Round",
+  "Cushion",
+  "Pear",
+  "Emerald",
+  "Baguette",
+  "Oval",
+  "OldMine",
+  "CushionBrilliant",
+  "CushionModified",
+  "Marquise",
+  "Heart",
+  "Trilliant",
+  "Triangular",
+  "Briolette",
+  "Asscher",
+  "TaperedBaguette",
+  "Kite",
+  "Lozenge",
+  "Hexagonal",
+  "Shield",
+  "Rose",
+  "Square",
+  "Octagonal",
+  "Cabochon",
+  "Pentagonal",
+];
+
+const SHAPE_BY_KEY = Object.fromEntries(ALL_SHAPES.map((s) => [s.key, s]));
+
+export const DIAMOND_SHAPES = SHAPE_ORDER.map((k) => SHAPE_BY_KEY[k]).filter(Boolean);
 
 export default DIAMOND_SHAPES;
