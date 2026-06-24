@@ -1157,9 +1157,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     }
     // Arrived here from a cross-category SKU search (the searched stone lives in
     // this category): override whatever was just restored with that query so the
-    // stone shows up immediately.
+    // stone shows up immediately. Then CONSUME it — wipe it from history state so
+    // returning to this page later (e.g. Back from a product) doesn't re-inject
+    // the old SKU into the search box on every visit.
     if (location.state?.searchSku) {
       setSkuQuery(location.state.searchSku);
+      navigate(location.pathname + location.search, { replace: true, state: null });
     }
     setBasicOpen(true);
     setMeasureOpen(false);
