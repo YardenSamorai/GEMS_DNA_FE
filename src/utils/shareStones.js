@@ -1,6 +1,6 @@
 import { getMappedCategories } from "./categoryMap";
 import { getDisplayShape, shortTreatment } from "../pages/inventory/helpers/constants";
-import { parseDims, usableImg } from "../pages/sales/SalesInventory";
+import { parseDims, usableImg, prettyBranch } from "../pages/sales/SalesInventory";
 import { logShareEvents } from "../services/stonesApi";
 import { trackShare } from "./activityLog";
 
@@ -53,6 +53,10 @@ const fluorAbbr = (v) => {
   const k = String(v ?? "").trim().toUpperCase();
   return FLUOR_ABBR[k] || k || "";
 };
+
+/* Branch label for share text — normalises bare "USA" to the real branch
+ * (shared with the catalog/detail surfaces). */
+const displayBranch = (v) => prettyBranch(v);
 
 const ratioOf = (stone) => {
   let ratio = parseFloat(stone?.ratio);
@@ -141,7 +145,7 @@ const buildDiamondText = (stone, { withPrice = true, withRap = false } = {}) => 
   const ratio = ratioOf(stone);
   if (ratio) lines.push(`Ratio: ${ratio}`);
 
-  const branch = String(stone.branch || "").trim();
+  const branch = displayBranch(stone.branch);
   if (branch) lines.push(`Branch: ${branch}`);
 
   if (stone.sku) lines.push(`SKU: ${stone.sku}`);
@@ -194,7 +198,7 @@ const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
   const ratio = ratioOf(stone);
   if (ratio) lines.push(`Ratio : ${ratio}`);
 
-  const branch = String(stone.branch || "").trim();
+  const branch = displayBranch(stone.branch);
   if (branch) lines.push(`Branch: ${branch}`);
 
   if (stone.sku) lines.push(`SKU: ${stone.sku}`);
@@ -215,11 +219,14 @@ const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
   return lines.join("\n");
 };
 
-/* Jewelry:
+/* Jewelry — every detail line carries a label, mirroring the product page:
  *   <title>
- *   <center stone weight>
- *   <style>
- *   <sku>
+ *   Gem type: <stone type>
+ *   Center stone: <center carat> ct
+ *   Total carat: <total carat> ct
+ *   Style: <style>
+ *   Metal: <metal>
+ *   SKU: <sku>
  *   Branch: <branch>
  *   …links */
 const buildJewelryText = (item) => {
@@ -228,15 +235,24 @@ const buildJewelryText = (item) => {
   const title = String(item.name || item.title || "").trim();
   if (title) lines.push(title);
 
+  const gemType = String(item.stoneType || "").trim();
+  if (gemType) lines.push(`Gem type: ${gemType}`);
+
   const cc = Number(item.centerCarat);
-  if (Number.isFinite(cc)) lines.push(`${cc.toFixed(2)} ct`);
+  if (Number.isFinite(cc)) lines.push(`Center stone: ${cc.toFixed(2)} ct`);
+
+  const tcw = Number(item.totalCarat);
+  if (Number.isFinite(tcw)) lines.push(`Total carat: ${tcw.toFixed(2)} ct`);
 
   const style = String(item.style || "").trim();
-  if (style) lines.push(style);
+  if (style) lines.push(`Style: ${style}`);
 
-  if (item.sku) lines.push(String(item.sku));
+  const metal = String(item.metal || "").trim();
+  if (metal) lines.push(`Metal: ${metal}`);
 
-  const branch = String(item.branch || "").trim();
+  if (item.sku) lines.push(`SKU: ${item.sku}`);
+
+  const branch = displayBranch(item.branch || item.location);
   if (branch) lines.push(`Branch: ${branch}`);
 
   const links = buildLinks(item);

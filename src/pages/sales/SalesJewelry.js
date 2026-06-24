@@ -6,7 +6,7 @@ import { decryptPrice } from "../../utils/decrypt";
 import { sanitizeText, normalizeJewelryCategory } from "../../utils/helper";
 import { getDisplayShape } from "../inventory/helpers/constants";
 import { DIAMOND_SHAPES } from "./diamondShapes";
-import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle } from "./SalesInventory";
+import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle, prettyBranch } from "./SalesInventory";
 
 /* ============================================================================
  * SalesJewelry — the jewelry surface of the sales catalog.
@@ -21,7 +21,41 @@ import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle } from "./SalesInvent
  * ========================================================================== */
 
 const PAGE_SIZE = 12;
-const STORE_KEY = "salesFilters:v1:jewelry";
+const STORE_KEY = "salesFilters:v2:jewelry";
+/* Saved filters live for two hours, then reset (idle-based timer). */
+const FILTER_TTL_MS = 2 * 60 * 60 * 1000;
+
+/* Catalog scroll restoration on Back from a product page. */
+const SCROLL_KEY = "salesScroll:v1:jewelry";
+const SCROLL_TTL_MS = 5 * 60 * 1000;
+const saveScrollPos = (count) => {
+  try {
+    sessionStorage.setItem(
+      SCROLL_KEY,
+      JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, count, t: Date.now() })
+    );
+  } catch {
+    /* non-fatal */
+  }
+};
+const readScrollPos = () => {
+  try {
+    const raw = sessionStorage.getItem(SCROLL_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p || typeof p.y !== "number" || Date.now() - (p.t || 0) > SCROLL_TTL_MS) return null;
+    return p;
+  } catch {
+    return null;
+  }
+};
+const clearScrollPos = () => {
+  try {
+    sessionStorage.removeItem(SCROLL_KEY);
+  } catch {
+    /* non-fatal */
+  }
+};
 
 /* The four headline jewelry kinds (with their own line icons). `match` lists
  * the jewelry_type values that fold into each button. */
@@ -114,7 +148,16 @@ const FILTER_DEFAULTS = {
 const loadSaved = () => {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && typeof parsed.t === "number") {
+      if (Date.now() - parsed.t > FILTER_TTL_MS) {
+        localStorage.removeItem(STORE_KEY);
+        return {};
+      }
+      return parsed.f || {};
+    }
+    return {}; // older un-timestamped format — ignore
   } catch {
     return {};
   }
@@ -296,6 +339,8 @@ const SalesJewelry = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const pendingScrollRef = useRef(null);
+  const restorePendingRef = useRef(false);
 
   const [basicOpen, setBasicOpen] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -307,9 +352,12 @@ const SalesJewelry = () => {
       localStorage.setItem(
         STORE_KEY,
         JSON.stringify({
-          jewelrySel, shapeSel, styleSel, gemTypeSel,
-          tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
-          skuQuery, sortKey, sortDir,
+          t: Date.now(),
+          f: {
+            jewelrySel, shapeSel, styleSel, gemTypeSel,
+            tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
+            skuQuery, sortKey, sortDir,
+          },
         })
       );
     } catch {
@@ -331,7 +379,11 @@ const SalesJewelry = () => {
         const mapped = (data?.jewelry || []).map(mapRow);
         if (!cancelled) {
           setRows(mapped);
-          setVisibleCount(PAGE_SIZE);
+          const savedScroll = readScrollPos();
+          setVisibleCount(savedScroll?.count ? Math.max(PAGE_SIZE, savedScroll.count) : PAGE_SIZE);
+          pendingScrollRef.current = savedScroll ? savedScroll.y : null;
+          restorePendingRef.current = !!savedScroll;
+          clearScrollPos();
         }
       } catch (err) {
         if (!cancelled) setError(err.message || "Failed to load jewelry");
@@ -359,13 +411,20 @@ const SalesJewelry = () => {
   // Style options depend on the jewelry selection (or the whole catalog when
   // nothing is picked) — "the fields here change with the jewelry choice".
   const styleOptions = useMemo(() => {
-    const seen = new Map();
+    // Count occurrences so the most common styles lead the list.
+    const counts = new Map(); // lowercase key -> { label, n }
     for (const r of rows) {
       if (!matchesJewelry(r)) continue;
       const s = (r.style || "").trim();
-      if (s && !seen.has(s.toLowerCase())) seen.set(s.toLowerCase(), s);
+      if (!s) continue;
+      const k = s.toLowerCase();
+      const cur = counts.get(k);
+      if (cur) cur.n += 1;
+      else counts.set(k, { label: s, n: 1 });
     }
-    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+    return Array.from(counts.values())
+      .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
+      .map((x) => x.label);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, jewelrySel]);
 
@@ -419,8 +478,20 @@ const SalesJewelry = () => {
   const hasMore = visibleCount < filtered.length;
 
   useEffect(() => {
+    if (restorePendingRef.current) {
+      restorePendingRef.current = false;
+      return;
+    }
     setVisibleCount(PAGE_SIZE);
   }, [filtered.length]);
+
+  // Restore the saved scroll position once the grid has rendered after Back.
+  useEffect(() => {
+    if (loading || pendingScrollRef.current == null) return;
+    const y = pendingScrollRef.current;
+    pendingScrollRef.current = null;
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  }, [loading]);
 
   // Infinite scroll sentinel.
   const sentinelRef = useRef(null);
@@ -598,6 +669,7 @@ const SalesJewelry = () => {
                 key={item.id ?? item.sku ?? idx}
                 to={`/sales/jewelry/${encodeURIComponent(item.sku || "")}`}
                 state={{ item }}
+                onClick={() => saveScrollPos(visibleCount)}
                 className="transition active:opacity-80"
               >
                 <JewelryCard item={item} />
@@ -695,6 +767,27 @@ const SalesJewelry = () => {
                       </div>
                     </section>
 
+                    {/* Style — options follow the jewelry selection, ordered by
+                        how common each style is. Sits above Shape. */}
+                    <section>
+                      <FieldLabel showClear={styleSel.length > 0} onClear={() => setStyleSel([])}>
+                        Style
+                      </FieldLabel>
+                      {styleOptions.length ? (
+                        <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
+                          <div className="grid grid-flow-col grid-rows-3 auto-cols-max gap-2">
+                            {styleOptions.map((s) => (
+                              <Chip key={s} active={styleSel.includes(s)} onClick={() => toggleIn(setStyleSel)(s)}>
+                                {s}
+                              </Chip>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[13px] text-app-soft">No styles available.</p>
+                      )}
+                    </section>
+
                     {/* Shape — same set as Emeralds. */}
                     <section>
                       <FieldLabel showClear={shapeSel.length > 0} onClear={() => setShapeSel([])}>
@@ -725,26 +818,6 @@ const SalesJewelry = () => {
                           })}
                         </div>
                       </div>
-                    </section>
-
-                    {/* Style — options follow the jewelry selection. */}
-                    <section>
-                      <FieldLabel showClear={styleSel.length > 0} onClear={() => setStyleSel([])}>
-                        Style
-                      </FieldLabel>
-                      {styleOptions.length ? (
-                        <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
-                          <div className="grid grid-flow-col grid-rows-3 auto-cols-max gap-2">
-                            {styleOptions.map((s) => (
-                              <Chip key={s} active={styleSel.includes(s)} onClick={() => toggleIn(setStyleSel)(s)}>
-                                {s}
-                              </Chip>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-[13px] text-app-soft">No styles available.</p>
-                      )}
                     </section>
 
                     {/* Gem type */}
@@ -985,7 +1058,7 @@ export const JewelryCard = ({ item }) => {
         {/* Title leads, then labelled spec lines. */}
         <h3 className="text-[14px] font-semibold leading-snug text-app-ink">{item.name || item.sku}</h3>
         <Line value={centerCt ? `Center stone weight: ${centerCt}` : null} />
-        <Line value={item.location ? `Location: ${item.location}` : null} />
+        <Line value={item.location ? `Branch: ${prettyBranch(item.location)}` : null} />
         <Line value={item.style ? `Style: ${item.style}` : null} />
         <Line value={item.sku ? `SKU: ${item.sku}` : null} />
         {price && (

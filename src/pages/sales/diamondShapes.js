@@ -100,7 +100,7 @@ const ALL_SHAPES = [
   },
   {
     key: "Cushion",
-    label: "Cushion",
+    label: "Cushion (all)",
     icon: S(
       <>
         <path d="M20,8 L44,8 Q56,8 56,20 L56,44 Q56,56 44,56 L20,56 Q8,56 8,44 L8,20 Q8,8 20,8 Z" />
@@ -365,20 +365,22 @@ const ALL_SHAPES = [
 const SHAPE_ORDER = [
   "Radiant",
   "Round",
+  // Cushion family grouped together: the catch-all "Cushion (all)" first, then
+  // the specific cuts and Old Mine right beside it.
   "Cushion",
+  "CushionModified",
+  "CushionBrilliant",
+  "OldMine",
   "Pear",
   "Emerald",
-  "Baguette",
   "Oval",
-  "OldMine",
-  "CushionBrilliant",
-  "CushionModified",
   "Marquise",
   "Heart",
   "Trilliant",
   "Triangular",
   "Briolette",
   "Asscher",
+  "Baguette",
   "TaperedBaguette",
   "Kite",
   "Lozenge",
@@ -391,8 +393,39 @@ const SHAPE_ORDER = [
   "Pentagonal",
 ];
 
+/* Emerald (and coloured-stone) Shape filter order — ranked by how common each
+ * cut is for emeralds. The diamond-only cushion specialty cuts (Old Mine,
+ * Cushion Brilliant/Modified) are dropped here. */
+const EMERALD_SHAPE_ORDER = [
+  "Emerald",
+  "Oval",
+  "Pear",
+  "Round",
+  "Cushion",
+  "Square",
+  "Octagonal",
+  "Cabochon",
+  "Heart",
+  "Marquise",
+  "Trilliant",
+  "Asscher",
+  "Radiant",
+  "Triangular",
+  "Hexagonal",
+  "Pentagonal",
+  "Kite",
+  "Lozenge",
+  "Shield",
+  "Rose",
+  "Briolette",
+  "Baguette",
+  "TaperedBaguette",
+];
+
 const SHAPE_BY_KEY = Object.fromEntries(ALL_SHAPES.map((s) => [s.key, s]));
 
 export const DIAMOND_SHAPES = SHAPE_ORDER.map((k) => SHAPE_BY_KEY[k]).filter(Boolean);
+
+export const EMERALD_SHAPES = EMERALD_SHAPE_ORDER.map((k) => SHAPE_BY_KEY[k]).filter(Boolean);
 
 export default DIAMOND_SHAPES;

@@ -5,7 +5,7 @@ import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
-import { DIAMOND_SHAPES } from "./diamondShapes";
+import { DIAMOND_SHAPES, EMERALD_SHAPES } from "./diamondShapes";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import placeholderImg from "../../assets/stone-placeholder-eshed.png";
 import { useSelection } from "../../context/SelectionContext";
@@ -190,15 +190,60 @@ const FILTER_DEFAULTS = {
 /* Per-category filter persistence. Each mode (diamond / emerald / gemstone)
  * keeps its own snapshot in localStorage, so switching between catalogs — or
  * leaving and coming back later — restores exactly what was filtered. */
-const filtersKey = (mode) => `salesFilters:v2:${mode}`;
+const filtersKey = (mode) => `salesFilters:v3:${mode}`;
+/* Saved filters live for two hours, then reset to neutral. The timer is the
+ * last time the filters changed, so an idle 2h window clears them. */
+const FILTER_TTL_MS = 2 * 60 * 60 * 1000;
 const loadSavedFilters = (mode) => {
   try {
     const raw = localStorage.getItem(filtersKey(mode));
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && typeof parsed.t === "number") {
+      if (Date.now() - parsed.t > FILTER_TTL_MS) {
+        localStorage.removeItem(filtersKey(mode));
+        return {};
+      }
+      return parsed.f || {};
+    }
+    return {}; // older un-timestamped format — ignore
   } catch {
     return {};
   }
 };
+/* Catalog scroll restoration — remember where the rep was (and how many cards
+ * were revealed) when they open a product, so Back returns to the same spot. */
+const scrollKey = (mode) => `salesScroll:v1:${mode}`;
+const SCROLL_TTL_MS = 5 * 60 * 1000;
+const saveScrollPos = (mode, count) => {
+  try {
+    sessionStorage.setItem(
+      scrollKey(mode),
+      JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, count, t: Date.now() })
+    );
+  } catch {
+    /* storage unavailable — non-fatal */
+  }
+};
+const readScrollPos = (mode) => {
+  try {
+    const raw = sessionStorage.getItem(scrollKey(mode));
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p || typeof p.y !== "number" || Date.now() - (p.t || 0) > SCROLL_TTL_MS) return null;
+    return p;
+  } catch {
+    return null;
+  }
+};
+const clearScrollPos = (mode) => {
+  try {
+    sessionStorage.removeItem(scrollKey(mode));
+  } catch {
+    /* non-fatal */
+  }
+};
+
 /* Advanced (collapsed by default) finish grades + fluorescence. */
 const GRADE_EVGF = ["EX", "VG", "G", "F"];
 const FLUOR_OPTIONS = ["None", "Faint", "Med.", "Strong"];
@@ -460,20 +505,48 @@ const LOCATION_MAP = {
 const normLoc = (v) => String(v || "").trim().replace(/\s+/g, " ").toUpperCase();
 
 /* Resolve the location line + memo flag for a stone.
- *  - Known in-house location  -> clean label, not on memo.
- *  - Other (real company)     -> show it, flagged as MEMO OUT.
- *  - Empty                    -> fall back to branch/city, not on memo. */
+ *
+ * The MEMO OUT flag ALWAYS comes from the server's authoritative `onMemo`
+ * field (computed from the in-house location list on the API). We deliberately
+ * do NOT re-derive it from LOCATION_MAP here: that map only exists to produce a
+ * friendly label, and any drift between it and the server's in-house set would
+ * otherwise flag in-house stones as "Memo out" by mistake. */
 export const resolveLocation = (s) => {
+  const onMemo = !!s.onMemo;
   const raw = s.exactLocation && String(s.exactLocation).trim() ? String(s.exactLocation).trim() : "";
   if (!raw) {
-    // No exact place: either there genuinely isn't one, or the server hid it
-    // for a restricted viewer (permissions). Fall back to the branch and trust
-    // the server-provided `onMemo` flag for the MEMO OUT badge.
-    return { label: s.location || s.branch || null, memo: !!s.onMemo };
+    // No exact place (genuinely none, or hidden for a restricted viewer).
+    return { label: s.location || s.branch || null, memo: onMemo };
   }
   const mapped = LOCATION_MAP[normLoc(raw)];
-  if (mapped) return { label: mapped, memo: false };
-  return { label: raw, memo: true };
+  // Friendly in-house label when known, otherwise the raw place. Memo status is
+  // the server's, never inferred from whether the label was mapped.
+  return { label: mapped || raw, memo: onMemo };
+};
+
+/* Branch label normaliser. Several feeds store the bare country "USA" where a
+ * real branch is meant — surface a proper branch name instead. US stock lives
+ * at the New York branch (jewelry has no NY/LA split in its feed). */
+const BRANCH_LABELS = {
+  USA: "New York",
+  US: "New York",
+  "U.S.": "New York",
+  "U.S.A": "New York",
+  "U.S.A.": "New York",
+  "UNITED STATES": "New York",
+  NY: "New York",
+  "NEW YORK": "New York",
+  LA: "Los Angeles",
+  "LOS ANGELES": "Los Angeles",
+  HK: "Hong Kong",
+  "HONG KONG": "Hong Kong",
+  IL: "Israel",
+  ISRAEL: "Israel",
+};
+export const prettyBranch = (v) => {
+  const s = String(v ?? "").trim();
+  if (!s) return s;
+  return BRANCH_LABELS[normLoc(s)] || s;
 };
 
 /* Diamond title: "0.51 Round H SI1 None IGI"
@@ -717,7 +790,7 @@ export const GemstoneCard = ({ stone, mode }) => {
   // product page. We still read resolveLocation for the MEMO OUT flag.
   const { memo: memoOut } = resolveLocation(stone);
   const branchLine =
-    stone.branch && String(stone.branch).trim() ? String(stone.branch).trim() : null;
+    stone.branch && String(stone.branch).trim() ? prettyBranch(stone.branch) : null;
   const img = stoneImage(stone);
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = img && !imgFailed;
@@ -885,6 +958,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Holds the y-offset to restore once the grid has re-rendered after a Back
+  // from a product page (see the load + restore effects).
+  const pendingScrollRef = useRef(null);
+  // Set while we're restoring a saved scroll position so the paging-reset
+  // effect doesn't snap the revealed-card count back to one page.
+  const restorePendingRef = useRef(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   // Drag-to-dismiss for the bottom sheets: gestures start only from the grab
@@ -1074,7 +1153,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               .filter((s) => cfg.test(getMappedCategories(s.category)))
               .map(adjustSalesPrices)
           );
-          setVisibleCount(PAGE_SIZE);
+          // If we're returning from a product page, reveal enough cards and
+          // remember where to scroll back to (restored once the grid renders).
+          const savedScroll = readScrollPos(mode);
+          setVisibleCount(savedScroll?.count ? Math.max(PAGE_SIZE, savedScroll.count) : PAGE_SIZE);
+          pendingScrollRef.current = savedScroll ? savedScroll.y : null;
+          restorePendingRef.current = !!savedScroll;
+          clearScrollPos(mode);
         }
       } catch (err) {
         if (!cancelled) setError(err.message || `Failed to load ${cfg.noun}`);
@@ -1087,6 +1172,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       cancelled = true;
     };
   }, [mode, actor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Once the grid has rendered after a load, jump back to the saved scroll
+  // position (set when the rep opened a product). Two rAFs ensure layout is
+  // settled before we scroll.
+  useEffect(() => {
+    if (loading || pendingScrollRef.current == null) return;
+    const y = pendingScrollRef.current;
+    pendingScrollRef.current = null;
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+  }, [loading]);
 
   // Track SKU searches for the Team activity feed — debounced so we log the
   // settled query, not every keystroke.
@@ -1123,7 +1218,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       return;
     }
     try {
-      localStorage.setItem(filtersKey(mode), JSON.stringify(collectFilters()));
+      localStorage.setItem(filtersKey(mode), JSON.stringify({ t: Date.now(), f: collectFilters() }));
     } catch {
       /* storage unavailable (private mode / quota) — non-fatal */
     }
@@ -1286,7 +1381,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       // every stone carries a v360 video link, so including video here made the
       // filter meaningless (image-less stones still showed "Coming Soon").
       if (onlyMedia && !stoneImage(s)) return false;
-      if (onlyInStock && resolveLocation(s).memo) return false;
+      // Guaranteed available — a stone is unavailable if it's on memo OR on
+      // hold (logical OR, not both).
+      if (onlyInStock) {
+        const onMemo = resolveLocation(s).memo;
+        const onHold = !!s.onHold || !!(s.holder && String(s.holder).trim());
+        if (onMemo || onHold) return false;
+      }
 
       if (skuQuery.trim()) {
         const q = norm(skuQuery);
@@ -1336,8 +1437,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     skuQuery,
   ]);
 
-  // Reset paging whenever the result set or its order changes (grid back to top).
+  // Reset paging whenever the result set or its order changes (grid back to
+  // top) — but not on the load that restores a saved scroll position.
   useEffect(() => {
+    if (restorePendingRef.current) {
+      restorePendingRef.current = false;
+      return;
+    }
     setVisibleCount(PAGE_SIZE);
   }, [filtered, sortBy]);
 
@@ -1400,8 +1506,32 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     return arr;
   }, [filtered, sortBy]);
 
-  const visibleStones = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
-  const hasMore = visibleCount < sorted.length;
+  // Keep pairs together: after sorting, drop each stone's pair partner in right
+  // after it so the two appear side by side in the catalog grid.
+  const paired = useMemo(() => {
+    const bySku = new Map();
+    for (const s of sorted) {
+      const k = norm(s.sku);
+      if (k) bySku.set(k, s);
+    }
+    const placed = new Set();
+    const out = [];
+    for (const s of sorted) {
+      const k = norm(s.sku);
+      if (k && placed.has(k)) continue;
+      out.push(s);
+      if (k) placed.add(k);
+      const pk = norm(s.pairSku);
+      if (pk && bySku.has(pk) && !placed.has(pk)) {
+        out.push(bySku.get(pk));
+        placed.add(pk);
+      }
+    }
+    return out;
+  }, [sorted]);
+
+  const visibleStones = useMemo(() => paired.slice(0, visibleCount), [paired, visibleCount]);
+  const hasMore = visibleCount < paired.length;
 
   // Infinite scroll — reveal the next batch when the sentinel nears the
   // viewport. `rootMargin` pre-loads slightly before the user hits bottom.
@@ -1459,6 +1589,53 @@ const SalesInventory = ({ mode = "gemstone" }) => {
             </svg>
           </span>
           <input type="checkbox" className="sr-only" checked={checked} onChange={() => set((v) => !v)} />
+          {label}
+        </label>
+      ))}
+    </div>
+  );
+
+  // Parcel type is single-select: a tap picks one option (replacing any prior
+  // choice); tapping the active one clears it.
+  const selectParcel = (p) =>
+    setParcelSel((cur) => (cur.length === 1 && cur[0] === p ? [] : [p]));
+
+  // "Only in USA" — a one-tap shortcut that selects both US branches (NY + LA)
+  // in the Location filter; tapping again clears them.
+  const usaActive = locationSel.includes("NY") && locationSel.includes("LA");
+  const toggleUsa = () =>
+    setLocationSel((cur) => {
+      const has = cur.includes("NY") && cur.includes("LA");
+      if (has) return cur.filter((v) => v !== "NY" && v !== "LA");
+      return Array.from(new Set([...cur, "NY", "LA"]));
+    });
+
+  // Quick toggles for diamonds/emeralds — the three availability switches plus
+  // the "Only in USA" branch shortcut. Rendered above Parcel type.
+  const quickTogglesWithUsa = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+      {[
+        { label: "Only with cert", checked: onlyCert, onToggle: () => setOnlyCert((v) => !v) },
+        { label: "Only with media", checked: onlyMedia, onToggle: () => setOnlyMedia((v) => !v) },
+        { label: "Guaranteed available", checked: onlyInStock, onToggle: () => setOnlyInStock((v) => !v) },
+        { label: "Only in USA", checked: usaActive, onToggle: toggleUsa },
+      ].map(({ label, checked, onToggle }) => (
+        <label
+          key={label}
+          className="flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-app-ink"
+        >
+          <span
+            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
+              checked
+                ? "border-emerald-500 bg-emerald-500 text-white"
+                : "border-app-line bg-app-surface text-transparent"
+            }`}
+          >
+            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
+            </svg>
+          </span>
+          <input type="checkbox" className="sr-only" checked={checked} onChange={onToggle} />
           {label}
         </label>
       ))}
@@ -1659,7 +1836,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
             <button
               type="button"
               onClick={resetFilters}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-app-line bg-app-surface px-3 py-1.5 text-[12px] font-semibold text-app-ink transition hover:bg-app-canvas2 active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.7)] transition hover:bg-emerald-700 active:scale-95"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-14.3-3.4L4 7M4 15a8 8 0 0014.3 3.4L20 17" />
@@ -1742,6 +1919,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                 key={stone.id ?? stone.sku ?? idx}
                 to={`/sales/stone/${encodeURIComponent(stone.sku || "")}`}
                 state={{ stone }}
+                onClick={() => saveScrollPos(mode, visibleCount)}
                 className="transition active:opacity-80"
               >
                 <GemstoneCard stone={stone} mode={mode} />
@@ -1835,7 +2013,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                       </h3>
                       <ScrollRow>
                         {EMERALD_PARCEL_OPTIONS.map((p) => (
-                          <Chip key={p} active={parcelSel.includes(p)} onClick={() => toggleVal(setParcelSel, p)}>
+                          <Chip key={p} active={parcelSel.includes(p)} onClick={() => selectParcel(p)}>
                             {p}
                           </Chip>
                         ))}
@@ -2014,8 +2192,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                   </div>
                 ) : mode === "diamond" || mode === "emerald" ? (
                   <div className="space-y-7">
-                  {/* Parcel type — kept above Basic. Diamonds: Single/Pair;
-                      emeralds also use Set/Parcel. */}
+                  {/* Quick toggles — availability switches + the NY/LA "Only in
+                      USA" shortcut, kept above Parcel type. */}
+                  <section>{quickTogglesWithUsa}</section>
+
+                  {/* Parcel type — Diamonds: Single/Pair; emeralds also use
+                      Set/Parcel. */}
                   <section>
                     <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
                       Parcel type
@@ -2025,7 +2207,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                         <Chip
                           key={p}
                           active={parcelSel.includes(p)}
-                          onClick={() => toggleVal(setParcelSel, p)}
+                          onClick={() => selectParcel(p)}
                         >
                           {p}
                         </Chip>
@@ -2057,10 +2239,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     </div>
 
                     {/* Two rows, columns flow horizontally and scroll right.
-                        Scrollbar hidden but swipe/scroll still works. */}
+                        Scrollbar hidden but swipe/scroll still works. Emeralds
+                        use their own shape ordering. */}
                     <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
                       <div className="grid grid-flow-col grid-rows-2 auto-cols-[90px] gap-1.5">
-                        {DIAMOND_SHAPES.map((sh) => {
+                        {(mode === "emerald" ? EMERALD_SHAPES : DIAMOND_SHAPES).map((sh) => {
                           const active = shapeSel.includes(sh.key);
                           return (
                             <button
@@ -2327,38 +2510,6 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                   </section>
                   )}
 
-                  {/* Quick toggles — keep stones that carry a cert / media. */}
-                  <div className="flex flex-nowrap items-center justify-between gap-x-2">
-                    {[
-                      { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
-                      { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
-                      { label: "Guaranteed available", checked: onlyInStock, set: setOnlyInStock },
-                    ].map(({ label, checked, set }) => (
-                      <label
-                        key={label}
-                        className="flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-app-ink"
-                      >
-                        <span
-                          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
-                            checked
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : "border-app-line bg-app-surface text-transparent"
-                          }`}
-                        >
-                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
-                          </svg>
-                        </span>
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={checked}
-                          onChange={() => set((v) => !v)}
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
                   </>
                   )}
 

@@ -28,6 +28,7 @@ import {
   hasCert,
   adjustSalesPrices,
   StonePlaceholder,
+  prettyBranch,
 } from "./SalesInventory";
 
 /* ============================================================================
@@ -102,6 +103,14 @@ const StoneDetail = () => {
   // Internal cost is hidden behind a tap (managers/admins only) so it's never
   // shown to a client over the rep's shoulder when the page first opens.
   const [costOpen, setCostOpen] = useState(false);
+
+  // Always open the product page from the top — never inherit the catalog's
+  // scroll position or a restored offset when a new SKU is opened.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [sku]);
 
   // Deep-link fallback — no stone in router state, find it by SKU.
   useEffect(() => {
@@ -278,10 +287,30 @@ const StoneDetail = () => {
 
   const selected = isSelected(stone);
 
+  // When the stone is set in a jewelry piece, surface that piece's SKU right
+  // under the stone SKU as an Eshed-green underlined link to the jewelry page.
+  const jewelryModel =
+    stone.jewelryModel && String(stone.jewelryModel).trim() ? String(stone.jewelryModel).trim() : null;
+  const jewelryLinkRow = jewelryModel
+    ? [
+        [
+          "Jewelry",
+          <button
+            type="button"
+            onClick={() => navigate(`/sales/jewelry/${encodeURIComponent(jewelryModel)}`)}
+            className="text-emerald-600 underline underline-offset-2 decoration-emerald-600/60 transition active:scale-95 hover:text-emerald-700 dark:text-emerald-400"
+          >
+            {jewelryModel}
+          </button>,
+        ],
+      ]
+    : [];
+
   // Diamonds use one flat spec list (no section headers). Weight, color, shape,
   // clarity, cert lab and fluorescence already live in the title above.
   const diamondSpecs = [
     ["SKU", stone.sku || BLANK],
+    ...jewelryLinkRow,
     ["Polish", stone.polish || BLANK],
     ["Sym.", stone.symmetry || BLANK],
     ["L/W/D (mm)", lwd || BLANK],
@@ -290,30 +319,32 @@ const StoneDetail = () => {
     ["Table", pct(stone.tablePercent) || BLANK],
     // Cut only appears when it actually has a value (no empty "-" row).
     ...(stone.cut && String(stone.cut).trim() ? [["Cut", String(stone.cut).trim()]] : []),
-    ["Branch", stone.branch || BLANK],
-    ["Location", locationLabel || BLANK],
+    ["Branch", prettyBranch(stone.branch) || BLANK],
+    ["Location", prettyBranch(locationLabel) || BLANK],
   ];
 
   // Emeralds use one flat spec list too (no section headers).
   const emeraldSpecs = [
     ["SKU", stone.sku || BLANK],
+    ...jewelryLinkRow,
     ["Origin", stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : BLANK],
     ["L/W/D (mm)", lwd || BLANK],
     ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : BLANK],
-    ["Branch", stone.branch || BLANK],
-    ["Location", locationLabel || BLANK],
+    ["Branch", prettyBranch(stone.branch) || BLANK],
+    ["Location", prettyBranch(locationLabel) || BLANK],
   ];
 
   // Other gemstones — flat list too. Weight, gem type, shape, lab and comment
   // already live in the title above, so they're dropped here.
   const gemstoneSpecs = [
     ["SKU", stone.sku || BLANK],
+    ...jewelryLinkRow,
     ["Color", getDisplayColor(stone) || BLANK],
     ["Origin", stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : BLANK],
     ["L/W/D (mm)", lwd || BLANK],
     ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : BLANK],
-    ["Branch", stone.branch || BLANK],
-    ["Location", locationLabel || BLANK],
+    ["Branch", prettyBranch(stone.branch) || BLANK],
+    ["Location", prettyBranch(locationLabel) || BLANK],
   ];
 
   return (
@@ -572,7 +603,7 @@ const StoneDetail = () => {
                   d="M7 7h.01M7 3h5.6a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-4.6 4.6a2 2 0 01-2.8 0L6.6 11.6A2 2 0 016 10.2V4a1 1 0 011-1z"
                 />
               </svg>
-              View internal cost
+              View cost
             </button>
           </div>
         )}

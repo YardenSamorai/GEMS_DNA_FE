@@ -9,7 +9,7 @@ import {
 } from "../../utils/shareStones";
 import { fetchJewelryCatalog } from "../../services/jewelryApi";
 import { getDisplayShape } from "../inventory/helpers/constants";
-import { norm, money, usableImg, StonePlaceholder } from "./SalesInventory";
+import { norm, money, usableImg, StonePlaceholder, prettyBranch } from "./SalesInventory";
 import { mapRow as mapJewelryRow } from "./SalesJewelry";
 import { useTeam } from "../../context/TeamContext";
 import { trackStoneView, trackStoneDwell, trackPriceView } from "../../utils/activityLog";
@@ -71,6 +71,13 @@ const JewelryDetail = () => {
   const [liked, setLiked] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
   const [shareFiles, setShareFiles] = useState([]);
+
+  // Always open the product page scrolled to the top.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [sku]);
 
   // Deep-link fallback — no item in router state, find it by SKU.
   useEffect(() => {
@@ -191,14 +198,15 @@ const JewelryDetail = () => {
   // (shipping_from), so Location and Branch surface the same value.
   const specs = [
     ["SKU", item.sku || BLANK],
+    ["Gem type", item.stoneType || BLANK],
     ["Center stone weight", centerCt || BLANK],
     ["Total weight", totalWt || BLANK],
     ["Total carat", totalCt || BLANK],
     ["Center stone shape", shape || BLANK],
     ["Style", item.style || BLANK],
     ["Metal", item.metal || BLANK],
-    ["Location", item.location || BLANK],
-    ["Branch", item.location || BLANK],
+    ["Location", prettyBranch(item.location) || BLANK],
+    ["Branch", prettyBranch(item.location) || BLANK],
   ];
 
   return (
