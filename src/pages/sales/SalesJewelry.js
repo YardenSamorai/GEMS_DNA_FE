@@ -621,7 +621,7 @@ const SalesJewelry = () => {
         onClick={() => setFiltersOpen(true)}
         aria-label="Open filters"
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
-        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden ${
+        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-[13.5px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.7)] transition-all duration-200 md:hidden ${
           showFloatingFilter
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-4 opacity-0"

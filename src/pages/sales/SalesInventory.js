@@ -44,6 +44,14 @@ const MODES = {
   },
 };
 
+/* Route each mode maps to, so a SKU search can navigate the user to whichever
+ * category the matched stone actually lives in. */
+const MODE_ROUTES = {
+  diamond: "/sales/diamonds",
+  emerald: "/sales/emeralds",
+  gemstone: "/sales/gemstones",
+};
+
 /* Resolve which catalog surface a stone belongs to from its category. Used by
  * the cross-category selection view, where each picked stone has to render with
  * its own mode's card layout regardless of which page it was added from. */
@@ -953,7 +961,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // snapshot on mount. We read the live location in the effect (not a one-shot
   // ref initializer) so it works whether the page mounts fresh or is reused.
   const location = useLocation();
+  const navigate = useNavigate();
   const replayAppliedRef = useRef(false);
+  // Full fetched catalog (every category, before this mode's slice) — used so a
+  // SKU search can find a stone that lives in another category and jump there.
+  const allStonesRef = useRef([]);
   const [stones, setStones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1131,6 +1143,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     } else {
       applyFilters(loadSavedFilters(mode));
     }
+    // Arrived here from a cross-category SKU search (the searched stone lives in
+    // this category): override whatever was just restored with that query so the
+    // stone shows up immediately.
+    if (location.state?.searchSku) {
+      setSkuQuery(location.state.searchSku);
+    }
     setBasicOpen(true);
     setMeasureOpen(false);
     setAdvancedOpen(false);
@@ -1148,11 +1166,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         const data = await fetchSoapStones(actor, { assignedTo: "all" });
         const rows = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
         if (!cancelled) {
-          setStones(
-            rows
-              .filter((s) => cfg.test(getMappedCategories(s.category)))
-              .map(adjustSalesPrices)
-          );
+          const all = rows.map(adjustSalesPrices);
+          // Keep the full catalog so a SKU search can detect a stone living in a
+          // different category and hop the user over to it.
+          allStonesRef.current = all;
+          setStones(all.filter((s) => cfg.test(getMappedCategories(s.category))));
           // If we're returning from a product page, reveal enough cards and
           // remember where to scroll back to (restored once the grid renders).
           const savedScroll = readScrollPos(mode);
@@ -1191,6 +1209,28 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     const t = setTimeout(() => trackSearch(q), 900);
     return () => clearTimeout(t);
   }, [skuQuery]);
+
+  // Cross-category SKU search: if the query matches no stone in the current
+  // category but does match one in another category, hop the user over to that
+  // category (carrying the query) so the stone is shown. Debounced + min length
+  // so we don't redirect mid-typing on a 1–2 char prefix.
+  useEffect(() => {
+    const q = norm(skuQuery);
+    if (loading || q.length < 3) return undefined;
+    const matchesSku = (s) => norm(s.sku).includes(q) || norm(s.pairSku).includes(q);
+    const t = setTimeout(() => {
+      // Found in this category already — stay put.
+      if (stones.some(matchesSku)) return;
+      const match = (allStonesRef.current || []).find(matchesSku);
+      if (!match) return;
+      const targetMode = modeForStone(match);
+      if (targetMode === mode) return;
+      const route = MODE_ROUTES[targetMode];
+      if (route) navigate(route, { state: { searchSku: skuQuery } });
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skuQuery, stones, loading, mode]);
 
   // Track sort changes — fire when the sort sheet closes with an active sort,
   // so we log the settled order (a readable label) rather than every toggle.
@@ -1856,7 +1896,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         aria-label="Open filters"
         onClick={() => setFiltersOpen(true)}
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
-        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden ${
+        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-[13.5px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.7)] transition-all duration-200 md:hidden ${
           showFloatingFilter
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-4 opacity-0"
