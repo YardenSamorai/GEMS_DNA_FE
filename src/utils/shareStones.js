@@ -97,18 +97,6 @@ const certUrl = (stone) => {
   return httpUrl(stone?.certificateUrl) || jpg || null;
 };
 
-/* video, certificate, image — in that order, only those present. */
-const buildLinks = (stone) => {
-  const out = [];
-  const v = videoUrl(stone);
-  if (v) out.push(v);
-  const c = certUrl(stone);
-  if (c) out.push(c);
-  const img = stoneImageUrl(stone);
-  if (img) out.push(img);
-  return out;
-};
-
 /* ============================================================================
  * Text builders
  * ========================================================================== */
@@ -255,8 +243,13 @@ const buildJewelryText = (item) => {
   const branch = displayBranch(item.branch || item.location);
   if (branch) lines.push(`Branch: ${branch}`);
 
-  const links = buildLinks(item);
-  if (links.length) lines.push("", ...links);
+  // Labelled media links, each preceded by a blank line.
+  const v = videoUrl(item);
+  if (v) lines.push("", `Video link: ${v}`);
+  const c = certUrl(item);
+  if (c) lines.push("", `Cert link: ${c}`);
+  const img = stoneImageUrl(item);
+  if (img) lines.push("", `Image link: ${img}`);
 
   return lines.join("\n");
 };
