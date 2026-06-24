@@ -28,11 +28,22 @@ const FILTER_TTL_MS = 2 * 60 * 60 * 1000;
 /* Catalog scroll restoration on Back from a product page. */
 const SCROLL_KEY = "salesScroll:v1:jewelry";
 const SCROLL_TTL_MS = 5 * 60 * 1000;
+/* The catalog scrolls inside <main> on mobile (the document is locked) and on
+ * the window on desktop — read/write both so save+restore work everywhere. */
+const getScrollY = () => {
+  const main = typeof document !== "undefined" ? document.querySelector("main") : null;
+  return Math.max(main?.scrollTop || 0, window.scrollY || window.pageYOffset || 0);
+};
+const setScrollY = (y) => {
+  const main = typeof document !== "undefined" ? document.querySelector("main") : null;
+  if (main) main.scrollTop = y;
+  window.scrollTo(0, y);
+};
 const saveScrollPos = (count) => {
   try {
     sessionStorage.setItem(
       SCROLL_KEY,
-      JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, count, t: Date.now() })
+      JSON.stringify({ y: getScrollY(), count, t: Date.now() })
     );
   } catch {
     /* non-fatal */
@@ -490,7 +501,7 @@ const SalesJewelry = () => {
     if (loading || pendingScrollRef.current == null) return;
     const y = pendingScrollRef.current;
     pendingScrollRef.current = null;
-    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+    requestAnimationFrame(() => requestAnimationFrame(() => setScrollY(y)));
   }, [loading]);
 
   // Infinite scroll sentinel.

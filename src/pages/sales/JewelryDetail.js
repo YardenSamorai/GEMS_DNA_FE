@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -72,8 +72,12 @@ const JewelryDetail = () => {
   const [actionOpen, setActionOpen] = useState(false);
   const [shareFiles, setShareFiles] = useState([]);
 
-  // Always open the product page scrolled to the top.
-  useEffect(() => {
+  // Always open the product page scrolled to the top. On mobile the document is
+  // locked and the real scroll lives in an inner <main> container, so
+  // window.scrollTo is a no-op there — reset that container too.
+  useLayoutEffect(() => {
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;

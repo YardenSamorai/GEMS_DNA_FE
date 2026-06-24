@@ -223,11 +223,23 @@ const loadSavedFilters = (mode) => {
  * were revealed) when they open a product, so Back returns to the same spot. */
 const scrollKey = (mode) => `salesScroll:v1:${mode}`;
 const SCROLL_TTL_MS = 5 * 60 * 1000;
+/* The catalog scrolls inside <main> on mobile (the document is locked) and on
+ * the window/document on desktop. Read/write both so save+restore work on every
+ * device. */
+const getScrollY = () => {
+  const main = typeof document !== "undefined" ? document.querySelector("main") : null;
+  return Math.max(main?.scrollTop || 0, window.scrollY || window.pageYOffset || 0);
+};
+const setScrollY = (y) => {
+  const main = typeof document !== "undefined" ? document.querySelector("main") : null;
+  if (main) main.scrollTop = y;
+  window.scrollTo(0, y);
+};
 const saveScrollPos = (mode, count) => {
   try {
     sessionStorage.setItem(
       scrollKey(mode),
-      JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, count, t: Date.now() })
+      JSON.stringify({ y: getScrollY(), count, t: Date.now() })
     );
   } catch {
     /* storage unavailable — non-fatal */
@@ -1198,7 +1210,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     if (loading || pendingScrollRef.current == null) return;
     const y = pendingScrollRef.current;
     pendingScrollRef.current = null;
-    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+    requestAnimationFrame(() => requestAnimationFrame(() => setScrollY(y)));
   }, [loading]);
 
   // Track SKU searches for the Team activity feed — debounced so we log the

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -105,8 +105,13 @@ const StoneDetail = () => {
   const [costOpen, setCostOpen] = useState(false);
 
   // Always open the product page from the top — never inherit the catalog's
-  // scroll position or a restored offset when a new SKU is opened.
-  useEffect(() => {
+  // scroll position when a new SKU is opened. On mobile the document is locked
+  // and the real scroll lives in an inner <main> container, so window.scrollTo
+  // is a no-op there; reset that container's scrollTop too. useLayoutEffect runs
+  // before paint so there's no flash of the page mid-scroll.
+  useLayoutEffect(() => {
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
