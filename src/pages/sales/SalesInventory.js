@@ -309,7 +309,10 @@ export const SHAPE_MATCH = {
   Flanders: ["FLANDERS"],
   SquareRadiant: ["SQRAD", "SQUARE RADIANT"],
   CushionBrilliant: ["CB", "CUSHION BRILLIANT"],
-  CushionModified: ["CMB", "CUSHION MODIFIED"],
+  // The feed codes generic cushions as "CU" — in the trade a plain cushion is a
+  // Cushion Modified Brilliant by default (the explicit "CB" rows are the true
+  // brilliants, "OMB" the old mines), so "CU" belongs under Cushion Modified.
+  CushionModified: ["CU", "CMB", "CUSHION MODIFIED"],
   OldMine: ["OM", "OMB", "OLD MINE", "OLD MINE BRILLIANT"],
 };
 const LOCATION_MATCH = {
