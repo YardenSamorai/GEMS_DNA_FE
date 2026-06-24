@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchJewelryCatalog } from "../../services/jewelryApi";
+import { useTeam } from "../../context/TeamContext";
 import { decryptPrice } from "../../utils/decrypt";
 import { sanitizeText, normalizeJewelryCategory } from "../../utils/helper";
 import { getDisplayShape } from "../inventory/helpers/constants";
@@ -244,12 +245,22 @@ export const mapRow = (row) => {
       }
     }
   }
+  // Location surface (mirrors loose stones). `branch` + `exactLocation` come
+  // from the linked centre stone (masked per viewer on the BE); `location`
+  // stays branch-backward-compatible. on memo/hold flags drive the catalog tags.
+  const branch = row.branch ? String(row.branch).trim() : (row.shipping_from ? String(row.shipping_from).trim() : "");
+  const exactLocation = row.exact_location ? String(row.exact_location).trim() : "";
   return {
     kind: "jewelry",
     id: row.model_number,
     sku: row.model_number || "",
     name: sanitizeText(row.title) || row.model_number || "Untitled",
-    location: row.shipping_from ? String(row.shipping_from).trim() : "",
+    location: branch,
+    branch,
+    exactLocation,
+    holder: row.holder ? String(row.holder).trim() : "",
+    onMemo: !!row.on_memo,
+    onHold: !!row.on_hold,
     videoUrl: row.video_link ? String(row.video_link).trim() : "",
     certificateUrl: row.certificate_link ? String(row.certificate_link).trim() : "",
     certificateNumber: row.certificate_number ? String(row.certificate_number).trim() : "",
@@ -328,6 +339,7 @@ const SORT_OPTIONS = [
 ];
 
 const SalesJewelry = () => {
+  const { actor } = useTeam();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -386,7 +398,7 @@ const SalesJewelry = () => {
       try {
         setLoading(true);
         setError("");
-        const data = await fetchJewelryCatalog();
+        const data = await fetchJewelryCatalog(actor);
         const mapped = (data?.jewelry || []).map(mapRow);
         if (!cancelled) {
           setRows(mapped);
@@ -405,7 +417,7 @@ const SalesJewelry = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [actor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Does a row's jewelry_type fall under any of the picked headline kinds?
   // Match on whole words only — a bare `includes` made "EARRINGS" contain the
@@ -1066,10 +1078,36 @@ export const JewelryCard = ({ item }) => {
         <SelectToggle stone={item} />
       </div>
       <div className="mt-2.5 flex flex-col gap-0.5">
+        {/* Status / media tags on one wrapping row (matches the stone cards):
+            HOLD + Memo out drive availability, Certificate + Video flag media. */}
+        {(item.onHold || item.holder || item.onMemo || item.certificateUrl || item.certificateNumber || item.videoUrl) && (
+          <div className="mb-0.5 flex flex-wrap items-center gap-1">
+            {(item.onHold || item.holder) && (
+              <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-red-600">
+                HOLD
+              </span>
+            )}
+            {item.onMemo && (
+              <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-amber-700">
+                Memo out
+              </span>
+            )}
+            {(item.certificateUrl || item.certificateNumber) && (
+              <span className="inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                Certificate
+              </span>
+            )}
+            {item.videoUrl && (
+              <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                Video
+              </span>
+            )}
+          </div>
+        )}
         {/* Title leads, then labelled spec lines. */}
         <h3 className="text-[14px] font-semibold leading-snug text-app-ink">{item.name || item.sku}</h3>
         <Line value={centerCt ? `Center stone weight: ${centerCt}` : null} />
-        <Line value={item.location ? `Branch: ${prettyBranch(item.location)}` : null} />
+        <Line value={item.branch ? `Branch: ${prettyBranch(item.branch)}` : null} />
         <Line value={item.style ? `Style: ${item.style}` : null} />
         <Line value={item.sku ? `SKU: ${item.sku}` : null} />
         {price && (

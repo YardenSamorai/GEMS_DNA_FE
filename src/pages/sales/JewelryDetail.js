@@ -90,7 +90,7 @@ const JewelryDetail = () => {
     (async () => {
       try {
         setLoading(true);
-        const data = await fetchJewelryCatalog();
+        const data = await fetchJewelryCatalog(actor);
         const rows = (data?.jewelry || []).map(mapJewelryRow);
         const found = rows.find((r) => norm(r.sku) === norm(sku));
         if (!cancelled) {
@@ -106,7 +106,7 @@ const JewelryDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [item, sku]);
+  }, [item, sku, actor?.id]);
 
   // Record the jewelry view for the manager's Team activity feed, plus a
   // price view when the piece carries a price.
@@ -197,9 +197,16 @@ const JewelryDetail = () => {
   const cert = certLink(item);
   const total = money(item.price);
 
+  // Exact physical place (e.g. "Eiseman Jewels - JN") comes from the linked
+  // centre stone and is only present for viewers entitled to it; lower tiers
+  // get just the branch. Fall back to the branch when no exact place is shared.
+  const exactLoc = item.exactLocation && String(item.exactLocation).trim()
+    ? String(item.exactLocation).trim()
+    : "";
+  const branchLabel = item.branch ? prettyBranch(item.branch) : "";
+
   // Flat spec list (no section dividers) — matches the diamond / emerald /
-  // gemstone product pages. Jewelry only carries a single geographic field
-  // (shipping_from), so Location and Branch surface the same value.
+  // gemstone product pages.
   const specs = [
     ["SKU", item.sku || BLANK],
     ["Gem type", item.stoneType || BLANK],
@@ -209,8 +216,8 @@ const JewelryDetail = () => {
     ["Center stone shape", shape || BLANK],
     ["Style", item.style || BLANK],
     ["Metal", item.metal || BLANK],
-    ["Location", prettyBranch(item.location) || BLANK],
-    ["Branch", prettyBranch(item.location) || BLANK],
+    ["Location", exactLoc || branchLabel || BLANK],
+    ["Branch", branchLabel || BLANK],
   ];
 
   return (
@@ -381,6 +388,25 @@ const JewelryDetail = () => {
             </div>
           )}
         </div>
+
+        {/* Availability flags — HOLD / Memo out, driven by the linked stone's
+            physical location & holder (so reps know if the piece is free). */}
+        {(item.onHold || item.holder || item.onMemo) && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {(item.onHold || item.holder) && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-red-600 dark:bg-red-500/15 dark:text-red-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+                HOLD
+              </span>
+            )}
+            {item.onMemo && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Memo out
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="mt-5 divide-y divide-app-line/60">
           {specs.map(([label, value]) => (

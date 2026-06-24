@@ -25,6 +25,15 @@ const qs = (params) => {
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
+/* Actor headers so the BE can resolve the viewer's role + location-view tier
+ * (same convention as stonesApi). The global Clerk-token interceptor also
+ * attaches the verified session token; these are the legacy fallback. */
+const teamHeaders = (user) => ({
+  ...(user?.id ? { "x-actor-id": user.id } : {}),
+  ...(user?.email ? { "x-actor-email": user.email } : {}),
+  ...(user?.name ? { "x-actor-name": user.name } : {}),
+});
+
 /* ---------- Jewelry Items ---------- */
 
 export const fetchJewelryItems = (userId, filters = {}) =>
@@ -50,8 +59,8 @@ export const createJewelryItemFromTemplate = (payload) =>
 // Public catalog (jewelry_products table populated from WooCommerce). Returns
 // a `{ jewelry: [...] }` shape; rows have `model_number`, `title`, `price`
 // (encrypted), `all_pictures_link`, etc.
-export const fetchJewelryCatalog = () =>
-  fetch(`${API_BASE}/api/jewelry`).then(json);
+export const fetchJewelryCatalog = (user) =>
+  fetch(`${API_BASE}/api/jewelry`, { headers: teamHeaders(user) }).then(json);
 
 export const updateJewelryItem = (id, payload) =>
   fetch(`${API_BASE}/api/jewelry-items/${id}`, {
