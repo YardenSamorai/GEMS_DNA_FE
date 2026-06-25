@@ -342,7 +342,12 @@ const JewelryDetail = () => {
       </div>
 
       {/* ---- Content sheet -------------------------------------------------- */}
-      <div className="relative z-10 -mt-6 rounded-t-3xl border-t border-app-line bg-app-canvas px-5 pb-4 pt-5">
+      {/* The sheet normally overlaps the media by 24px for the rounded look, but
+          on the video slide that overlap hides the player's controls (play /
+          progress bar), so drop the overlap there to free up room. */}
+      <div className={`relative z-10 rounded-t-3xl border-t border-app-line bg-app-canvas px-5 pb-4 pt-5 ${
+        video && slide >= slideCount - 1 ? "mt-0" : "-mt-6"
+      }`}>
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-[21px] font-semibold leading-snug tracking-tight text-app-ink">
             {title}
