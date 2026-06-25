@@ -289,9 +289,10 @@ const StoneDetail = () => {
   const weightNum = Number(stone.weightCt);
   const totalCost = Number.isFinite(weightNum) ? costPerCt * weightNum : null;
   const showCost = canViewCost && Number.isFinite(costPerCt) && costPerCt > 0;
-  // Rap list price — shown alongside the internal cost in the same dialog.
+  // Rap list price — shown alongside the internal cost, but only for (non-fancy)
+  // diamonds: Rapaport pricing doesn't apply to emeralds or fancy-colour stones.
   const rapListPrice = Number(stone.rapListPrice);
-  const showRapList = Number.isFinite(rapListPrice) && rapListPrice > 0;
+  const showRapList = isDiamond && !isFancy && Number.isFinite(rapListPrice) && rapListPrice > 0;
 
   const selected = isSelected(stone);
 
