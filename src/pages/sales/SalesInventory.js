@@ -1564,26 +1564,44 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     return arr;
   }, [filtered, sortBy]);
 
-  // Keep pairs together: after sorting, drop each stone's pair partner in right
-  // after it so the two appear side by side in the catalog grid.
+  // Keep pairs together AND on the same row. First we group each stone with its
+  // pair partner (deduped — a stone never appears twice even when both rows
+  // point at each other). Then we lay the groups out so a pair always starts in
+  // the left column of the 2-up mobile grid: if a pair would otherwise begin in
+  // the right column (odd slot) it'd split across two rows, so we pull the next
+  // single forward to fill that slot and keep the pair side by side.
   const paired = useMemo(() => {
     const bySku = new Map();
     for (const s of sorted) {
       const k = norm(s.sku);
       if (k) bySku.set(k, s);
     }
+    // Ordered blocks: [single] or [a, b] for a pair, preserving the sort order.
     const placed = new Set();
-    const out = [];
+    const blocks = [];
     for (const s of sorted) {
       const k = norm(s.sku);
       if (k && placed.has(k)) continue;
-      out.push(s);
       if (k) placed.add(k);
       const pk = norm(s.pairSku);
       if (pk && bySku.has(pk) && !placed.has(pk)) {
-        out.push(bySku.get(pk));
+        blocks.push([s, bySku.get(pk)]);
         placed.add(pk);
+      } else {
+        blocks.push([s]);
       }
+    }
+    // Assemble, aligning each pair to an even (left-column) position. The 2-up
+    // grid is the phone layout where "side by side" matters most.
+    const queue = blocks.slice();
+    const out = [];
+    while (queue.length) {
+      const block = queue.shift();
+      if (block.length === 2 && out.length % 2 === 1) {
+        const singleIdx = queue.findIndex((b) => b.length === 1);
+        if (singleIdx !== -1) out.push(...queue.splice(singleIdx, 1)[0]);
+      }
+      out.push(...block);
     }
     return out;
   }, [sorted]);
