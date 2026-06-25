@@ -289,6 +289,9 @@ const StoneDetail = () => {
   const weightNum = Number(stone.weightCt);
   const totalCost = Number.isFinite(weightNum) ? costPerCt * weightNum : null;
   const showCost = canViewCost && Number.isFinite(costPerCt) && costPerCt > 0;
+  // Rap list price — shown alongside the internal cost in the same dialog.
+  const rapListPrice = Number(stone.rapListPrice);
+  const showRapList = Number.isFinite(rapListPrice) && rapListPrice > 0;
 
   const selected = isSelected(stone);
 
@@ -670,6 +673,12 @@ const StoneDetail = () => {
                     <div className="flex items-baseline justify-between gap-3 border-t border-app-line pt-2.5">
                       <span className="text-[13px] text-app-muted">Total cost</span>
                       <span className="text-[17px] font-semibold text-app-ink">{money(totalCost)}</span>
+                    </div>
+                  )}
+                  {showRapList && (
+                    <div className="flex items-baseline justify-between gap-3 border-t border-app-line pt-2.5">
+                      <span className="text-[13px] text-app-muted">Rap list price</span>
+                      <span className="text-[17px] font-semibold text-app-ink">{money(rapListPrice)}</span>
                     </div>
                   )}
                 </div>
