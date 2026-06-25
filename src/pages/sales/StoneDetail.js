@@ -676,12 +676,6 @@ const StoneDetail = () => {
                       <span className="text-[17px] font-semibold text-app-ink">{money(totalCost)}</span>
                     </div>
                   )}
-                  {showRapList && (
-                    <div className="flex items-baseline justify-between gap-3 border-t border-app-line pt-2.5">
-                      <span className="text-[13px] text-app-muted">Rap list price</span>
-                      <span className="text-[17px] font-semibold text-app-ink">{money(rapListPrice)}</span>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             </div>
@@ -689,7 +683,7 @@ const StoneDetail = () => {
         </AnimatePresence>
 
         {/* Price panel — dark ink block, echoing the primary action buttons. */}
-        {(ppc || total || (isDiamond && !isFancy && stone.rapPrice)) && (
+        {(ppc || total || (isDiamond && !isFancy && stone.rapPrice) || showRapList) && (
           <div className="mt-7 overflow-hidden rounded-2xl bg-app-ink text-app-canvas">
             <div className="divide-y divide-white/10 px-5 tabular-nums">
               {ppc && (
@@ -706,6 +700,15 @@ const StoneDetail = () => {
                     RAP
                   </span>
                   <span className="text-[14.5px] font-semibold">{stone.rapPrice}%</span>
+                </div>
+              )}
+              {/* Rapaport list price — diamonds only, sits right under RAP. */}
+              {showRapList && (
+                <div className="flex items-baseline justify-between py-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.1em] opacity-60">
+                    RAP LIST
+                  </span>
+                  <span className="text-[14.5px] font-semibold">{money(rapListPrice)}</span>
                 </div>
               )}
               {total && (
