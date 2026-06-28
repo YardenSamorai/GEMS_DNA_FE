@@ -12,6 +12,7 @@ import { getDisplayShape } from "../inventory/helpers/constants";
 import { norm, money, usableImg, StonePlaceholder, prettyBranch } from "./SalesInventory";
 import { mapRow as mapJewelryRow } from "./SalesJewelry";
 import { useTeam } from "../../context/TeamContext";
+import { useSelection } from "../../context/SelectionContext";
 import { trackStoneView, trackStoneDwell, trackPriceView } from "../../utils/activityLog";
 
 /* ============================================================================
@@ -68,9 +69,12 @@ const JewelryDetail = () => {
   const [item, setItem] = useState(routerState?.item || null);
   const [loading, setLoading] = useState(!routerState?.item);
   const [error, setError] = useState("");
-  const [liked, setLiked] = useState(false);
+  // The top-right star adds/removes this piece from the shared selection —
+  // same behaviour as the catalog card's star and the other product pages.
+  const { isSelected, toggle } = useSelection();
   const [actionOpen, setActionOpen] = useState(false);
   const [shareFiles, setShareFiles] = useState([]);
+  const [withPrice, setWithPrice] = useState(true);
 
   // Always open the product page scrolled to the top. On mobile the document is
   // locked and the real scroll lives in an inner <main> container, so
@@ -211,13 +215,13 @@ const JewelryDetail = () => {
     ["SKU", item.sku || BLANK],
     ["Gem type", item.stoneType || BLANK],
     ["Center stone weight", centerCt || BLANK],
-    ["Total weight", totalWt || BLANK],
     ["Total carat", totalCt || BLANK],
+    ["Total weight", totalWt || BLANK],
     ["Center stone shape", shape || BLANK],
     ["Style", item.style || BLANK],
     ["Metal", item.metal || BLANK],
-    ["Location", exactLoc || branchLabel || BLANK],
     ["Branch", branchLabel || BLANK],
+    ["Location", exactLoc || branchLabel || BLANK],
   ];
 
   return (
@@ -236,22 +240,22 @@ const JewelryDetail = () => {
         </button>
         <button
           type="button"
-          onClick={() => setLiked((v) => !v)}
-          aria-label="Favorite"
-          aria-pressed={liked}
+          onClick={() => toggle(item)}
+          aria-label={isSelected(item) ? "Remove from selection" : "Add to selection"}
+          aria-pressed={isSelected(item)}
           className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-app-surface/85 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.25)] backdrop-blur-md transition active:scale-95"
         >
           <svg
-            className={`h-5 w-5 transition-colors ${liked ? "text-emerald-500" : "text-app-graphite"}`}
-            fill={liked ? "currentColor" : "none"}
+            className={`h-5 w-5 transition-colors ${isSelected(item) ? "text-emerald-500" : "text-app-graphite"}`}
+            fill={isSelected(item) ? "currentColor" : "none"}
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={1.8}
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              strokeWidth={2}
+              d="M12 2.5l2.93 5.94 6.57.96-4.75 4.63 1.12 6.54L12 18.98l-5.87 3.09 1.12-6.54L2.5 9.9l6.57-.96L12 2.5z"
             />
           </svg>
         </button>
@@ -348,67 +352,52 @@ const JewelryDetail = () => {
       <div className={`relative z-10 rounded-t-3xl border-t border-app-line bg-app-canvas px-5 pb-4 pt-5 ${
         video && slide >= slideCount - 1 ? "mt-0" : "-mt-6"
       }`}>
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-[21px] font-semibold leading-snug tracking-tight text-app-ink">
-            {title}
-          </h1>
-          {(cert || video) && (
-            <div className="mt-0.5 flex shrink-0 flex-col items-end gap-2">
-              {cert && (
-                <a
-                  href={cert}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-600 transition active:scale-95"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.8}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  Certificate
-                </a>
-              )}
-              {video && (
-                <button
-                  type="button"
-                  onClick={scrollToVideo}
-                  aria-label="Play 360° video"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-[12px] font-semibold text-sky-600 transition active:scale-95"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.8}
-                      d="M21 12a9 9 0 11-3.5-7.1M21 4v4h-4"
-                    />
-                  </svg>
-                  V360
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Title — stands on its own line. */}
+        <h1 className="text-[21px] font-semibold leading-snug tracking-tight text-app-ink">
+          {title}
+        </h1>
 
-        {/* Availability flags — HOLD / Memo out, driven by the linked stone's
-            physical location & holder (so reps know if the piece is free). */}
-        {(item.onHold || item.holder || item.onMemo) && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {(item.onHold || item.holder) && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-red-600 dark:bg-red-500/15 dark:text-red-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
-                HOLD
-              </span>
-            )}
+        {/* Tags row — all chips together under the title (same as the other
+            product pages): Memo out status plus the Certificate / Video quick
+            actions. These appear here only, not on the catalog card. */}
+        {(item.onMemo || cert || video) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {item.onMemo && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600 ring-1 ring-inset ring-amber-500/30">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 Memo out
               </span>
+            )}
+            {cert && (
+              <a
+                href={cert}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 transition active:scale-95"
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                Certificate
+              </a>
+            )}
+            {video && (
+              <button
+                type="button"
+                onClick={scrollToVideo}
+                aria-label="Play video"
+                className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600 transition active:scale-95"
+              >
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5.5v13l11-6.5-11-6.5z" />
+                </svg>
+                Video
+              </button>
             )}
           </div>
         )}
@@ -489,10 +478,38 @@ const JewelryDetail = () => {
               </div>
 
               <div className="px-5 pb-2">
+                {/* Include price toggle — flips whether the total price appears
+                    in the WhatsApp message (and the preview below). */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={withPrice}
+                  onClick={() => setWithPrice((v) => !v)}
+                  className="mb-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3 text-left transition active:scale-[0.99]"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold tracking-tight text-app-ink">Include price</span>
+                    <span className="block text-[12px] text-app-soft">
+                      {withPrice ? "Message will show the total price" : "Price hidden from the message"}
+                    </span>
+                  </span>
+                  <span
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                      withPrice ? "bg-emerald-500" : "bg-app-line"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        withPrice ? "translate-x-[22px]" : "translate-x-0.5"
+                      }`}
+                    />
+                  </span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(item, { files: shareFiles, actor });
+                    shareStonesOnWhatsApp(item, { files: shareFiles, actor, withPrice });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
@@ -527,7 +544,7 @@ const JewelryDetail = () => {
                   )}
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(item)}
+                  {buildStoneShareText(item, { withPrice })}
                 </pre>
               </div>
             </motion.div>

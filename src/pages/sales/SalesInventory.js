@@ -85,6 +85,17 @@ const SIZE_PRESETS = [
   { label: "15.00 +", from: "15.00", to: "" },
 ];
 
+/* Emerald weight bands — coarser than diamonds, by request. */
+const EMERALD_SIZE_PRESETS = [
+  { label: "0.00 - 1.99", from: "0.00", to: "1.99" },
+  { label: "2.00 - 2.99", from: "2.00", to: "2.99" },
+  { label: "3.00 - 4.99", from: "3.00", to: "4.99" },
+  { label: "5.00 - 9.99", from: "5.00", to: "9.99" },
+  { label: "10.00 +", from: "10.00", to: "" },
+];
+/* The size/weight bands a mode shows (and matches against). */
+const sizePresetsFor = (mode) => (mode === "emerald" ? EMERALD_SIZE_PRESETS : SIZE_PRESETS);
+
 /* Price-per-carat quick bands ($). Open-ended on the first/last band. */
 const PPC_PRESETS = [
   { label: "Up to 1K", from: "", to: "1000" },
@@ -107,24 +118,18 @@ const TOTAL_PRESETS = [
 const COLOR_GRADES = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const FANCY_INTENSITY = [
   "Faint",
-  "Very Faint",
+  "Very Light",
   "Light",
   "Fancy Light",
   "Fancy",
-  "Fancy Dark",
   "Fancy Intense",
   "Fancy Vivid",
   "Fancy Deep",
+  "Fancy Dark",
 ];
-const FANCY_COLORS = [
-  "Yellow",
-  "Pink",
-  "Green",
-  "Blue",
-  "Orange",
-  "Brown",
-  "Black",
-];
+/* Named fancy colours; "Other" matches anything outside this list. */
+const FANCY_COLOR_NAMES = ["Yellow", "Pink", "Brown", "Blue", "Orange", "Black"];
+const FANCY_COLORS = [...FANCY_COLOR_NAMES, "Other"];
 const CLARITY_GRADES = [
   "FL",
   "IF",
@@ -142,18 +147,18 @@ const CLARITY_GRADES = [
 const LAB_OPTIONS = ["GIA", "HRD", "IGI", "EGL"];
 const LOCATION_OPTIONS = ["HK", "IL", "LA", "NY"];
 // Emerald-specific option sets.
-const EMERALD_LAB_OPTIONS = ["GRS", "SSEF", "Gübelin", "GIA", "AGL", "CDC"];
+const EMERALD_LAB_OPTIONS = ["GRS", "AGL", "GIA", "CDC", "Gübelin", "SIG", "SSEF", "Other"];
 const TREATMENT_OPTIONS = ["No Oil", "Insignificant", "Minor", "Moderate", "Significant"];
 const ORIGIN_OPTIONS = ["Colombia", "Zambia", "Brazil", "Madagascar"];
 const EMERALD_PARCEL_OPTIONS = ["Single", "Pair", "Set", "Parcel"];
 // Gemstone-specific option sets. "Other" always means "matches none of the
 // explicitly-listed values above it".
 const GEM_COLORS = [
-  { key: "Green", swatch: "#1f9d57" },
   { key: "Blue", swatch: "#2563eb" },
-  { key: "Violet", swatch: "#7c3aed" },
   { key: "Pink", swatch: "#ec4899" },
   { key: "Red", swatch: "#dc2626" },
+  { key: "Violet", swatch: "#7c3aed" },
+  { key: "Green", swatch: "#1f9d57" },
   { key: "Other", swatch: null },
 ];
 // Color word roots used to bucket a stone (matched against category + colour
@@ -166,17 +171,17 @@ const GEM_COLOR_ROOTS = {
   Red: ["RED"],
 };
 const GEM_TYPE_OPTIONS = [
+  "Sapphire",
+  "Spinel",
+  "Ruby",
   "Tourmaline",
   "Aquamarine",
-  "Rubellite",
-  "Ruby",
-  "Sapphire",
   "Tanzanite",
+  "Rubellite",
   "Morganite",
   "Amethyst",
   "Tsavorite",
   "Kunzite",
-  "Spinel",
   "Other",
 ];
 const GEM_LAB_OPTIONS = ["AGL", "GRS", "GIA", "ICA", "GWL", "SIG", "Other"];
@@ -193,8 +198,16 @@ const FILTER_DEFAULTS = {
   claritySel: [], labSel: [], locationSel: [], treatmentSel: [], originSel: [],
   gemColorSel: [], gemTypeSel: [], cutSel: [], polishSel: [], symmetrySel: [],
   fluorSel: [], parcelSel: ["Single"], onlyCert: false, onlyMedia: false, onlyInStock: false,
+  onlyLoose: false,
   skuQuery: "", sortBy: [],
 };
+/* Per-mode opening defaults. Diamonds & Emeralds open pre-filtered to Single +
+ * Only with cert (parcelSel already defaults to Single for every mode). */
+const CERT_DEFAULT_MODES = new Set(["diamond", "emerald"]);
+const modeFilterDefaults = (mode) => ({
+  ...FILTER_DEFAULTS,
+  onlyCert: CERT_DEFAULT_MODES.has(mode) ? true : FILTER_DEFAULTS.onlyCert,
+});
 /* Per-category filter persistence. Each mode (diamond / emerald / gemstone)
  * keeps its own snapshot in localStorage, so switching between catalogs — or
  * leaving and coming back later — restores exactly what was filtered. */
@@ -1082,6 +1095,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [onlyCert, setOnlyCert] = useState(false);
   const [onlyMedia, setOnlyMedia] = useState(false);
   const [onlyInStock, setOnlyInStock] = useState(false);
+  // Restrict to loose stones only (exclude stones already set in a jewelry piece).
+  const [onlyLoose, setOnlyLoose] = useState(false);
   const advancedGroups = [
     { title: "Cut", options: GRADE_EVGF, sel: cutSel, setter: setCutSel },
     { title: "Polish", options: GRADE_EVGF, sel: polishSel, setter: setPolishSel },
@@ -1097,13 +1112,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     colorMode, colorGrades, fancyIntensity, fancyColor,
     claritySel, labSel, locationSel, treatmentSel, originSel,
     gemColorSel, gemTypeSel, cutSel, polishSel, symmetrySel,
-    fluorSel, parcelSel, onlyCert, onlyMedia, onlyInStock,
+    fluorSel, parcelSel, onlyCert, onlyMedia, onlyInStock, onlyLoose,
     skuQuery, sortBy,
   });
   // Push a saved snapshot (or the neutral defaults) back into state. Any key
   // missing from an older snapshot falls back to its default.
   const applyFilters = (saved) => {
-    const f = { ...FILTER_DEFAULTS, ...(saved || {}) };
+    const f = { ...modeFilterDefaults(mode), ...(saved || {}) };
     setShapeSel(f.shapeSel);
     setSizeFrom(f.sizeFrom);
     setSizeTo(f.sizeTo);
@@ -1139,6 +1154,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     setOnlyCert(f.onlyCert);
     setOnlyMedia(f.onlyMedia);
     setOnlyInStock(f.onlyInStock);
+    setOnlyLoose(f.onlyLoose);
     setSkuQuery(f.skuQuery);
     setSortBy(f.sortBy);
   };
@@ -1295,14 +1311,36 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // the only one with filter controls today, but the logic is harmless for the
   // others (all selections stay empty → everything passes).
   const filtered = useMemo(() => {
+    // Emeralds and gemstones share the same shape set / matching rules.
+    const usesEmeraldShapes = mode === "emerald" || mode === "gemstone";
+    // Shape keys currently shown for this mode (drives the "Other" catch-all).
+    const shapeUniverse = (usesEmeraldShapes ? EMERALD_SHAPES : DIAMOND_SHAPES)
+      .map((sh) => sh.key)
+      .filter((k) => k !== "Other");
     return stones.filter((s) => {
       if (shapeSel.length) {
         const raw = norm(s.shape);
         const dna = norm(getDisplayShape(s.shape));
-        const ok = shapeSel.some((k) =>
-          (SHAPE_MATCH[k] || [k.toUpperCase()]).some((t) => t === raw || t === dna)
-        );
-        if (!ok) return false;
+        const matchKey = (k) => (SHAPE_MATCH[k] || [k.toUpperCase()]).some((t) => t === raw || t === dna);
+        // Ratio (length / width) — used by the emerald/gemstone Asscher rule.
+        let shapeRatio = parseFloat(s.ratio);
+        if (!Number.isFinite(shapeRatio)) {
+          const [l, w] = parseDims(s.measurements);
+          if (Number.isFinite(l) && Number.isFinite(w) && w) shapeRatio = l / w;
+        }
+        const matchesShape = (k) => {
+          // Asscher = a square-ish Emerald cut: an emerald-cut stone whose ratio
+          // sits in 1.00–1.15, plus any true asscher-coded stones.
+          if (usesEmeraldShapes && k === "Asscher") {
+            const isEmeraldCut = (SHAPE_MATCH.Emerald || []).some((t) => t === raw || t === dna);
+            const squareRatio = Number.isFinite(shapeRatio) && shapeRatio >= 1 && shapeRatio <= 1.15;
+            return (isEmeraldCut && squareRatio) || matchKey("Asscher");
+          }
+          // Other = matches none of the listed shapes for this mode.
+          if (k === "Other") return !shapeUniverse.some(matchKey);
+          return matchKey(k);
+        };
+        if (!shapeSel.some(matchesShape)) return false;
       }
 
       if (sizeFrom || sizeTo || sizeBands.length) {
@@ -1314,8 +1352,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
           if (!isNaN(ct) && ct >= f && ct <= t) ok = true;
         }
         if (!ok && sizeBands.length) {
+          const presets = sizePresetsFor(mode);
           ok = sizeBands.some((label) => {
-            const b = SIZE_PRESETS.find((p) => p.label === label);
+            const b = presets.find((p) => p.label === label);
             if (!b) return false;
             const f = b.from ? parseFloat(b.from) : -Infinity;
             const t = b.to ? parseFloat(b.to) : Infinity;
@@ -1363,7 +1402,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         }
         if (fancyColor.length) {
           const fc = norm(s.fancyColor);
-          if (!fancyColor.some((v) => fc.includes(norm(v)))) return false;
+          // "Other" = none of the named fancy colours appears in the stone.
+          const ok = fancyColor.some((v) =>
+            v === "Other"
+              ? !FANCY_COLOR_NAMES.some((n) => fc.includes(norm(n)))
+              : fc.includes(norm(v))
+          );
+          if (!ok) return false;
         }
       }
 
@@ -1380,10 +1425,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       }
 
       if (labSel.length) {
-        // Gemstone labs have an "Other" bucket; emerald/diamond use a plain
-        // substring match against their fixed lab lists.
+        // Gemstone & emerald labs have an "Other" bucket (anything outside the
+        // listed labs); diamonds use a plain substring match.
         if (mode === "gemstone") {
           if (!matchWithOther(s.lab, labSel, GEM_LAB_OPTIONS)) return false;
+        } else if (mode === "emerald") {
+          if (!matchWithOther(s.lab, labSel, EMERALD_LAB_OPTIONS)) return false;
         } else {
           const lab = norm(s.lab);
           if (!labSel.some((v) => lab.includes(norm(v)))) return false;
@@ -1446,6 +1493,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         const onHold = !!s.onHold || !!(s.holder && String(s.holder).trim());
         if (onMemo || onHold) return false;
       }
+      // Only loose — drop stones that are already set in a jewelry piece.
+      if (onlyLoose && s.jewelryModel && String(s.jewelryModel).trim()) return false;
 
       if (skuQuery.trim()) {
         const q = norm(skuQuery);
@@ -1492,6 +1541,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     onlyCert,
     onlyMedia,
     onlyInStock,
+    onlyLoose,
     skuQuery,
   ]);
 
@@ -1648,6 +1698,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
         { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
         { label: "Guaranteed available", checked: onlyInStock, set: setOnlyInStock },
+        { label: "Only Loose", checked: onlyLoose, set: setOnlyLoose },
       ].map(({ label, checked, set }) => (
         <label
           key={label}
@@ -1694,6 +1745,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         { label: "Only with cert", checked: onlyCert, onToggle: () => setOnlyCert((v) => !v) },
         { label: "Only with media", checked: onlyMedia, onToggle: () => setOnlyMedia((v) => !v) },
         { label: "Guaranteed available", checked: onlyInStock, onToggle: () => setOnlyInStock((v) => !v) },
+        { label: "Only Loose", checked: onlyLoose, onToggle: () => setOnlyLoose((v) => !v) },
         { label: "Only in USA", checked: usaActive, onToggle: toggleUsa },
       ].map(({ label, checked, onToggle }) => (
         <label
@@ -1774,11 +1826,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // Any facet filter differs from its default? (SKU search + sort excluded —
   // they have their own controls.) Drives the top-bar Reset button.
   const activeFilterState = collectFilters();
+  const modeDefaults = modeFilterDefaults(mode);
   const hasActiveFilters = Object.keys(FILTER_DEFAULTS).some(
     (k) =>
       k !== "sortBy" &&
       k !== "skuQuery" &&
-      JSON.stringify(activeFilterState[k]) !== JSON.stringify(FILTER_DEFAULTS[k])
+      JSON.stringify(activeFilterState[k]) !== JSON.stringify(modeDefaults[k])
   );
 
   // Build the full, replayable snapshot of the current search for the activity
@@ -1789,7 +1842,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     const criteria = {};
     for (const k of Object.keys(FILTER_DEFAULTS)) {
       if (k === "sortBy" || k === "skuQuery") continue;
-      if (JSON.stringify(activeFilterState[k]) !== JSON.stringify(FILTER_DEFAULTS[k])) {
+      if (JSON.stringify(activeFilterState[k]) !== JSON.stringify(modeDefaults[k])) {
         criteria[k] = activeFilterState[k];
       }
     }
@@ -1829,7 +1882,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         const criteria = {};
         for (const k of Object.keys(FILTER_DEFAULTS)) {
           if (k === "sortBy" || k === "skuQuery") continue;
-          if (JSON.stringify(activeFilterState[k]) !== JSON.stringify(FILTER_DEFAULTS[k])) {
+          if (JSON.stringify(activeFilterState[k]) !== JSON.stringify(modeDefaults[k])) {
             criteria[k] = activeFilterState[k];
           }
         }
@@ -1932,7 +1985,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         aria-label="Open filters"
         onClick={() => setFiltersOpen(true)}
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
-        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-[13.5px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.7)] transition-all duration-200 md:hidden ${
+        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden ${
           showFloatingFilter
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-4 opacity-0"
@@ -2064,17 +2117,28 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                 className="flex shrink-0 cursor-grab touch-none items-center justify-between border-b border-app-line px-5 py-3 active:cursor-grabbing"
               >
                 <h2 className="text-base font-semibold tracking-tight text-app-ink">Filter</h2>
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen(false)}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label="Close"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-app-muted transition hover:bg-app-canvas2 hover:text-app-ink"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="rounded-lg px-3 py-1.5 text-[13px] font-semibold text-red-600 transition hover:bg-red-50 active:scale-95"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen(false)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label="Close"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-app-muted transition hover:bg-app-canvas2 hover:text-app-ink"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable body — vertical scroll for the section stack,
@@ -2082,6 +2146,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               <div className="flex-1 overflow-y-auto px-5 py-4">
                 {mode === "gemstone" ? (
                   <div className="space-y-7">
+                    {/* Quick availability toggles — kept above Parcel type, same
+                        as the diamond / emerald catalogs. */}
+                    <section>{togglesControls}</section>
+
                     {/* Parcel type */}
                     <section>
                       <h3 className="mb-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-app-muted">
@@ -2155,7 +2223,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                           </div>
                           <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
                             <div className="grid grid-flow-col grid-rows-2 auto-cols-[90px] gap-1.5">
-                              {DIAMOND_SHAPES.map((sh) => {
+                              {EMERALD_SHAPES.map((sh) => {
                                 const active = shapeSel.includes(sh.key);
                                 return (
                                   <button
@@ -2223,8 +2291,6 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                             presets={TOTAL_PRESETS}
                           />
                         </section>
-
-                        {togglesControls}
                       </>
                     )}
 
@@ -2386,7 +2452,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                     {/* Quick carat bands — single scrollable row. */}
                     <div className="scrollbar-hide -mx-5 mt-3 overflow-x-auto px-5">
                       <div className="flex gap-2">
-                        {SIZE_PRESETS.map((p) => {
+                        {sizePresetsFor(mode).map((p) => {
                           const active = sizeBands.includes(p.label);
                           return (
                             <button
@@ -2490,22 +2556,6 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                       <div className="mt-4 space-y-4">
                         <div>
                           <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
-                            Intensity
-                          </h4>
-                          <ScrollRow>
-                            {FANCY_INTENSITY.map((v) => (
-                              <Chip
-                                key={v}
-                                active={fancyIntensity.includes(v)}
-                                onClick={() => toggleVal(setFancyIntensity, v)}
-                              >
-                                {v}
-                              </Chip>
-                            ))}
-                          </ScrollRow>
-                        </div>
-                        <div>
-                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
                             Color
                           </h4>
                           <ScrollRow>
@@ -2514,6 +2564,22 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                                 key={v}
                                 active={fancyColor.includes(v)}
                                 onClick={() => toggleVal(setFancyColor, v)}
+                              >
+                                {v}
+                              </Chip>
+                            ))}
+                          </ScrollRow>
+                        </div>
+                        <div>
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-app-soft">
+                            Intensity
+                          </h4>
+                          <ScrollRow>
+                            {FANCY_INTENSITY.map((v) => (
+                              <Chip
+                                key={v}
+                                active={fancyIntensity.includes(v)}
+                                onClick={() => toggleVal(setFancyIntensity, v)}
                               >
                                 {v}
                               </Chip>

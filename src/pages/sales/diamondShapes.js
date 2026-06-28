@@ -395,37 +395,66 @@ const SHAPE_ORDER = [
 
 /* Emerald (and coloured-stone) Shape filter order — ranked by how common each
  * cut is for emeralds. The diamond-only cushion specialty cuts (Old Mine,
- * Cushion Brilliant/Modified) are dropped here. */
+ * Cushion Brilliant/Modified) are dropped here, along with shapes we don't
+ * surface for emeralds (Octagonal / Radiant / Pentagonal / Lozenge / Rose).
+ * "Other" is a catch-all for anything outside the listed cuts. */
 const EMERALD_SHAPE_ORDER = [
   "Emerald",
   "Oval",
   "Pear",
   "Round",
   "Cushion",
-  "Square",
-  "Octagonal",
+  "Square", // shown as "Carre" for emeralds
+  "Asscher",
+  "Baguette",
   "Cabochon",
   "Heart",
   "Marquise",
   "Trilliant",
-  "Asscher",
-  "Radiant",
   "Triangular",
   "Hexagonal",
-  "Pentagonal",
   "Kite",
-  "Lozenge",
   "Shield",
-  "Rose",
   "Briolette",
-  "Baguette",
   "TaperedBaguette",
+  "Other",
 ];
+
+/* Emerald-only label overrides (the underlying match key stays the same). */
+const EMERALD_SHAPE_LABELS = { Square: "Carre" };
+
+/* "Other" pseudo-shape — a dashed gem with an ellipsis, meaning "any cut not
+ * listed above". Matching for it is handled in the catalog filter. */
+const OTHER_SHAPE = {
+  key: "Other",
+  label: "Other",
+  icon: (cls) => (
+    <svg
+      className={cls}
+      viewBox="0 0 64 64"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    >
+      <circle cx="32" cy="32" r="22" strokeDasharray="5 5" />
+      <circle cx="23" cy="32" r="2" fill="currentColor" stroke="none" />
+      <circle cx="32" cy="32" r="2" fill="currentColor" stroke="none" />
+      <circle cx="41" cy="32" r="2" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+};
 
 const SHAPE_BY_KEY = Object.fromEntries(ALL_SHAPES.map((s) => [s.key, s]));
 
 export const DIAMOND_SHAPES = SHAPE_ORDER.map((k) => SHAPE_BY_KEY[k]).filter(Boolean);
 
-export const EMERALD_SHAPES = EMERALD_SHAPE_ORDER.map((k) => SHAPE_BY_KEY[k]).filter(Boolean);
+export const EMERALD_SHAPES = EMERALD_SHAPE_ORDER.map((k) => {
+  if (k === "Other") return OTHER_SHAPE;
+  const base = SHAPE_BY_KEY[k];
+  if (!base) return null;
+  return EMERALD_SHAPE_LABELS[k] ? { ...base, label: EMERALD_SHAPE_LABELS[k] } : base;
+}).filter(Boolean);
 
 export default DIAMOND_SHAPES;

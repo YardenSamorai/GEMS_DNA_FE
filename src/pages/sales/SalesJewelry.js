@@ -123,6 +123,16 @@ const JEWELRY_KINDS = [
 
 const GEM_TYPES = ["Diamonds", "Emeralds", "Fancy", "Gemstones", "Other"];
 
+/* Branch filter — mirrors the loose-stone catalogs. Chips show the short code,
+ * matched against the (BE-resolved) branch name on each row. */
+const LOCATION_OPTIONS = ["HK", "IL", "LA", "NY"];
+const LOCATION_MATCH = {
+  HK: ["HK", "HONG KONG"],
+  IL: ["IL", "ISRAEL"],
+  LA: ["LA", "LOS ANGELES"],
+  NY: ["NY", "NEW YORK"],
+};
+
 /* Total carat quick bands. */
 const TCW_PRESETS = [
   { label: "0.00 - 2.99", from: "0", to: "2.99" },
@@ -146,6 +156,7 @@ const FILTER_DEFAULTS = {
   shapeSel: [],
   styleSel: [],
   gemTypeSel: [],
+  locationSel: [],
   tcwFrom: "",
   tcwTo: "",
   tcwBands: [],
@@ -349,6 +360,7 @@ const SalesJewelry = () => {
   const [shapeSel, setShapeSel] = useState(saved.shapeSel);
   const [styleSel, setStyleSel] = useState(saved.styleSel);
   const [gemTypeSel, setGemTypeSel] = useState(saved.gemTypeSel);
+  const [locationSel, setLocationSel] = useState(saved.locationSel);
   const [tcwFrom, setTcwFrom] = useState(saved.tcwFrom);
   const [tcwTo, setTcwTo] = useState(saved.tcwTo);
   const [tcwBands, setTcwBands] = useState(saved.tcwBands);
@@ -366,8 +378,6 @@ const SalesJewelry = () => {
   const restorePendingRef = useRef(false);
 
   const [basicOpen, setBasicOpen] = useState(true);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [measureOpen, setMeasureOpen] = useState(false);
 
   // Persist the chosen filters so the page reopens exactly as it was left.
   useEffect(() => {
@@ -377,7 +387,7 @@ const SalesJewelry = () => {
         JSON.stringify({
           t: Date.now(),
           f: {
-            jewelrySel, shapeSel, styleSel, gemTypeSel,
+            jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel,
             tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
             skuQuery, sortKey, sortDir,
           },
@@ -387,7 +397,7 @@ const SalesJewelry = () => {
       /* storage unavailable — non-fatal */
     }
   }, [
-    jewelrySel, shapeSel, styleSel, gemTypeSel,
+    jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -470,6 +480,10 @@ const SalesJewelry = () => {
       }
       if (styleSel.length && !styleSel.some((s) => s.toLowerCase() === (r.style || "").toLowerCase()))
         return false;
+      if (locationSel.length) {
+        const loc = norm(r.branch);
+        if (!locationSel.some((v) => (LOCATION_MATCH[v] || [v]).some((t) => loc.includes(t)))) return false;
+      }
       if (!matchGemType(r.stoneType, gemTypeSel)) return false;
       if (!numericOk(r.totalCarat, tcwFrom, tcwTo, tcwBands, TCW_PRESETS)) return false;
       if (!numericOk(r.price, priceFrom, priceTo, priceBands, PRICE_PRESETS)) return false;
@@ -492,7 +506,7 @@ const SalesJewelry = () => {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    rows, jewelrySel, shapeSel, styleSel, gemTypeSel,
+    rows, jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -558,6 +572,7 @@ const SalesJewelry = () => {
     setShapeSel([]);
     setStyleSel([]);
     setGemTypeSel([]);
+    setLocationSel([]);
     setTcwFrom("");
     setTcwTo("");
     setTcwBands([]);
@@ -583,6 +598,7 @@ const SalesJewelry = () => {
     shapeSel.length +
     styleSel.length +
     gemTypeSel.length +
+    locationSel.length +
     tcwBands.length +
     (tcwFrom || tcwTo ? 1 : 0) +
     priceBands.length +
@@ -633,9 +649,23 @@ const SalesJewelry = () => {
       </div>
 
       {!loading && !error && (
-        <p className="mt-2 pl-1 text-[12px] font-medium text-app-soft">
-          {filtered.length.toLocaleString()} {filtered.length === 1 ? "result" : "results"}
-        </p>
+        <div className="mt-2 flex items-center justify-between gap-3 pl-1">
+          <p className="text-[12px] font-medium text-app-soft">
+            {filtered.length.toLocaleString()} {filtered.length === 1 ? "result" : "results"}
+          </p>
+          {filterCount > 0 && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.7)] transition hover:bg-emerald-700 active:scale-95"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-14.3-3.4L4 7M4 15a8 8 0 0014.3 3.4L20 17" />
+              </svg>
+              Reset
+            </button>
+          )}
+        </div>
       )}
 
       {/* Floating Filter button */}
@@ -644,7 +674,7 @@ const SalesJewelry = () => {
         onClick={() => setFiltersOpen(true)}
         aria-label="Open filters"
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
-        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-[13.5px] font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.7)] transition-all duration-200 md:hidden ${
+        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden ${
           showFloatingFilter
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-4 opacity-0"
@@ -946,21 +976,38 @@ const SalesJewelry = () => {
                         </div>
                       </div>
                     </section>
+
+                    {/* Branch — filter by branch (HK / IL / LA / NY). */}
+                    <section>
+                      <FieldLabel showClear={locationSel.length > 0} onClear={() => setLocationSel([])}>
+                        Branch
+                      </FieldLabel>
+                      <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
+                        <div className="flex gap-2">
+                          {LOCATION_OPTIONS.map((loc) => (
+                            <Chip key={loc} active={locationSel.includes(loc)} onClick={() => toggleIn(setLocationSel)(loc)}>
+                              {loc}
+                            </Chip>
+                          ))}
+                        </div>
+                      </div>
+                    </section>
                   </>
                 )}
-
-                <SectionDivider label="Advanced search" open={advancedOpen} onClick={() => setAdvancedOpen((o) => !o)} />
-                {advancedOpen && <div className="space-y-6" />}
-
-                <SectionDivider label="Measurements" open={measureOpen} onClick={() => setMeasureOpen((o) => !o)} />
-                {measureOpen && <div className="space-y-6" />}
               </div>
 
-              <div className="border-t border-app-line p-4">
+              <div className="flex items-center gap-3 border-t border-app-line p-4">
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-xl border border-app-line bg-app-surface px-5 py-3 text-[13px] font-semibold text-app-graphite transition hover:bg-app-canvas2"
+                >
+                  Reset
+                </button>
                 <button
                   type="button"
                   onClick={() => setFiltersOpen(false)}
-                  className="w-full rounded-xl bg-app-ink py-3 text-[14px] font-semibold text-app-canvas transition active:scale-[0.99]"
+                  className="flex-1 rounded-xl bg-app-ink py-3 text-[14px] font-semibold text-app-canvas transition active:scale-[0.99]"
                 >
                   Show {filtered.length.toLocaleString()} {filtered.length === 1 ? "result" : "results"}
                 </button>
@@ -1078,30 +1125,12 @@ export const JewelryCard = ({ item }) => {
         <SelectToggle stone={item} />
       </div>
       <div className="mt-2.5 flex flex-col gap-0.5">
-        {/* Status / media tags on one wrapping row (matches the stone cards):
-            HOLD + Memo out drive availability, Certificate + Video flag media. */}
-        {(item.onHold || item.holder || item.onMemo || item.certificateUrl || item.certificateNumber || item.videoUrl) && (
+        {/* Only "Memo out" is relevant for jewelry availability. */}
+        {item.onMemo && (
           <div className="mb-0.5 flex flex-wrap items-center gap-1">
-            {(item.onHold || item.holder) && (
-              <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-red-600">
-                HOLD
-              </span>
-            )}
-            {item.onMemo && (
-              <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-amber-700">
-                Memo out
-              </span>
-            )}
-            {(item.certificateUrl || item.certificateNumber) && (
-              <span className="inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                Certificate
-              </span>
-            )}
-            {item.videoUrl && (
-              <span className="inline-flex items-center rounded bg-sky-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-                Video
-              </span>
-            )}
+            <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-amber-700">
+              Memo out
+            </span>
           </div>
         )}
         {/* Title leads, then labelled spec lines. */}

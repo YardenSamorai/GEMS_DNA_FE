@@ -217,7 +217,7 @@ const buildColoredStoneText = (stone, { withPrice = true } = {}) => {
  *   SKU: <sku>
  *   Branch: <branch>
  *   …links */
-const buildJewelryText = (item) => {
+const buildJewelryText = (item, { withPrice = true } = {}) => {
   const lines = [];
 
   const title = String(item.name || item.title || "").trim();
@@ -232,6 +232,9 @@ const buildJewelryText = (item) => {
   const tcw = Number(item.totalCarat);
   if (Number.isFinite(tcw)) lines.push(`Total carat: ${tcw.toFixed(2)} ct`);
 
+  const wt = Number(item.jewelryWeight);
+  if (Number.isFinite(wt)) lines.push(`Total weight: ${parseFloat(wt.toFixed(2))} g`);
+
   const style = String(item.style || "").trim();
   if (style) lines.push(`Style: ${style}`);
 
@@ -242,6 +245,11 @@ const buildJewelryText = (item) => {
 
   const branch = displayBranch(item.branch || item.location);
   if (branch) lines.push(`Branch: ${branch}`);
+
+  if (withPrice) {
+    const price = Number(item.price);
+    if (Number.isFinite(price) && price > 0) lines.push(`Total: ${usd(price)}`);
+  }
 
   // Labelled media links, each preceded by a blank line.
   const v = videoUrl(item);
@@ -258,7 +266,7 @@ const buildJewelryText = (item) => {
  * their own field list. */
 export const buildStoneShareText = (stone, opts = {}) => {
   if (!stone) return "";
-  if (stone.kind === "jewelry") return buildJewelryText(stone);
+  if (stone.kind === "jewelry") return buildJewelryText(stone, opts);
   return isDiamondStone(stone)
     ? buildDiamondText(stone, opts)
     : buildColoredStoneText(stone, opts);
