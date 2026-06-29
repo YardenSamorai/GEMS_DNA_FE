@@ -1692,36 +1692,6 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   }, []);
 
   // Shared filter fragments reused across modes (kept identical everywhere).
-  const togglesControls = (
-    <div className="flex flex-nowrap items-center justify-between gap-x-2">
-      {[
-        { label: "Only with cert", checked: onlyCert, set: setOnlyCert },
-        { label: "Only with media", checked: onlyMedia, set: setOnlyMedia },
-        { label: "Guaranteed available", checked: onlyInStock, set: setOnlyInStock },
-        { label: "Only Loose", checked: onlyLoose, set: setOnlyLoose },
-      ].map(({ label, checked, set }) => (
-        <label
-          key={label}
-          className="flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-app-ink"
-        >
-          <span
-            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
-              checked
-                ? "border-emerald-500 bg-emerald-500 text-white"
-                : "border-app-line bg-app-surface text-transparent"
-            }`}
-          >
-            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
-            </svg>
-          </span>
-          <input type="checkbox" className="sr-only" checked={checked} onChange={() => set((v) => !v)} />
-          {label}
-        </label>
-      ))}
-    </div>
-  );
-
   // Parcel type is single-select: a tap picks one option (replacing any prior
   // choice); tapping the active one clears it.
   const selectParcel = (p) =>
@@ -2147,8 +2117,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
                 {mode === "gemstone" ? (
                   <div className="space-y-7">
                     {/* Quick availability toggles — kept above Parcel type, same
-                        as the diamond / emerald catalogs. */}
-                    <section>{togglesControls}</section>
+                        as the diamond / emerald catalogs. Uses the wrapping
+                        layout (incl. "Only in USA") so it never forces the sheet
+                        to scroll sideways on narrow screens. */}
+                    <section>{quickTogglesWithUsa}</section>
 
                     {/* Parcel type */}
                     <section>
