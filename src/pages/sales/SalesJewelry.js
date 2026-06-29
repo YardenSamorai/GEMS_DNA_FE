@@ -1,13 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchJewelryCatalog } from "../../services/jewelryApi";
+import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
 import { decryptPrice } from "../../utils/decrypt";
 import { sanitizeText, normalizeJewelryCategory } from "../../utils/helper";
 import { getDisplayShape } from "../inventory/helpers/constants";
 import { DIAMOND_SHAPES } from "./diamondShapes";
-import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle, prettyBranch } from "./SalesInventory";
+import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle, prettyBranch, modeForStone } from "./SalesInventory";
+
+/* Stone catalog routes by mode — used to hop a SKU search over to the loose
+ * stone catalog when the searched SKU belongs to a stone, not a jewelry piece. */
+const STONE_ROUTES = {
+  diamond: "/sales/diamonds",
+  emerald: "/sales/emeralds",
+  gemstone: "/sales/gemstones",
+};
 
 /* ============================================================================
  * SalesJewelry — the jewelry surface of the sales catalog.
@@ -351,6 +360,8 @@ const SORT_OPTIONS = [
 
 const SalesJewelry = () => {
   const { actor } = useTeam();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -378,6 +389,56 @@ const SalesJewelry = () => {
   const restorePendingRef = useRef(false);
 
   const [basicOpen, setBasicOpen] = useState(true);
+
+  // Loose stones (every category) — lets a SKU search recognise a stone that
+  // lives in the loose catalog and hop the rep over to it.
+  const allStonesRef = useRef([]);
+
+  // Arrived from a cross-category SKU search (the searched SKU is a jewelry
+  // piece): seed the search box with the query, then CONSUME it from history
+  // state so Back-navigation later doesn't re-inject the old SKU.
+  useEffect(() => {
+    if (location.state?.searchSku) {
+      setSkuQuery(location.state.searchSku);
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Preload loose stones once (per actor) for the reverse SKU hop.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchSoapStones(actor, { assignedTo: "all" });
+        const list = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
+        if (!cancelled) allStonesRef.current = list;
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [actor?.id]);
+
+  // Cross-category SKU search: if the query matches no jewelry piece but does
+  // match a loose stone, hop to that stone's catalog (carrying the query).
+  useEffect(() => {
+    const q = norm(skuQuery);
+    if (loading || q.length < 3) return undefined;
+    const t = setTimeout(() => {
+      if (rows.some((r) => norm(`${r.name} ${r.sku}`).includes(q))) return;
+      const match = (allStonesRef.current || []).find(
+        (s) => norm(s.sku).includes(q) || norm(s.pairSku).includes(q)
+      );
+      if (!match) return;
+      const route = STONE_ROUTES[modeForStone(match)];
+      if (route) navigate(route, { state: { searchSku: skuQuery } });
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skuQuery, rows, loading]);
 
   // Persist the chosen filters so the page reopens exactly as it was left.
   useEffect(() => {

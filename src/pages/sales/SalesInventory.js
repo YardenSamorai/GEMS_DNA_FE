@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { fetchSoapStones } from "../../services/stonesApi";
+import { fetchJewelryCatalog } from "../../services/jewelryApi";
 import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
@@ -994,6 +995,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // Full fetched catalog (every category, before this mode's slice) — used so a
   // SKU search can find a stone that lives in another category and jump there.
   const allStonesRef = useRef([]);
+  // Jewelry model numbers — lets a SKU search detect a piece that lives in the
+  // (separate) jewelry catalog and hop the rep over to it.
+  const allJewelryRef = useRef([]);
   const [stones, setStones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1225,6 +1229,25 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     };
   }, [mode, actor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load jewelry model numbers once (per actor) so a SKU search can recognise a
+  // jewelry piece and hop the rep to the jewelry catalog. Failures are silent —
+  // the jewelry hop just won't be available.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchJewelryCatalog(actor);
+        const rows = Array.isArray(data?.jewelry) ? data.jewelry : Array.isArray(data) ? data : [];
+        if (!cancelled) allJewelryRef.current = rows;
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [actor?.id]);
+
   // Once the grid has rendered after a load, jump back to the saved scroll
   // position (set when the rep opened a product). Two rAFs ensure layout is
   // settled before we scroll.
@@ -1256,11 +1279,19 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       // Found in this category already — stay put.
       if (stones.some(matchesSku)) return;
       const match = (allStonesRef.current || []).find(matchesSku);
-      if (!match) return;
-      const targetMode = modeForStone(match);
-      if (targetMode === mode) return;
-      const route = MODE_ROUTES[targetMode];
-      if (route) navigate(route, { state: { searchSku: skuQuery } });
+      if (match) {
+        const targetMode = modeForStone(match);
+        if (targetMode === mode) return;
+        const route = MODE_ROUTES[targetMode];
+        if (route) navigate(route, { state: { searchSku: skuQuery } });
+        return;
+      }
+      // Not a loose stone in any category — maybe it's a jewelry piece. Hop to
+      // the jewelry catalog carrying the query so it shows up there.
+      const inJewelry = (allJewelryRef.current || []).some((j) =>
+        norm(j.model_number).includes(q)
+      );
+      if (inJewelry) navigate("/sales/jewelry", { state: { searchSku: skuQuery } });
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
