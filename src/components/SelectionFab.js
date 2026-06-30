@@ -29,12 +29,12 @@ const SelectionFab = () => {
     if (!open) setActionsOpen(false);
   }, [open]);
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (showLogo = true) => {
     if (exporting || count === 0) return;
     setActionsOpen(false);
     setExporting(true);
     try {
-      await downloadCatalogPdf(items);
+      await downloadCatalogPdf(items, { showLogo });
     } catch (err) {
       console.error("[catalog pdf] export failed", err);
       alert("Could not generate the PDF. Please try again.");
@@ -138,19 +138,34 @@ const SelectionFab = () => {
                           <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} aria-hidden />
                           <div
                             role="menu"
-                            className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-app-line bg-app-surface py-1 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.35)]"
+                            className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-app-line bg-app-surface py-1 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.35)]"
                           >
+                            <div className="px-4 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-soft">
+                              Export catalog to PDF
+                            </div>
                             <button
                               type="button"
                               role="menuitem"
-                              onClick={handleExportPdf}
+                              onClick={() => handleExportPdf(true)}
                               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13.5px] font-medium text-app-ink transition hover:bg-app-canvas2"
                             >
                               <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M14 3v5h5M9 13h6M9 17h6" />
                               </svg>
-                              Export catalog to PDF
+                              With logo
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => handleExportPdf(false)}
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13.5px] font-medium text-app-ink transition hover:bg-app-canvas2"
+                            >
+                              <svg className="h-4 w-4 text-app-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M14 3v5h5M9 13h6M9 17h6" />
+                              </svg>
+                              Without logo
                             </button>
                           </div>
                         </>

@@ -28,7 +28,6 @@ import {
   money,
   parseDims,
   fluorDisplay,
-  resolveLocation,
 } from "../pages/sales/SalesInventory";
 import { getMappedCategories } from "../utils/categoryMap";
 
@@ -127,7 +126,6 @@ const itemSpecs = (it) => {
     Number.isFinite(Number(n)) && Number(n) !== 0 ? `${Number(n).toFixed(1)}%` : "";
   const origin =
     it.origin && String(it.origin).toUpperCase() !== "N/A" ? it.origin : "";
-  const { label: locationLabel } = resolveLocation(it);
 
   if (isDiamond) {
     return cleanRows([
@@ -140,7 +138,6 @@ const itemSpecs = (it) => {
       ["Table", pct(it.tablePercent)],
       ...(it.cut && String(it.cut).trim() ? [["Cut", String(it.cut).trim()]] : []),
       ["Branch", it.branch],
-      ["Location", locationLabel],
     ]);
   }
   if (isEmerald) {
@@ -150,7 +147,6 @@ const itemSpecs = (it) => {
       ["L/W/D (mm)", lwd],
       ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : ""],
       ["Branch", it.branch],
-      ["Location", locationLabel],
     ]);
   }
   return cleanRows([
@@ -160,7 +156,6 @@ const itemSpecs = (it) => {
     ["L/W/D (mm)", lwd],
     ["L/W Ratio", Number.isFinite(ratio) ? ratio.toFixed(2) : ""],
     ["Branch", it.branch],
-    ["Location", locationLabel],
   ]);
 };
 
@@ -205,9 +200,12 @@ const formatOf = (dataUrl) => {
  *
  * options:
  *   - showPrices (bool, default true) — include the price block per card.
+ *   - showLogo   (bool, default true) — include the ESHED wordmark/branding in
+ *     the header & footer. When false the document is unbranded (neutral
+ *     "Gemstone Catalog" header, no ESHED mark) — useful for white-label sends.
  */
 export async function buildCatalogPdf(rawItems, options = {}) {
-  const { showPrices = true } = options;
+  const { showPrices = true, showLogo = true } = options;
   const items = (rawItems || []).filter(Boolean);
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -241,20 +239,28 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     pdf.setFillColor(...wash);
     pdf.rect(0, 0, pageW, headerBottom - 4, "F");
 
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.setTextColor(...ink);
-    pdf.text("ESHED", margin, 16);
+    if (showLogo) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(18);
+      pdf.setTextColor(...ink);
+      pdf.text("ESHED", margin, 16);
 
-    // Emerald accent under the wordmark.
-    pdf.setDrawColor(...brand);
-    pdf.setLineWidth(1.1);
-    pdf.line(margin, 19, margin + 16, 19);
+      // Emerald accent under the wordmark.
+      pdf.setDrawColor(...brand);
+      pdf.setLineWidth(1.1);
+      pdf.line(margin, 19, margin + 16, 19);
 
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9);
-    pdf.setTextColor(...soft);
-    pdf.text("Gemstone Catalog", margin, 24.5);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...soft);
+      pdf.text("Gemstone Catalog", margin, 24.5);
+    } else {
+      // Unbranded: a neutral title stands in for the wordmark.
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(15);
+      pdf.setTextColor(...ink);
+      pdf.text("Gemstone Catalog", margin, 18);
+    }
 
     const dateStr = new Date().toLocaleDateString("en-GB", {
       day: "numeric",
@@ -424,7 +430,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7.5);
     pdf.setTextColor(...soft);
-    pdf.text("ESHED", margin, fy);
+    if (showLogo) pdf.text("ESHED", margin, fy);
     pdf.text(`Page ${p} of ${total}`, pageW - margin, fy, { align: "right" });
   }
 
