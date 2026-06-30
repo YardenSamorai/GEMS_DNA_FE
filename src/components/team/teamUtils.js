@@ -84,14 +84,47 @@ export const roleLabelFor = (role) =>
     ? "Admin"
     : role === "manager"
     ? "Manager"
+    : role === "sales_agent"
+    ? "Sales agent"
     : "Salesman";
 
 // Roles an admin can assign through the UI. Owner is never assignable.
 export const ASSIGNABLE_ROLES = [
-  { value: "salesman", label: "Salesman" },
   { value: "manager", label: "Manager" },
+  { value: "salesman", label: "Salesman" },
+  { value: "sales_agent", label: "Sales agent" },
   { value: "admin", label: "Admin — full access" },
 ];
+
+// Default permission preset per assignable role. Selecting a role seeds these
+// (sections / location visibility / cost), then the admin can fine-tune each
+// member. Admin/owner bypass this (they always get full access). The tiers are
+// ordered Manager > Salesman > Sales agent.
+export const ROLE_PRESETS = {
+  manager: {
+    sections: ["dashboard", "inventory", "crm", "sales"],
+    locationView: "full",
+    canViewCost: true,
+  },
+  salesman: {
+    sections: ["dashboard", "sales"],
+    locationView: "branch_only",
+    canViewCost: false,
+  },
+  sales_agent: {
+    sections: ["sales"],
+    locationView: "status_only",
+    canViewCost: false,
+  },
+};
+
+// Resolve the preset for a role, falling back to the neutral defaults.
+export const presetForRole = (role) => {
+  const p = ROLE_PRESETS[role];
+  return p
+    ? { sections: [...p.sections], locationView: p.locationView, canViewCost: p.canViewCost }
+    : { sections: [...DEFAULT_PERMS.sections], locationView: DEFAULT_PERMS.locationView, canViewCost: false };
+};
 
 /* --------------------------------------------------------------- Format */
 

@@ -12,10 +12,10 @@ import MemberDetail from "../../components/team/MemberDetail";
 import PermissionsEditor from "../../components/team/PermissionsEditor";
 import {
   ASSIGNABLE_ROLES,
-  DEFAULT_PERMS,
   cleanEmail,
   fmtMoney,
   isAdminRole,
+  presetForRole,
   roleLabelFor,
 } from "../../components/team/teamUtils";
 
@@ -26,6 +26,8 @@ const RoleBadge = ({ role }) => {
     ? "bg-amber-100 text-amber-700 ring-amber-200"
     : role === "manager"
     ? "bg-sky-100 text-sky-700 ring-sky-200"
+    : role === "sales_agent"
+    ? "bg-violet-100 text-violet-700 ring-violet-200"
     : "bg-emerald-100 text-emerald-700 ring-emerald-200";
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ${tint}`}>
@@ -74,9 +76,20 @@ const Field = ({ label, required, children }) => (
 const InviteModal = ({ remaining, onClose, onInvited, actor, refresh }) => {
   const [inviting, setInviting] = useState(false);
   const [role, setRole] = useState("salesman");
-  const [sections, setSections] = useState([...DEFAULT_PERMS.sections]);
-  const [locationView, setLocationView] = useState(DEFAULT_PERMS.locationView);
-  const [canViewCost, setCanViewCost] = useState(false);
+  const salesmanPreset = presetForRole("salesman");
+  const [sections, setSections] = useState(salesmanPreset.sections);
+  const [locationView, setLocationView] = useState(salesmanPreset.locationView);
+  const [canViewCost, setCanViewCost] = useState(salesmanPreset.canViewCost);
+
+  // Selecting a role seeds its default permissions; the admin can then tweak.
+  const applyRole = (next) => {
+    setRole(next);
+    if (next === "admin") return; // admins always get full access — no preset
+    const preset = presetForRole(next);
+    setSections(preset.sections);
+    setLocationView(preset.locationView);
+    setCanViewCost(preset.canViewCost);
+  };
 
   const toggleSection = (key) =>
     setSections((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -138,11 +151,7 @@ const InviteModal = ({ remaining, onClose, onInvited, actor, refresh }) => {
           <Field label="Role" required>
             <select
               value={role}
-              onChange={(e) => {
-                const next = e.target.value;
-                setRole(next);
-                setCanViewCost(next === "manager" || next === "admin");
-              }}
+              onChange={(e) => applyRole(e.target.value)}
               className="team-input"
             >
               {ASSIGNABLE_ROLES.map((r) => (
@@ -373,6 +382,7 @@ const TeamSettings = () => {
     const isPending = !m.clerk_user_id && m.role !== "owner";
     if (roleFilter === "manager" && m.role !== "manager") return false;
     if (roleFilter === "salesman" && !(m.role === "salesman" || m.role === "rep")) return false;
+    if (roleFilter === "sales_agent" && m.role !== "sales_agent") return false;
     if (roleFilter === "pending" && !isPending) return false;
     if (roleFilter === "online" && !presenceByClerk[m.clerk_user_id]?.online) return false;
     return true;
@@ -398,6 +408,7 @@ const TeamSettings = () => {
     ["online", "Online"],
     ["manager", "Managers"],
     ["salesman", "Salesmen"],
+    ["sales_agent", "Sales agents"],
     ["pending", "Pending"],
   ];
 

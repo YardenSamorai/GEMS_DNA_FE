@@ -16,6 +16,7 @@ import {
   fmtMoney,
   isAdminRole,
   permsOf,
+  presetForRole,
   relTime,
   roleLabelFor,
   timeAgo,
@@ -28,6 +29,8 @@ const RoleBadge = ({ role }) => {
     ? "bg-amber-100 text-amber-700 ring-amber-200"
     : role === "manager"
     ? "bg-sky-100 text-sky-700 ring-sky-200"
+    : role === "sales_agent"
+    ? "bg-violet-100 text-violet-700 ring-violet-200"
     : "bg-emerald-100 text-emerald-700 ring-emerald-200";
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1 ${tint}`}>
@@ -174,6 +177,22 @@ const MemberDetail = ({ actor, member, kpis = {}, presence = {}, onChanged, onCl
       ...d,
       sections: d.sections.includes(key) ? d.sections.filter((k) => k !== key) : [...d.sections, key],
     }));
+
+  // Changing the role re-seeds that role's default permissions; the admin can
+  // then fine-tune them before saving. Admin keeps whatever (it gets full
+  // access regardless), so we only swap the role there.
+  const changeRole = (next) =>
+    setDraft((d) => {
+      if (next === "admin") return { ...d, role: next };
+      const preset = presetForRole(next);
+      return {
+        ...d,
+        role: next,
+        sections: preset.sections,
+        locationView: preset.locationView,
+        canViewCost: preset.canViewCost,
+      };
+    });
 
   const save = async () => {
     setSaving(true);
@@ -466,7 +485,7 @@ const MemberDetail = ({ actor, member, kpis = {}, presence = {}, onChanged, onCl
                   <span className="mb-1 block text-[11px] uppercase tracking-wider font-medium text-stone-500">Role</span>
                   <select
                     value={draft.role}
-                    onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))}
+                    onChange={(e) => changeRole(e.target.value)}
                     className="team-input"
                   >
                     {ASSIGNABLE_ROLES.map((r) => (
