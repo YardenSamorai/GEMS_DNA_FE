@@ -202,13 +202,10 @@ const FILTER_DEFAULTS = {
   onlyLoose: false,
   skuQuery: "", sortBy: [],
 };
-/* Per-mode opening defaults. Diamonds & Emeralds open pre-filtered to Single +
- * Only with cert (parcelSel already defaults to Single for every mode). */
-const CERT_DEFAULT_MODES = new Set(["diamond", "emerald"]);
-const modeFilterDefaults = (mode) => ({
-  ...FILTER_DEFAULTS,
-  onlyCert: CERT_DEFAULT_MODES.has(mode) ? true : FILTER_DEFAULTS.onlyCert,
-});
+/* Per-mode opening defaults. Every stone category (diamond / emerald /
+ * gemstone) opens pre-filtered to Single parcel only — no other facet is on by
+ * default. parcelSel already defaults to Single for every mode. */
+const modeFilterDefaults = (mode) => ({ ...FILTER_DEFAULTS });
 /* Per-category filter persistence. Each mode (diamond / emerald / gemstone)
  * keeps its own snapshot in localStorage, so switching between catalogs — or
  * leaving and coming back later — restores exactly what was filtered. */
@@ -1019,7 +1016,6 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   // Once the header (Filter / search / Sort) scrolls out of view we surface a
   // floating Filter button so it stays reachable deep down the grid.
   const headerRef = useRef(null);
-  const [showFloatingFilter, setShowFloatingFilter] = useState(false);
   // True for the render immediately after we hydrate a category's saved
   // filters, so the persistence effect doesn't write stale values back.
   const justSwitchedRef = useRef(true);
@@ -1710,18 +1706,6 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  // Show the floating Filter button only while the real header is off-screen.
-  useEffect(() => {
-    const node = headerRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(
-      (entries) => setShowFloatingFilter(!entries[0].isIntersecting),
-      { rootMargin: "-8px 0px 0px 0px" }
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   // Shared filter fragments reused across modes (kept identical everywhere).
   // Parcel type is single-select: a tap picks one option (replacing any prior
   // choice); tapping the active one clears it.
@@ -1977,20 +1961,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         </div>
       )}
 
-      {/* Floating Filter button — fades in once the header scrolls away so the
-          filters stay one tap away anywhere down the grid. Sits above the
-          mobile dock (safe-area aware) and opens the same sheet. */}
+      {/* Floating Filter button — always visible on the right so the filters
+          stay one tap away anywhere on the grid. Sits above the mobile dock
+          (safe-area aware) and opens the same sheet. */}
       <button
         type="button"
         aria-haspopup="dialog"
         aria-label="Open filters"
         onClick={() => setFiltersOpen(true)}
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
-        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden ${
-          showFloatingFilter
-            ? "pointer-events-auto translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-4 opacity-0"
-        }`}
+        className="fixed right-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden pointer-events-auto translate-y-0 opacity-100"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.9} d="M4 6h16M7 12h10M10 18h4" />

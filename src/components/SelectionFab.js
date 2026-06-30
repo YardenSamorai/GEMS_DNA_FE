@@ -51,7 +51,7 @@ const SelectionFab = () => {
           onClick={() => setOpen(true)}
           aria-label={`Review ${count} selected ${count === 1 ? "stone" : "stones"}`}
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
-          className="fixed right-4 z-40 flex items-center gap-2.5 rounded-full bg-emerald-600 px-5 py-3.5 text-white shadow-[0_10px_30px_-8px_rgba(5,150,105,0.7)] transition-all duration-200 hover:bg-emerald-700 active:scale-95 md:!bottom-6"
+          className="fixed left-4 z-40 flex items-center gap-2.5 rounded-full bg-emerald-600 px-5 py-3.5 text-white shadow-[0_10px_30px_-8px_rgba(5,150,105,0.7)] transition-all duration-200 hover:bg-emerald-700 active:scale-95 md:!bottom-6"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path

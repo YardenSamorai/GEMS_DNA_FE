@@ -609,19 +609,8 @@ const SalesJewelry = () => {
     return () => io.disconnect();
   }, [hasMore, filtered.length]);
 
-  // Floating filter button — reveal once the header scrolls out of view.
+  // Header ref (kept for layout; the floating filter button is always shown).
   const headerRef = useRef(null);
-  const [showFloatingFilter, setShowFloatingFilter] = useState(false);
-  useEffect(() => {
-    const node = headerRef.current;
-    if (!node) return undefined;
-    const io = new IntersectionObserver(
-      ([entry]) => setShowFloatingFilter(!entry.isIntersecting),
-      { rootMargin: "-12px 0px 0px 0px" }
-    );
-    io.observe(node);
-    return () => io.disconnect();
-  }, []);
 
   const toggleIn = (setter) => (val) =>
     setter((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
@@ -735,11 +724,7 @@ const SalesJewelry = () => {
         onClick={() => setFiltersOpen(true)}
         aria-label="Open filters"
         style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
-        className={`fixed left-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden ${
-          showFloatingFilter
-            ? "pointer-events-auto translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-4 opacity-0"
-        }`}
+        className="fixed right-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden pointer-events-auto translate-y-0 opacity-100"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 5h18M6 12h12M10 19h4" />
