@@ -344,8 +344,9 @@ const MemberDetail = ({ actor, member, kpis = {}, presence = {}, onChanged, onCl
         ))}
       </div>
 
-      {/* Body */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+      {/* Body — extra bottom padding on phones so the Save/Reset row clears the
+          fixed mobile dock (≈74px + safe area). Restored to normal at md+. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-28 sm:px-5 sm:pt-5 md:pb-6">
         {tab === "overview" && (
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
