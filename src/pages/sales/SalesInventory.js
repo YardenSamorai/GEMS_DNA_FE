@@ -635,6 +635,18 @@ export const stoneImage = (s) => {
   return usableImg(firstExtra);
 };
 
+/* Vimeo embeds auto-pick a low rendition for small players, which looks soft on
+ * retina phones. For player.vimeo.com URLs we pin a high quality and strip the
+ * player chrome; the quality selector stays so a viewer can adjust if needed.
+ * Any non-Vimeo URL (V360 spins, etc.) passes through completely untouched. */
+export const enhanceVimeoUrl = (url) => {
+  if (!url || !/player\.vimeo\.com\/video\//i.test(url)) return url;
+  const [base, frag] = String(url).split("#");
+  const sep = base.includes("?") ? "&" : "?";
+  const params = "quality=1080p&dnt=1&title=0&byline=0&portrait=0&quality_selector=1";
+  return `${base}${sep}${params}${frag ? `#${frag}` : ""}`;
+};
+
 /* Sales-floor price policy (applied once at load time so cards, the product
  * page, the price filters, sorting and WhatsApp shares all see the same
  * adjusted figures). The DB now stores real prices, so:

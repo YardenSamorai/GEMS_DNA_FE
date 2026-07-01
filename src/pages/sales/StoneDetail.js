@@ -25,6 +25,7 @@ import {
   money,
   resolveLocation,
   usableImg,
+  enhanceVimeoUrl,
   hasCert,
   adjustSalesPrices,
   StonePlaceholder,
@@ -408,7 +409,7 @@ const StoneDetail = () => {
             {video && (
               <div key="video" className="aspect-square w-full shrink-0 snap-center bg-black">
                 <iframe
-                  src={video}
+                  src={enhanceVimeoUrl(video)}
                   title={`${stone.sku} video`}
                   className="h-full w-full"
                   frameBorder="0"
