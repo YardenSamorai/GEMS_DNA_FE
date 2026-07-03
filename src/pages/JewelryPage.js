@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import GemstoneDetails from '../components/GemstoneDetails';
 import { Skeleton, SkeletonText } from '../components/ui/Skeleton';
 
@@ -7,8 +8,20 @@ const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.
 
 const JewelryPage = () => {
   const { modelNumber } = useParams();
+  const navigate = useNavigate();
+  const { isSignedIn } = useUser();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // In the installed PWA there's no browser back button; this returns the rep
+  // to their filtered inventory list (history is preserved by in-app nav).
+  const goBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/inventory');
+    }
+  };
 
   useEffect(() => {
     const fetchItem = async () => {
@@ -47,7 +60,24 @@ const JewelryPage = () => {
   }
   if (!item) return <div className="p-8 text-center text-red-600">Jewelry item not found</div>;
 
-  return <GemstoneDetails data={item} />;
+  return (
+    <>
+      {isSignedIn && (
+        <div className="mx-auto max-w-4xl px-4 pt-6">
+          <button
+            onClick={goBack}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-stone-100 text-stone-700 text-sm font-medium hover:bg-stone-200 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+        </div>
+      )}
+      <GemstoneDetails data={item} />
+    </>
+  );
 };
 
 export default JewelryPage;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
@@ -16,11 +16,23 @@ const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.
 
 const DiamondCard = () => {
   const { stone_id } = useParams();
+  const navigate = useNavigate();
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [interestedOpen, setInterestedOpen] = useState(false);
   const { isSignedIn } = useUser();
+
+  // Back to wherever the rep came from (their filtered inventory list). Inside
+  // the PWA there's no browser chrome, so this is the only way back. Fall back
+  // to the inventory route when there's no in-app history to pop.
+  const goBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/inventory");
+    }
+  };
 
   const isEmerald = () => {
     return getMappedCategories(details?.category).includes('Emerald');
@@ -128,7 +140,28 @@ const DiamondCard = () => {
     );
   }
 
-  const halfTotalPrice = decryptPrice(details.total_price) / 2;
+  // Neto/Bruto preference is set on the inventory screen and mirrored here via
+  // localStorage. Diamonds have no Bruto/Neto split — they're always Neto (no
+  // "B" prefix). Gemstones/emeralds follow the preference:
+  //   Neto  → price / 2, no "B" prefix
+  //   Bruto → full price, "B" prefix
+  const priceMode = (() => {
+    try {
+      return localStorage.getItem("gems_price_mode") === "bruto" ? "bruto" : "neto";
+    } catch {
+      return "neto";
+    }
+  })();
+
+  const priceCodeFor = (encryptedValue) => {
+    const full = decryptPrice(encryptedValue);
+    if (isDiamond()) return encryptPrice(full / 2);
+    if (priceMode === "bruto") {
+      const code = encryptPrice(full);
+      return code === "N/A" ? code : `B${code}`;
+    }
+    return encryptPrice(full / 2);
+  };
 
   const certUrl = details.certificate_url
     || (details.certificate_number ? `${barakURL}/${details.certificate_number}.pdf` : null);
@@ -141,6 +174,18 @@ const DiamondCard = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
+        {isSignedIn && (
+          <button
+            onClick={goBack}
+            className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full glass-surface text-app-graphite text-sm font-medium hover:bg-app-surface/85 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+        )}
+
         {/* Header Card — v1.0.5 glass shell. The legacy emerald-gradient title
             bar is replaced by an ink-tone editorial header: lab badge, copyable
             SKU, large display title, and a discreet price slot for signed-in
@@ -182,7 +227,7 @@ const DiamondCard = () => {
                     Total price
                   </span>
                   <span className="text-[26px] sm:text-[28px] font-semibold tracking-tight text-app-ink">
-                    {encryptPrice(halfTotalPrice)}
+                    {priceCodeFor(details.total_price)}
                   </span>
                 </div>
               )}
@@ -358,13 +403,7 @@ const DiamondCard = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-app-muted font-medium text-[12.5px]">Price per carat</span>
                           <span className="text-[16px] font-semibold tracking-tight text-app-ink">
-                            {/* Diamonds have no Bruto/Neto split — they're always
-                                Neto, so we show the Neto code (price/2, no "B"
-                                prefix) to match the Neto Total above. Gemstones
-                                keep the Bruto code (B + full price). */}
-                            {isDiamond()
-                              ? encryptPrice(decryptPrice(details.price_per_carat) / 2)
-                              : <>B{encryptPrice(decryptPrice(details.price_per_carat))}</>}
+                            {priceCodeFor(details.price_per_carat)}
                           </span>
                         </div>
                       </div>

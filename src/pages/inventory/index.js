@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { useRouteLoading } from "../../components/RouteLoadingContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -86,6 +86,10 @@ const shareMultipleToWhatsApp = (selectedStonesArray) => {
   const encodedMessage = encodeURIComponent(message.trim());
   window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
 };
+
+// sessionStorage key for restoring the inventory view (mode/filters/search)
+// after visiting a stone's DNA page.
+const INVENTORY_VIEW_KEY = "inventory.viewState";
 
 /* ---------------- Price Encoding (BARELOVSK) ---------------- */
 const encodePriceBARELOVSK = (price) => {
@@ -1665,7 +1669,8 @@ const ExportModal = ({
   subtitle = null,
   buttonText = "Export",
   buttonColor = "from-emerald-500 to-emerald-600",
-  showHidePricesOption = true
+  showHidePricesOption = true,
+  priceMode = "neto"
 }) => {
   const [globalMarkup, setGlobalMarkup] = useState(0);
   const [priceOverrides, setPriceOverrides] = useState({});
@@ -1787,7 +1792,12 @@ const ExportModal = ({
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-white">{title}</h2>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-bold text-white">{title}</h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-white/25 text-white border border-white/30">
+                      {priceMode === "bruto" ? "Bruto prices" : "Neto prices"}
+                    </span>
+                  </div>
                   <p className="text-white/80 text-xs sm:text-sm">{subtitle || `${selectedStones.length} stones selected`}</p>
                 </div>
               </div>
@@ -1832,6 +1842,9 @@ const ExportModal = ({
                 </button>
               </div>
               <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${priceMode === "bruto" ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
+                  {priceMode === "bruto" ? "Bruto" : "Neto"}
+                </span>
                 <span className="text-stone-500">
                   Original: <span className="font-semibold text-stone-700">${totalOriginal.toLocaleString()}</span>
                 </span>
@@ -2268,6 +2281,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
 const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel, priceMode = 'neto' }) => {
   const [activeTab, setActiveTab] = useState('details');
   const [activeImgIdx, setActiveImgIdx] = useState(0);
+  const navigate = useNavigate();
 
   if (!isOpen || !stone) return null;
 
@@ -2280,6 +2294,23 @@ const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel, priceMode = 'neto' })
         ? `https://gems-dna.com/jewelry/items/${stone.workshopId}`
         : `https://gems-dna.com/jewelry/${stone.sku}`)
     : `https://gems-dna.com/${stone.sku}`;
+
+  // Inside the installed PWA there is no browser chrome (no back button), so a
+  // new-tab DNA link strands the rep. Detect standalone display mode and route
+  // in-app instead, which keeps history so the DNA page's Back button returns
+  // here with filters intact. Regular browsers keep the new-tab behavior.
+  const inAppDnaPath = shareUrl.replace(/^https?:\/\/gems-dna\.com/i, "") || "/";
+  const isStandalonePwa = typeof window !== "undefined" && (
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    window.navigator.standalone === true
+  );
+  const handleOpenDna = (e) => {
+    if (isStandalonePwa) {
+      e.preventDefault();
+      onClose?.();
+      navigate(inAppDnaPath);
+    }
+  };
 
   const images = isJewelry ? (stone.allImages || (stone.imageUrl ? [stone.imageUrl] : [])) : [];
   const videoUrl = isJewelry ? stone.videoLink : stone.videoUrl;
@@ -2618,6 +2649,7 @@ const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel, priceMode = 'neto' })
             )}
             <a
               href={shareUrl}
+              onClick={handleOpenDna}
               target="_blank"
               rel="noopener noreferrer"
               className="py-2 px-3 rounded-full bg-app-ink text-app-canvas font-semibold flex items-center justify-center gap-1.5 hover:bg-app-graphite transition-colors text-sm shadow-sm"
@@ -5545,8 +5577,22 @@ const StoneSearchPage = () => {
   const { user } = useUser();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
-  
-  const [inventoryMode, setInventoryMode] = useState('diamonds');
+
+  // Restore the last inventory view (mode + filters + search) so returning
+  // from a stone's DNA page — especially inside the installed PWA where there
+  // is no browser chrome — lands the rep back on the same filtered list.
+  // A URL ?search=… always wins (deep-link / SKU jump) over the saved view.
+  const savedView = (() => {
+    if (initialSearch) return null;
+    try {
+      const raw = sessionStorage.getItem(INVENTORY_VIEW_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const [inventoryMode, setInventoryMode] = useState(savedView?.inventoryMode || 'diamonds');
 
   const defaultFilters = {
     sku: initialSearch,
@@ -5575,7 +5621,9 @@ const StoneSearchPage = () => {
     box: "",
   };
 
-  const [filters, setFilters] = useState(defaultFilters);
+  const [filters, setFilters] = useState(
+    savedView?.filters ? { ...defaultFilters, ...savedView.filters } : defaultFilters
+  );
 
   const [stones, setStones] = useState([]);
   // Phase A: per-SKU map of cross-system status pulled from the workshop.
@@ -5599,7 +5647,7 @@ const StoneSearchPage = () => {
   const [showInternalExcelModal, setShowInternalExcelModal] = useState(false); // Internal Excel column picker
   const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
   const [showPDFModal, setShowPDFModal] = useState(false);
-  const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', 'diamonds'));
+  const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', savedView?.inventoryMode || 'diamonds'));
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [savedFilters, setSavedFilters] = useState([]);
@@ -5626,8 +5674,37 @@ const StoneSearchPage = () => {
   const [sortConfig, setSortConfig] = useState({ field: "sku", direction: "asc" });
   const [viewMode, setViewMode] = useState("table");
   const [pairViewMode, setPairViewMode] = useState("cards");
-  const [smartSearch, setSmartSearch] = useState("");
-  const [priceMode, setPriceMode] = useState("neto"); // 'neto' = /2, 'bruto' = full DB price
+  const [smartSearch, setSmartSearch] = useState(savedView?.smartSearch || "");
+  const [priceMode, setPriceMode] = useState(() => {
+    // Persisted so the public DNA page (DiamondCard) can mirror the same
+    // Neto/Bruto choice — the toggle lives here but the code is decoded there.
+    try {
+      return localStorage.getItem("gems_price_mode") === "bruto" ? "bruto" : "neto";
+    } catch {
+      return "neto";
+    }
+  }); // 'neto' = /2, 'bruto' = full DB price
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("gems_price_mode", priceMode);
+    } catch {
+      /* storage unavailable — DNA page falls back to Neto */
+    }
+  }, [priceMode]);
+
+  // Snapshot the current view so navigating to a stone's DNA page and coming
+  // back (via the DNA page's Back button) restores the same filters/mode.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        INVENTORY_VIEW_KEY,
+        JSON.stringify({ inventoryMode, filters, smartSearch })
+      );
+    } catch {
+      /* storage unavailable — view simply won't be restored */
+    }
+  }, [inventoryMode, filters, smartSearch]);
 
   // Jewelry state - fetched from backend API
   const [jewelryItems, setJewelryItems] = useState([]);
@@ -8556,6 +8633,7 @@ const StoneSearchPage = () => {
           setExportMode('combined'); // Reset to default
         }}
         selectedStones={applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))}
+        priceMode={priceMode}
         onExport={(modifiedStones, options = {}) => {
           if (exportMode === 'separate') {
             exportToExcelSeparate(modifiedStones, options);
@@ -8595,6 +8673,7 @@ const StoneSearchPage = () => {
         isOpen={showPDFPriceModal}
         onClose={() => setShowPDFPriceModal(false)}
         selectedStones={applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))}
+        priceMode={priceMode}
         onExport={(modifiedStones) => {
           setPdfStonesWithPrices(modifiedStones);
           setShowPDFPriceModal(false);
