@@ -141,10 +141,11 @@ const DiamondCard = () => {
   }
 
   // Neto/Bruto preference is set on the inventory screen and mirrored here via
-  // localStorage. Diamonds have no Bruto/Neto split — they're always Neto (no
-  // "B" prefix). Gemstones/emeralds follow the preference:
-  //   Neto  → price / 2, no "B" prefix
-  //   Bruto → full price, "B" prefix
+  // localStorage. The stored DB price is already Neto — the exact same model
+  // the inventory uses (Neto = raw value, Bruto = raw × 2):
+  //   Neto  → raw value, no "B" prefix
+  //   Bruto → raw × 2, "B" prefix (gemstones/emeralds only)
+  // Diamonds have no Bruto/Neto split, so they always show the raw Neto value.
   const priceMode = (() => {
     try {
       return localStorage.getItem("gems_price_mode") === "bruto" ? "bruto" : "neto";
@@ -155,12 +156,11 @@ const DiamondCard = () => {
 
   const priceCodeFor = (encryptedValue) => {
     const full = decryptPrice(encryptedValue);
-    if (isDiamond()) return encryptPrice(full / 2);
-    if (priceMode === "bruto") {
-      const code = encryptPrice(full);
+    if (!isDiamond() && priceMode === "bruto") {
+      const code = encryptPrice(full * 2);
       return code === "N/A" ? code : `B${code}`;
     }
-    return encryptPrice(full / 2);
+    return encryptPrice(full);
   };
 
   const certUrl = details.certificate_url
