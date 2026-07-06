@@ -298,25 +298,30 @@ const RepIdentity = ({ rep, big }) => (
   </div>
 );
 
+/* Compact one-row card: identity on the left, the four 7-day counters inline
+ * on the right. Keeps every number visible while roughly halving the height,
+ * so the mobile list needs far less scrolling to reach the feed below. */
 const RepCard = ({ rep, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className="flex w-full flex-col rounded-2xl border border-app-line bg-app-surface px-4 py-3.5 text-left transition hover:bg-app-canvas2 active:scale-[0.99]"
+    className="flex w-full items-center gap-2 rounded-2xl border border-app-line bg-app-surface px-3 py-2.5 text-left transition hover:bg-app-canvas2 active:scale-[0.99]"
   >
-    <RepIdentity rep={rep} />
-    <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+    <div className="min-w-0 flex-1">
+      <RepIdentity rep={rep} />
+    </div>
+    <div className="flex shrink-0 items-center">
       {[
-        ["Sessions", rep.sessions_7d],
+        ["Sess", rep.sessions_7d],
         ["Views", rep.stone_views_7d],
         ["Shares", rep.shares_7d],
         ["Events", rep.events_7d],
       ].map(([label, value]) => (
-        <div key={label} className="rounded-xl bg-app-canvas2 px-1 py-2">
-          <div className="text-[16px] font-semibold leading-none tabular-nums text-app-ink">
+        <div key={label} className="w-[46px] text-center">
+          <div className="text-[14px] font-semibold leading-none tabular-nums text-app-ink">
             {Number(value || 0).toLocaleString()}
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-wide text-app-soft">{label}</div>
+          <div className="mt-0.5 text-[9px] uppercase tracking-wide text-app-soft">{label}</div>
         </div>
       ))}
     </div>
@@ -1028,7 +1033,7 @@ const TeamActivityView = ({ actor }) => {
         <>
           {/* Desktop: sortable table. Mobile: the compact cards. */}
           <TeamTable reps={sortedReps} sort={teamSort} onSort={onTeamSort} onSelect={setSelectedRep} />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:hidden">
             {sortedReps.map((rep) => (
               <RepCard key={rep.actor_id || rep.email} rep={rep} onClick={() => setSelectedRep(rep)} />
             ))}
