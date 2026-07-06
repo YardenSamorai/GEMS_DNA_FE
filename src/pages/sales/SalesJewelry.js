@@ -167,6 +167,7 @@ const FILTER_DEFAULTS = {
   styleSel: [],
   gemTypeSel: [],
   locationSel: [],
+  onlyInStock: false,
   tcwFrom: "",
   tcwTo: "",
   tcwBands: [],
@@ -379,6 +380,8 @@ const SalesJewelry = () => {
   const [styleSel, setStyleSel] = useState(saved.styleSel);
   const [gemTypeSel, setGemTypeSel] = useState(saved.gemTypeSel);
   const [locationSel, setLocationSel] = useState(saved.locationSel);
+  // Guaranteed available — hide pieces that are on memo or on hold.
+  const [onlyInStock, setOnlyInStock] = useState(saved.onlyInStock);
   const [tcwFrom, setTcwFrom] = useState(saved.tcwFrom);
   const [tcwTo, setTcwTo] = useState(saved.tcwTo);
   const [tcwBands, setTcwBands] = useState(saved.tcwBands);
@@ -455,7 +458,7 @@ const SalesJewelry = () => {
         JSON.stringify({
           t: Date.now(),
           f: {
-            jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel,
+            jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
             tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
             skuQuery, sortKey, sortDir,
           },
@@ -465,7 +468,7 @@ const SalesJewelry = () => {
       /* storage unavailable — non-fatal */
     }
   }, [
-    jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel,
+    jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -552,6 +555,9 @@ const SalesJewelry = () => {
         const loc = norm(r.branch);
         if (!locationSel.some((v) => (LOCATION_MATCH[v] || [v]).some((t) => loc.includes(t)))) return false;
       }
+      // Guaranteed available — a piece is unavailable when on memo OR on hold
+      // (same rule as the loose-stone catalogs).
+      if (onlyInStock && (r.onMemo || r.onHold)) return false;
       if (!matchGemType(r.stoneType, gemTypeSel)) return false;
       if (!numericOk(r.totalCarat, tcwFrom, tcwTo, tcwBands, TCW_PRESETS)) return false;
       if (!numericOk(r.price, priceFrom, priceTo, priceBands, PRICE_PRESETS)) return false;
@@ -579,7 +585,7 @@ const SalesJewelry = () => {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    rows, jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel,
+    rows, jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -629,12 +635,23 @@ const SalesJewelry = () => {
   const toggleBand = (setter) => (label) =>
     setter((prev) => (prev.includes(label) ? prev.filter((v) => v !== label) : [...prev, label]));
 
+  // "Only in USA" — one-tap shortcut that selects both US branches (NY + LA)
+  // in the Branch filter; tapping again clears them. Mirrors the stone catalogs.
+  const usaActive = locationSel.includes("NY") && locationSel.includes("LA");
+  const toggleUsa = () =>
+    setLocationSel((cur) => {
+      const has = cur.includes("NY") && cur.includes("LA");
+      if (has) return cur.filter((v) => v !== "NY" && v !== "LA");
+      return Array.from(new Set([...cur, "NY", "LA"]));
+    });
+
   const resetFilters = () => {
     setJewelrySel([]);
     setShapeSel([]);
     setStyleSel([]);
     setGemTypeSel([]);
     setLocationSel([]);
+    setOnlyInStock(false);
     setTcwFrom("");
     setTcwTo("");
     setTcwBands([]);
@@ -664,6 +681,7 @@ const SalesJewelry = () => {
     styleSel.length +
     gemTypeSel.length +
     locationSel.length +
+    (onlyInStock ? 1 : 0) +
     tcwBands.length +
     (tcwFrom || tcwTo ? 1 : 0) +
     priceBands.length +
@@ -875,37 +893,66 @@ const SalesJewelry = () => {
               </div>
 
               <div className="flex-1 space-y-7 overflow-y-auto px-5 py-4">
+                {/* Quick availability toggles — always visible, above Basic.
+                    Same checkbox style as the stone catalogs. */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+                  {[
+                    { label: "Guaranteed available", checked: onlyInStock, onToggle: () => setOnlyInStock((v) => !v) },
+                    { label: "Only in USA", checked: usaActive, onToggle: toggleUsa },
+                  ].map(({ label, checked, onToggle }) => (
+                    <label
+                      key={label}
+                      className="flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-app-ink"
+                    >
+                      <span
+                        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition ${
+                          checked
+                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            : "border-app-line bg-app-surface text-transparent"
+                        }`}
+                      >
+                        <svg className="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l3.5 3.5L15 7" />
+                        </svg>
+                      </span>
+                      <input type="checkbox" className="sr-only" checked={checked} onChange={onToggle} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+
+                {/* Jewelry — four headline kinds with icons. Lives above the
+                    Basic section so it's always in reach. */}
+                <section>
+                  <FieldLabel showClear={jewelrySel.length > 0} onClear={() => setJewelrySel([])}>
+                    Jewelry
+                  </FieldLabel>
+                  <div className="grid grid-cols-4 gap-2">
+                    {JEWELRY_KINDS.map((j) => {
+                      const active = jewelrySel.includes(j.key);
+                      return (
+                        <button
+                          key={j.key}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => toggleIn(setJewelrySel)(j.key)}
+                          className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 transition ${
+                            active
+                              ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
+                              : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+                          }`}
+                        >
+                          {j.icon("h-7 w-7")}
+                          <span className="text-center text-[11.5px] font-medium leading-tight">{j.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
                 <SectionDivider label="Basic" open={basicOpen} onClick={() => setBasicOpen((o) => !o)} />
                 {basicOpen && (
                   <>
-                    {/* Jewelry — four headline kinds with icons. */}
-                    <section>
-                      <FieldLabel showClear={jewelrySel.length > 0} onClear={() => setJewelrySel([])}>
-                        Jewelry
-                      </FieldLabel>
-                      <div className="grid grid-cols-4 gap-2">
-                        {JEWELRY_KINDS.map((j) => {
-                          const active = jewelrySel.includes(j.key);
-                          return (
-                            <button
-                              key={j.key}
-                              type="button"
-                              aria-pressed={active}
-                              onClick={() => toggleIn(setJewelrySel)(j.key)}
-                              className={`flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 transition ${
-                                active
-                                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600"
-                                  : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
-                              }`}
-                            >
-                              {j.icon("h-7 w-7")}
-                              <span className="text-center text-[11.5px] font-medium leading-tight">{j.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </section>
-
                     {/* Style — options follow the jewelry selection, ordered by
                         how common each style is. Sits above Shape. */}
                     <section>
