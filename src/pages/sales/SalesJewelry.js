@@ -302,6 +302,8 @@ export const mapRow = (row) => {
     image: firstImage,
     images,
     price: price || 0,
+    // When the piece was first imported — drives the default newest-first order.
+    createdAt: row.first_seen_at || null,
   };
 };
 
@@ -353,6 +355,7 @@ const FieldLabel = ({ children, onClear, showClear }) => (
 );
 
 const SORT_OPTIONS = [
+  { key: "createdAt", label: "Newest" },
   { key: "price", label: "Price" },
   { key: "name", label: "Name" },
   { key: "category", label: "Category" },
@@ -561,6 +564,11 @@ const SalesJewelry = () => {
         if (sortKey === "price") {
           return ((Number(a.price) || 0) - (Number(b.price) || 0)) * dir;
         }
+        if (sortKey === "createdAt") {
+          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return (ta - tb) * dir;
+        }
         return String(a[sortKey] || "").toLowerCase().localeCompare(String(b[sortKey] || "").toLowerCase()) * dir;
       });
     }
@@ -632,10 +640,13 @@ const SalesJewelry = () => {
   };
 
   const onSortClick = (key) => {
+    // "Newest" is only meaningful descending, so it opens on desc and toggles
+    // straight back to the default order. Other keys keep asc → desc → off.
+    const firstDir = key === "createdAt" ? "desc" : "asc";
     if (sortKey !== key) {
       setSortKey(key);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
+      setSortDir(firstDir);
+    } else if (sortDir === firstDir && key !== "createdAt") {
       setSortDir("desc");
     } else {
       setSortKey("");
