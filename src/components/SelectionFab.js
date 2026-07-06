@@ -2,9 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelection } from "../context/SelectionContext";
+import { useTeam } from "../context/TeamContext";
 import { GemstoneCard, modeForStone } from "../pages/sales/SalesInventory";
 import { JewelryCard } from "../pages/sales/SalesJewelry";
 import { downloadCatalogPdf } from "../services/catalogPdf";
+import { shareStonesOnWhatsApp } from "../utils/shareStones";
 
 /* Floating "selection" button — bottom-right counterpart to the catalog's
  * bottom-left filter FAB. Appears once at least one stone is picked, shows the
@@ -13,6 +15,7 @@ import { downloadCatalogPdf } from "../services/catalogPdf";
  * dock on phones and drops to a normal bottom margin on desktop. */
 const SelectionFab = () => {
   const { items, count, clear } = useSelection();
+  const { actor } = useTeam();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -41,6 +44,14 @@ const SelectionFab = () => {
     } finally {
       setExporting(false);
     }
+  };
+
+  // Multi-share: one long WhatsApp message with each item's share block,
+  // separated by a dashed line (same per-item format as the product pages).
+  const handleShareWhatsApp = (withPrice) => {
+    if (count === 0) return;
+    setActionsOpen(false);
+    shareStonesOnWhatsApp(items, { actor, withPrice });
   };
 
   return (
@@ -140,6 +151,32 @@ const SelectionFab = () => {
                             role="menu"
                             className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-app-line bg-app-surface py-1 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.35)]"
                           >
+                            <div className="px-4 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-soft">
+                              Share on WhatsApp
+                            </div>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => handleShareWhatsApp(true)}
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13.5px] font-medium text-app-ink transition hover:bg-app-canvas2"
+                            >
+                              <svg className="h-4 w-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.1 13.9c-.2.6-1.2 1.2-1.7 1.2-.4.1-1 .1-1.6-.1a13 13 0 01-1.5-.5 11.5 11.5 0 01-4.4-3.9c-.3-.5-.9-1.4-.9-2.4s.5-1.5.7-1.7c.2-.2.4-.3.6-.3h.4c.1 0 .3 0 .5.4l.7 1.7c.1.2.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.1.3.6 1 1.3 1.6.9.8 1.6 1 1.9 1.2.3.1.4.1.6-.1l.8-.9c.2-.2.3-.2.6-.1l1.5.7c.2.1.4.2.4.3.1.1.1.5-.1.9z" />
+                              </svg>
+                              With prices
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => handleShareWhatsApp(false)}
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13.5px] font-medium text-app-ink transition hover:bg-app-canvas2"
+                            >
+                              <svg className="h-4 w-4 text-app-soft" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.1 13.9c-.2.6-1.2 1.2-1.7 1.2-.4.1-1 .1-1.6-.1a13 13 0 01-1.5-.5 11.5 11.5 0 01-4.4-3.9c-.3-.5-.9-1.4-.9-2.4s.5-1.5.7-1.7c.2-.2.4-.3.6-.3h.4c.1 0 .3 0 .5.4l.7 1.7c.1.2.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.1.3.6 1 1.3 1.6.9.8 1.6 1 1.9 1.2.3.1.4.1.6-.1l.8-.9c.2-.2.3-.2.6-.1l1.5.7c.2.1.4.2.4.3.1.1.1.5-.1.9z" />
+                              </svg>
+                              Without prices
+                            </button>
+                            <div className="mx-3 my-1 h-px bg-app-line" aria-hidden />
                             <div className="px-4 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-soft">
                               Export catalog to PDF
                             </div>

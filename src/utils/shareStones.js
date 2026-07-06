@@ -272,12 +272,12 @@ export const buildStoneShareText = (stone, opts = {}) => {
     : buildColoredStoneText(stone, opts);
 };
 
-/* Many stones → blocks separated by a divider. */
+/* Many stones → blocks separated by a dashed divider line. */
 export const buildStonesMessage = (stones, opts = {}) =>
   (Array.isArray(stones) ? stones : [stones])
     .filter(Boolean)
     .map((s) => buildStoneShareText(s, opts))
-    .join("\n\n— — —\n\n");
+    .join("\n\n- - - - - - - - -\n\n");
 
 /* ============================================================================
  * Attachment helpers (stone photo + certificate)
