@@ -9,6 +9,7 @@ import { sanitizeText, normalizeJewelryCategory } from "../../utils/helper";
 import { getDisplayShape } from "../inventory/helpers/constants";
 import { DIAMOND_SHAPES } from "./diamondShapes";
 import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle, prettyBranch, modeForStone } from "./SalesInventory";
+import { getCatalogView } from "./salesPrefs";
 
 /* Stone catalog routes by mode — used to hop a SKU search over to the loose
  * stone catalog when the searched SKU belongs to a stone, not a jewelry piece. */
@@ -367,6 +368,9 @@ const SalesJewelry = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  // 'grid' (cards) or 'rows' (list) — personal preference from Dashboard →
+  // Settings; read once per mount.
+  const [catalogView] = useState(getCatalogView);
   const [error, setError] = useState("");
 
   const saved = useMemo(() => ({ ...FILTER_DEFAULTS, ...loadSaved() }), []);
@@ -744,17 +748,32 @@ const SalesJewelry = () => {
         {filterCount > 0 && <span className="tabular-nums">· {filterCount}</span>}
       </button>
 
-      {/* Loading skeletons */}
+      {/* Loading skeletons — mirror whichever layout the rep picked. */}
       {loading && (
-        <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i}>
-              <div className="aspect-square w-full rounded-xl skeleton" />
-              <div className="mt-2.5 h-4 w-3/4 rounded skeleton" />
-              <div className="mt-1.5 h-3 w-1/2 rounded skeleton" />
-            </div>
-          ))}
-        </div>
+        catalogView === "rows" ? (
+          <div className="mt-6 flex flex-col gap-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-2xl border border-app-line bg-app-surface p-3">
+                <div className="h-24 w-24 shrink-0 rounded-xl skeleton sm:h-28 sm:w-28" />
+                <div className="flex-1 space-y-2 pt-1">
+                  <div className="h-3.5 w-3/4 rounded skeleton" />
+                  <div className="h-3 w-1/2 rounded skeleton" />
+                  <div className="h-3 w-2/5 rounded skeleton" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i}>
+                <div className="aspect-square w-full rounded-xl skeleton" />
+                <div className="mt-2.5 h-4 w-3/4 rounded skeleton" />
+                <div className="mt-1.5 h-3 w-1/2 rounded skeleton" />
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {error && (
@@ -773,16 +792,26 @@ const SalesJewelry = () => {
 
       {!loading && !error && filtered.length > 0 && (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+          <div
+            className={
+              catalogView === "rows"
+                ? "mt-6 flex flex-col gap-2"
+                : "mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4"
+            }
+          >
             {visibleRows.map((item, idx) => (
               <Link
                 key={item.id ?? item.sku ?? idx}
                 to={`/sales/jewelry/${encodeURIComponent(item.sku || "")}`}
                 state={{ item }}
                 onClick={() => saveScrollPos(visibleCount)}
-                className="transition active:opacity-80"
+                className={
+                  catalogView === "rows"
+                    ? "rounded-2xl border border-app-line bg-app-surface p-3 transition hover:bg-app-canvas2 active:opacity-80"
+                    : "transition active:opacity-80"
+                }
               >
-                <JewelryCard item={item} />
+                <JewelryCard item={item} layout={catalogView === "rows" ? "row" : "grid"} />
               </Link>
             ))}
           </div>
@@ -1160,14 +1189,21 @@ const Line = ({ value }) =>
 /* Catalog card — square image, then each spec stacked on its own line:
  *   center-stone weight, total weight (g), Shape, Jewelry type, Gem type,
  *   then SKU, then price. */
-export const JewelryCard = ({ item }) => {
+export const JewelryCard = ({ item, layout = "grid" }) => {
+  const isRow = layout === "row";
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = item.image && !imgFailed;
   const centerCt = Number.isFinite(item.centerCarat) ? `${item.centerCarat.toFixed(2)} ct` : null;
   const price = money(item.price);
   return (
-    <div className="flex flex-col">
-      <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-app-canvas2">
+    // "grid" = classic card (image on top); "row" = thumbnail left, details
+    // right — the list view picked in Dashboard → Settings.
+    <div className={isRow ? "flex items-start gap-3" : "flex flex-col"}>
+      <div
+        className={`relative shrink-0 overflow-hidden rounded-xl bg-app-canvas2 ${
+          isRow ? "h-24 w-24 sm:h-28 sm:w-28" : "aspect-square w-full"
+        }`}
+      >
         {showImage ? (
           <img
             src={item.image}
@@ -1181,7 +1217,7 @@ export const JewelryCard = ({ item }) => {
         )}
         <SelectToggle stone={item} />
       </div>
-      <div className="mt-2.5 flex flex-col gap-0.5">
+      <div className={`${isRow ? "min-w-0 flex-1" : "mt-2.5"} flex flex-col gap-0.5`}>
         {/* Only "Memo out" is relevant for jewelry availability. */}
         {item.onMemo && (
           <div className="mb-0.5 flex flex-wrap items-center gap-1">

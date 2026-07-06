@@ -7,6 +7,7 @@ import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
 import { DIAMOND_SHAPES, EMERALD_SHAPES } from "./diamondShapes";
+import { getCatalogView } from "./salesPrefs";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import placeholderImg from "../../assets/stone-placeholder-eshed.png";
 import { useSelection } from "../../context/SelectionContext";
@@ -823,7 +824,8 @@ export const SelectToggle = ({ stone }) => {
   );
 };
 
-export const GemstoneCard = ({ stone, mode }) => {
+export const GemstoneCard = ({ stone, mode, layout = "grid" }) => {
+  const isRow = layout === "row";
   const isDiamond = mode === "diamond";
   const isEmerald = mode === "emerald";
   const title = isDiamond
@@ -867,13 +869,16 @@ export const GemstoneCard = ({ stone, mode }) => {
     .join("  ·  ");
 
   return (
-    <div className="flex flex-col">
+    // Two layouts, same content: "grid" (image on top — the classic card) and
+    // "row" (thumbnail on the left, details to the right — the list view a rep
+    // can pick in Dashboard → Settings).
+    <div className={isRow ? "flex items-start gap-3" : "flex flex-col"}>
       {/* Image — shows the photo when present, otherwise a "Coming soon"
           placeholder. Also falls back if a "valid"-looking URL 404s. */}
       <div
-        className={`relative aspect-square w-full overflow-hidden rounded-xl bg-app-canvas2 ${
-          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-app-canvas" : ""
-        }`}
+        className={`relative shrink-0 overflow-hidden rounded-xl bg-app-canvas2 ${
+          isRow ? "h-24 w-24 sm:h-28 sm:w-28" : "aspect-square w-full"
+        } ${selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-app-canvas" : ""}`}
       >
         {showImage ? (
           <img
@@ -890,7 +895,7 @@ export const GemstoneCard = ({ stone, mode }) => {
       </div>
 
       {/* Details — bold title, then plain stacked lines (catalog style). */}
-      <div className="mt-2.5 flex flex-col gap-0.5">
+      <div className={`${isRow ? "min-w-0 flex-1" : "mt-2.5"} flex flex-col gap-0.5`}>
         {/* Status flags sit together on one wrapping row (never stacked):
             HOLD / Memo out / In Jewelry. In Jewelry jumps to the jewelry page
             and stops the card's own navigation. */}
@@ -1011,6 +1016,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // 'grid' (cards) or 'rows' (list) — a personal preference the rep picks in
+  // Dashboard → Settings; read once per mount.
+  const [catalogView] = useState(getCatalogView);
   // Holds the y-offset to restore once the grid has re-rendered after a Back
   // from a product page (see the load + restore effects).
   const pendingScrollRef = useRef(null);
@@ -2000,19 +2008,34 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         }}
       />
 
-      {/* Loading skeleton */}
+      {/* Loading skeleton — mirrors whichever layout the rep picked. */}
       {loading && (
-        <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex flex-col">
-              <div className="aspect-square w-full rounded-xl skeleton" />
-              <div className="mt-2.5 space-y-2">
-                <div className="h-3.5 w-3/4 rounded skeleton" />
-                <div className="h-3 w-1/2 rounded skeleton" />
+        catalogView === "rows" ? (
+          <div className="mt-6 flex flex-col gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-2xl border border-app-line bg-app-surface p-3">
+                <div className="h-24 w-24 shrink-0 rounded-xl skeleton sm:h-28 sm:w-28" />
+                <div className="flex-1 space-y-2 pt-1">
+                  <div className="h-3.5 w-3/4 rounded skeleton" />
+                  <div className="h-3 w-1/2 rounded skeleton" />
+                  <div className="h-3 w-2/5 rounded skeleton" />
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex flex-col">
+                <div className="aspect-square w-full rounded-xl skeleton" />
+                <div className="mt-2.5 space-y-2">
+                  <div className="h-3.5 w-3/4 rounded skeleton" />
+                  <div className="h-3 w-1/2 rounded skeleton" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Error */}
@@ -2032,19 +2055,30 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       </div>
       )}
 
-      {/* Grid — 2 cards per row on phones, wider on larger screens. */}
+      {/* Results — grid (2-up cards) or rows (full-width list), per the rep's
+          Dashboard → Settings preference. Same data on both. */}
       {!loading && !error && filtered.length > 0 && (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+          <div
+            className={
+              catalogView === "rows"
+                ? "mt-6 flex flex-col gap-2"
+                : "mt-6 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4"
+            }
+          >
             {visibleStones.map((stone, idx) => (
               <Link
                 key={stone.id ?? stone.sku ?? idx}
                 to={`/sales/stone/${encodeURIComponent(stone.sku || "")}`}
                 state={{ stone }}
                 onClick={() => saveScrollPos(mode, visibleCount)}
-                className="transition active:opacity-80"
+                className={
+                  catalogView === "rows"
+                    ? "rounded-2xl border border-app-line bg-app-surface p-3 transition hover:bg-app-canvas2 active:opacity-80"
+                    : "transition active:opacity-80"
+                }
               >
-                <GemstoneCard stone={stone} mode={mode} />
+                <GemstoneCard stone={stone} mode={mode} layout={catalogView === "rows" ? "row" : "grid"} />
               </Link>
             ))}
           </div>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTeam } from "../../context/TeamContext";
 import { fetchShareEvents } from "../../services/stonesApi";
 import { fetchTeamActivity, fetchRepActivity } from "../../services/activityApi";
+import { getCatalogView, setCatalogView } from "./salesPrefs";
 
 /* ============================================================================
  * SalesDashboard — the sales "Home".
@@ -1096,6 +1097,93 @@ const TeamActivityView = ({ actor }) => {
   );
 };
 
+/* ------------------------------------------------------------------ Settings */
+
+/* Personal display preferences (device-local). Currently: how the catalogs lay
+ * out their results — the classic card grid or full-width rows. */
+const SettingsView = () => {
+  const [view, setView] = useState(getCatalogView);
+  const pick = (v) => {
+    setView(v);
+    setCatalogView(v);
+  };
+
+  const Option = ({ id, title, desc, preview }) => {
+    const active = view === id;
+    return (
+      <button
+        type="button"
+        onClick={() => pick(id)}
+        aria-pressed={active}
+        className={`flex flex-col gap-3 rounded-2xl border p-4 text-left transition active:scale-[0.99] ${
+          active
+            ? "border-emerald-600 bg-emerald-600/5 ring-1 ring-emerald-600"
+            : "border-app-line bg-app-surface hover:bg-app-canvas2"
+        }`}
+      >
+        <div className="h-20 w-full">{preview}</div>
+        <div>
+          <p className="flex items-center gap-1.5 text-[14px] font-semibold text-app-ink">
+            {title}
+            {active && (
+              <svg className="h-4 w-4 text-emerald-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1.2 14.4l-4-4 1.4-1.4 2.6 2.6 5.6-5.6 1.4 1.4-7 7z" />
+              </svg>
+            )}
+          </p>
+          <p className="mt-0.5 text-[12px] text-app-muted">{desc}</p>
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <div className="mt-5">
+      <div className="rounded-2xl border border-app-line bg-app-surface px-4 py-4 sm:px-5">
+        <h2 className="text-[15px] font-semibold tracking-tight text-app-ink">Catalog view</h2>
+        <p className="mt-0.5 text-[12.5px] text-app-muted">
+          How stones and jewelry are laid out in the sales catalogs. Applies on this device.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Option
+            id="grid"
+            title="Grid"
+            desc="Cards with a large photo — 2 per row on phones."
+            preview={
+              <div className="grid h-full grid-cols-2 gap-1.5">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-md bg-app-canvas2" />
+                ))}
+              </div>
+            }
+          />
+          <Option
+            id="rows"
+            title="Rows"
+            desc="Full-width list — thumbnail left, details right."
+            preview={
+              <div className="flex h-full flex-col justify-between gap-1.5">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex flex-1 gap-1.5">
+                    <div className="aspect-square h-full rounded-md bg-app-canvas2" />
+                    <div className="flex flex-1 flex-col justify-center gap-1">
+                      <div className="h-1.5 w-3/4 rounded bg-app-canvas2" />
+                      <div className="h-1.5 w-1/2 rounded bg-app-canvas2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            }
+          />
+        </div>
+        <p className="mt-3 text-[11.5px] text-app-soft">
+          The change takes effect the next time you open a catalog.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 /* --------------------------------------------------------------------- Shell */
 
 const SalesDashboard = () => {
@@ -1116,6 +1204,8 @@ const SalesDashboard = () => {
           <p className="mt-0.5 text-[13px] text-app-muted">
             {tab === "team"
               ? "Who's active and what the team is doing"
+              : tab === "settings"
+              ? "Personal display preferences"
               : canSeeTeam
               ? "Stones shared by the whole team"
               : "Stones you've shared with clients"}
@@ -1123,28 +1213,29 @@ const SalesDashboard = () => {
         </div>
       </div>
 
-      {canSeeTeam && (
-        <div className="mt-4 inline-flex rounded-xl border border-app-line bg-app-surface p-1">
-          {[
-            ["shares", "Shares"],
-            ["team", "Team activity"],
-          ].map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition ${
-                tab === id ? "bg-app-ink text-app-canvas" : "text-app-graphite hover:bg-app-canvas2"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="mt-4 inline-flex rounded-xl border border-app-line bg-app-surface p-1">
+        {[
+          ["shares", "Shares"],
+          ...(canSeeTeam ? [["team", "Team activity"]] : []),
+          ["settings", "Settings"],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition ${
+              tab === id ? "bg-app-ink text-app-canvas" : "text-app-graphite hover:bg-app-canvas2"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {tab === "team" && canSeeTeam ? (
         <TeamActivityView actor={actor} />
+      ) : tab === "settings" ? (
+        <SettingsView />
       ) : (
         <SharesView actor={actor} isAdmin={isAdmin} isManager={isManager} />
       )}
