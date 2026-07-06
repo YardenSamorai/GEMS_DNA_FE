@@ -514,12 +514,35 @@ const SearchDetailModal = ({ ev, onClose }) => {
   );
 };
 
-const ActivityFeed = ({ events }) => {
+/* "Today" / "Yesterday" / "Jul 3" — calendar-day headers for the feed. */
+const dayLabel = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const ActivityFeed = ({ events, emptyText = "No activity yet." }) => {
   const [detailEv, setDetailEv] = useState(null);
   if (!events?.length) {
     return (
-      <div className="rounded-2xl glass-surface p-8 text-center text-[13px] text-app-soft">No activity yet.</div>
+      <div className="rounded-2xl glass-surface p-8 text-center text-[13px] text-app-soft">{emptyText}</div>
     );
+  }
+  // Break the flat list into calendar days so the feed reads as a timeline
+  // instead of one endless list.
+  const items = [];
+  let lastDay = null;
+  for (const ev of events) {
+    const day = dayLabel(ev.created_at);
+    if (day && day !== lastDay) {
+      items.push({ header: true, id: `day-${day}`, label: day });
+      lastDay = day;
+    }
+    items.push({ header: false, id: ev.id, ev });
   }
   return (
     // initial={false} keeps the first paint calm (no cascade on load); items
@@ -527,7 +550,24 @@ const ActivityFeed = ({ events }) => {
     // while `layout` makes the existing rows ease down to make room.
     <ul className="space-y-1.5">
       <AnimatePresence initial={false}>
-        {events.map((ev) => {
+        {items.map((item) => {
+          if (item.header) {
+            return (
+              <motion.li
+                key={item.id}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center gap-3 pt-2 first:pt-0"
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">
+                  {item.label}
+                </span>
+                <span className="h-px flex-1 bg-app-line" />
+              </motion.li>
+            );
+          }
+          const ev = item.ev;
           const meta = ACTIVITY_META[ev.type] || { label: ev.type, chip: "bg-stone-100 text-stone-600" };
           const summary = eventSummary(ev);
           const to = eventLink(ev);
@@ -703,6 +743,100 @@ const RepDetail = ({ actor, repId, fallbackRep, onBack }) => {
   );
 };
 
+/* ---- Team members table (desktop) --------------------------------------- */
+
+const TEAM_COLUMNS = [
+  { key: "name", label: "Member", align: "left" },
+  { key: "last_seen", label: "Last seen", align: "left" },
+  { key: "sessions_7d", label: "Sessions" },
+  { key: "stone_views_7d", label: "Views" },
+  { key: "shares_7d", label: "Shares" },
+  { key: "events_7d", label: "Events" },
+];
+
+const repSortValue = (rep, key) => {
+  if (key === "name") return String(rep.name || rep.email || "").toLowerCase();
+  if (key === "last_seen") {
+    // Online now outranks any historical timestamp.
+    if (rep.online) return Number.MAX_SAFE_INTEGER;
+    const t = new Date(rep.last_seen || 0).getTime();
+    return Number.isFinite(t) ? t : 0;
+  }
+  return Number(rep[key] || 0);
+};
+
+const TeamTable = ({ reps, sort, onSort, onSelect }) => (
+  <div className="hidden overflow-hidden rounded-2xl border border-app-line bg-app-surface md:block">
+    <table className="w-full">
+      <thead>
+        <tr className="border-b border-app-line bg-app-canvas2/60">
+          {TEAM_COLUMNS.map((col) => {
+            const active = sort.key === col.key;
+            return (
+              <th
+                key={col.key}
+                className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-app-soft ${
+                  col.align === "left" ? "text-left" : "text-right"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSort(col.key)}
+                  className={`inline-flex items-center gap-1 transition hover:text-app-ink ${
+                    active ? "text-app-ink" : ""
+                  }`}
+                >
+                  {col.label}
+                  {active && <span aria-hidden>{sort.dir === "asc" ? "↑" : "↓"}</span>}
+                </button>
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {reps.map((rep) => (
+          <tr
+            key={rep.actor_id || rep.email}
+            onClick={() => onSelect(rep)}
+            className="cursor-pointer border-b border-app-line/60 transition last:border-0 hover:bg-app-canvas2"
+          >
+            <td className="px-4 py-3">
+              <RepIdentity rep={rep} />
+            </td>
+            <td className="px-4 py-3 text-[12.5px] text-app-muted">
+              {rep.online ? (
+                <span className="font-semibold text-emerald-600">Online now</span>
+              ) : rep.last_seen ? (
+                relTime(rep.last_seen)
+              ) : (
+                "—"
+              )}
+            </td>
+            {["sessions_7d", "stone_views_7d", "shares_7d", "events_7d"].map((k) => (
+              <td key={k} className="px-4 py-3 text-right text-[13.5px] font-semibold tabular-nums text-app-ink">
+                {Number(rep[k] || 0).toLocaleString()}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+/* ---- Live feed filters --------------------------------------------------- */
+
+const FEED_TYPE_GROUPS = [
+  { key: "all", label: "All" },
+  { key: "views", label: "Views", types: ["stone_view", "stone_dwell", "media_view", "price_view", "category_view"] },
+  { key: "searches", label: "Searches", types: ["search", "filter_apply", "sort", "zero_results"] },
+  { key: "shares", label: "Shares", types: ["share"] },
+  { key: "sessions", label: "Sessions", types: ["session_start", "session_end"] },
+  { key: "exports", label: "Exports", types: ["export"] },
+  { key: "blocked", label: "Blocked", types: ["denied"] },
+];
+
 const TeamActivityView = ({ actor }) => {
   const [reps, setReps] = useState([]);
   const [events, setEvents] = useState([]);
@@ -711,6 +845,11 @@ const TeamActivityView = ({ actor }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [selectedRep, setSelectedRep] = useState(null);
+  // Table sort — default: most recently active on top.
+  const [teamSort, setTeamSort] = useState({ key: "last_seen", dir: "desc" });
+  // Live-feed filters: activity-type group + a specific person ("" = everyone).
+  const [feedType, setFeedType] = useState("all");
+  const [feedRep, setFeedRep] = useState("");
   // Newest loaded event id — lets the live poll ask for "only newer than this"
   // without stale closures.
   const latestIdRef = useRef(0);
@@ -801,6 +940,39 @@ const TeamActivityView = ({ actor }) => {
 
   const onlineCount = reps.filter((r) => r.online).length;
 
+  const sortedReps = useMemo(() => {
+    const dir = teamSort.dir === "asc" ? 1 : -1;
+    return [...reps].sort((a, b) => {
+      const va = repSortValue(a, teamSort.key);
+      const vb = repSortValue(b, teamSort.key);
+      if (typeof va === "string" || typeof vb === "string") {
+        return String(va).localeCompare(String(vb)) * dir;
+      }
+      return (va - vb) * dir;
+    });
+  }, [reps, teamSort]);
+
+  const onTeamSort = (key) => {
+    setTeamSort((s) => {
+      if (s.key !== key) {
+        // Text columns start ascending; numeric/recency start descending.
+        return { key, dir: key === "name" ? "asc" : "desc" };
+      }
+      return { key, dir: s.dir === "asc" ? "desc" : "asc" };
+    });
+  };
+
+  const filteredEvents = useMemo(() => {
+    const group = FEED_TYPE_GROUPS.find((g) => g.key === feedType);
+    return events.filter((ev) => {
+      if (feedRep && String(ev.actor_id || "") !== feedRep) return false;
+      if (group?.types && !group.types.includes(ev.type)) return false;
+      return true;
+    });
+  }, [events, feedType, feedRep]);
+
+  const feedIsFiltered = feedType !== "all" || !!feedRep;
+
   if (selectedRep) {
     return (
       <RepDetail
@@ -842,17 +1014,26 @@ const TeamActivityView = ({ actor }) => {
         />
       </div>
 
-      <h2 className="mb-2 mt-7 text-[13px] font-semibold uppercase tracking-[0.1em] text-app-soft">Team members</h2>
+      <h2 className="mb-2 mt-7 text-[13px] font-semibold uppercase tracking-[0.1em] text-app-soft">
+        Team members
+        <span className="ml-2 hidden text-[11px] font-normal normal-case tracking-normal text-app-soft md:inline">
+          (click a column to sort · click a member for their full history)
+        </span>
+      </h2>
       {reps.length === 0 ? (
         <div className="rounded-2xl glass-surface p-8 text-center text-[13px] text-app-soft">
           No team members to track yet.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {reps.map((rep) => (
-            <RepCard key={rep.actor_id || rep.email} rep={rep} onClick={() => setSelectedRep(rep)} />
-          ))}
-        </div>
+        <>
+          {/* Desktop: sortable table. Mobile: the compact cards. */}
+          <TeamTable reps={sortedReps} sort={teamSort} onSort={onTeamSort} onSelect={setSelectedRep} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden">
+            {sortedReps.map((rep) => (
+              <RepCard key={rep.actor_id || rep.email} rep={rep} onClick={() => setSelectedRep(rep)} />
+            ))}
+          </div>
+        </>
       )}
 
       <h2 className="mb-2 mt-7 text-[13px] font-semibold uppercase tracking-[0.1em] text-app-soft">
@@ -861,7 +1042,50 @@ const TeamActivityView = ({ actor }) => {
           (open it on a rep to see their full history)
         </span>
       </h2>
-      <ActivityFeed events={events} />
+
+      {/* Feed filters: activity-type chips + person picker. Filtering is applied
+          to the loaded pages — Load more keeps pulling older events, which then
+          pass through the same filters. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          {FEED_TYPE_GROUPS.map((g) => (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => setFeedType(g.key)}
+              className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition ${
+                feedType === g.key
+                  ? "border-app-ink bg-app-ink text-app-canvas"
+                  : "border-app-line bg-app-surface text-app-graphite hover:bg-app-canvas2"
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+        <select
+          value={feedRep}
+          onChange={(e) => setFeedRep(e.target.value)}
+          className="ml-auto rounded-xl border border-app-line bg-app-surface px-3 py-1.5 text-[12.5px] font-semibold text-app-graphite focus:border-app-ink focus:outline-none"
+          aria-label="Filter feed by member"
+        >
+          <option value="">Everyone</option>
+          {reps.map((r) => (
+            <option key={r.actor_id || r.email} value={String(r.actor_id || "")}>
+              {r.name || r.email || "—"}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <ActivityFeed
+        events={filteredEvents}
+        emptyText={
+          feedIsFiltered
+            ? "Nothing matches these filters in the loaded events — try Load more or clear the filters."
+            : "No activity yet."
+        }
+      />
       {cursor && <LoadMore onClick={loadMore} loading={loadingMore} />}
     </>
   );
