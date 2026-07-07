@@ -119,27 +119,10 @@ const trimWhitespace = (dataUrl) =>
     img.src = dataUrl;
   });
 
-// SKUs that have no product page on eshed.com — the "View more images &
-// videos" link is omitted for these.
-const NO_LINK_SKUS = new Set([
-  "RI-HJ-029",
-  "RI-HJ-028",
-  "RI-HJ-027",
-  "RI-HJ-026",
-  "ER-HJ-01W",
-  "RI-HJ-024",
-  "RI-HJ-023",
-  "RI-HJ-020",
-  "RI-ONE-012",
-].map((s) => s.toLowerCase()));
-
 // Product page on the public eshed.com website (e.g.
 // https://eshed.com/eshed/RI-HER-021/).
-const itemUrl = (stone) => {
-  const sku = String(stone.sku || "").trim();
-  if (!sku || NO_LINK_SKUS.has(sku.toLowerCase())) return null;
-  return `https://eshed.com/eshed/${encodeURIComponent(sku)}/`;
-};
+const itemUrl = (stone) =>
+  stone.sku ? `https://eshed.com/eshed/${encodeURIComponent(stone.sku)}/` : null;
 
 const itemTypeLabel = (stone) => {
   if (stone.category === "Jewelry") return stone.jewelryType || "Jewelry";
@@ -266,6 +249,12 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
     });
     aboutY += isLandscape ? 6.5 : 9;
   });
+
+  pdf.setFont(BODY_FONT, "normal");
+  pdf.setFontSize(9);
+  pdf.setTextColor(200, 200, 200);
+  const dateStr = new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" });
+  pdf.text(dateStr, pageWidth / 2, pageHeight - 34, { align: "center" });
 
   pdf.setDrawColor(180, 180, 180);
   pdf.setLineWidth(0.3);
@@ -422,9 +411,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       }
 
       // Product page link — blue + underlined when the item has a DNA page.
-      // SKUs in NO_LINK_SKUS get no link and no placeholder either.
       const url = itemUrl(stone);
-      const linkSuppressed = NO_LINK_SKUS.has(String(stone.sku || "").trim().toLowerCase());
       pdf.setFontSize(6.3);
       if (url) {
         const label = "View more images & videos";
@@ -435,7 +422,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
         pdf.setDrawColor(37, 99, 235);
         pdf.setLineWidth(0.15);
         pdf.line(x + cellW / 2 - lw / 2, textY + 0.6, x + cellW / 2 + lw / 2, textY + 0.6);
-      } else if (!linkSuppressed) {
+      } else {
         pdf.setFont("helvetica", "italic");
         pdf.setTextColor(140, 140, 140);
         pdf.text("Add product-page link", x + cellW / 2, textY, { align: "center" });
