@@ -150,7 +150,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
     } catch (e) { /* skip */ }
   }
 
-  const titleY = pageHeight * (isLandscape ? 0.5 : 0.52);
+  const titleY = pageHeight * (isLandscape ? 0.42 : 0.44);
   pdf.setFont(TITLE_FONT, "normal");
   pdf.setFontSize(30);
   pdf.setTextColor(255, 255, 255);
@@ -167,29 +167,29 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       body: "Our collection features fine jewelry and one-of-a-kind high jewelry made with natural emeralds, rare gemstones, natural diamonds, and fancy-color diamonds. Each piece is created for luxury retailers, combining exceptional gemstones with elegant design, craftsmanship, and strong commercial appeal.",
     },
   ];
-  const aboutMaxW = isLandscape ? 200 : 145;
-  const aboutBodySize = isLandscape ? 7.6 : 8;
-  const aboutLineH = isLandscape ? 3.4 : 3.7;
-  let aboutY = titleY + (isLandscape ? 12 : 16);
+  const aboutMaxW = isLandscape ? 230 : 160;
+  const aboutBodySize = isLandscape ? 9.5 : 10;
+  const aboutLineH = isLandscape ? 4.4 : 4.8;
+  let aboutY = titleY + (isLandscape ? 16 : 22);
   ABOUT.forEach((section) => {
     pdf.setFont(TITLE_FONT, "normal");
-    pdf.setFontSize(10);
-    pdf.setTextColor(235, 235, 235);
-    pdf.text(section.heading, pageWidth / 2, aboutY, { align: "center", charSpace: 1.2 });
+    pdf.setFontSize(13);
+    pdf.setTextColor(240, 240, 240);
+    pdf.text(section.heading, pageWidth / 2, aboutY, { align: "center", charSpace: 1.6 });
     // short accent line under the heading
-    pdf.setDrawColor(160, 160, 160);
-    pdf.setLineWidth(0.25);
-    pdf.line(pageWidth / 2 - 9, aboutY + 2.2, pageWidth / 2 + 9, aboutY + 2.2);
-    aboutY += 7.5;
+    pdf.setDrawColor(170, 170, 170);
+    pdf.setLineWidth(0.3);
+    pdf.line(pageWidth / 2 - 11, aboutY + 2.6, pageWidth / 2 + 11, aboutY + 2.6);
+    aboutY += 9.5;
     pdf.setFont(BODY_FONT, "normal");
     pdf.setFontSize(aboutBodySize);
-    pdf.setTextColor(205, 205, 205);
+    pdf.setTextColor(215, 215, 215);
     const lines = pdf.splitTextToSize(section.body, aboutMaxW);
     lines.forEach((line) => {
       pdf.text(line, pageWidth / 2, aboutY, { align: "center" });
       aboutY += aboutLineH;
     });
-    aboutY += isLandscape ? 5.5 : 8;
+    aboutY += isLandscape ? 7 : 10;
   });
 
   pdf.setFont(BODY_FONT, "normal");
