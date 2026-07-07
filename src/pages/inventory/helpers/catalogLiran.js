@@ -152,7 +152,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
 
   const titleY = pageHeight * (isLandscape ? 0.42 : 0.44);
   pdf.setFont(TITLE_FONT, "normal");
-  pdf.setFontSize(30);
+  pdf.setFontSize(24);
   pdf.setTextColor(255, 255, 255);
   pdf.text("JEWELRY CATALOG", pageWidth / 2, titleY, { align: "center" });
 
@@ -167,29 +167,29 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       body: "Our collection features fine jewelry and one-of-a-kind high jewelry showcasing natural emeralds, rare gemstones, natural diamonds, and fancy-color diamonds. Each piece is created for luxury retailers, combining exceptional gemstones with elegant design, superior craftsmanship, value, and strong commercial appeal.",
     },
   ];
-  const aboutMaxW = isLandscape ? 230 : 160;
-  const aboutBodySize = isLandscape ? 9.5 : 10;
-  const aboutLineH = isLandscape ? 4.4 : 4.8;
-  let aboutY = titleY + (isLandscape ? 16 : 22);
+  const aboutMaxW = isLandscape ? 235 : 165;
+  const aboutBodySize = isLandscape ? 10.5 : 11;
+  const aboutLineH = isLandscape ? 4.9 : 5.3;
+  let aboutY = titleY + (isLandscape ? 15 : 20);
   ABOUT.forEach((section) => {
     pdf.setFont(TITLE_FONT, "normal");
-    pdf.setFontSize(13);
+    pdf.setFontSize(14);
     pdf.setTextColor(240, 240, 240);
     pdf.text(section.heading, pageWidth / 2, aboutY, { align: "center", charSpace: 1.6 });
     // short accent line under the heading
     pdf.setDrawColor(170, 170, 170);
     pdf.setLineWidth(0.3);
-    pdf.line(pageWidth / 2 - 11, aboutY + 2.6, pageWidth / 2 + 11, aboutY + 2.6);
-    aboutY += 9.5;
+    pdf.line(pageWidth / 2 - 12, aboutY + 2.8, pageWidth / 2 + 12, aboutY + 2.8);
+    aboutY += 10;
     pdf.setFont(BODY_FONT, "normal");
     pdf.setFontSize(aboutBodySize);
-    pdf.setTextColor(215, 215, 215);
+    pdf.setTextColor(220, 220, 220);
     const lines = pdf.splitTextToSize(section.body, aboutMaxW);
     lines.forEach((line) => {
       pdf.text(line, pageWidth / 2, aboutY, { align: "center" });
       aboutY += aboutLineH;
     });
-    aboutY += isLandscape ? 7 : 10;
+    aboutY += isLandscape ? 6.5 : 9;
   });
 
   pdf.setFont(BODY_FONT, "normal");
@@ -222,10 +222,11 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   pdf.text(ESHED.email, sepRight + 4, coverFooterY, { align: "left" });
 
   // ==================== CONTENT PAGES ====================
-  // 4 cols x 3 rows in both orientations — landscape just gives each card
-  // more width, so the grid looks airier.
-  const COLS = 4;
-  const ROWS = 3;
+  // Dense grid so pages look full and colorful: portrait 4x4 (16/page),
+  // landscape 5x3 (15/page). The card is compact — the image fills most of
+  // it, with no dead space at the bottom.
+  const COLS = isLandscape ? 5 : 4;
+  const ROWS = isLandscape ? 3 : 4;
   const perPage = COLS * ROWS;
   const totalPages = Math.ceil(selectedStones.length / perPage);
 
@@ -285,30 +286,31 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       pdf.setLineWidth(0.2);
       pdf.rect(x, y, cellW, cellH);
 
-      // Image — one uniform square slot for every card, so all photos come
-      // out the same size. Each photo is scaled to fit the square while
-      // keeping its original aspect ratio (no cropping, no distortion).
-      const TEXT_BLOCK = 21; // sku + type + title/blanks + link, tightened
-      const boxSize = Math.min(cellW - 2, cellH - TEXT_BLOCK - 3);
-      const boxX = x + (cellW - boxSize) / 2;
+      // Image — one uniform slot for every card, filling all the space the
+      // text below doesn't need, so the page looks full and colorful. Photos
+      // are scaled to fit while keeping their original aspect ratio.
+      const TEXT_BLOCK = 16; // sku + type + title/blanks + link, tight
+      const boxW = cellW - 2;
+      const boxH = cellH - TEXT_BLOCK - 5;
+      const boxX = x + (cellW - boxW) / 2;
       const boxY = y + 1.5;
       if (img) {
         try {
           const p = pdf.getImageProperties(img);
           const ratio = p.width / p.height;
-          let w = boxSize, h = boxSize / ratio;
-          if (h > boxSize) { h = boxSize; w = boxSize * ratio; }
+          let w = boxW, h = boxW / ratio;
+          if (h > boxH) { h = boxH; w = boxH * ratio; }
           const fmt = img.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
-          pdf.addImage(img, fmt, boxX + (boxSize - w) / 2, boxY + (boxSize - h) / 2, w, h);
+          pdf.addImage(img, fmt, boxX + (boxW - w) / 2, boxY + (boxH - h) / 2, w, h);
         } catch (e) { /* leave blank */ }
       } else {
         pdf.setFontSize(6.5);
         pdf.setTextColor(180, 180, 180);
         pdf.setFont("helvetica", "italic");
-        pdf.text("No image", x + cellW / 2, boxY + boxSize / 2, { align: "center" });
+        pdf.text("No image", x + cellW / 2, boxY + boxH / 2, { align: "center" });
       }
 
-      let textY = boxY + boxSize + 3.5;
+      let textY = boxY + boxH + 3.5;
 
       // SKU / model number — bold, centered.
       pdf.setFont("helvetica", "bold");
@@ -383,15 +385,16 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
     } catch (e) { /* skip */ }
   }
 
+  const contactTitleY = pageHeight * (isLandscape ? 0.38 : 0.38);
   pdf.setFont(TITLE_FONT, "normal");
-  pdf.setFontSize(26);
+  pdf.setFontSize(24);
   pdf.setTextColor(255, 255, 255);
-  pdf.text("CONTACT US", pageWidth / 2, pageHeight * 0.4, { align: "center", charSpace: 1 });
+  pdf.text("CONTACT US", pageWidth / 2, contactTitleY, { align: "center", charSpace: 1 });
   pdf.setDrawColor(170, 170, 170);
   pdf.setLineWidth(0.3);
-  pdf.line(pageWidth / 2 - 14, pageHeight * 0.4 + 3.5, pageWidth / 2 + 14, pageHeight * 0.4 + 3.5);
+  pdf.line(pageWidth / 2 - 14, contactTitleY + 3.5, pageWidth / 2 + 14, contactTitleY + 3.5);
 
-  let cy = pageHeight * 0.4 + (isLandscape ? 16 : 20);
+  let cy = contactTitleY + (isLandscape ? 17 : 22);
 
   // Contact person
   pdf.setFont(TITLE_FONT, "normal");
@@ -432,7 +435,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   cy += 7.5;
   pdf.setFontSize(10);
   pdf.setTextColor(220, 220, 220);
-  const igLabel = "Instagram  @eshed_gemstar";
+  const igLabel = "@eshed_gemstar";
   pdf.textWithLink(igLabel, pageWidth / 2 - pdf.getTextWidth(igLabel) / 2, cy, { url: "https://www.instagram.com/eshed_gemstar/" });
   pdf.setDrawColor(200, 200, 200);
   pdf.setLineWidth(0.2);
