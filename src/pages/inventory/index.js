@@ -18,6 +18,7 @@ import StoneUsagePanel from "../../components/StoneUsagePanel";
 import ItemTierManager from "../../components/catalog/ItemTierManager";
 import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL, fetchSoapStones, assignStone } from "../../services/stonesApi";
 import InternalExcelModal from "./components/InternalExcelModal";
+import { exportCatalogLiran } from "./helpers/catalogLiran";
 import MemberAvatar from "../../components/team/MemberAvatar";
 import AssigneeFilter from "../../components/team/AssigneeFilter";
 import { useTeam } from "../../context/TeamContext";
@@ -6182,6 +6183,23 @@ const StoneSearchPage = () => {
     }
   };
 
+  // One-off ESHED-branded worksheet catalog ("Catalog (Liran)").
+  const handleCatalogLiran = async () => {
+    const selectedData = allItems.filter((s) => selectedStones.has(s.id));
+    if (selectedData.length === 0) {
+      alert("Please select at least one stone to export.");
+      return;
+    }
+    const t = toast.loading("Generating Catalog (Liran)\u2026");
+    try {
+      await exportCatalogLiran(selectedData);
+      toast.success("Catalog ready", { id: t });
+    } catch (err) {
+      console.error("Catalog (Liran) generation failed:", err);
+      toast.error("Failed to generate catalog", { id: t });
+    }
+  };
+
   // Handle category export choice
   const handleCategoryExportChoice = (choice) => {
     setShowCategoryExportModal(false);
@@ -7935,6 +7953,21 @@ const StoneSearchPage = () => {
                           <p className="text-xs text-stone-500">Professional catalog with images</p>
                         </div>
                       </button>
+
+                      <button
+                        onClick={handleCatalogLiran}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-teal-50 transition-colors border-t border-stone-100"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium">Catalog (Liran)</span>
+                          <p className="text-xs text-stone-500">ESHED cover &middot; 4&times;3 worksheet grid</p>
+                        </div>
+                      </button>
                       
                       {/* Labels Section */}
                       <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
@@ -8529,6 +8562,21 @@ const StoneSearchPage = () => {
                   <div>
                     <span className="font-medium">Generate PDF Catalog</span>
                     <p className="text-xs text-stone-500">Professional catalog with images</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleCatalogLiran}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-teal-50 transition-colors border-t border-stone-100"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="font-medium">Catalog (Liran)</span>
+                    <p className="text-xs text-stone-500">ESHED cover &middot; 4&times;3 worksheet grid</p>
                   </div>
                 </button>
                 

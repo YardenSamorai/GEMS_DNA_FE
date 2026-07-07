@@ -1,0 +1,324 @@
+/*
+ * "Catalog (Liran)" — one-off ESHED-branded jewelry catalog export.
+ *
+ * Completely separate from the regular PDF catalog on purpose: the cover uses
+ * the ESHED logo (white, transparent) instead of Gemstar, the contact details
+ * are fixed (www.eshed.com / info@eshed.com / NY phone), and the content pages
+ * are a plain 4x3 worksheet grid (image, SKU, type, "Website text" blanks and
+ * a product-page link) that Liran fills in for the website.
+ */
+import jsPDF from "jspdf";
+
+const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
+
+const ESHED = {
+  site: "www.eshed.com",
+  siteUrl: "https://www.eshed.com",
+  phone: "+1.917.309.2523",
+  email: "info@eshed.com",
+  branches: "NEW YORK      \u00B7      LOS ANGELES      \u00B7      HONG KONG      \u00B7      TEL AVIV",
+};
+
+const imageToBase64 = (url) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+
+const fetchFontAsBase64 = async (url) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Font not found: ${url}`);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+let _fontsCache = null;
+const loadFonts = async () => {
+  if (_fontsCache) return _fontsCache;
+  try {
+    const [playfair, latoLight] = await Promise.all([
+      fetchFontAsBase64("/fonts/PlayfairDisplay-Regular.ttf"),
+      fetchFontAsBase64("/fonts/Lato-Light.ttf"),
+    ]);
+    _fontsCache = { playfair, latoLight };
+  } catch (e) {
+    _fontsCache = null;
+  }
+  return _fontsCache;
+};
+
+// Public product page (DNA) for an inventory item, if it has one.
+const itemUrl = (stone) => {
+  if (stone.category === "Jewelry") {
+    if (stone.source === "workshop") {
+      return stone.workshopId ? `https://gems-dna.com/jewelry/items/${stone.workshopId}` : null;
+    }
+    return stone.sku ? `https://gems-dna.com/jewelry/${stone.sku}` : null;
+  }
+  return stone.sku ? `https://gems-dna.com/${stone.sku}` : null;
+};
+
+const itemTypeLabel = (stone) => {
+  if (stone.category === "Jewelry") return stone.jewelryType || "Jewelry";
+  return stone.category || "Gemstone";
+};
+
+export const exportCatalogLiran = async (selectedStones) => {
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+
+  const fonts = await loadFonts();
+  let TITLE_FONT = "helvetica";
+  let BODY_FONT = "helvetica";
+  if (fonts) {
+    pdf.addFileToVFS("PlayfairDisplay-Regular.ttf", fonts.playfair);
+    pdf.addFont("PlayfairDisplay-Regular.ttf", "PlayfairDisplay", "normal");
+    pdf.addFileToVFS("Lato-Light.ttf", fonts.latoLight);
+    pdf.addFont("Lato-Light.ttf", "LatoLight", "normal");
+    TITLE_FONT = "PlayfairDisplay";
+    BODY_FONT = "LatoLight";
+  }
+
+  let coverBg = null;
+  let logo = null;
+  try { coverBg = await imageToBase64("/images/A4_cover_bg.png"); } catch (e) { /* fallback: dark fill */ }
+  try { logo = await imageToBase64("/images/eshed_logo_white.png"); } catch (e) { /* skip logo */ }
+
+  const loadItemImage = async (url) => {
+    if (!url) return null;
+    try {
+      const res = await fetch(`${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.image && data.image.startsWith("data:")) ? data.image : null;
+    } catch (e) { return null; }
+  };
+
+  // ==================== COVER ====================
+  if (coverBg) {
+    try { pdf.addImage(coverBg, "PNG", 0, 0, pageWidth, pageHeight); } catch (e) {
+      pdf.setFillColor(24, 24, 24);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+    }
+  } else {
+    pdf.setFillColor(24, 24, 24);
+    pdf.rect(0, 0, pageWidth, pageHeight, "F");
+  }
+
+  if (logo) {
+    try {
+      const props = pdf.getImageProperties(logo);
+      const logoW = 58;
+      const logoH = logoW * (props.height / props.width);
+      pdf.addImage(logo, "PNG", pageWidth / 2 - logoW / 2, 48, logoW, logoH);
+    } catch (e) { /* skip */ }
+  }
+
+  pdf.setFont(TITLE_FONT, "normal");
+  pdf.setFontSize(30);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text("JEWELRY CATALOG", pageWidth / 2, pageHeight * 0.55, { align: "center" });
+
+  pdf.setFont(BODY_FONT, "normal");
+  pdf.setFontSize(9);
+  pdf.setTextColor(200, 200, 200);
+  const dateStr = new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" });
+  pdf.text(dateStr, pageWidth / 2, pageHeight - 34, { align: "center" });
+
+  pdf.setDrawColor(180, 180, 180);
+  pdf.setLineWidth(0.3);
+  pdf.line(15, pageHeight - 24, pageWidth - 15, pageHeight - 24);
+
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(230, 230, 230);
+  pdf.text(ESHED.branches, pageWidth / 2, pageHeight - 17, { align: "center" });
+
+  pdf.setFontSize(8);
+  const coverFooterY = pageHeight - 10;
+  const sepLeft = pageWidth / 2 - 32;
+  const sepRight = pageWidth / 2 + 32;
+  pdf.setTextColor(220, 220, 220);
+  pdf.textWithLink(ESHED.site, sepLeft - 4, coverFooterY, { align: "right", url: ESHED.siteUrl });
+  pdf.setTextColor(150, 150, 150);
+  pdf.text("|", sepLeft, coverFooterY, { align: "center" });
+  pdf.setTextColor(220, 220, 220);
+  pdf.text(ESHED.phone, pageWidth / 2, coverFooterY, { align: "center" });
+  pdf.setTextColor(150, 150, 150);
+  pdf.text("|", sepRight, coverFooterY, { align: "center" });
+  pdf.setTextColor(220, 220, 220);
+  pdf.text(ESHED.email, sepRight + 4, coverFooterY, { align: "left" });
+
+  // ==================== CONTENT PAGES (4 cols x 3 rows) ====================
+  const COLS = 4;
+  const ROWS = 3;
+  const perPage = COLS * ROWS;
+  const totalPages = Math.ceil(selectedStones.length / perPage);
+
+  const HEADER_H = 28;
+  const drawHeader = () => {
+    if (coverBg) {
+      try { pdf.addImage(coverBg, "PNG", 0, 0, pageWidth, HEADER_H); } catch (e) {
+        pdf.setFillColor(24, 24, 24);
+        pdf.rect(0, 0, pageWidth, HEADER_H, "F");
+      }
+    } else {
+      pdf.setFillColor(24, 24, 24);
+      pdf.rect(0, 0, pageWidth, HEADER_H, "F");
+    }
+    if (logo) {
+      try {
+        const lp = pdf.getImageProperties(logo);
+        const lh = 14;
+        const lw = lh * (lp.width / lp.height);
+        pdf.addImage(logo, "PNG", margin + 2, (HEADER_H - lh) / 2, lw, lh);
+      } catch (e) { /* skip */ }
+    }
+    pdf.setFont(BODY_FONT, "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(
+      "N e w   Y o r k   |   L o s   A n g e l e s   |   H o n g   K o n g   |   T e l   A v i v",
+      pageWidth - margin - 2,
+      HEADER_H / 2 - 1,
+      { align: "right" }
+    );
+    pdf.setFontSize(7);
+    pdf.setTextColor(220, 220, 220);
+    pdf.text(
+      `${ESHED.site}   |   ${ESHED.phone}   |   ${ESHED.email}`,
+      pageWidth - margin - 2,
+      HEADER_H / 2 + 5,
+      { align: "right" }
+    );
+  };
+
+  const drawFooter = (pageNum) => {
+    const fY = pageHeight - 10;
+    pdf.setDrawColor(220, 220, 220);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, fY - 5, pageWidth - margin, fY - 5);
+    pdf.setFont(BODY_FONT, "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 120, 120);
+    const fDate = new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" });
+    pdf.text(fDate, margin, fY);
+    pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, fY, { align: "right" });
+  };
+
+  // Pre-load all item images in parallel (same proxy as the regular catalog).
+  const images = await Promise.all(selectedStones.map((s) => loadItemImage(s.imageUrl)));
+
+  const gridTop = HEADER_H + 5;
+  const gridBottom = pageHeight - 18;
+  const cellW = (pageWidth - margin * 2) / COLS;
+  const cellH = (gridBottom - gridTop) / ROWS;
+
+  let pageNum = 0;
+  for (let i = 0; i < selectedStones.length; i += perPage) {
+    pdf.addPage();
+    pageNum++;
+    drawHeader();
+
+    const pageItems = selectedStones.slice(i, i + perPage);
+    for (let j = 0; j < pageItems.length; j++) {
+      const stone = pageItems[j];
+      const img = images[i + j];
+      const col = j % COLS;
+      const row = Math.floor(j / COLS);
+      const x = margin + col * cellW;
+      const y = gridTop + row * cellH;
+
+      // Cell border — thin gray, cells touching like a table.
+      pdf.setDrawColor(190, 190, 190);
+      pdf.setLineWidth(0.2);
+      pdf.rect(x, y, cellW, cellH);
+
+      // Image — centered, fit inside a square box preserving aspect ratio.
+      const boxSize = Math.min(cellW - 8, cellH - 32);
+      const boxX = x + (cellW - boxSize) / 2;
+      const boxY = y + 3;
+      if (img) {
+        try {
+          const p = pdf.getImageProperties(img);
+          const ratio = p.width / p.height;
+          let w = boxSize, h = boxSize;
+          if (ratio > 1) h = boxSize / ratio; else w = boxSize * ratio;
+          const fmt = img.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
+          pdf.addImage(img, fmt, boxX + (boxSize - w) / 2, boxY + (boxSize - h) / 2, w, h);
+        } catch (e) { /* leave blank */ }
+      } else {
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(180, 180, 180);
+        pdf.setFont("helvetica", "italic");
+        pdf.text("No image", x + cellW / 2, boxY + boxSize / 2, { align: "center" });
+      }
+
+      let textY = boxY + boxSize + 4;
+
+      // SKU / model number — bold, centered.
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(String(stone.sku || "-"), x + cellW / 2, textY, { align: "center" });
+      textY += 3.4;
+
+      // Type label — small gray, centered.
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(6.3);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(itemTypeLabel(stone), x + cellW / 2, textY, { align: "center" });
+      textY += 4.6;
+
+      // "Website text:" blanks for Liran to fill in by hand.
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(6.3);
+      pdf.setTextColor(60, 60, 60);
+      pdf.text("Website text:", x + 3, textY);
+      pdf.setDrawColor(160, 160, 160);
+      pdf.setLineWidth(0.15);
+      pdf.line(x + 18, textY + 0.5, x + cellW - 3, textY + 0.5);
+      textY += 4;
+      pdf.line(x + 3, textY + 0.5, x + cellW - 3, textY + 0.5);
+      textY += 5;
+
+      // Product page link — blue + underlined when the item has a DNA page.
+      const url = itemUrl(stone);
+      pdf.setFontSize(6.3);
+      if (url) {
+        const label = "View more images & videos";
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(37, 99, 235);
+        pdf.textWithLink(label, x + cellW / 2, textY, { align: "center", url });
+        const lw = pdf.getTextWidth(label);
+        pdf.setDrawColor(37, 99, 235);
+        pdf.setLineWidth(0.15);
+        pdf.line(x + cellW / 2 - lw / 2, textY + 0.6, x + cellW / 2 + lw / 2, textY + 0.6);
+      } else {
+        pdf.setFont("helvetica", "italic");
+        pdf.setTextColor(140, 140, 140);
+        pdf.text("Add product-page link", x + cellW / 2, textY, { align: "center" });
+      }
+    }
+
+    drawFooter(pageNum);
+  }
+
+  const filename = `ESHED_Jewelry_Catalog_${new Date().toISOString().split("T")[0]}_${selectedStones.length}pcs.pdf`;
+  pdf.save(filename);
+};
