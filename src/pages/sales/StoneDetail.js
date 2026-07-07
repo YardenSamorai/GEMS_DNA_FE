@@ -185,7 +185,18 @@ const StoneDetail = () => {
   const images = useMemo(() => (stone ? stoneImages(stone) : []), [stone]);
   // Folder-only video URLs are as common as folder-only images — same filter.
   const video = stone ? usableImg(stone.videoUrl) : null;
-  const slideCount = images.length + (video ? 1 : 0);
+  // Secondary videos (additional_videos, ';'-separated). Some legacy URLs come
+  // HTML-encoded ("&amp;"), so decode before validating. The primary video
+  // stays first; extras follow as their own slides.
+  const videos = useMemo(() => {
+    const list = video ? [video] : [];
+    for (const raw of String(stone?.additionalVideos || "").split(";")) {
+      const u = usableImg(raw.trim().replace(/&amp;/gi, "&"));
+      if (u && /^https?:\/\//i.test(u) && !list.includes(u)) list.push(u);
+    }
+    return list;
+  }, [stone, video]);
+  const slideCount = images.length + videos.length;
   const [slide, setSlide] = useState(0);
   const trackRef = useRef(null);
   const onTrackScroll = () => {
@@ -193,8 +204,8 @@ const StoneDetail = () => {
     if (!el || !el.clientWidth) return;
     const idx = Math.round(el.scrollLeft / el.clientWidth);
     setSlide(idx);
-    // Landed on the 360° video slide (appended last) → log a media open.
-    if (video && idx === images.length && stone?.sku) {
+    // Landed on a video slide (appended after the photos) → log a media open.
+    if (videos.length && idx >= images.length && stone?.sku) {
       trackMedia(stone.sku, "video_360", stone.category);
     }
   };
@@ -394,7 +405,8 @@ const StoneDetail = () => {
           </svg>
         </button>
 
-        {/* Swipeable track — photos first, the video as the last slide. */}
+        {/* Swipeable track — photos first, then the video slides (primary
+            video first, any additional_videos after it). */}
         {slideCount > 0 ? (
           <div
             ref={trackRef}
@@ -406,18 +418,18 @@ const StoneDetail = () => {
                 <img src={src} alt={title || stone.sku} className="h-full w-full object-cover" />
               </div>
             ))}
-            {video && (
-              <div key="video" className="aspect-square w-full shrink-0 snap-center bg-black">
+            {videos.map((src, vi) => (
+              <div key={src} className="aspect-square w-full shrink-0 snap-center bg-black">
                 <iframe
-                  src={enhanceVimeoUrl(video)}
-                  title={`${stone.sku} video`}
+                  src={enhanceVimeoUrl(src)}
+                  title={`${stone.sku} video${vi > 0 ? ` ${vi + 1}` : ""}`}
                   className="h-full w-full"
                   frameBorder="0"
                   allow="autoplay; fullscreen"
                   allowFullScreen
                 />
               </div>
-            )}
+            ))}
           </div>
         ) : (
           <div className="aspect-square w-full">
@@ -453,12 +465,12 @@ const StoneDetail = () => {
           </button>
         )}
 
-        {/* Slide dots — lifted above the sheet overlap; the video slide gets a
-            play glyph instead of a dot. */}
+        {/* Slide dots — lifted above the sheet overlap; every video slide gets
+            a play glyph instead of a dot. */}
         {slideCount > 1 && (
           <div className="absolute bottom-10 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/35 px-2.5 py-1.5 backdrop-blur-sm">
             {Array.from({ length: slideCount }).map((_, i) => {
-              const isVideoDot = video && i === slideCount - 1;
+              const isVideoDot = videos.length > 0 && i >= images.length;
               const active = slide === i;
               return isVideoDot ? (
                 <svg
@@ -487,7 +499,7 @@ const StoneDetail = () => {
           on the video slide that overlap hides the player's controls (play /
           progress bar), so drop the overlap there to free up room. */}
       <div className={`relative z-10 rounded-t-3xl border-t border-app-line bg-app-canvas px-5 pb-4 pt-5 ${
-        video && slide >= slideCount - 1 ? "mt-0" : "-mt-6"
+        videos.length > 0 && slide >= images.length ? "mt-0" : "-mt-6"
       }`}>
         {/* Title — stands on its own line. */}
         <h1 className="text-[21px] font-semibold leading-snug tracking-tight text-app-ink">
@@ -496,7 +508,7 @@ const StoneDetail = () => {
 
         {/* Tags row — all chips together under the title: status flags (HOLD /
             Memo out) plus the quick actions (Certificate, V360). */}
-        {(holder || stone.onHold || memoOut || stone.jewelryModel || cert || hasCert(stone) || video) && (
+        {(holder || stone.onHold || memoOut || stone.jewelryModel || cert || hasCert(stone) || videos.length > 0) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {(holder || stone.onHold) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-red-600/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-600 ring-1 ring-inset ring-red-600/25">
@@ -555,7 +567,7 @@ const StoneDetail = () => {
                   Certified
                 </span>
               ))}
-            {video && (
+            {videos.length > 0 && (
               <button
                 type="button"
                 onClick={() => {
