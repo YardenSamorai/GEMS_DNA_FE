@@ -227,6 +227,18 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
     setRows((prev) => prev.filter((r) => r.id !== id));
   };
 
+  // Fisher-Yates shuffle for a random catalog order.
+  const handleShuffle = () => {
+    setRows((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [next[i], next[j]] = [next[j], next[i]];
+      }
+      return next;
+    });
+  };
+
   const handleAddManual = ({ image, sku, type, text }) => {
     const id = `manual-${Date.now()}`;
     setRows((prev) => [
@@ -269,14 +281,28 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                   Drag to set the order &middot; add website text per item ({rows.length} items)
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleShuffle}
+                  disabled={rows.length < 2}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-colors disabled:opacity-50"
+                  title="Randomize the order"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h3.5c1.2 0 2.3.6 3 1.6l3 4.8c.7 1 1.8 1.6 3 1.6H20m0 0l-2.5-2.5M20 15l-2.5 2.5M4 17h3.5c.8 0 1.6-.3 2.2-.8M20 7h-3.5c-.8 0-1.6.3-2.2.8M20 7l-2.5-2.5M20 7l-2.5 2.5" />
+                  </svg>
+                  Shuffle
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Reorderable list */}
