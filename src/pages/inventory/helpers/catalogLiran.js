@@ -370,6 +370,95 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
     drawFooter(pageNum);
   }
 
+  // ==================== CONTACT US (closing page) ====================
+  pdf.addPage();
+  drawCoverBg();
+
+  if (logo) {
+    try {
+      const props = pdf.getImageProperties(logo);
+      const logoW = 45;
+      const logoH = logoW * (props.height / props.width);
+      pdf.addImage(logo, "PNG", pageWidth / 2 - logoW / 2, pageHeight * 0.13, logoW, logoH);
+    } catch (e) { /* skip */ }
+  }
+
+  pdf.setFont(TITLE_FONT, "normal");
+  pdf.setFontSize(26);
+  pdf.setTextColor(255, 255, 255);
+  pdf.text("CONTACT US", pageWidth / 2, pageHeight * 0.4, { align: "center", charSpace: 1 });
+  pdf.setDrawColor(170, 170, 170);
+  pdf.setLineWidth(0.3);
+  pdf.line(pageWidth / 2 - 14, pageHeight * 0.4 + 3.5, pageWidth / 2 + 14, pageHeight * 0.4 + 3.5);
+
+  let cy = pageHeight * 0.4 + (isLandscape ? 16 : 20);
+
+  // Contact person
+  pdf.setFont(TITLE_FONT, "normal");
+  pdf.setFontSize(15);
+  pdf.setTextColor(245, 245, 245);
+  pdf.text("Liran Eshed", pageWidth / 2, cy, { align: "center" });
+  cy += 7.5;
+  pdf.setFont(BODY_FONT, "normal");
+  pdf.setFontSize(11);
+  pdf.setTextColor(220, 220, 220);
+  const phoneLabel = "+1 (917) 309-2523";
+  pdf.textWithLink(phoneLabel, pageWidth / 2 - pdf.getTextWidth(phoneLabel) / 2, cy, { url: "tel:+19173092523" });
+  cy += isLandscape ? 11 : 14;
+
+  // New York office
+  pdf.setFont(TITLE_FONT, "normal");
+  pdf.setFontSize(10.5);
+  pdf.setTextColor(235, 235, 235);
+  pdf.text("NEW YORK OFFICE", pageWidth / 2, cy, { align: "center", charSpace: 1.2 });
+  cy += 6;
+  pdf.setFont(BODY_FONT, "normal");
+  pdf.setFontSize(10);
+  pdf.setTextColor(210, 210, 210);
+  pdf.text("580 Fifth Ave, Suite 3000", pageWidth / 2, cy, { align: "center" });
+  cy += 4.8;
+  pdf.text("New York, NY 10036, United States", pageWidth / 2, cy, { align: "center" });
+  cy += isLandscape ? 11 : 14;
+
+  // Website + Instagram links
+  pdf.setFont(BODY_FONT, "normal");
+  pdf.setFontSize(11);
+  pdf.setTextColor(235, 235, 235);
+  const siteLabel = "www.eshed.com";
+  pdf.textWithLink(siteLabel, pageWidth / 2 - pdf.getTextWidth(siteLabel) / 2, cy, { url: "https://www.eshed.com" });
+  pdf.setDrawColor(200, 200, 200);
+  pdf.setLineWidth(0.2);
+  pdf.line(pageWidth / 2 - pdf.getTextWidth(siteLabel) / 2, cy + 1, pageWidth / 2 + pdf.getTextWidth(siteLabel) / 2, cy + 1);
+  cy += 7.5;
+  pdf.setFontSize(10);
+  pdf.setTextColor(220, 220, 220);
+  const igLabel = "Instagram  @eshed_gemstar";
+  pdf.textWithLink(igLabel, pageWidth / 2 - pdf.getTextWidth(igLabel) / 2, cy, { url: "https://www.instagram.com/eshed_gemstar/" });
+  pdf.setDrawColor(200, 200, 200);
+  pdf.setLineWidth(0.2);
+  pdf.line(pageWidth / 2 - pdf.getTextWidth(igLabel) / 2, cy + 1, pageWidth / 2 + pdf.getTextWidth(igLabel) / 2, cy + 1);
+
+  // Same bottom strip as the cover: divider + branches + contact row.
+  pdf.setDrawColor(180, 180, 180);
+  pdf.setLineWidth(0.3);
+  pdf.line(15, pageHeight - 24, pageWidth - 15, pageHeight - 24);
+  pdf.setFont(BODY_FONT, "normal");
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(230, 230, 230);
+  pdf.text(ESHED.branches, pageWidth / 2, pageHeight - 17, { align: "center" });
+  pdf.setFontSize(8);
+  const cFooterY = pageHeight - 10;
+  pdf.setTextColor(220, 220, 220);
+  pdf.textWithLink(ESHED.site, sepLeft - 4, cFooterY, { align: "right", url: ESHED.siteUrl });
+  pdf.setTextColor(150, 150, 150);
+  pdf.text("|", sepLeft, cFooterY, { align: "center" });
+  pdf.setTextColor(220, 220, 220);
+  pdf.text(ESHED.phone, pageWidth / 2, cFooterY, { align: "center" });
+  pdf.setTextColor(150, 150, 150);
+  pdf.text("|", sepRight, cFooterY, { align: "center" });
+  pdf.setTextColor(220, 220, 220);
+  pdf.text(ESHED.email, sepRight + 4, cFooterY, { align: "left" });
+
   const filename = `ESHED_Jewelry_Catalog_${new Date().toISOString().split("T")[0]}_${selectedStones.length}pcs.pdf`;
   pdf.save(filename);
 };
