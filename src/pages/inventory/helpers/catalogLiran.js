@@ -72,61 +72,6 @@ const itemTypeLabel = (stone) => {
   return stone.category || "Gemstone";
 };
 
-// Product photos ship with generous white margins which makes the jewel look
-// tiny in the grid. Crop to the content bounding box (plus a little air) so
-// the piece fills the image slot.
-const trimWhitespace = (dataUrl) =>
-  new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            const i = (y * canvas.width + x) * 4;
-            const isContent = data[i + 3] > 16 &&
-              (data[i] < 242 || data[i + 1] < 242 || data[i + 2] < 242);
-            if (isContent) {
-              if (x < minX) minX = x;
-              if (x > maxX) maxX = x;
-              if (y < minY) minY = y;
-              if (y > maxY) maxY = y;
-            }
-          }
-        }
-        // Nothing (or almost nothing) detected — keep the original.
-        if (maxX <= minX || maxY <= minY || (maxX - minX) * (maxY - minY) < canvas.width * canvas.height * 0.005) {
-          resolve(dataUrl);
-          return;
-        }
-        const pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.04);
-        minX = Math.max(0, minX - pad);
-        minY = Math.max(0, minY - pad);
-        maxX = Math.min(canvas.width - 1, maxX + pad);
-        maxY = Math.min(canvas.height - 1, maxY + pad);
-        const w = maxX - minX + 1;
-        const h = maxY - minY + 1;
-        const out = document.createElement("canvas");
-        out.width = w;
-        out.height = h;
-        const octx = out.getContext("2d");
-        octx.fillStyle = "#ffffff";
-        octx.fillRect(0, 0, w, h);
-        octx.drawImage(canvas, minX, minY, w, h, 0, 0, w, h);
-        resolve(out.toDataURL("image/jpeg", 0.92));
-      } catch (e) {
-        resolve(dataUrl);
-      }
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
 
 export const exportCatalogLiran = async (selectedStones, options = {}) => {
   const orientation = options.orientation === "landscape" ? "landscape" : "portrait";
@@ -183,13 +128,12 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   const loadItemImage = async (url) => {
     if (!url) return null;
     // Manually-added items carry an already-encoded data URL from the upload.
-    if (url.startsWith("data:")) return trimWhitespace(url);
+    if (url.startsWith("data:")) return url;
     try {
       const res = await fetch(`${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`);
       if (!res.ok) return null;
       const data = await res.json();
-      if (data.image && data.image.startsWith("data:")) return trimWhitespace(data.image);
-      return null;
+      return (data.image && data.image.startsWith("data:")) ? data.image : null;
     } catch (e) { return null; }
   };
 
@@ -304,30 +248,30 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       pdf.setLineWidth(0.2);
       pdf.rect(x, y, cellW, cellH);
 
-      // Image — as large as the card allows: nearly full cell width, and all
-      // the height left over after the (compact) text block below.
+      // Image — one uniform square slot for every card, so all photos come
+      // out the same size. Each photo is scaled to fit the square while
+      // keeping its original aspect ratio (no cropping, no distortion).
       const TEXT_BLOCK = 24; // sku + type + title/blanks + link, tightened
-      const boxW = cellW - 3;
-      const boxH = cellH - TEXT_BLOCK - 4;
-      const boxX = x + (cellW - boxW) / 2;
+      const boxSize = Math.min(cellW - 4, cellH - TEXT_BLOCK - 4);
+      const boxX = x + (cellW - boxSize) / 2;
       const boxY = y + 2;
       if (img) {
         try {
           const p = pdf.getImageProperties(img);
           const ratio = p.width / p.height;
-          let w = boxW, h = boxW / ratio;
-          if (h > boxH) { h = boxH; w = boxH * ratio; }
+          let w = boxSize, h = boxSize / ratio;
+          if (h > boxSize) { h = boxSize; w = boxSize * ratio; }
           const fmt = img.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
-          pdf.addImage(img, fmt, boxX + (boxW - w) / 2, boxY + (boxH - h) / 2, w, h);
+          pdf.addImage(img, fmt, boxX + (boxSize - w) / 2, boxY + (boxSize - h) / 2, w, h);
         } catch (e) { /* leave blank */ }
       } else {
         pdf.setFontSize(6.5);
         pdf.setTextColor(180, 180, 180);
         pdf.setFont("helvetica", "italic");
-        pdf.text("No image", x + cellW / 2, boxY + boxH / 2, { align: "center" });
+        pdf.text("No image", x + cellW / 2, boxY + boxSize / 2, { align: "center" });
       }
 
-      let textY = boxY + boxH + 3.5;
+      let textY = boxY + boxSize + 3.5;
 
       // SKU / model number — bold, centered.
       pdf.setFont("helvetica", "bold");
