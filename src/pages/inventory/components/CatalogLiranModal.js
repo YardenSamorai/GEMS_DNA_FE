@@ -239,25 +239,41 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
     });
   };
 
-  // Group by collection, then by jewelry type, then by SKU. Items without a
-  // collection sink to the end so the named collections lead the catalog.
+  const rowKey = (r, field) => String(r.stone[field] || "").trim().toLowerCase();
+
+  // Group by collection (items without one sink to the end), then by
+  // jewelry type, then by SKU.
   const handleSortByCollection = () => {
-    setRows((prev) => {
-      const key = (r, field) => String(r.stone[field] || "").trim().toLowerCase();
-      return [...prev].sort((a, b) => {
-        const colA = key(a, "collection");
-        const colB = key(b, "collection");
-        if (colA !== colB) {
-          if (!colA) return 1;
-          if (!colB) return -1;
-          return colA.localeCompare(colB);
-        }
-        const typeA = key(a, "jewelryType") || key(a, "category");
-        const typeB = key(b, "jewelryType") || key(b, "category");
-        if (typeA !== typeB) return typeA.localeCompare(typeB);
-        return String(a.stone.sku || "").localeCompare(String(b.stone.sku || ""));
-      });
-    });
+    setRows((prev) => [...prev].sort((a, b) => {
+      const colA = rowKey(a, "collection");
+      const colB = rowKey(b, "collection");
+      if (colA !== colB) {
+        if (!colA) return 1;
+        if (!colB) return -1;
+        return colA.localeCompare(colB);
+      }
+      const typeA = rowKey(a, "jewelryType") || rowKey(a, "category");
+      const typeB = rowKey(b, "jewelryType") || rowKey(b, "category");
+      if (typeA !== typeB) return typeA.localeCompare(typeB);
+      return String(a.stone.sku || "").localeCompare(String(b.stone.sku || ""));
+    }));
+  };
+
+  // Group by category / jewelry type, then by collection, then by SKU.
+  const handleSortByCategory = () => {
+    setRows((prev) => [...prev].sort((a, b) => {
+      const typeA = rowKey(a, "jewelryType") || rowKey(a, "category");
+      const typeB = rowKey(b, "jewelryType") || rowKey(b, "category");
+      if (typeA !== typeB) {
+        if (!typeA) return 1;
+        if (!typeB) return -1;
+        return typeA.localeCompare(typeB);
+      }
+      const colA = rowKey(a, "collection");
+      const colB = rowKey(b, "collection");
+      if (colA !== colB) return colA.localeCompare(colB);
+      return String(a.stone.sku || "").localeCompare(String(b.stone.sku || ""));
+    }));
   };
 
   const handleAddManual = ({ image, sku, type, text }) => {
@@ -307,13 +323,25 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                   type="button"
                   onClick={handleSortByCollection}
                   disabled={rows.length < 2}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors disabled:opacity-50"
-                  title="Sort by collection, then jewelry type"
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors disabled:opacity-50"
+                  title="Sort by collection"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9M3 12h5m8-4v12m0 0l-4-4m4 4l4-4" />
                   </svg>
-                  Sort
+                  <span className="hidden sm:inline">Collection</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSortByCategory}
+                  disabled={rows.length < 2}
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors disabled:opacity-50"
+                  title="Sort by category (jewelry type)"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                  <span className="hidden sm:inline">Category</span>
                 </button>
                 <button
                   type="button"
@@ -325,7 +353,7 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h3.5c1.2 0 2.3.6 3 1.6l3 4.8c.7 1 1.8 1.6 3 1.6H20m0 0l-2.5-2.5M20 15l-2.5 2.5M4 17h3.5c.8 0 1.6-.3 2.2-.8M20 7h-3.5c-.8 0-1.6.3-2.2.8M20 7l-2.5-2.5M20 7l-2.5 2.5" />
                   </svg>
-                  Shuffle
+                  <span className="hidden sm:inline">Shuffle</span>
                 </button>
                 <button
                   onClick={onClose}
