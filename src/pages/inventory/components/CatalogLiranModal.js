@@ -463,6 +463,8 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
   const PRESETS = [
     { label: "Category \u2192 Collection", defs: [{ field: "category", subField: "collection" }, { field: "sku" }] },
     { label: "Collection \u2192 Category", defs: [{ field: "collection", subField: "category" }, { field: "sku" }] },
+    { label: "Category \u2192 Style", defs: [{ field: "category", subField: "style" }, { field: "sku" }] },
+    { label: "Style \u2192 Category", defs: [{ field: "style", subField: "category" }, { field: "sku" }] },
     { label: "Category \u2192 Price high", defs: [{ field: "category" }, { field: "price", dir: "desc" }] },
     { label: "Metal \u2192 Category", defs: [{ field: "metalType", subField: "category" }, { field: "sku" }] },
     { label: "Price high \u2192 low", defs: [{ field: "price", dir: "desc" }] },
