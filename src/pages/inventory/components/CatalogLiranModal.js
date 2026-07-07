@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
 
@@ -209,10 +209,15 @@ const SORT_FIELDS = [
   { id: "stoneType", label: "Stone type", orderable: true },
   { id: "metalType", label: "Metal", orderable: true },
   { id: "shape", label: "Shape", orderable: true },
+  { id: "color", label: "Color", orderable: true },
+  { id: "clarity", label: "Clarity", orderable: true },
+  { id: "availability", label: "Availability", orderable: true },
+  { id: "source", label: "Source", orderable: true },
   { id: "sku", label: "SKU / Model" },
   { id: "title", label: "Website text" },
   { id: "price", label: "Price", numeric: true },
-  { id: "weight", label: "Weight (ct)", numeric: true },
+  { id: "weight", label: "Total weight (ct)", numeric: true },
+  { id: "centerCarat", label: "Center stone (ct)", numeric: true },
 ];
 
 const fieldMeta = (id) => SORT_FIELDS.find((f) => f.id === id) || {};
@@ -226,15 +231,22 @@ const getSortValue = (row, field) => {
     case "stoneType": return String(s.stoneType || "").trim();
     case "metalType": return String(s.metalType || "").trim();
     case "shape": return String(s.shape || "").trim();
+    case "color": return String(s.color || "").trim();
+    case "clarity": return String(s.clarity || "").trim();
+    case "availability": return String(s.availability || "").trim();
+    case "source": return s.source === "workshop" ? "Workshop" : s.source === "catalog" ? "Catalog" : String(s.source || "").trim();
     case "sku": return String(s.sku || "").trim();
     case "title": return String(row.websiteText || s.title || "").trim();
     case "price": return s.priceTotal;
     case "weight": return s.weightCt;
+    case "centerCarat": return s.centerStoneCarat;
     default: return "";
   }
 };
 
 const EMPTY_LABEL = "(empty)";
+
+const textValue = (row, field) => String(getSortValue(row, field) || "").trim() || EMPTY_LABEL;
 
 // Alphabetical, numeric-aware compare with empty values pushed to the end.
 const compareText = (va, vb) => {
@@ -254,8 +266,54 @@ const compareByOrder = (va, vb, orderList) => {
   return c !== 0 ? c : compareText(va, vb);
 };
 
+// Single comparator built from the configured levels. Shared by the live
+// preview and the final Apply so the two never disagree.
+const buildComparator = (levels) => (a, b) => {
+  for (const lvl of levels) {
+    const meta = fieldMeta(lvl.field);
+    let c = 0;
+    if (meta.numeric) {
+      const na = Number(getSortValue(a, lvl.field)) || 0;
+      const nb = Number(getSortValue(b, lvl.field)) || 0;
+      c = na - nb;
+    } else {
+      const va = textValue(a, lvl.field);
+      const vb = textValue(b, lvl.field);
+      c = lvl.valueOrder ? compareByOrder(va, vb, lvl.valueOrder) : compareText(va, vb);
+    }
+    if (c !== 0) return lvl.dir === "desc" ? (c > 0 ? -1 : 1) : (c > 0 ? 1 : -1);
+
+    // Same group: apply the nested sub-sort configured for this level,
+    // using the per-group hand-arranged order.
+    if (lvl.subField && lvl.subOrders) {
+      const parent = textValue(a, lvl.field);
+      const sa = textValue(a, lvl.subField);
+      const sb = textValue(b, lvl.subField);
+      const parentKey = Object.keys(lvl.subOrders).find((k) => k.toLowerCase() === parent.toLowerCase());
+      const orderList = parentKey ? lvl.subOrders[parentKey] : null;
+      const sc = orderList ? compareByOrder(sa, sb, orderList) : compareText(sa, sb);
+      if (sc !== 0) return sc > 0 ? 1 : -1;
+    }
+  }
+  return 0;
+};
+
+const SORT_PRESETS_KEY = "catalogLiranSortPresets.v1";
+
+const loadSavedPresets = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SORT_PRESETS_KEY));
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+};
+
 const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
   const [levels, setLevels] = useState([]);
+  const [savedPresets, setSavedPresets] = useState(loadSavedPresets);
+  const [presetName, setPresetName] = useState("");
+  const [showPreview, setShowPreview] = useState(true);
 
   const distinctValues = (field, filterFn) => {
     const seen = new Map();
@@ -266,6 +324,17 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
       if (!seen.has(k)) seen.set(k, v || EMPTY_LABEL);
     });
     return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  };
+
+  // How many selected items fall under each value (lower-cased key).
+  const countValues = (field, filterFn) => {
+    const counts = {};
+    rows.forEach((r) => {
+      if (filterFn && !filterFn(r)) return;
+      const k = textValue(r, field).toLowerCase();
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    return counts;
   };
 
   // Per-parent sub-value orders, e.g. within "Necklaces" -> [Herit., Tennis…]
@@ -288,6 +357,7 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
     subField: null,
     subOrders: null,
     expanded: {},
+    search: "",
   });
 
   const addLevel = () => {
@@ -341,6 +411,31 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
     }));
   };
 
+  // Jump a value straight to the first / last position.
+  const moveValueToEdge = (levelId, idx, edge) => {
+    setLevels((prev) => prev.map((l) => {
+      if (l.id !== levelId || !l.valueOrder) return l;
+      const order = [...l.valueOrder];
+      const [val] = order.splice(idx, 1);
+      if (edge === "top") order.unshift(val); else order.push(val);
+      return { ...l, valueOrder: order };
+    }));
+  };
+
+  // Reset a level's hand-arranged order back to alphabetical (or reversed).
+  const resetValueOrder = (levelId, reversed) => {
+    setLevels((prev) => prev.map((l) => {
+      if (l.id !== levelId || !l.valueOrder) return l;
+      const order = distinctValues(l.field);
+      if (reversed) order.reverse();
+      return { ...l, valueOrder: order };
+    }));
+  };
+
+  const setLevelSearch = (levelId, search) => {
+    setLevels((prev) => prev.map((l) => (l.id === levelId ? { ...l, search } : l)));
+  };
+
   const moveSubValue = (levelId, parentValue, idx, delta) => {
     setLevels((prev) => prev.map((l) => {
       if (l.id !== levelId || !l.subOrders?.[parentValue]) return l;
@@ -368,41 +463,74 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
   const PRESETS = [
     { label: "Category \u2192 Collection", defs: [{ field: "category", subField: "collection" }, { field: "sku" }] },
     { label: "Collection \u2192 Category", defs: [{ field: "collection", subField: "category" }, { field: "sku" }] },
+    { label: "Category \u2192 Price high", defs: [{ field: "category" }, { field: "price", dir: "desc" }] },
+    { label: "Metal \u2192 Category", defs: [{ field: "metalType", subField: "category" }, { field: "sku" }] },
     { label: "Price high \u2192 low", defs: [{ field: "price", dir: "desc" }] },
     { label: "Price low \u2192 high", defs: [{ field: "price", dir: "asc" }] },
+    { label: "Weight high \u2192 low", defs: [{ field: "weight", dir: "desc" }] },
   ];
+
+  /* ---- saved presets (localStorage) ---- */
+
+  const persistPresets = (next) => {
+    setSavedPresets(next);
+    try { localStorage.setItem(SORT_PRESETS_KEY, JSON.stringify(next)); } catch { /* storage full / blocked */ }
+  };
+
+  const handleSavePreset = () => {
+    const name = presetName.trim();
+    if (!name || levels.length === 0) return;
+    const config = levels.map(({ field, dir, valueOrder, subField, subOrders }) => ({
+      field, dir, valueOrder, subField, subOrders,
+    }));
+    const next = [...savedPresets.filter((p) => p.name.toLowerCase() !== name.toLowerCase()), { name, config }];
+    persistPresets(next);
+    setPresetName("");
+  };
+
+  const handleDeletePreset = (name) => {
+    persistPresets(savedPresets.filter((p) => p.name !== name));
+  };
+
+  // Keep the saved order for values that still exist, append anything new
+  // alphabetically at the end.
+  const mergeOrder = (saved, current) => {
+    if (!Array.isArray(saved)) return current;
+    const kept = saved.filter((v) => current.some((c) => c.toLowerCase() === v.toLowerCase()));
+    const added = current.filter((c) => !saved.some((v) => v.toLowerCase() === c.toLowerCase()));
+    return [...kept, ...added];
+  };
+
+  const handleLoadPreset = (preset) => {
+    setLevels(preset.config.map((cfg) => {
+      const l = makeLevel(cfg.field);
+      l.dir = cfg.dir === "desc" ? "desc" : "asc";
+      if (l.valueOrder && cfg.valueOrder) l.valueOrder = mergeOrder(cfg.valueOrder, l.valueOrder);
+      if (cfg.subField && l.valueOrder) {
+        l.subField = cfg.subField;
+        const fresh = buildSubOrders(cfg.field, cfg.subField);
+        if (cfg.subOrders) {
+          Object.keys(fresh).forEach((parent) => {
+            const savedKey = Object.keys(cfg.subOrders).find((k) => k.toLowerCase() === parent.toLowerCase());
+            if (savedKey) fresh[parent] = mergeOrder(cfg.subOrders[savedKey], fresh[parent]);
+          });
+        }
+        l.subOrders = fresh;
+      }
+      return l;
+    }));
+  };
+
+  /* ---- live preview of the resulting order ---- */
+
+  const previewRows = useMemo(() => {
+    if (levels.length === 0) return null;
+    return [...rows].sort(buildComparator(levels));
+  }, [rows, levels]);
 
   const apply = () => {
     if (levels.length === 0) return;
-    onApply((prev) => [...prev].sort((a, b) => {
-      for (const lvl of levels) {
-        const meta = fieldMeta(lvl.field);
-        let c = 0;
-        if (meta.numeric) {
-          const na = Number(getSortValue(a, lvl.field)) || 0;
-          const nb = Number(getSortValue(b, lvl.field)) || 0;
-          c = na - nb;
-        } else {
-          const va = String(getSortValue(a, lvl.field) || "").trim() || EMPTY_LABEL;
-          const vb = String(getSortValue(b, lvl.field) || "").trim() || EMPTY_LABEL;
-          c = lvl.valueOrder ? compareByOrder(va, vb, lvl.valueOrder) : compareText(va, vb);
-        }
-        if (c !== 0) return lvl.dir === "desc" ? (c > 0 ? -1 : 1) : (c > 0 ? 1 : -1);
-
-        // Same group: apply the nested sub-sort configured for this level,
-        // using the per-group hand-arranged order.
-        if (lvl.subField && lvl.subOrders) {
-          const parent = String(getSortValue(a, lvl.field) || "").trim() || EMPTY_LABEL;
-          const sa = String(getSortValue(a, lvl.subField) || "").trim() || EMPTY_LABEL;
-          const sb = String(getSortValue(b, lvl.subField) || "").trim() || EMPTY_LABEL;
-          const parentKey = Object.keys(lvl.subOrders).find((k) => k.toLowerCase() === parent.toLowerCase());
-          const orderList = parentKey ? lvl.subOrders[parentKey] : null;
-          const sc = orderList ? compareByOrder(sa, sb, orderList) : compareText(sa, sb);
-          if (sc !== 0) return sc > 0 ? 1 : -1;
-        }
-      }
-      return 0;
-    }));
+    onApply((prev) => [...prev].sort(buildComparator(levels)));
     onClose();
   };
 
@@ -414,7 +542,7 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
       </div>
 
       {/* Quick presets */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
         <span className="text-[11px] text-stone-500">Quick start:</span>
         {PRESETS.map((p) => (
           <button
@@ -427,6 +555,23 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
           </button>
         ))}
       </div>
+
+      {/* User-saved presets */}
+      {savedPresets.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+          <span className="text-[11px] text-stone-500">My presets:</span>
+          {savedPresets.map((p) => (
+            <span key={p.name} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">
+              <button type="button" onClick={() => handleLoadPreset(p)} className="hover:underline" title="Load this preset">
+                {p.name}
+              </button>
+              <button type="button" onClick={() => handleDeletePreset(p.name)} className="p-0.5 rounded-full text-emerald-400 hover:text-red-500" title="Delete preset">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {levels.length === 0 && (
         <p className="text-xs text-stone-500 mb-2">Add a sort level to get started, or pick a quick start above.</p>
@@ -474,10 +619,16 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
             </div>
 
             {/* Custom value order for orderable fields (category, collection, style…) */}
-            {lvl.valueOrder && (
+            {lvl.valueOrder && (() => {
+              const counts = countValues(lvl.field);
+              const search = (lvl.search || "").trim().toLowerCase();
+              const visible = search
+                ? lvl.valueOrder.filter((v) => v.toLowerCase().includes(search))
+                : lvl.valueOrder;
+              return (
               <div className="mt-2 pl-7">
-                {/* Optional nested sub-sort inside each group */}
-                <div className="flex items-center gap-2 mb-1.5">
+                {/* Sub-sort selector + order tools */}
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="text-[11px] text-stone-500 shrink-0">Sub-sort inside each group:</span>
                   <select
                     value={lvl.subField || ""}
@@ -489,43 +640,75 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
                       <option key={f.id} value={f.id}>{f.label}</option>
                     ))}
                   </select>
+                  <span className="flex-1" />
+                  <button type="button" onClick={() => resetValueOrder(lvl.id, false)} className="px-1.5 py-0.5 rounded text-[10px] font-medium text-stone-500 bg-stone-100 hover:bg-stone-200 transition-colors" title="Reset order alphabetically">
+                    {"Reset A \u2192 Z"}
+                  </button>
+                  <button type="button" onClick={() => resetValueOrder(lvl.id, true)} className="px-1.5 py-0.5 rounded text-[10px] font-medium text-stone-500 bg-stone-100 hover:bg-stone-200 transition-colors" title="Reset order reverse-alphabetically">
+                    {"Reset Z \u2192 A"}
+                  </button>
                 </div>
 
+                {/* Search within long value lists */}
+                {lvl.valueOrder.length > 8 && (
+                  <input
+                    type="text"
+                    value={lvl.search || ""}
+                    onChange={(e) => setLevelSearch(lvl.id, e.target.value)}
+                    placeholder={`Search ${lvl.valueOrder.length} values\u2026`}
+                    className="w-full mb-1.5 text-[11px] px-2 py-1 rounded-md border border-stone-200 bg-white focus:border-indigo-400 outline-none"
+                  />
+                )}
+
                 <div className="space-y-1">
-                  {lvl.valueOrder.map((val, vIdx) => {
+                  {visible.map((val) => {
+                    const vIdx = lvl.valueOrder.indexOf(val);
                     const subList = lvl.subField && lvl.subOrders ? lvl.subOrders[val] : null;
                     const isOpen = !!lvl.expanded[val];
+                    const count = counts[val.toLowerCase()] || 0;
                     return (
                       <div key={val}>
-                        <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-md px-2 py-1">
-                          <span className="text-[11px] font-semibold text-indigo-600 w-4 text-center">{vIdx + 1}</span>
-                          <span className="flex-1 text-xs text-stone-700 truncate">{val}</span>
+                        <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-md px-2 py-1">
+                          <span className="text-[11px] font-semibold text-indigo-600 w-4 text-center shrink-0">{vIdx + 1}</span>
+                          <span className="flex-1 min-w-0 text-xs text-stone-700 truncate">{val}</span>
+                          <span className="shrink-0 text-[10px] text-stone-400 tabular-nums" title={`${count} item${count === 1 ? "" : "s"}`}>
+                            {count}
+                          </span>
                           {subList && subList.length > 0 && (
                             <button
                               type="button"
                               onClick={() => toggleExpanded(lvl.id, val)}
-                              className="flex items-center gap-0.5 text-[10px] font-medium text-purple-600 hover:text-purple-800"
+                              className="shrink-0 flex items-center gap-0.5 text-[10px] font-medium text-purple-600 hover:text-purple-800"
                               title={`Arrange ${fieldMeta(lvl.subField).label} order inside ${val}`}
                             >
                               {subList.length}
                               <svg className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                             </button>
                           )}
-                          <button type="button" onClick={() => moveValue(lvl.id, vIdx, -1)} disabled={vIdx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move up">
+                          <button type="button" onClick={() => moveValueToEdge(lvl.id, vIdx, "top")} disabled={vIdx === 0} className="shrink-0 text-stone-400 hover:text-indigo-600 disabled:opacity-30" title="Move to first">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
+                          </button>
+                          <button type="button" onClick={() => moveValue(lvl.id, vIdx, -1)} disabled={vIdx === 0} className="shrink-0 text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move up">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
                           </button>
-                          <button type="button" onClick={() => moveValue(lvl.id, vIdx, 1)} disabled={vIdx === lvl.valueOrder.length - 1} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move down">
+                          <button type="button" onClick={() => moveValue(lvl.id, vIdx, 1)} disabled={vIdx === lvl.valueOrder.length - 1} className="shrink-0 text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move down">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          <button type="button" onClick={() => moveValueToEdge(lvl.id, vIdx, "bottom")} disabled={vIdx === lvl.valueOrder.length - 1} className="shrink-0 text-stone-400 hover:text-indigo-600 disabled:opacity-30" title="Move to last">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 13l-7 7-7-7M19 5l-7 7-7-7" /></svg>
                           </button>
                         </div>
 
                         {/* Sub-value order inside this group */}
-                        {subList && isOpen && (
+                        {subList && isOpen && (() => {
+                          const subCounts = countValues(lvl.subField, (r) => textValue(r, lvl.field).toLowerCase() === val.toLowerCase());
+                          return (
                           <div className="mt-1 mb-1.5 ml-6 pl-2 border-l-2 border-purple-200 space-y-1">
                             {subList.map((subVal, sIdx) => (
                               <div key={subVal} className="flex items-center gap-2 bg-purple-50/60 border border-purple-100 rounded-md px-2 py-0.5">
                                 <span className="text-[10px] font-semibold text-purple-500 w-4 text-center">{sIdx + 1}</span>
-                                <span className="flex-1 text-[11px] text-stone-600 truncate">{subVal}</span>
+                                <span className="flex-1 min-w-0 text-[11px] text-stone-600 truncate">{subVal}</span>
+                                <span className="shrink-0 text-[10px] text-stone-400 tabular-nums">{subCounts[subVal.toLowerCase()] || 0}</span>
                                 <button type="button" onClick={() => moveSubValue(lvl.id, val, sIdx, -1)} disabled={sIdx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move up">
                                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
                                 </button>
@@ -535,18 +718,53 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
                               </div>
                             ))}
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     );
                   })}
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between mt-3">
+      {/* Live preview of the resulting order */}
+      {previewRows && (
+        <div className="mt-3 bg-white border border-stone-200 rounded-lg p-2.5">
+          <button
+            type="button"
+            onClick={() => setShowPreview((v) => !v)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <span className="text-[11px] font-bold text-stone-700">
+              Live preview <span className="font-normal text-stone-400">({previewRows.length} items)</span>
+            </span>
+            <svg className={`w-3.5 h-3.5 text-stone-400 transition-transform ${showPreview ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {showPreview && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {previewRows.slice(0, 15).map((r, i) => (
+                <span
+                  key={r.id}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-100 text-[10px] text-stone-600"
+                  title={`${textValue(r, "category")} \u00b7 ${textValue(r, "collection")}`}
+                >
+                  <span className="font-semibold text-indigo-500">{i + 1}</span>
+                  {r.stone.sku || r.stone.title || "?"}
+                </span>
+              ))}
+              {previewRows.length > 15 && (
+                <span className="px-1.5 py-0.5 text-[10px] text-stone-400">+{previewRows.length - 15} more</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mt-3">
         <button
           type="button"
           onClick={addLevel}
@@ -556,6 +774,31 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Add level
         </button>
+
+        {/* Save the current configuration as a named preset */}
+        {levels.length > 0 && (
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSavePreset(); }}
+              placeholder={"Preset name\u2026"}
+              className="w-28 text-[11px] px-2 py-1.5 rounded-lg border border-stone-200 bg-white focus:border-emerald-400 outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleSavePreset}
+              disabled={!presetName.trim()}
+              className="px-2 py-1.5 rounded-lg text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-40"
+              title="Save this sort configuration for reuse"
+            >
+              Save
+            </button>
+          </div>
+        )}
+
+        <span className="flex-1" />
         <div className="flex items-center gap-2">
           <button
             type="button"
