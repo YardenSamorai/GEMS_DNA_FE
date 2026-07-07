@@ -61,16 +61,10 @@ const loadFonts = async () => {
   return _fontsCache;
 };
 
-// Public product page (DNA) for an inventory item, if it has one.
-const itemUrl = (stone) => {
-  if (stone.category === "Jewelry") {
-    if (stone.source === "workshop") {
-      return stone.workshopId ? `https://gems-dna.com/jewelry/items/${stone.workshopId}` : null;
-    }
-    return stone.sku ? `https://gems-dna.com/jewelry/${stone.sku}` : null;
-  }
-  return stone.sku ? `https://gems-dna.com/${stone.sku}` : null;
-};
+// Product page on the public eshed.com website (e.g.
+// https://eshed.com/eshed/RI-HER-021/).
+const itemUrl = (stone) =>
+  stone.sku ? `https://eshed.com/eshed/${encodeURIComponent(stone.sku)}/` : null;
 
 const itemTypeLabel = (stone) => {
   if (stone.category === "Jewelry") return stone.jewelryType || "Jewelry";
@@ -285,17 +279,27 @@ export const exportCatalogLiran = async (selectedStones) => {
       pdf.text(itemTypeLabel(stone), x + cellW / 2, textY, { align: "center" });
       textY += 4.6;
 
-      // "Website text:" blanks for Liran to fill in by hand.
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(6.3);
-      pdf.setTextColor(60, 60, 60);
-      pdf.text("Website text:", x + 3, textY);
-      pdf.setDrawColor(160, 160, 160);
-      pdf.setLineWidth(0.15);
-      pdf.line(x + 18, textY + 0.5, x + cellW - 3, textY + 0.5);
-      textY += 4;
-      pdf.line(x + 3, textY + 0.5, x + cellW - 3, textY + 0.5);
-      textY += 5;
+      // Website text — printed when typed in the dialog, otherwise blank
+      // fill-in lines so the sheet still works as a handwriting worksheet.
+      if (stone.websiteText) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(6.3);
+        pdf.setTextColor(50, 50, 50);
+        const lines = pdf.splitTextToSize(stone.websiteText, cellW - 6).slice(0, 3);
+        pdf.text(lines, x + 3, textY);
+        textY += Math.max(lines.length, 2) * 3 + 3;
+      } else {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(6.3);
+        pdf.setTextColor(60, 60, 60);
+        pdf.text("Website text:", x + 3, textY);
+        pdf.setDrawColor(160, 160, 160);
+        pdf.setLineWidth(0.15);
+        pdf.line(x + 18, textY + 0.5, x + cellW - 3, textY + 0.5);
+        textY += 4;
+        pdf.line(x + 3, textY + 0.5, x + cellW - 3, textY + 0.5);
+        textY += 5;
+      }
 
       // Product page link — blue + underlined when the item has a DNA page.
       const url = itemUrl(stone);

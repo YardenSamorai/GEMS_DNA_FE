@@ -19,6 +19,7 @@ import ItemTierManager from "../../components/catalog/ItemTierManager";
 import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL, fetchSoapStones, assignStone } from "../../services/stonesApi";
 import InternalExcelModal from "./components/InternalExcelModal";
 import { exportCatalogLiran } from "./helpers/catalogLiran";
+import CatalogLiranModal from "./components/CatalogLiranModal";
 import MemberAvatar from "../../components/team/MemberAvatar";
 import AssigneeFilter from "../../components/team/AssigneeFilter";
 import { useTeam } from "../../context/TeamContext";
@@ -5650,6 +5651,8 @@ const StoneSearchPage = () => {
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', savedView?.inventoryMode || 'diamonds'));
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [catalogLiranStones, setCatalogLiranStones] = useState(null); // snapshot of selection; null = dialog closed
+  const [catalogLiranGenerating, setCatalogLiranGenerating] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [savedFilters, setSavedFilters] = useState([]);
   const [showSaveFilter, setShowSaveFilter] = useState(false);
@@ -6184,19 +6187,30 @@ const StoneSearchPage = () => {
   };
 
   // One-off ESHED-branded worksheet catalog ("Catalog (Liran)").
-  const handleCatalogLiran = async () => {
+  // Opens a pre-flight dialog (drag & drop order + per-item website text);
+  // the snapshot of the selection is stored so edits in the dialog survive
+  // re-renders of the inventory underneath.
+  const handleCatalogLiran = () => {
     const selectedData = allItems.filter((s) => selectedStones.has(s.id));
     if (selectedData.length === 0) {
       alert("Please select at least one stone to export.");
       return;
     }
+    setCatalogLiranStones(selectedData);
+  };
+
+  const handleCatalogLiranGenerate = async (orderedItems) => {
+    setCatalogLiranGenerating(true);
     const t = toast.loading("Generating Catalog (Liran)\u2026");
     try {
-      await exportCatalogLiran(selectedData);
+      await exportCatalogLiran(orderedItems);
       toast.success("Catalog ready", { id: t });
+      setCatalogLiranStones(null);
     } catch (err) {
       console.error("Catalog (Liran) generation failed:", err);
       toast.error("Failed to generate catalog", { id: t });
+    } finally {
+      setCatalogLiranGenerating(false);
     }
   };
 
@@ -8763,6 +8777,15 @@ const StoneSearchPage = () => {
             setPdfGenerating(false);
           }
         }}
+      />
+
+      {/* Catalog (Liran) — order + website text dialog */}
+      <CatalogLiranModal
+        isOpen={!!catalogLiranStones}
+        stones={catalogLiranStones || []}
+        onClose={() => setCatalogLiranStones(null)}
+        isGenerating={catalogLiranGenerating}
+        onGenerate={handleCatalogLiranGenerate}
       />
 
       {/* DNA Drawer */}
