@@ -160,11 +160,11 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   const ABOUT = [
     {
       heading: "OUR COMPANY",
-      body: "Eshed is part of Eshed\u2013Gemstar, a family-led gemstone and jewelry group with decades of experience in sourcing, cutting, manufacturing, and wholesale supply. With deep expertise in natural gemstones and diamonds, Eshed\u2013Gemstar serves leading jewelry houses and luxury retailers worldwide.",
+      body: "Eshed is part of Eshed\u2013Gemstar, a family-led gemstone and jewelry group with decades of experience in sourcing, cutting, manufacturing, and wholesale supply. As manufacturers, we offer a full mine-to-jewelry process, from natural gemstone sourcing to finished high jewelry. With deep expertise in natural gemstones and diamonds, Eshed\u2013Gemstar serves leading jewelry houses and luxury retailers worldwide.",
     },
     {
       heading: "OUR JEWELRY",
-      body: "Our collection features fine jewelry and one-of-a-kind high jewelry made with natural emeralds, rare gemstones, natural diamonds, and fancy-color diamonds. Each piece is created for luxury retailers, combining exceptional gemstones with elegant design, craftsmanship, and strong commercial appeal.",
+      body: "Our collection features fine jewelry and one-of-a-kind high jewelry showcasing natural emeralds, rare gemstones, natural diamonds, and fancy-color diamonds. Each piece is created for luxury retailers, combining exceptional gemstones with elegant design, superior craftsmanship, value, and strong commercial appeal.",
     },
   ];
   const aboutMaxW = isLandscape ? 230 : 160;
