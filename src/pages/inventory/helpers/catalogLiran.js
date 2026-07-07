@@ -96,6 +96,8 @@ export const exportCatalogLiran = async (selectedStones) => {
 
   const loadItemImage = async (url) => {
     if (!url) return null;
+    // Manually-added items carry an already-encoded data URL from the upload.
+    if (url.startsWith("data:")) return url;
     try {
       const res = await fetch(`${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`);
       if (!res.ok) return null;

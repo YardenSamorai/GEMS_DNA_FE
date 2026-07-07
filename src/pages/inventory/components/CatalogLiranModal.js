@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
 
@@ -6,11 +6,39 @@ import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion
  * Pre-flight dialog for the "Catalog (Liran)" export.
  *
  * Lets the user (a) reorder the selected items with drag & drop — the PDF
- * grid follows this order — and (b) type an optional "Website text" per item
- * which is printed in the PDF instead of the blank fill-in lines.
+ * grid follows this order — (b) type an optional "Website text" per item
+ * which is printed in the PDF instead of the blank fill-in lines, and
+ * (c) manually add items that aren't in the inventory (image upload +
+ * SKU + jewelry type + website text).
  */
 
-const RowItem = ({ row, onTextChange }) => {
+const JEWELRY_TYPES = ["Ring", "Bracelet", "Necklace", "Earrings", "Pendant", "Brooch", "Jewelry"];
+
+// Re-encode an uploaded image to a JPEG data URL (max 1000px on the long
+// side) so jsPDF gets a format it always supports, at a sane size.
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1000;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      // White backdrop so transparent PNGs don't turn black in JPEG.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.9));
+    };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+
+const RowItem = ({ row, onTextChange, onRemove }) => {
   const controls = useDragControls();
   return (
     <Reorder.Item
@@ -52,6 +80,11 @@ const RowItem = ({ row, onTextChange }) => {
             <span className="text-xs text-stone-400 shrink-0">
               {row.stone.category === "Jewelry" ? (row.stone.jewelryType || "Jewelry") : (row.stone.category || "Stone")}
             </span>
+            {row.manual && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-600 bg-teal-50 border border-teal-200 rounded px-1.5 py-0.5 shrink-0">
+                Manual
+              </span>
+            )}
           </div>
           <input
             type="text"
@@ -61,23 +94,143 @@ const RowItem = ({ row, onTextChange }) => {
             className="mt-1 w-full text-sm px-2.5 py-1.5 rounded-lg border border-stone-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none placeholder:text-stone-300"
           />
         </div>
+
+        {row.manual && (
+          <button
+            type="button"
+            onClick={() => onRemove(row.id)}
+            className="shrink-0 p-1.5 rounded-lg text-stone-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Remove item"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
       </div>
     </Reorder.Item>
   );
 };
 
+/* Inline form for adding an item that isn't in the inventory. */
+const AddItemForm = ({ onAdd, onCancel }) => {
+  const [image, setImage] = useState(null);
+  const [sku, setSku] = useState("");
+  const [type, setType] = useState("Ring");
+  const [text, setText] = useState("");
+  const fileRef = useRef(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setImage(await fileToDataUrl(file));
+    } catch (err) {
+      console.error("Image load failed:", err);
+      alert("Could not read this image file.");
+    }
+  };
+
+  return (
+    <div className="bg-teal-50/60 border border-teal-200 rounded-xl p-3 mb-3">
+      <div className="flex items-start gap-3">
+        {/* Image picker */}
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="shrink-0 w-16 h-16 rounded-lg border-2 border-dashed border-teal-300 bg-white hover:bg-teal-50 transition-colors overflow-hidden flex items-center justify-center"
+          title="Upload image"
+        >
+          {image ? (
+            <img src={image} alt="" className="w-full h-full object-contain" />
+          ) : (
+            <svg className="w-6 h-6 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M12 4v.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          )}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+              placeholder="SKU / Model"
+              className="flex-1 min-w-0 text-sm px-2.5 py-1.5 rounded-lg border border-stone-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none"
+            />
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="text-sm px-2 py-1.5 rounded-lg border border-stone-200 bg-white focus:border-teal-400 outline-none"
+            >
+              {JEWELRY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Website text (optional)"
+            className="w-full text-sm px-2.5 py-1.5 rounded-lg border border-stone-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none placeholder:text-stone-300"
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 mt-2.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100 rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={!sku.trim()}
+          onClick={() => onAdd({ image, sku: sku.trim(), type, text: text.trim() })}
+          className="px-4 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50"
+        >
+          Add item
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }) => {
   const [rows, setRows] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   // Re-seed rows whenever the dialog opens with a fresh selection.
   useEffect(() => {
     if (isOpen) {
       setRows((stones || []).map((stone) => ({ id: stone.id, stone, websiteText: "" })));
+      setShowAddForm(false);
     }
   }, [isOpen, stones]);
 
   const handleTextChange = (id, text) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, websiteText: text } : r)));
+  };
+
+  const handleRemove = (id) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleAddManual = ({ image, sku, type, text }) => {
+    const id = `manual-${Date.now()}`;
+    setRows((prev) => [
+      ...prev,
+      {
+        id,
+        manual: true,
+        websiteText: text,
+        stone: { id, sku, category: "Jewelry", jewelryType: type, imageUrl: image || null },
+      },
+    ]);
+    setShowAddForm(false);
   };
 
   if (typeof document === "undefined") return null;
@@ -120,9 +273,24 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
 
             {/* Reorderable list */}
             <div className="flex-1 overflow-y-auto px-4 py-4">
+              {showAddForm ? (
+                <AddItemForm onAdd={handleAddManual} onCancel={() => setShowAddForm(false)} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(true)}
+                  className="w-full mb-3 py-2.5 rounded-xl border-2 border-dashed border-stone-300 text-sm font-medium text-stone-500 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50/50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add item not in inventory
+                </button>
+              )}
+
               <Reorder.Group axis="y" values={rows} onReorder={setRows} className="space-y-2">
                 {rows.map((row) => (
-                  <RowItem key={row.id} row={row} onTextChange={handleTextChange} />
+                  <RowItem key={row.id} row={row} onTextChange={handleTextChange} onRemove={handleRemove} />
                 ))}
               </Reorder.Group>
             </div>
