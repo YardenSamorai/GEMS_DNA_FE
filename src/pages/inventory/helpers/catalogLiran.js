@@ -150,10 +150,47 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
     } catch (e) { /* skip */ }
   }
 
+  const titleY = pageHeight * (isLandscape ? 0.5 : 0.52);
   pdf.setFont(TITLE_FONT, "normal");
   pdf.setFontSize(30);
   pdf.setTextColor(255, 255, 255);
-  pdf.text("JEWELRY CATALOG", pageWidth / 2, pageHeight * 0.55, { align: "center" });
+  pdf.text("JEWELRY CATALOG", pageWidth / 2, titleY, { align: "center" });
+
+  // --- About sections (Our Company / Our Jewelry) ---
+  const ABOUT = [
+    {
+      heading: "OUR COMPANY",
+      body: "Eshed is part of Eshed\u2013Gemstar, a family-led gemstone and jewelry group with decades of experience in sourcing, cutting, manufacturing, and wholesale supply. With deep expertise in natural gemstones and diamonds, Eshed\u2013Gemstar serves leading jewelry houses and luxury retailers worldwide.",
+    },
+    {
+      heading: "OUR JEWELRY",
+      body: "Our collection features fine jewelry and one-of-a-kind high jewelry made with natural emeralds, rare gemstones, natural diamonds, and fancy-color diamonds. Each piece is created for luxury retailers, combining exceptional gemstones with elegant design, craftsmanship, and strong commercial appeal.",
+    },
+  ];
+  const aboutMaxW = isLandscape ? 200 : 145;
+  const aboutBodySize = isLandscape ? 7.6 : 8;
+  const aboutLineH = isLandscape ? 3.4 : 3.7;
+  let aboutY = titleY + (isLandscape ? 12 : 16);
+  ABOUT.forEach((section) => {
+    pdf.setFont(TITLE_FONT, "normal");
+    pdf.setFontSize(10);
+    pdf.setTextColor(235, 235, 235);
+    pdf.text(section.heading, pageWidth / 2, aboutY, { align: "center", charSpace: 1.2 });
+    // short accent line under the heading
+    pdf.setDrawColor(160, 160, 160);
+    pdf.setLineWidth(0.25);
+    pdf.line(pageWidth / 2 - 9, aboutY + 2.2, pageWidth / 2 + 9, aboutY + 2.2);
+    aboutY += 7.5;
+    pdf.setFont(BODY_FONT, "normal");
+    pdf.setFontSize(aboutBodySize);
+    pdf.setTextColor(205, 205, 205);
+    const lines = pdf.splitTextToSize(section.body, aboutMaxW);
+    lines.forEach((line) => {
+      pdf.text(line, pageWidth / 2, aboutY, { align: "center" });
+      aboutY += aboutLineH;
+    });
+    aboutY += isLandscape ? 5.5 : 8;
+  });
 
   pdf.setFont(BODY_FONT, "normal");
   pdf.setFontSize(9);
