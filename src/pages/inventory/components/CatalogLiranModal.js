@@ -38,7 +38,35 @@ const fileToDataUrl = (file) =>
     img.src = url;
   });
 
-const RowItem = ({ row, onTextChange, onRemove }) => {
+/* Editable position badge: shows the item's place in the list; type a new
+   number and press Enter (or click away) to jump the item straight there. */
+const PositionJumper = ({ index, total, onCommit }) => {
+  const [val, setVal] = useState(String(index + 1));
+  useEffect(() => { setVal(String(index + 1)); }, [index]);
+  const commit = () => {
+    const n = parseInt(val, 10);
+    if (!Number.isNaN(n) && n - 1 !== index) {
+      onCommit(Math.min(Math.max(n, 1), total) - 1);
+    } else {
+      setVal(String(index + 1));
+    }
+  };
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={val}
+      onChange={(e) => setVal(e.target.value.replace(/[^0-9]/g, ""))}
+      onFocus={(e) => e.target.select()}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+      className="w-9 text-center text-xs font-semibold text-stone-600 bg-stone-100 border border-stone-200 rounded-md px-1 py-0.5 focus:bg-white focus:border-teal-400 outline-none"
+      title="Position — type a number and press Enter to jump"
+    />
+  );
+};
+
+const RowItem = ({ row, index, total, onTextChange, onRemove, onMoveTo }) => {
   const controls = useDragControls();
   return (
     <Reorder.Item
@@ -49,6 +77,31 @@ const RowItem = ({ row, onTextChange, onRemove }) => {
       whileDrag={{ scale: 1.02, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", zIndex: 10 }}
     >
       <div className="flex items-center gap-3 p-3">
+        {/* Position controls: editable number + jump to first/last */}
+        <div className="shrink-0 flex flex-col items-center gap-0.5">
+          <PositionJumper index={index} total={total} onCommit={(to) => onMoveTo(row.id, to)} />
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => onMoveTo(row.id, 0)}
+              disabled={index === 0}
+              className="p-0.5 text-stone-400 hover:text-teal-600 disabled:opacity-30 transition-colors"
+              title="Move to top"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => onMoveTo(row.id, total - 1)}
+              disabled={index === total - 1}
+              className="p-0.5 text-stone-400 hover:text-teal-600 disabled:opacity-30 transition-colors"
+              title="Move to bottom"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 13l-7 7-7-7M19 5l-7 7-7-7" /></svg>
+            </button>
+          </div>
+        </div>
+
         {/* Drag handle — the only place that starts a drag, so the text
             input below stays freely clickable/selectable. */}
         <button
@@ -299,6 +352,7 @@ const buildComparator = (levels) => (a, b) => {
 };
 
 const SORT_PRESETS_KEY = "catalogLiranSortPresets.v1";
+const LAST_SORT_KEY = "catalogLiranLastSort.v1";
 
 const loadSavedPresets = () => {
   try {
@@ -306,6 +360,15 @@ const loadSavedPresets = () => {
     return Array.isArray(raw) ? raw : [];
   } catch {
     return [];
+  }
+};
+
+const loadLastSort = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LAST_SORT_KEY));
+    return Array.isArray(raw) && raw.length > 0 ? raw : null;
+  } catch {
+    return null;
   }
 };
 
@@ -482,10 +545,7 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
   const handleSavePreset = () => {
     const name = presetName.trim();
     if (!name || levels.length === 0) return;
-    const config = levels.map(({ field, dir, valueOrder, subField, subOrders }) => ({
-      field, dir, valueOrder, subField, subOrders,
-    }));
-    const next = [...savedPresets.filter((p) => p.name.toLowerCase() !== name.toLowerCase()), { name, config }];
+    const next = [...savedPresets.filter((p) => p.name.toLowerCase() !== name.toLowerCase()), { name, config: serializeLevels() }];
     persistPresets(next);
     setPresetName("");
   };
@@ -503,8 +563,11 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
     return [...kept, ...added];
   };
 
-  const handleLoadPreset = (preset) => {
-    setLevels(preset.config.map((cfg) => {
+  // Rebuild editable levels from a saved config, merging saved value orders
+  // with whatever values exist in the current selection.
+  const levelsFromConfig = (config) => config
+    .filter((cfg) => fieldMeta(cfg.field).label)
+    .map((cfg) => {
       const l = makeLevel(cfg.field);
       l.dir = cfg.dir === "desc" ? "desc" : "asc";
       if (l.valueOrder && cfg.valueOrder) l.valueOrder = mergeOrder(cfg.valueOrder, l.valueOrder);
@@ -520,8 +583,19 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
         l.subOrders = fresh;
       }
       return l;
-    }));
+    });
+
+  const handleLoadPreset = (preset) => {
+    setLevels(levelsFromConfig(preset.config));
   };
+
+  // Restore the last applied sort automatically when the panel opens, so a
+  // carefully built configuration is never lost between sessions.
+  useEffect(() => {
+    const last = loadLastSort();
+    if (last) setLevels(levelsFromConfig(last));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ---- live preview of the resulting order ---- */
 
@@ -530,8 +604,13 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
     return [...rows].sort(buildComparator(levels));
   }, [rows, levels]);
 
+  const serializeLevels = () => levels.map(({ field, dir, valueOrder, subField, subOrders }) => ({
+    field, dir, valueOrder, subField, subOrders,
+  }));
+
   const apply = () => {
     if (levels.length === 0) return;
+    try { localStorage.setItem(LAST_SORT_KEY, JSON.stringify(serializeLevels())); } catch { /* storage blocked */ }
     onApply((prev) => [...prev].sort(buildComparator(levels)));
     onClose();
   };
@@ -777,6 +856,17 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
           Add level
         </button>
 
+        {levels.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setLevels([])}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:bg-stone-100 transition-colors"
+            title="Remove all sort levels"
+          >
+            Clear all
+          </button>
+        )}
+
         {/* Save the current configuration as a named preset */}
         {levels.length > 0 && (
           <div className="flex items-center gap-1">
@@ -853,6 +943,18 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
 
   const handleRemove = (id) => {
     setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  // Jump an item straight to a target position (0-based) without dragging.
+  const handleMoveTo = (id, targetIdx) => {
+    setRows((prev) => {
+      const from = prev.findIndex((r) => r.id === id);
+      if (from === -1) return prev;
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(Math.min(Math.max(targetIdx, 0), next.length), 0, item);
+      return next;
+    });
   };
 
   // Fisher-Yates shuffle for a random catalog order.
@@ -1036,8 +1138,16 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
               )}
 
               <Reorder.Group axis="y" values={rows} onReorder={setRows} className="space-y-2">
-                {rows.map((row) => (
-                  <RowItem key={row.id} row={row} onTextChange={handleTextChange} onRemove={handleRemove} />
+                {rows.map((row, idx) => (
+                  <RowItem
+                    key={row.id}
+                    row={row}
+                    index={idx}
+                    total={rows.length}
+                    onTextChange={handleTextChange}
+                    onRemove={handleRemove}
+                    onMoveTo={handleMoveTo}
+                  />
                 ))}
               </Reorder.Group>
             </div>
