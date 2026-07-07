@@ -62,6 +62,63 @@ const loadFonts = async () => {
   return _fontsCache;
 };
 
+// Product photos ship with wildly different amounts of white padding around
+// the jewel, so "same image size" doesn't mean "same jewel size". Cropping
+// each photo to its content bounding box first, then fitting everything into
+// the same square slot, makes every piece come out visually equal.
+const trimWhitespace = (dataUrl) =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let minX = canvas.width, minY = canvas.height, maxX = -1, maxY = -1;
+        for (let py = 0; py < canvas.height; py++) {
+          for (let px = 0; px < canvas.width; px++) {
+            const i = (py * canvas.width + px) * 4;
+            const isContent = data[i + 3] > 16 &&
+              (data[i] < 242 || data[i + 1] < 242 || data[i + 2] < 242);
+            if (isContent) {
+              if (px < minX) minX = px;
+              if (px > maxX) maxX = px;
+              if (py < minY) minY = py;
+              if (py > maxY) maxY = py;
+            }
+          }
+        }
+        // Nothing (or almost nothing) detected — keep the original.
+        if (maxX <= minX || maxY <= minY || (maxX - minX) * (maxY - minY) < canvas.width * canvas.height * 0.005) {
+          resolve(dataUrl);
+          return;
+        }
+        const pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.05);
+        minX = Math.max(0, minX - pad);
+        minY = Math.max(0, minY - pad);
+        maxX = Math.min(canvas.width - 1, maxX + pad);
+        maxY = Math.min(canvas.height - 1, maxY + pad);
+        const w = maxX - minX + 1;
+        const h = maxY - minY + 1;
+        const out = document.createElement("canvas");
+        out.width = w;
+        out.height = h;
+        const octx = out.getContext("2d");
+        octx.fillStyle = "#ffffff";
+        octx.fillRect(0, 0, w, h);
+        octx.drawImage(canvas, minX, minY, w, h, 0, 0, w, h);
+        resolve(out.toDataURL("image/jpeg", 0.92));
+      } catch (e) {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+
 // Product page on the public eshed.com website (e.g.
 // https://eshed.com/eshed/RI-HER-021/).
 const itemUrl = (stone) =>
@@ -128,12 +185,13 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   const loadItemImage = async (url) => {
     if (!url) return null;
     // Manually-added items carry an already-encoded data URL from the upload.
-    if (url.startsWith("data:")) return url;
+    if (url.startsWith("data:")) return trimWhitespace(url);
     try {
       const res = await fetch(`${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`);
       if (!res.ok) return null;
       const data = await res.json();
-      return (data.image && data.image.startsWith("data:")) ? data.image : null;
+      if (data.image && data.image.startsWith("data:")) return trimWhitespace(data.image);
+      return null;
     } catch (e) { return null; }
   };
 
@@ -286,31 +344,33 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       pdf.setLineWidth(0.2);
       pdf.rect(x, y, cellW, cellH);
 
-      // Image — one uniform slot for every card, filling all the space the
-      // text below doesn't need, so the page looks full and colorful. Photos
-      // are scaled to fit while keeping their original aspect ratio.
+      // Image area — everything above the tight text block. Photos were
+      // already cropped to the jewel itself (trimWhitespace), and each one is
+      // scaled so its LARGEST side hits the same uniform square slot. That
+      // way every piece prints at the same visual size, original aspect kept.
       const TEXT_BLOCK = 16; // sku + type + title/blanks + link, tight
-      const boxW = cellW - 2;
-      const boxH = cellH - TEXT_BLOCK - 5;
-      const boxX = x + (cellW - boxW) / 2;
-      const boxY = y + 1.5;
+      const areaW = cellW - 2;
+      const areaH = cellH - TEXT_BLOCK - 5;
+      const areaX = x + (cellW - areaW) / 2;
+      const areaY = y + 1.5;
+      const slot = Math.min(areaW, areaH); // uniform square, same on every card
       if (img) {
         try {
           const p = pdf.getImageProperties(img);
           const ratio = p.width / p.height;
-          let w = boxW, h = boxW / ratio;
-          if (h > boxH) { h = boxH; w = boxH * ratio; }
+          let w = slot, h = slot / ratio;
+          if (h > slot) { h = slot; w = slot * ratio; }
           const fmt = img.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
-          pdf.addImage(img, fmt, boxX + (boxW - w) / 2, boxY + (boxH - h) / 2, w, h);
+          pdf.addImage(img, fmt, areaX + (areaW - w) / 2, areaY + (areaH - h) / 2, w, h);
         } catch (e) { /* leave blank */ }
       } else {
         pdf.setFontSize(6.5);
         pdf.setTextColor(180, 180, 180);
         pdf.setFont("helvetica", "italic");
-        pdf.text("No image", x + cellW / 2, boxY + boxH / 2, { align: "center" });
+        pdf.text("No image", x + cellW / 2, areaY + areaH / 2, { align: "center" });
       }
 
-      let textY = boxY + boxH + 3.5;
+      let textY = areaY + areaH + 3.5;
 
       // SKU / model number — bold, centered.
       pdf.setFont("helvetica", "bold");
