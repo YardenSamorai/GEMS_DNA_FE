@@ -251,10 +251,10 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       // Image — one uniform square slot for every card, so all photos come
       // out the same size. Each photo is scaled to fit the square while
       // keeping its original aspect ratio (no cropping, no distortion).
-      const TEXT_BLOCK = 24; // sku + type + title/blanks + link, tightened
-      const boxSize = Math.min(cellW - 4, cellH - TEXT_BLOCK - 4);
+      const TEXT_BLOCK = 21; // sku + type + title/blanks + link, tightened
+      const boxSize = Math.min(cellW - 2, cellH - TEXT_BLOCK - 3);
       const boxX = x + (cellW - boxSize) / 2;
-      const boxY = y + 2;
+      const boxY = y + 1.5;
       if (img) {
         try {
           const p = pdf.getImageProperties(img);
