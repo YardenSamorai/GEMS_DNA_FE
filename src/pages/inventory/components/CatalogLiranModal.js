@@ -204,9 +204,18 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Re-seed rows whenever the dialog opens with a fresh selection.
+  // Website text starts as the item's title (site title for catalog jewelry,
+  // a built-up one for stones) and stays fully editable.
   useEffect(() => {
     if (isOpen) {
-      setRows((stones || []).map((stone) => ({ id: stone.id, stone, websiteText: "" })));
+      const defaultTitle = (stone) => {
+        if (stone.title) return stone.title;
+        if (stone.category === "Jewelry") return "";
+        return [stone.weightCt ? `${stone.weightCt}ct` : null, stone.shape, stone.category]
+          .filter(Boolean)
+          .join(" ");
+      };
+      setRows((stones || []).map((stone) => ({ id: stone.id, stone, websiteText: defaultTitle(stone) })));
       setShowAddForm(false);
     }
   }, [isOpen, stones]);
