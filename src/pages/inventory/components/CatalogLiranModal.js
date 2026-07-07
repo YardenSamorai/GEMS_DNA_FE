@@ -202,6 +202,7 @@ const AddItemForm = ({ onAdd, onCancel }) => {
 const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }) => {
   const [rows, setRows] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [orientation, setOrientation] = useState("portrait");
 
   // Re-seed rows whenever the dialog opens with a fresh selection.
   // Website text starts as the item's title (site title for catalog jewelry,
@@ -305,7 +306,34 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-4 border-t border-stone-200 bg-white rounded-b-none sm:rounded-b-2xl flex items-center justify-end gap-3">
+            <div className="px-5 py-4 border-t border-stone-200 bg-white rounded-b-none sm:rounded-b-2xl flex items-center justify-between gap-3">
+              {/* Page orientation picker */}
+              <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={() => setOrientation("portrait")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    orientation === "portrait" ? "bg-white text-stone-800 shadow-sm" : "text-stone-500 hover:text-stone-700"
+                  }`}
+                  title="Portrait (A4 vertical)"
+                >
+                  <span className="inline-block w-2.5 h-3.5 border-[1.5px] border-current rounded-[2px]" />
+                  Portrait
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrientation("landscape")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    orientation === "landscape" ? "bg-white text-stone-800 shadow-sm" : "text-stone-500 hover:text-stone-700"
+                  }`}
+                  title="Landscape (A4 horizontal)"
+                >
+                  <span className="inline-block w-3.5 h-2.5 border-[1.5px] border-current rounded-[2px]" />
+                  Landscape
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
                 disabled={isGenerating}
@@ -314,7 +342,7 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                 Cancel
               </button>
               <button
-                onClick={() => onGenerate(rows.map((r) => ({ ...r.stone, websiteText: r.websiteText.trim() })))}
+                onClick={() => onGenerate(rows.map((r) => ({ ...r.stone, websiteText: r.websiteText.trim() })), { orientation })}
                 disabled={isGenerating || rows.length === 0}
                 className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 rounded-lg shadow-md transition-all disabled:opacity-60 flex items-center gap-2"
               >
@@ -326,6 +354,7 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                 )}
                 {isGenerating ? "Generating\u2026" : "Generate PDF"}
               </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>

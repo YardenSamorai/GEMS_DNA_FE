@@ -4,8 +4,9 @@
  * Completely separate from the regular PDF catalog on purpose: the cover uses
  * the ESHED logo (white, transparent) instead of Gemstar, the contact details
  * are fixed (www.eshed.com / info@eshed.com / NY phone), and the content pages
- * are a plain 4x3 worksheet grid (image, SKU, type, "Website text" blanks and
- * a product-page link) that Liran fills in for the website.
+ * are a plain 4x3 worksheet grid (image, SKU, type, website text / blanks and
+ * a product-page link) that Liran fills in for the website. Pages can be
+ * portrait or landscape (options.orientation), same 4x3 grid in both.
  */
 import jsPDF from "jspdf";
 
@@ -71,8 +72,10 @@ const itemTypeLabel = (stone) => {
   return stone.category || "Gemstone";
 };
 
-export const exportCatalogLiran = async (selectedStones) => {
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+export const exportCatalogLiran = async (selectedStones, options = {}) => {
+  const orientation = options.orientation === "landscape" ? "landscape" : "portrait";
+  const isLandscape = orientation === "landscape";
+  const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 10;
@@ -91,8 +94,35 @@ export const exportCatalogLiran = async (selectedStones) => {
 
   let coverBg = null;
   let logo = null;
+  let logoDark = null;
   try { coverBg = await imageToBase64("/images/A4_cover_bg.png"); } catch (e) { /* fallback: dark fill */ }
   try { logo = await imageToBase64("/images/eshed_logo_white.png"); } catch (e) { /* skip logo */ }
+  try { logoDark = await imageToBase64("/images/eshed_logo_dark.png"); } catch (e) { /* skip logo */ }
+
+  // Draw the stone-texture background scaled to COVER the page (crop instead
+  // of stretch), so landscape pages don't get a distorted texture.
+  const drawCoverBg = (h = pageHeight) => {
+    if (!coverBg) {
+      pdf.setFillColor(24, 24, 24);
+      pdf.rect(0, 0, pageWidth, h, "F");
+      return;
+    }
+    try {
+      const p = pdf.getImageProperties(coverBg);
+      const ratio = p.height / p.width;
+      let drawW = pageWidth;
+      let drawH = pageWidth * ratio;
+      if (drawH < h) {
+        drawH = h;
+        drawW = h / ratio;
+      }
+      // Overflow past the page edges is clipped by the PDF viewer.
+      pdf.addImage(coverBg, "PNG", 0, 0, drawW, drawH);
+    } catch (e) {
+      pdf.setFillColor(24, 24, 24);
+      pdf.rect(0, 0, pageWidth, h, "F");
+    }
+  };
 
   const loadItemImage = async (url) => {
     if (!url) return null;
@@ -107,22 +137,15 @@ export const exportCatalogLiran = async (selectedStones) => {
   };
 
   // ==================== COVER ====================
-  if (coverBg) {
-    try { pdf.addImage(coverBg, "PNG", 0, 0, pageWidth, pageHeight); } catch (e) {
-      pdf.setFillColor(24, 24, 24);
-      pdf.rect(0, 0, pageWidth, pageHeight, "F");
-    }
-  } else {
-    pdf.setFillColor(24, 24, 24);
-    pdf.rect(0, 0, pageWidth, pageHeight, "F");
-  }
+  drawCoverBg();
 
   if (logo) {
     try {
       const props = pdf.getImageProperties(logo);
       const logoW = 58;
       const logoH = logoW * (props.height / props.width);
-      pdf.addImage(logo, "PNG", pageWidth / 2 - logoW / 2, 48, logoW, logoH);
+      // Keep the logo/title spacing proportional in both orientations.
+      pdf.addImage(logo, "PNG", pageWidth / 2 - logoW / 2, pageHeight * 0.16, logoW, logoH);
     } catch (e) { /* skip */ }
   }
 
@@ -160,48 +183,27 @@ export const exportCatalogLiran = async (selectedStones) => {
   pdf.setTextColor(220, 220, 220);
   pdf.text(ESHED.email, sepRight + 4, coverFooterY, { align: "left" });
 
-  // ==================== CONTENT PAGES (4 cols x 3 rows) ====================
+  // ==================== CONTENT PAGES ====================
+  // 4 cols x 3 rows in both orientations — landscape just gives each card
+  // more width, so the grid looks airier.
   const COLS = 4;
   const ROWS = 3;
   const perPage = COLS * ROWS;
   const totalPages = Math.ceil(selectedStones.length / perPage);
 
-  const HEADER_H = 28;
+  // Clean header: just the dark ESHED logo on the left — no background bar,
+  // no branch/contact text.
+  const HEADER_H = 20;
   const drawHeader = () => {
-    if (coverBg) {
-      try { pdf.addImage(coverBg, "PNG", 0, 0, pageWidth, HEADER_H); } catch (e) {
-        pdf.setFillColor(24, 24, 24);
-        pdf.rect(0, 0, pageWidth, HEADER_H, "F");
-      }
-    } else {
-      pdf.setFillColor(24, 24, 24);
-      pdf.rect(0, 0, pageWidth, HEADER_H, "F");
-    }
-    if (logo) {
+    const headerLogo = logoDark || logo;
+    if (headerLogo) {
       try {
-        const lp = pdf.getImageProperties(logo);
-        const lh = 14;
+        const lp = pdf.getImageProperties(headerLogo);
+        const lh = 12;
         const lw = lh * (lp.width / lp.height);
-        pdf.addImage(logo, "PNG", margin + 2, (HEADER_H - lh) / 2, lw, lh);
+        pdf.addImage(headerLogo, "PNG", margin + 2, (HEADER_H - lh) / 2 + 2, lw, lh);
       } catch (e) { /* skip */ }
     }
-    pdf.setFont(BODY_FONT, "normal");
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text(
-      "N e w   Y o r k   |   L o s   A n g e l e s   |   H o n g   K o n g   |   T e l   A v i v",
-      pageWidth - margin - 2,
-      HEADER_H / 2 - 1,
-      { align: "right" }
-    );
-    pdf.setFontSize(7);
-    pdf.setTextColor(220, 220, 220);
-    pdf.text(
-      `${ESHED.site}   |   ${ESHED.phone}   |   ${ESHED.email}`,
-      pageWidth - margin - 2,
-      HEADER_H / 2 + 5,
-      { align: "right" }
-    );
   };
 
   const drawFooter = (pageNum) => {

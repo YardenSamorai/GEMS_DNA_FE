@@ -6199,11 +6199,11 @@ const StoneSearchPage = () => {
     setCatalogLiranStones(selectedData);
   };
 
-  const handleCatalogLiranGenerate = async (orderedItems) => {
+  const handleCatalogLiranGenerate = async (orderedItems, options = {}) => {
     setCatalogLiranGenerating(true);
     const t = toast.loading("Generating Catalog (Liran)\u2026");
     try {
-      await exportCatalogLiran(orderedItems);
+      await exportCatalogLiran(orderedItems, options);
       toast.success("Catalog ready", { id: t });
       setCatalogLiranStones(null);
     } catch (err) {
