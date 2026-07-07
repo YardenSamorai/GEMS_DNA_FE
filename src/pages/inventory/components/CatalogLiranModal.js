@@ -239,6 +239,27 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
     });
   };
 
+  // Group by collection, then by jewelry type, then by SKU. Items without a
+  // collection sink to the end so the named collections lead the catalog.
+  const handleSortByCollection = () => {
+    setRows((prev) => {
+      const key = (r, field) => String(r.stone[field] || "").trim().toLowerCase();
+      return [...prev].sort((a, b) => {
+        const colA = key(a, "collection");
+        const colB = key(b, "collection");
+        if (colA !== colB) {
+          if (!colA) return 1;
+          if (!colB) return -1;
+          return colA.localeCompare(colB);
+        }
+        const typeA = key(a, "jewelryType") || key(a, "category");
+        const typeB = key(b, "jewelryType") || key(b, "category");
+        if (typeA !== typeB) return typeA.localeCompare(typeB);
+        return String(a.stone.sku || "").localeCompare(String(b.stone.sku || ""));
+      });
+    });
+  };
+
   const handleAddManual = ({ image, sku, type, text }) => {
     const id = `manual-${Date.now()}`;
     setRows((prev) => [
@@ -282,6 +303,18 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSortByCollection}
+                  disabled={rows.length < 2}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors disabled:opacity-50"
+                  title="Sort by collection, then jewelry type"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9M3 12h5m8-4v12m0 0l-4-4m4 4l4-4" />
+                  </svg>
+                  Sort
+                </button>
                 <button
                   type="button"
                   onClick={handleShuffle}
