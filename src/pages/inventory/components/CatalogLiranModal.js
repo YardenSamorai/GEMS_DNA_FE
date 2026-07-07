@@ -197,9 +197,223 @@ const AddItemForm = ({ onAdd, onCancel }) => {
   );
 };
 
+/* ---------------- Advanced multi-level sort ---------------- */
+
+const SORT_FIELDS = [
+  { id: "category", label: "Category" },
+  { id: "collection", label: "Collection" },
+  { id: "sku", label: "SKU / Model" },
+  { id: "title", label: "Website text" },
+];
+
+const getSortValue = (row, field) => {
+  const s = row.stone;
+  switch (field) {
+    case "category": return String(s.jewelryType || s.category || "").trim();
+    case "collection": return String(s.collection || "").trim();
+    case "sku": return String(s.sku || "").trim();
+    case "title": return String(row.websiteText || s.title || "").trim();
+    default: return "";
+  }
+};
+
+// Fields whose distinct values the user can arrange by hand ("Necklace
+// first, then Ring…"). SKU/title just sort alphabetically (numeric-aware).
+const ORDERABLE_FIELDS = new Set(["category", "collection"]);
+
+const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
+  const [levels, setLevels] = useState([]);
+
+  const distinctValues = (field) => {
+    const seen = new Map();
+    rows.forEach((r) => {
+      const v = getSortValue(r, field);
+      const k = v.toLowerCase();
+      if (!seen.has(k)) seen.set(k, v || "(empty)");
+    });
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  };
+
+  const addLevel = () => {
+    const used = new Set(levels.map((l) => l.field));
+    const nextField = SORT_FIELDS.find((f) => !used.has(f.id))?.id || "sku";
+    setLevels((prev) => [...prev, {
+      id: `lvl-${Date.now()}`,
+      field: nextField,
+      dir: "asc",
+      valueOrder: ORDERABLE_FIELDS.has(nextField) ? distinctValues(nextField) : null,
+    }]);
+  };
+
+  const changeField = (id, field) => {
+    setLevels((prev) => prev.map((l) => (l.id === id ? {
+      ...l,
+      field,
+      valueOrder: ORDERABLE_FIELDS.has(field) ? distinctValues(field) : null,
+    } : l)));
+  };
+
+  const toggleDir = (id) => {
+    setLevels((prev) => prev.map((l) => (l.id === id ? { ...l, dir: l.dir === "asc" ? "desc" : "asc" } : l)));
+  };
+
+  const moveLevel = (idx, delta) => {
+    setLevels((prev) => {
+      const next = [...prev];
+      const to = idx + delta;
+      if (to < 0 || to >= next.length) return prev;
+      [next[idx], next[to]] = [next[to], next[idx]];
+      return next;
+    });
+  };
+
+  const removeLevel = (id) => setLevels((prev) => prev.filter((l) => l.id !== id));
+
+  const moveValue = (levelId, idx, delta) => {
+    setLevels((prev) => prev.map((l) => {
+      if (l.id !== levelId || !l.valueOrder) return l;
+      const to = idx + delta;
+      if (to < 0 || to >= l.valueOrder.length) return l;
+      const order = [...l.valueOrder];
+      [order[idx], order[to]] = [order[to], order[idx]];
+      return { ...l, valueOrder: order };
+    }));
+  };
+
+  const apply = () => {
+    if (levels.length === 0) return;
+    onApply((prev) => [...prev].sort((a, b) => {
+      for (const lvl of levels) {
+        const va = getSortValue(a, lvl.field) || "(empty)";
+        const vb = getSortValue(b, lvl.field) || "(empty)";
+        let c = 0;
+        if (lvl.valueOrder) {
+          const findIdx = (v) => {
+            const i = lvl.valueOrder.findIndex((o) => o.toLowerCase() === v.toLowerCase());
+            return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+          };
+          c = findIdx(va) - findIdx(vb);
+        } else {
+          if (va.toLowerCase() !== vb.toLowerCase()) {
+            if (va === "(empty)") c = 1;
+            else if (vb === "(empty)") c = -1;
+            else c = va.localeCompare(vb, undefined, { numeric: true });
+          }
+        }
+        if (c !== 0) return lvl.dir === "desc" ? -c : c;
+      }
+      return 0;
+    }));
+    onClose();
+  };
+
+  return (
+    <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3 mb-3">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-bold text-stone-800">Advanced sort</h3>
+        <span className="text-[11px] text-stone-500">Level 1 wins, ties fall to the next level</span>
+      </div>
+
+      {levels.length === 0 && (
+        <p className="text-xs text-stone-500 mb-2">Add a sort level to get started.</p>
+      )}
+
+      <div className="space-y-2">
+        {levels.map((lvl, idx) => (
+          <div key={lvl.id} className="bg-white rounded-lg border border-stone-200 p-2.5">
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
+                {idx + 1}
+              </span>
+              <select
+                value={lvl.field}
+                onChange={(e) => changeField(lvl.id, e.target.value)}
+                className="flex-1 min-w-0 text-sm px-2 py-1.5 rounded-lg border border-stone-200 bg-white focus:border-indigo-400 outline-none"
+              >
+                {SORT_FIELDS.map((f) => (
+                  <option key={f.id} value={f.id} disabled={levels.some((l) => l.id !== lvl.id && l.field === f.id)}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => toggleDir(lvl.id)}
+                className="shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 transition-colors"
+                title="Toggle direction"
+              >
+                {lvl.dir === "asc" ? "A \u2192 Z" : "Z \u2192 A"}
+              </button>
+              <div className="shrink-0 flex flex-col">
+                <button type="button" onClick={() => moveLevel(idx, -1)} disabled={idx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30 leading-none" title="Move level up">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                </button>
+                <button type="button" onClick={() => moveLevel(idx, 1)} disabled={idx === levels.length - 1} className="text-stone-400 hover:text-stone-700 disabled:opacity-30 leading-none" title="Move level down">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+              </div>
+              <button type="button" onClick={() => removeLevel(lvl.id)} className="shrink-0 p-1 rounded text-stone-300 hover:text-red-500 transition-colors" title="Remove level">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Custom value order for category / collection levels */}
+            {lvl.valueOrder && (
+              <div className="mt-2 pl-7 space-y-1">
+                {lvl.valueOrder.map((val, vIdx) => (
+                  <div key={val} className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-md px-2 py-1">
+                    <span className="text-[11px] font-semibold text-indigo-600 w-4 text-center">{vIdx + 1}</span>
+                    <span className="flex-1 text-xs text-stone-700 truncate">{val}</span>
+                    <button type="button" onClick={() => moveValue(lvl.id, vIdx, -1)} disabled={vIdx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move up">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                    </button>
+                    <button type="button" onClick={() => moveValue(lvl.id, vIdx, 1)} disabled={vIdx === lvl.valueOrder.length - 1} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move down">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between mt-3">
+        <button
+          type="button"
+          onClick={addLevel}
+          disabled={levels.length >= SORT_FIELDS.length}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-40"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          Add level
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={apply}
+            disabled={levels.length === 0}
+            className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50"
+          >
+            Apply sort
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }) => {
   const [rows, setRows] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAdvancedSort, setShowAdvancedSort] = useState(false);
   const [orientation, setOrientation] = useState("portrait");
 
   // Re-seed rows whenever the dialog opens with a fresh selection.
@@ -216,6 +430,7 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
       };
       setRows((stones || []).map((stone) => ({ id: stone.id, stone, websiteText: defaultTitle(stone) })));
       setShowAddForm(false);
+      setShowAdvancedSort(false);
     }
   }, [isOpen, stones]);
 
@@ -356,6 +571,22 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                   <span className="hidden sm:inline">Shuffle</span>
                 </button>
                 <button
+                  type="button"
+                  onClick={() => setShowAdvancedSort((v) => !v)}
+                  disabled={rows.length < 2}
+                  className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 ${
+                    showAdvancedSort
+                      ? "text-white bg-amber-600 border-amber-600"
+                      : "text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200"
+                  }`}
+                  title="Advanced multi-level sort"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  <span className="hidden sm:inline">Advanced</span>
+                </button>
+                <button
                   onClick={onClose}
                   className="p-2 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
                 >
@@ -368,6 +599,14 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
 
             {/* Reorderable list */}
             <div className="flex-1 overflow-y-auto px-4 py-4">
+              {showAdvancedSort && (
+                <AdvancedSortPanel
+                  rows={rows}
+                  onApply={setRows}
+                  onClose={() => setShowAdvancedSort(false)}
+                />
+              )}
+
               {showAddForm ? (
                 <AddItemForm onAdd={handleAddManual} onCancel={() => setShowAddForm(false)} />
               ) : (
