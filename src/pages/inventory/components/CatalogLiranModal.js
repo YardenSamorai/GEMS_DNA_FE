@@ -199,58 +199,119 @@ const AddItemForm = ({ onAdd, onCancel }) => {
 
 /* ---------------- Advanced multi-level sort ---------------- */
 
+// orderable: the user can arrange the field's distinct values by hand
+// ("Necklace first, then Ring…") and optionally nest a sub-sort inside
+// each group. numeric: compared as numbers (price / weight).
 const SORT_FIELDS = [
-  { id: "category", label: "Category" },
-  { id: "collection", label: "Collection" },
+  { id: "category", label: "Category", orderable: true },
+  { id: "collection", label: "Collection", orderable: true },
+  { id: "style", label: "Style", orderable: true },
+  { id: "stoneType", label: "Stone type", orderable: true },
+  { id: "metalType", label: "Metal", orderable: true },
+  { id: "shape", label: "Shape", orderable: true },
   { id: "sku", label: "SKU / Model" },
   { id: "title", label: "Website text" },
+  { id: "price", label: "Price", numeric: true },
+  { id: "weight", label: "Weight (ct)", numeric: true },
 ];
+
+const fieldMeta = (id) => SORT_FIELDS.find((f) => f.id === id) || {};
 
 const getSortValue = (row, field) => {
   const s = row.stone;
   switch (field) {
     case "category": return String(s.jewelryType || s.category || "").trim();
     case "collection": return String(s.collection || "").trim();
+    case "style": return String(s.style || "").trim();
+    case "stoneType": return String(s.stoneType || "").trim();
+    case "metalType": return String(s.metalType || "").trim();
+    case "shape": return String(s.shape || "").trim();
     case "sku": return String(s.sku || "").trim();
     case "title": return String(row.websiteText || s.title || "").trim();
+    case "price": return s.priceTotal;
+    case "weight": return s.weightCt;
     default: return "";
   }
 };
 
-// Fields whose distinct values the user can arrange by hand ("Necklace
-// first, then Ring…"). SKU/title just sort alphabetically (numeric-aware).
-const ORDERABLE_FIELDS = new Set(["category", "collection"]);
+const EMPTY_LABEL = "(empty)";
+
+// Alphabetical, numeric-aware compare with empty values pushed to the end.
+const compareText = (va, vb) => {
+  if (va.toLowerCase() === vb.toLowerCase()) return 0;
+  if (va === EMPTY_LABEL) return 1;
+  if (vb === EMPTY_LABEL) return -1;
+  return va.localeCompare(vb, undefined, { numeric: true });
+};
+
+// Compare by a hand-arranged list of values; unknown values go last (alphabetical).
+const compareByOrder = (va, vb, orderList) => {
+  const findIdx = (v) => {
+    const i = orderList.findIndex((o) => o.toLowerCase() === v.toLowerCase());
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const c = findIdx(va) - findIdx(vb);
+  return c !== 0 ? c : compareText(va, vb);
+};
 
 const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
   const [levels, setLevels] = useState([]);
 
-  const distinctValues = (field) => {
+  const distinctValues = (field, filterFn) => {
     const seen = new Map();
     rows.forEach((r) => {
-      const v = getSortValue(r, field);
+      if (filterFn && !filterFn(r)) return;
+      const v = String(getSortValue(r, field) || "").trim();
       const k = v.toLowerCase();
-      if (!seen.has(k)) seen.set(k, v || "(empty)");
+      if (!seen.has(k)) seen.set(k, v || EMPTY_LABEL);
     });
     return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   };
 
+  // Per-parent sub-value orders, e.g. within "Necklaces" -> [Herit., Tennis…]
+  const buildSubOrders = (field, subField) => {
+    const map = {};
+    distinctValues(field).forEach((pv) => {
+      map[pv] = distinctValues(subField, (r) => {
+        const v = String(getSortValue(r, field) || "").trim() || EMPTY_LABEL;
+        return v.toLowerCase() === pv.toLowerCase();
+      });
+    });
+    return map;
+  };
+
+  const makeLevel = (field) => ({
+    id: `lvl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    field,
+    dir: "asc",
+    valueOrder: fieldMeta(field).orderable ? distinctValues(field) : null,
+    subField: null,
+    subOrders: null,
+    expanded: {},
+  });
+
   const addLevel = () => {
     const used = new Set(levels.map((l) => l.field));
     const nextField = SORT_FIELDS.find((f) => !used.has(f.id))?.id || "sku";
-    setLevels((prev) => [...prev, {
-      id: `lvl-${Date.now()}`,
-      field: nextField,
-      dir: "asc",
-      valueOrder: ORDERABLE_FIELDS.has(nextField) ? distinctValues(nextField) : null,
-    }]);
+    setLevels((prev) => [...prev, makeLevel(nextField)]);
   };
 
   const changeField = (id, field) => {
-    setLevels((prev) => prev.map((l) => (l.id === id ? {
-      ...l,
-      field,
-      valueOrder: ORDERABLE_FIELDS.has(field) ? distinctValues(field) : null,
-    } : l)));
+    setLevels((prev) => prev.map((l) => (l.id === id ? { ...makeLevel(field), id: l.id, dir: l.dir } : l)));
+  };
+
+  const changeSubField = (id, subField) => {
+    setLevels((prev) => prev.map((l) => {
+      if (l.id !== id) return l;
+      if (!subField) return { ...l, subField: null, subOrders: null, expanded: {} };
+      return { ...l, subField, subOrders: buildSubOrders(l.field, subField), expanded: {} };
+    }));
+  };
+
+  const toggleExpanded = (id, parentValue) => {
+    setLevels((prev) => prev.map((l) => (l.id === id
+      ? { ...l, expanded: { ...l.expanded, [parentValue]: !l.expanded[parentValue] } }
+      : l)));
   };
 
   const toggleDir = (id) => {
@@ -280,27 +341,65 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
     }));
   };
 
+  const moveSubValue = (levelId, parentValue, idx, delta) => {
+    setLevels((prev) => prev.map((l) => {
+      if (l.id !== levelId || !l.subOrders?.[parentValue]) return l;
+      const list = [...l.subOrders[parentValue]];
+      const to = idx + delta;
+      if (to < 0 || to >= list.length) return l;
+      [list[idx], list[to]] = [list[to], list[idx]];
+      return { ...l, subOrders: { ...l.subOrders, [parentValue]: list } };
+    }));
+  };
+
+  // One-click starting points; every level stays fully editable afterwards.
+  const applyPreset = (defs) => {
+    setLevels(defs.map(({ field, dir, subField }) => {
+      const l = makeLevel(field);
+      if (dir) l.dir = dir;
+      if (subField && l.valueOrder) {
+        l.subField = subField;
+        l.subOrders = buildSubOrders(field, subField);
+      }
+      return l;
+    }));
+  };
+
+  const PRESETS = [
+    { label: "Category \u2192 Collection", defs: [{ field: "category", subField: "collection" }, { field: "sku" }] },
+    { label: "Collection \u2192 Category", defs: [{ field: "collection", subField: "category" }, { field: "sku" }] },
+    { label: "Price high \u2192 low", defs: [{ field: "price", dir: "desc" }] },
+    { label: "Price low \u2192 high", defs: [{ field: "price", dir: "asc" }] },
+  ];
+
   const apply = () => {
     if (levels.length === 0) return;
     onApply((prev) => [...prev].sort((a, b) => {
       for (const lvl of levels) {
-        const va = getSortValue(a, lvl.field) || "(empty)";
-        const vb = getSortValue(b, lvl.field) || "(empty)";
+        const meta = fieldMeta(lvl.field);
         let c = 0;
-        if (lvl.valueOrder) {
-          const findIdx = (v) => {
-            const i = lvl.valueOrder.findIndex((o) => o.toLowerCase() === v.toLowerCase());
-            return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-          };
-          c = findIdx(va) - findIdx(vb);
+        if (meta.numeric) {
+          const na = Number(getSortValue(a, lvl.field)) || 0;
+          const nb = Number(getSortValue(b, lvl.field)) || 0;
+          c = na - nb;
         } else {
-          if (va.toLowerCase() !== vb.toLowerCase()) {
-            if (va === "(empty)") c = 1;
-            else if (vb === "(empty)") c = -1;
-            else c = va.localeCompare(vb, undefined, { numeric: true });
-          }
+          const va = String(getSortValue(a, lvl.field) || "").trim() || EMPTY_LABEL;
+          const vb = String(getSortValue(b, lvl.field) || "").trim() || EMPTY_LABEL;
+          c = lvl.valueOrder ? compareByOrder(va, vb, lvl.valueOrder) : compareText(va, vb);
         }
-        if (c !== 0) return lvl.dir === "desc" ? -c : c;
+        if (c !== 0) return lvl.dir === "desc" ? (c > 0 ? -1 : 1) : (c > 0 ? 1 : -1);
+
+        // Same group: apply the nested sub-sort configured for this level,
+        // using the per-group hand-arranged order.
+        if (lvl.subField && lvl.subOrders) {
+          const parent = String(getSortValue(a, lvl.field) || "").trim() || EMPTY_LABEL;
+          const sa = String(getSortValue(a, lvl.subField) || "").trim() || EMPTY_LABEL;
+          const sb = String(getSortValue(b, lvl.subField) || "").trim() || EMPTY_LABEL;
+          const parentKey = Object.keys(lvl.subOrders).find((k) => k.toLowerCase() === parent.toLowerCase());
+          const orderList = parentKey ? lvl.subOrders[parentKey] : null;
+          const sc = orderList ? compareByOrder(sa, sb, orderList) : compareText(sa, sb);
+          if (sc !== 0) return sc > 0 ? 1 : -1;
+        }
       }
       return 0;
     }));
@@ -314,8 +413,23 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
         <span className="text-[11px] text-stone-500">Level 1 wins, ties fall to the next level</span>
       </div>
 
+      {/* Quick presets */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+        <span className="text-[11px] text-stone-500">Quick start:</span>
+        {PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => applyPreset(p.defs)}
+            className="px-2 py-1 rounded-full text-[11px] font-medium text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-100 transition-colors"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       {levels.length === 0 && (
-        <p className="text-xs text-stone-500 mb-2">Add a sort level to get started.</p>
+        <p className="text-xs text-stone-500 mb-2">Add a sort level to get started, or pick a quick start above.</p>
       )}
 
       <div className="space-y-2">
@@ -342,7 +456,9 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
                 className="shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 transition-colors"
                 title="Toggle direction"
               >
-                {lvl.dir === "asc" ? "A \u2192 Z" : "Z \u2192 A"}
+                {fieldMeta(lvl.field).numeric
+                  ? (lvl.dir === "asc" ? "Low \u2192 High" : "High \u2192 Low")
+                  : (lvl.dir === "asc" ? "A \u2192 Z" : "Z \u2192 A")}
               </button>
               <div className="shrink-0 flex flex-col">
                 <button type="button" onClick={() => moveLevel(idx, -1)} disabled={idx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30 leading-none" title="Move level up">
@@ -357,21 +473,73 @@ const AdvancedSortPanel = ({ rows, onApply, onClose }) => {
               </button>
             </div>
 
-            {/* Custom value order for category / collection levels */}
+            {/* Custom value order for orderable fields (category, collection, style…) */}
             {lvl.valueOrder && (
-              <div className="mt-2 pl-7 space-y-1">
-                {lvl.valueOrder.map((val, vIdx) => (
-                  <div key={val} className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-md px-2 py-1">
-                    <span className="text-[11px] font-semibold text-indigo-600 w-4 text-center">{vIdx + 1}</span>
-                    <span className="flex-1 text-xs text-stone-700 truncate">{val}</span>
-                    <button type="button" onClick={() => moveValue(lvl.id, vIdx, -1)} disabled={vIdx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move up">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-                    </button>
-                    <button type="button" onClick={() => moveValue(lvl.id, vIdx, 1)} disabled={vIdx === lvl.valueOrder.length - 1} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move down">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                  </div>
-                ))}
+              <div className="mt-2 pl-7">
+                {/* Optional nested sub-sort inside each group */}
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[11px] text-stone-500 shrink-0">Sub-sort inside each group:</span>
+                  <select
+                    value={lvl.subField || ""}
+                    onChange={(e) => changeSubField(lvl.id, e.target.value || null)}
+                    className="text-[11px] px-1.5 py-1 rounded-md border border-stone-200 bg-white focus:border-indigo-400 outline-none"
+                  >
+                    <option value="">None</option>
+                    {SORT_FIELDS.filter((f) => f.orderable && f.id !== lvl.field).map((f) => (
+                      <option key={f.id} value={f.id}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  {lvl.valueOrder.map((val, vIdx) => {
+                    const subList = lvl.subField && lvl.subOrders ? lvl.subOrders[val] : null;
+                    const isOpen = !!lvl.expanded[val];
+                    return (
+                      <div key={val}>
+                        <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-md px-2 py-1">
+                          <span className="text-[11px] font-semibold text-indigo-600 w-4 text-center">{vIdx + 1}</span>
+                          <span className="flex-1 text-xs text-stone-700 truncate">{val}</span>
+                          {subList && subList.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(lvl.id, val)}
+                              className="flex items-center gap-0.5 text-[10px] font-medium text-purple-600 hover:text-purple-800"
+                              title={`Arrange ${fieldMeta(lvl.subField).label} order inside ${val}`}
+                            >
+                              {subList.length}
+                              <svg className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                          )}
+                          <button type="button" onClick={() => moveValue(lvl.id, vIdx, -1)} disabled={vIdx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move up">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                          </button>
+                          <button type="button" onClick={() => moveValue(lvl.id, vIdx, 1)} disabled={vIdx === lvl.valueOrder.length - 1} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move down">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                        </div>
+
+                        {/* Sub-value order inside this group */}
+                        {subList && isOpen && (
+                          <div className="mt-1 mb-1.5 ml-6 pl-2 border-l-2 border-purple-200 space-y-1">
+                            {subList.map((subVal, sIdx) => (
+                              <div key={subVal} className="flex items-center gap-2 bg-purple-50/60 border border-purple-100 rounded-md px-2 py-0.5">
+                                <span className="text-[10px] font-semibold text-purple-500 w-4 text-center">{sIdx + 1}</span>
+                                <span className="flex-1 text-[11px] text-stone-600 truncate">{subVal}</span>
+                                <button type="button" onClick={() => moveSubValue(lvl.id, val, sIdx, -1)} disabled={sIdx === 0} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move up">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                                </button>
+                                <button type="button" onClick={() => moveSubValue(lvl.id, val, sIdx, 1)} disabled={sIdx === subList.length - 1} className="text-stone-400 hover:text-stone-700 disabled:opacity-30" title="Move down">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
