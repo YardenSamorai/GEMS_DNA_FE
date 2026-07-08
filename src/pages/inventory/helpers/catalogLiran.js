@@ -166,6 +166,14 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 10;
 
+  // jsPDF's align:"center" ignores charSpace, so letter-spaced headings
+  // drift to the right. Compute the real painted width (spacing between
+  // glyphs included) and place the text manually.
+  const textCenteredSpaced = (str, centerX, y, charSpace) => {
+    const w = pdf.getTextWidth(str) + charSpace * (str.length - 1);
+    pdf.text(str, centerX - w / 2, y, { charSpace });
+  };
+
   const fonts = await loadFonts();
   let TITLE_FONT = "helvetica";
   let BODY_FONT = "helvetica";
@@ -261,7 +269,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
     pdf.setFont(TITLE_FONT, "normal");
     pdf.setFontSize(14);
     pdf.setTextColor(240, 240, 240);
-    pdf.text(section.heading, pageWidth / 2, aboutY, { align: "center", charSpace: 1.6 });
+    textCenteredSpaced(section.heading, pageWidth / 2, aboutY, 1.6);
     // short accent line under the heading
     pdf.setDrawColor(170, 170, 170);
     pdf.setLineWidth(0.3);
@@ -486,7 +494,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   pdf.setFont(TITLE_FONT, "normal");
   pdf.setFontSize(24);
   pdf.setTextColor(255, 255, 255);
-  pdf.text("CONTACT US", pageWidth / 2, contactTitleY, { align: "center", charSpace: 1 });
+  textCenteredSpaced("CONTACT US", pageWidth / 2, contactTitleY, 1);
   pdf.setDrawColor(170, 170, 170);
   pdf.setLineWidth(0.3);
   pdf.line(pageWidth / 2 - 14, contactTitleY + 3.5, pageWidth / 2 + 14, contactTitleY + 3.5);
@@ -510,7 +518,7 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   pdf.setFont(TITLE_FONT, "normal");
   pdf.setFontSize(10.5);
   pdf.setTextColor(235, 235, 235);
-  pdf.text("NEW YORK OFFICE", pageWidth / 2, cy, { align: "center", charSpace: 1.2 });
+  textCenteredSpaced("NEW YORK OFFICE", pageWidth / 2, cy, 1.2);
   cy += 6;
   pdf.setFont(BODY_FONT, "normal");
   pdf.setFontSize(10);
