@@ -124,6 +124,34 @@ const trimWhitespace = (dataUrl) =>
 const itemUrl = (stone) =>
   stone.sku ? `https://eshed.com/eshed/${encodeURIComponent(stone.sku)}/` : null;
 
+// Where "View more" points when the item's product page no longer exists.
+const CATALOG_FALLBACK_URL = "https://eshed.com/shop/";
+
+// Ask the backend which SKUs still have a live page on eshed.com. Returns a
+// lower-cased Set of DEAD skus. Any failure returns an empty set (fail open:
+// better an occasional dead link than wrongly rerouting live ones).
+const fetchDeadSkus = async (stones) => {
+  const skus = [...new Set(stones.map((s) => String(s.sku || "").trim()).filter(Boolean))];
+  if (skus.length === 0) return new Set();
+  try {
+    const res = await fetch(`${API_BASE}/api/check-product-links`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ skus }),
+    });
+    if (!res.ok) return new Set();
+    const data = await res.json();
+    return new Set(
+      Object.entries(data.results || {})
+        .filter(([, alive]) => alive === false)
+        .map(([sku]) => sku.toLowerCase())
+    );
+  } catch (e) {
+    console.warn("Product link check failed, keeping original links:", e);
+    return new Set();
+  }
+};
+
 const itemTypeLabel = (stone) => {
   if (stone.category === "Jewelry") return stone.jewelryType || "Jewelry";
   return stone.category || "Gemstone";
@@ -316,8 +344,12 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
     pdf.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, fY, { align: "right" });
   };
 
-  // Pre-load all item images in parallel (same proxy as the regular catalog).
-  const images = await Promise.all(selectedStones.map((s) => loadItemImage(s.imageUrl)));
+  // Pre-load all item images and check which product pages are still live
+  // on eshed.com, in parallel (same proxy as the regular catalog).
+  const [images, deadSkus] = await Promise.all([
+    Promise.all(selectedStones.map((s) => loadItemImage(s.imageUrl))),
+    fetchDeadSkus(selectedStones),
+  ]);
 
   const gridTop = HEADER_H + 5;
   const gridBottom = pageHeight - 18;
@@ -411,7 +443,12 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       }
 
       // Product page link — blue + underlined when the item has a DNA page.
-      const url = itemUrl(stone);
+      // Items whose page was removed from eshed.com link to the shop catalog
+      // instead of a dead product URL.
+      let url = itemUrl(stone);
+      if (url && deadSkus.has(String(stone.sku || "").trim().toLowerCase())) {
+        url = CATALOG_FALLBACK_URL;
+      }
       pdf.setFontSize(6.3);
       if (url) {
         const label = "View more images & videos";
