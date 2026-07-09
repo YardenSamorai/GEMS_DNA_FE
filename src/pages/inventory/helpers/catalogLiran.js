@@ -125,7 +125,7 @@ const itemUrl = (stone) =>
   stone.sku ? `https://eshed.com/eshed/${encodeURIComponent(stone.sku)}/` : null;
 
 // Where "View more" points when the item's product page no longer exists.
-const CATALOG_FALLBACK_URL = "https://eshed.com/shop/";
+const CATALOG_FALLBACK_URL = "https://eshed.com/product-category/jewelry/";
 
 // Ask the backend which SKUs still have a live page on eshed.com. Returns a
 // lower-cased Set of DEAD skus. Any failure returns an empty set (fail open:
