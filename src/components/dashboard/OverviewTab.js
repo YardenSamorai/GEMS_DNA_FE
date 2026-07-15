@@ -4,6 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import { ensureOccasionTasks } from "../../services/crmApi";
 import { activityRowLink, activityIconMeta, timeAgo } from "../../utils/activity";
 import { useTeam } from "../../context/TeamContext";
+import SyncHistoryCard from "./SyncHistoryCard";
 
 const API_BASE =
   process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
@@ -399,6 +400,13 @@ const OverviewTab = ({ onJumpTab, drillTabs }) => {
           )}
         </div>
       </section>
+
+      {/* ─── Inventory sync log (admins only) ─── */}
+      {!isRep && (
+        <section>
+          <SyncHistoryCard />
+        </section>
+      )}
 
       {/* ─── Drill into a domain ─── */}
       {Array.isArray(drillTabs) && drillTabs.length > 0 && (
