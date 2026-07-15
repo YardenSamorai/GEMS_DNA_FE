@@ -8,10 +8,10 @@ const API_BASE =
  * SyncHistoryCard — "Inventory sync" panel on the Dashboard Overview tab
  * (admins only).
  *
- * Shows the outcome of every Barak stone sync — both the scheduled Render
- * cron job and manual runs from the Sync button — backed by the BE sync_log
- * table via GET /api/sync/history. The card surfaces the latest runs inline
- * and opens a modal with the full log.
+ * Shows the outcome of every Barak sync — stones (SOAP) and jewelry (FTP
+ * CSV), both the scheduled Render cron jobs and manual runs — backed by the
+ * BE sync_log table via GET /api/sync/history. The card surfaces the latest
+ * run of each feed inline and opens a modal with the full log.
  * ============================================================================ */
 
 const fmtWhen = (iso) => {
@@ -55,6 +55,18 @@ const SourceBadge = ({ source }) => (
   </span>
 );
 
+const TypeBadge = ({ type }) => (
+  <span
+    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${
+      type === "jewelry"
+        ? "bg-amber-500/10 text-amber-700"
+        : "bg-violet-500/10 text-violet-700"
+    }`}
+  >
+    {type === "jewelry" ? "Jewelry" : "Stones"}
+  </span>
+);
+
 const StatusDot = ({ ok }) => (
   <span
     className={`inline-flex h-2 w-2 shrink-0 rounded-full ${ok ? "bg-emerald-500" : "bg-rose-500"}`}
@@ -70,11 +82,12 @@ const Row = ({ run }) => (
         <span className="text-[13px] font-medium text-app-ink tabular-nums">
           {fmtWhen(run.started_at)}
         </span>
+        <TypeBadge type={run.sync_type} />
         <SourceBadge source={run.source} />
       </div>
       <p className="truncate text-[11px] text-app-muted">
         {run.success
-          ? `${Number(run.stones_count || 0).toLocaleString()} stones · ${fmtDuration(run.duration_ms)}`
+          ? `${Number(run.stones_count || 0).toLocaleString()} ${run.sync_type === "jewelry" ? "jewelry items" : "stones"} · ${fmtDuration(run.duration_ms)}`
           : run.message || "Sync failed"}
       </p>
     </div>
@@ -104,7 +117,22 @@ const SyncHistoryCard = () => {
     return () => { alive = false; };
   }, []);
 
-  const latest = history?.[0] || null;
+  // Latest run of each feed — a jewelry run shouldn't hide the stones status
+  // (and vice versa), so the summary strip shows one line per feed.
+  const latestRuns = React.useMemo(() => {
+    if (!history?.length) return [];
+    const seen = new Set();
+    const out = [];
+    for (const run of history) {
+      const t = run.sync_type === "jewelry" ? "jewelry" : "stones";
+      if (!seen.has(t)) {
+        seen.add(t);
+        out.push(run);
+      }
+      if (seen.size === 2) break;
+    }
+    return out;
+  }, [history]);
 
   return (
     <>
@@ -113,7 +141,7 @@ const SyncHistoryCard = () => {
           <div>
             <h2 className="text-[13px] font-semibold tracking-tight text-app-ink">Inventory sync</h2>
             <p className="text-[11px] text-app-muted">
-              Barak stone syncs — automatic (twice a day) and manual runs.
+              Barak stone &amp; jewelry syncs — automatic and manual runs.
             </p>
           </div>
           {history?.length > 0 && (
@@ -141,31 +169,35 @@ const SyncHistoryCard = () => {
           </p>
         ) : (
           <>
-            {/* Latest run summary strip */}
-            {latest && (
-              <div
-                className={`mb-3 flex items-center gap-3 rounded-2xl border px-3 py-2.5 ${
-                  latest.success
-                    ? "border-emerald-500/25 bg-emerald-500/8"
-                    : "border-rose-500/25 bg-rose-500/8"
-                }`}
-              >
-                <StatusDot ok={latest.success} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12.5px] font-semibold text-app-ink">
-                    {latest.success
-                      ? `Last sync: ${Number(latest.stones_count || 0).toLocaleString()} stones`
-                      : "Last sync failed"}
-                  </p>
-                  <p className="truncate text-[11px] text-app-muted">
-                    {fmtWhen(latest.started_at)} · {latest.source === "cron" ? "automatic" : "manual"}
-                    {latest.success
-                      ? ` · took ${fmtDuration(latest.duration_ms)}`
-                      : latest.message ? ` · ${latest.message}` : ""}
-                  </p>
+            {/* Latest run summary — one strip per feed (stones / jewelry) */}
+            {latestRuns.map((run) => {
+              const isJewelry = run.sync_type === "jewelry";
+              return (
+                <div
+                  key={run.id}
+                  className={`mb-3 flex items-center gap-3 rounded-2xl border px-3 py-2.5 ${
+                    run.success
+                      ? "border-emerald-500/25 bg-emerald-500/8"
+                      : "border-rose-500/25 bg-rose-500/8"
+                  }`}
+                >
+                  <StatusDot ok={run.success} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12.5px] font-semibold text-app-ink">
+                      {run.success
+                        ? `Last ${isJewelry ? "jewelry" : "stones"} sync: ${Number(run.stones_count || 0).toLocaleString()} ${isJewelry ? "items" : "stones"}`
+                        : `Last ${isJewelry ? "jewelry" : "stones"} sync failed`}
+                    </p>
+                    <p className="truncate text-[11px] text-app-muted">
+                      {fmtWhen(run.started_at)} · {run.source === "cron" ? "automatic" : "manual"}
+                      {run.success
+                        ? ` · took ${fmtDuration(run.duration_ms)}`
+                        : run.message ? ` · ${run.message}` : ""}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })}
             <div className="space-y-0.5">
               {history.slice(0, 5).map((run) => <Row key={run.id} run={run} />)}
             </div>
