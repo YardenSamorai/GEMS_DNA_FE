@@ -9,7 +9,8 @@ import {
 } from "../../utils/shareStones";
 import { fetchJewelryCatalog } from "../../services/jewelryApi";
 import { getDisplayShape } from "../inventory/helpers/constants";
-import { norm, money, usableImg, enhanceVimeoUrl, StonePlaceholder, prettyBranch } from "./SalesInventory";
+import { norm, money, usableImg, StonePlaceholder, prettyBranch } from "./SalesInventory";
+import VimeoEmbed from "./VimeoEmbed";
 import { mapRow as mapJewelryRow } from "./SalesJewelry";
 import { useTeam } from "../../context/TeamContext";
 import { useSelection } from "../../context/SelectionContext";
@@ -273,14 +274,7 @@ const JewelryDetail = () => {
             ))}
             {video && (
               <div key="video" className="aspect-square w-full shrink-0 snap-center bg-black">
-                <iframe
-                  src={enhanceVimeoUrl(video)}
-                  title={`${item.sku} video`}
-                  className="h-full w-full"
-                  frameBorder="0"
-                  allow="autoplay; fullscreen"
-                  allowFullScreen
-                />
+                <VimeoEmbed src={video} title={`${item.sku} video`} />
               </div>
             )}
           </div>

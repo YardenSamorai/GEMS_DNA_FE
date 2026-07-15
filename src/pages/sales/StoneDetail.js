@@ -25,12 +25,12 @@ import {
   money,
   resolveLocation,
   usableImg,
-  enhanceVimeoUrl,
   hasCert,
   adjustSalesPrices,
   StonePlaceholder,
   prettyBranch,
 } from "./SalesInventory";
+import VimeoEmbed from "./VimeoEmbed";
 
 /* ============================================================================
  * StoneDetail — the per-stone product page behind the sales catalog cards.
@@ -420,14 +420,7 @@ const StoneDetail = () => {
             ))}
             {videos.map((src, vi) => (
               <div key={src} className="aspect-square w-full shrink-0 snap-center bg-black">
-                <iframe
-                  src={enhanceVimeoUrl(src)}
-                  title={`${stone.sku} video${vi > 0 ? ` ${vi + 1}` : ""}`}
-                  className="h-full w-full"
-                  frameBorder="0"
-                  allow="autoplay; fullscreen"
-                  allowFullScreen
-                />
+                <VimeoEmbed src={src} title={`${stone.sku} video${vi > 0 ? ` ${vi + 1}` : ""}`} />
               </div>
             ))}
           </div>
