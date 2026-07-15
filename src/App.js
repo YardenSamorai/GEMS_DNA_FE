@@ -283,6 +283,14 @@ const AppLayout = () => {
     return <FullScreenLoader />;
   }
 
+  // /api/team/me failed (after retries) — we don't know who this user is, so
+  // we must NOT render the app shell (the old code fell back to full owner
+  // access here, letting restricted members see everything). Fail closed with
+  // a retry screen instead.
+  if (clerkLoaded && isSignedIn && team?.ready && team?.loadError) {
+    return <WorkspaceLoadErrorScreen onRetry={team.refresh} />;
+  }
+
   // Hard redirect: store-portal users have no business inside the
   // sidebar app at all. Send them to /store-portal the moment we
   // resolve their role.
@@ -392,6 +400,40 @@ const DeniedLogger = ({ resource, path }) => {
     trackDenied(resource, { path });
   }, [resource, path]);
   return null;
+};
+
+// Shown when /api/team/me keeps failing — we can't resolve the user's role,
+// so we render nothing but a retry prompt (never the app shell).
+const WorkspaceLoadErrorScreen = ({ onRetry }) => {
+  const [retrying, setRetrying] = useState(false);
+  const retry = async () => {
+    setRetrying(true);
+    try { await onRetry?.(); } finally { setRetrying(false); }
+  };
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="glass-surface-strong rounded-3xl px-8 py-10 max-w-md w-full text-center">
+        <div className="relative w-16 h-16 mx-auto rounded-2xl bg-app-ink flex items-center justify-center">
+          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </div>
+        <h2 className="text-[22px] font-semibold tracking-tight text-app-ink mt-6">Couldn't load your workspace</h2>
+        <p className="text-[14px] text-app-muted mt-2 leading-relaxed">
+          We couldn't verify your account and permissions. This is usually a temporary
+          connection issue — please try again.
+        </p>
+        <button
+          type="button"
+          onClick={retry}
+          disabled={retrying}
+          className="mt-6 rounded-xl bg-app-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+        >
+          {retrying ? "Retrying…" : "Try again"}
+        </button>
+      </div>
+    </div>
+  );
 };
 
 // Shown to a signed-in member whose admin hasn't granted them any section yet.

@@ -51,6 +51,7 @@ const normalizePermissions = (raw) => {
 const TeamContext = createContext({
   loading: true,
   ready: false,
+  loadError: false,
   me: null,
   members: [],
   membersById: {},
@@ -78,6 +79,7 @@ export const TeamProvider = ({ children }) => {
   const [state, setState] = useState({
     loading: true,
     ready: false,
+    loadError: false,
     me: null,
     members: [],
     tenantUserId: null,
@@ -103,38 +105,51 @@ export const TeamProvider = ({ children }) => {
       setState((s) => ({ ...s, loading: false, ready: false }));
       return;
     }
-    try {
-      const data = await fetchTeamMe(actor);
-      setState({
-        loading: false,
-        ready: true,
-        me: data?.me || null,
-        members: Array.isArray(data?.members) ? data.members : [],
-        tenantUserId: data?.tenantUserId || actor.id,
-        actorUserId: data?.actorUserId || actor.id,
-        role: data?.role || "owner",
-        permissions: data?.permissions || data?.me?.permissions || null,
-        isOwner: data?.isOwner !== undefined ? !!data.isOwner : true,
-        isStoreUser: !!data?.isStoreUser,
-        companyId: data?.companyId || null,
-      });
-    } catch (e) {
-      // Failure should never break the app — fall back to "you're a solo owner".
-      console.warn("TeamProvider /me failed:", e.message);
-      setState({
-        loading: false,
-        ready: true,
-        me: null,
-        members: [],
-        tenantUserId: actor.id,
-        actorUserId: actor.id,
-        role: "owner",
-        permissions: ADMIN_PERMISSIONS,
-        isOwner: true,
-        isStoreUser: false,
-        companyId: null,
-      });
+    // /me is the single call every permission gate keys off, so ride out
+    // transient failures (network blip, backend cold start) with retries
+    // before giving up.
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const data = await fetchTeamMe(actor);
+        setState({
+          loading: false,
+          ready: true,
+          loadError: false,
+          me: data?.me || null,
+          members: Array.isArray(data?.members) ? data.members : [],
+          tenantUserId: data?.tenantUserId || actor.id,
+          actorUserId: data?.actorUserId || actor.id,
+          role: data?.role || "owner",
+          permissions: data?.permissions || data?.me?.permissions || null,
+          isOwner: data?.isOwner !== undefined ? !!data.isOwner : true,
+          isStoreUser: !!data?.isStoreUser,
+          companyId: data?.companyId || null,
+        });
+        return;
+      } catch (e) {
+        console.warn(`TeamProvider /me failed (attempt ${attempt}/3):`, e.message);
+        if (attempt < 3) await sleep(1500 * attempt);
+      }
     }
+    // Fail CLOSED. The old behaviour fell back to "solo owner" (full admin
+    // shell + every nav section), which let a restricted member see the whole
+    // app whenever /me errored out. Instead we surface a retry screen via
+    // `loadError` and grant no role at all.
+    setState({
+      loading: false,
+      ready: true,
+      loadError: true,
+      me: null,
+      members: [],
+      tenantUserId: actor.id,
+      actorUserId: actor.id,
+      role: null,
+      permissions: null,
+      isOwner: false,
+      isStoreUser: false,
+      companyId: null,
+    });
   }, [isSignedIn, actor]);
 
   useEffect(() => { refresh(); }, [refresh]);
