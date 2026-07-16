@@ -2,35 +2,39 @@ import React, { useEffect, useRef, useState } from "react";
 import Player from "@vimeo/player";
 import { enhanceVimeoUrl } from "./SalesInventory";
 
+const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
+
 /* ============================================================================
- * VimeoEmbed — quality-locked Vimeo iframe for the product pages.
+ * VimeoEmbed — full-quality video for the product pages.
  *
- * Vimeo's adaptive player picks the stream rendition from the player's CSS
- * size (ignoring devicePixelRatio) and its bandwidth estimate. On phones the
- * ~390px square player gets the soft 240p/360p stream: the first second looks
- * sharp (initial segment), then ABR "adapts" down and the quality visibly
- * drops. Desktop players are big enough to receive 1080p, which is why the
- * same videos look fine there.
+ * Why not just the Vimeo iframe? iOS Safari plays embedded Vimeo through
+ * Apple's native HLS engine, which picks the rendition by player size and
+ * ignores every quality instruction (URL param, SDK setQuality). A ~390px
+ * square player gets the blurry 240p/360p stream no matter what we ask —
+ * that's why videos looked great on desktop but terrible on iPhone.
  *
- * Fix: drive the player with the official @vimeo/player SDK and LOCK the
- * quality to the highest rendition the video offers (setQuality disables
- * adaptive switching entirely — the player buffers instead of degrading).
+ * Fix: the BE exposes /api/vimeo-file/:id (Vimeo API + Pro account), which
+ * returns the direct progressive MP4 at the highest rendition (usually
+ * 1080p). We play that in a native <video> — one fixed-quality file, no
+ * adaptive engine, no way to degrade. A big centered play button starts it.
  *
- * The tiny native play button is also a fiddly tap target on phones, so we
- * overlay our own big centered play button; the SDK's play / pause / ended
- * events keep it in sync (it reappears when the video is paused or ends).
- *
- * Non-Vimeo sources (V360 spins, YouTube) render as a plain full-size iframe.
+ * If the MP4 can't be resolved (endpoint down, token missing, brand-new
+ * video still transcoding) we fall back to the old quality-locked iframe.
+ * Non-Vimeo sources (V360 spins, YouTube) render as a plain iframe.
  * ========================================================================== */
 
-/* Highest-first preference order for locked playback quality. */
-const QUALITY_ORDER = ["2160p", "1440p", "1080p", "720p", "540p"];
+const vimeoId = (url) => {
+  const m = /player\.vimeo\.com\/video\/(\d+)/i.exec(url || "");
+  return m ? m[1] : null;
+};
+
+/* In-module cache so swiping back and forth doesn't refetch the link. */
+const fileCache = new Map(); // videoId -> link | null (null = resolution failed)
 
 /* IMPORTANT (iOS): this overlay is never unmounted — it fades out via CSS
  * (`opacity-0 pointer-events-none`) when playback starts. Removing a DOM node
  * mid-touch is a long-standing Safari bug that breaks tap-to-click dispatch
- * for the whole page afterwards (scrolling keeps working but taps go dead),
- * which is exactly what unmounting the button on tap used to trigger. */
+ * for the whole page afterwards (scrolling keeps working but taps go dead). */
 const PlayOverlay = ({ onClick, hidden }) => (
   <button
     type="button"
@@ -48,15 +52,58 @@ const PlayOverlay = ({ onClick, hidden }) => (
   </button>
 );
 
-const VimeoEmbed = ({ src, title }) => {
-  const isVimeo = /player\.vimeo\.com\/video\//i.test(src || "");
+/* ---- Native MP4 player (the preferred path) ------------------------------ */
+const NativeVideo = ({ fileUrl, title }) => {
+  const videoRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+
+  // Pause before unmount so iOS doesn't hold a dangling media session.
+  useEffect(() => {
+    const el = videoRef.current;
+    return () => {
+      try {
+        el?.pause();
+      } catch {
+        /* non-fatal */
+      }
+    };
+  }, []);
+
+  const handlePlay = () => {
+    videoRef.current?.play().catch(() => {});
+  };
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-black">
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <video
+        ref={videoRef}
+        src={fileUrl}
+        title={title}
+        className="h-full w-full object-contain"
+        playsInline
+        loop
+        controls={playing}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+      />
+      <PlayOverlay onClick={handlePlay} hidden={playing} />
+    </div>
+  );
+};
+
+/* ---- Quality-locked iframe (fallback path) ------------------------------- */
+const QUALITY_ORDER = ["2160p", "1440p", "1080p", "720p", "540p"];
+
+const IframeVideo = ({ src, title }) => {
   const iframeRef = useRef(null);
   const playerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    if (!isVimeo || !iframeRef.current) return undefined;
-
+    if (!iframeRef.current) return undefined;
     const player = new Player(iframeRef.current);
     playerRef.current = player;
 
@@ -66,8 +113,6 @@ const VimeoEmbed = ({ src, title }) => {
     player.on("pause", onStop);
     player.on("ended", onStop);
 
-    // Lock the highest rendition this video actually has. getQualities tells
-    // us what exists; if it isn't available we blind-try from the top.
     player
       .ready()
       .then(async () => {
@@ -76,38 +121,31 @@ const VimeoEmbed = ({ src, title }) => {
           const qualities = await player.getQualities();
           available = (qualities || []).map((q) => q.id || q);
         } catch {
-          /* getQualities unsupported — fall through to blind attempts */
+          /* getQualities unsupported */
         }
         for (const q of QUALITY_ORDER) {
           if (available.length && !available.includes(q)) continue;
           try {
             await player.setQuality(q);
-            return; // locked
+            return;
           } catch {
-            /* rendition rejected — try the next one down */
+            /* try next */
           }
         }
       })
-      .catch(() => {
-        /* player never became ready — leave defaults */
-      });
+      .catch(() => {});
 
     return () => {
       player.off("play", onPlay);
       player.off("pause", onStop);
       player.off("ended", onStop);
-      // Stop playback before the iframe unmounts so iOS doesn't keep a
-      // dangling active media session for a removed player.
       try {
         player.pause().catch(() => {});
       } catch {
         /* already gone */
       }
-      // iOS Safari: removing an iframe while it holds focus (the user tapped
-      // the video / its controls) breaks tap hit-testing for the ENTIRE page
-      // afterwards — scrolling still works but no element receives clicks
-      // until a reload. Blurring the iframe before it leaves the DOM releases
-      // the ghost focus and keeps taps alive after Back navigation.
+      // iOS: release ghost focus from the removed iframe, otherwise taps die
+      // page-wide after Back navigation.
       try {
         const ae = document.activeElement;
         if (ae && (ae === iframeRef.current || ae.tagName === "IFRAME")) {
@@ -119,25 +157,12 @@ const VimeoEmbed = ({ src, title }) => {
       }
       playerRef.current = null;
     };
-  }, [isVimeo]);
+  }, []);
 
   const handlePlay = () => {
     playerRef.current?.play().catch(() => {});
     setPlaying(true);
   };
-
-  if (!isVimeo) {
-    return (
-      <iframe
-        src={src}
-        title={title}
-        className="h-full w-full"
-        frameBorder="0"
-        allow="autoplay; fullscreen"
-        allowFullScreen
-      />
-    );
-  }
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -152,6 +177,60 @@ const VimeoEmbed = ({ src, title }) => {
       />
       <PlayOverlay onClick={handlePlay} hidden={playing} />
     </div>
+  );
+};
+
+/* ---- Entry component ------------------------------------------------------ */
+const VimeoEmbed = ({ src, title }) => {
+  const id = vimeoId(src);
+  // undefined = still resolving, null = failed (use iframe), string = MP4 url
+  const [fileUrl, setFileUrl] = useState(() => (id && fileCache.has(id) ? fileCache.get(id) : undefined));
+
+  useEffect(() => {
+    if (!id || fileUrl !== undefined) return undefined;
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/vimeo-file/${id}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const link = data?.link || null;
+        fileCache.set(id, link);
+        if (alive) setFileUrl(link);
+      } catch {
+        fileCache.set(id, null);
+        if (alive) setFileUrl(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  if (!id) {
+    // Non-Vimeo (V360, YouTube) — plain iframe, untouched.
+    return (
+      <iframe
+        src={src}
+        title={title}
+        className="h-full w-full"
+        frameBorder="0"
+        allow="autoplay; fullscreen"
+        allowFullScreen
+      />
+    );
+  }
+
+  if (fileUrl === undefined) {
+    // Resolving the direct file — brief black placeholder (sub-second).
+    return <div className="h-full w-full bg-black" />;
+  }
+
+  return fileUrl ? (
+    <NativeVideo fileUrl={fileUrl} title={title} />
+  ) : (
+    <IframeVideo src={src} title={title} />
   );
 };
 
