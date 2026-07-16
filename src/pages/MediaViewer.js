@@ -22,6 +22,14 @@ import { useSearchParams } from "react-router-dom";
 
 const IMAGE_RE = /\.(jpe?g|png|webp|gif)(\?|$)/i;
 
+/* Direct video FILES (Vimeo's progressive MP4s) play in the native <video>
+ * player at full quality. Anything else — V360 spins, player pages — is an
+ * interactive web viewer, not a file, and must be embedded as an iframe. */
+const isVideoFile = (src) =>
+  /\.(mp4|webm|mov|m4v)(\?|$)/i.test(src) ||
+  /vimeocdn\.com/i.test(src) ||
+  /player\.vimeo\.com\/progressive/i.test(src);
+
 const MediaViewer = () => {
   const [params] = useSearchParams();
   const type = (params.get("type") || "").toLowerCase();
@@ -53,6 +61,18 @@ const MediaViewer = () => {
           <p className="max-w-sm text-center text-[14px] leading-relaxed text-white/60">
             This link is missing or invalid.
           </p>
+        ) : type === "video" && !isVideoFile(src) ? (
+          /* Interactive viewers (V360 spins, player pages) — embedded frame.
+             The viewer page itself handles playback and drag-to-spin. */
+          <div className="w-full max-w-[720px] overflow-hidden rounded-2xl bg-black shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
+            <iframe
+              src={src}
+              title={sku ? `${sku} video` : "Video"}
+              className="aspect-square w-full border-0"
+              allow="autoplay; fullscreen"
+              allowFullScreen
+            />
+          </div>
         ) : type === "video" ? (
           <div className="relative w-full max-w-[720px] overflow-hidden rounded-2xl bg-black shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
