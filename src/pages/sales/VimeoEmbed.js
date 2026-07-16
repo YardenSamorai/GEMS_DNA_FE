@@ -26,12 +26,21 @@ import { enhanceVimeoUrl } from "./SalesInventory";
 /* Highest-first preference order for locked playback quality. */
 const QUALITY_ORDER = ["2160p", "1440p", "1080p", "720p", "540p"];
 
-const PlayOverlay = ({ onClick }) => (
+/* IMPORTANT (iOS): this overlay is never unmounted — it fades out via CSS
+ * (`opacity-0 pointer-events-none`) when playback starts. Removing a DOM node
+ * mid-touch is a long-standing Safari bug that breaks tap-to-click dispatch
+ * for the whole page afterwards (scrolling keeps working but taps go dead),
+ * which is exactly what unmounting the button on tap used to trigger. */
+const PlayOverlay = ({ onClick, hidden }) => (
   <button
     type="button"
     onClick={onClick}
     aria-label="Play video"
-    className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white shadow-[0_4px_24px_rgba(0,0,0,0.45)] backdrop-blur-sm transition active:scale-95"
+    aria-hidden={hidden}
+    tabIndex={hidden ? -1 : 0}
+    className={`absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white shadow-[0_4px_24px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-opacity duration-200 active:scale-95 ${
+      hidden ? "pointer-events-none opacity-0" : "opacity-100"
+    }`}
   >
     <svg className="ml-1 h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86A1 1 0 008 5.14z" />
@@ -87,6 +96,27 @@ const VimeoEmbed = ({ src, title }) => {
       player.off("play", onPlay);
       player.off("pause", onStop);
       player.off("ended", onStop);
+      // Stop playback before the iframe unmounts so iOS doesn't keep a
+      // dangling active media session for a removed player.
+      try {
+        player.pause().catch(() => {});
+      } catch {
+        /* already gone */
+      }
+      // iOS Safari: removing an iframe while it holds focus (the user tapped
+      // the video / its controls) breaks tap hit-testing for the ENTIRE page
+      // afterwards — scrolling still works but no element receives clicks
+      // until a reload. Blurring the iframe before it leaves the DOM releases
+      // the ghost focus and keeps taps alive after Back navigation.
+      try {
+        const ae = document.activeElement;
+        if (ae && (ae === iframeRef.current || ae.tagName === "IFRAME")) {
+          ae.blur();
+          window.focus();
+        }
+      } catch {
+        /* non-fatal */
+      }
       playerRef.current = null;
     };
   }, [isVimeo]);
@@ -120,7 +150,7 @@ const VimeoEmbed = ({ src, title }) => {
         allow="autoplay; fullscreen"
         allowFullScreen
       />
-      {!playing && <PlayOverlay onClick={handlePlay} />}
+      <PlayOverlay onClick={handlePlay} hidden={playing} />
     </div>
   );
 };
