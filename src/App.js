@@ -9,6 +9,8 @@ import { Toaster } from "react-hot-toast";
 import InventoryHub from "./pages/InventoryHub";
 import CustomerSharePage from "./pages/share/CustomerSharePage";
 import SignaturePage from "./pages/sign/SignaturePage";
+import MediaViewer from "./pages/MediaViewer";
+import ShareItemPage from "./pages/ShareItemPage";
 import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
 import LoginSheet from "./components/LoginSheet";
 import { motion } from "framer-motion";
@@ -683,6 +685,14 @@ function AppContent() {
               have a portal account. Also outside <AppLayout> and outside
               the Clerk gates so the recipient can sign without an account. */}
           <Route path="/sign/:token" element={<SignaturePage />} />
+
+          {/* Public branded media viewer — the CERT / VIDEO buttons inside the
+              exported catalog PDF land here (clients have no account, so it
+              lives outside the Clerk gates). */}
+          <Route path="/media" element={<MediaViewer />} />
+          {/* Public share composer — the SHARE button inside the exported
+              catalog PDF lands here (edit the price, then send on WhatsApp). */}
+          <Route path="/share-item" element={<ShareItemPage />} />
 
           {/* Standalone auth pages — must be registered BEFORE the catch-all
               `/:stone_id` route below, otherwise Clerk's hosted SignIn/SignUp

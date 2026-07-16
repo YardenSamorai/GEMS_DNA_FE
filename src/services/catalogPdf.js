@@ -30,7 +30,7 @@ import {
   fluorDisplay,
 } from "../pages/sales/SalesInventory";
 import { getMappedCategories } from "../utils/categoryMap";
-import { buildStoneShareText, withDirectVideoLinks } from "../utils/shareStones";
+import { withDirectVideoLinks } from "../utils/shareStones";
 
 /* ───────────────────────── item normalisers ───────────────────────── */
 
@@ -179,6 +179,43 @@ const httpOk = (u) => {
 };
 const itemVideoLink = (it) => httpOk(it.videoUrl) || httpOk(it.additionalVideos);
 const itemCertLink = (it) => httpOk(it.certificateUrl) || httpOk(it.certificateImageJpg);
+
+/* Compact item payload for the PDF's SHARE button → /share-item page. Only
+ * the fields the WhatsApp message template reads; empty values dropped, and
+ * every price field stripped when the catalog was exported without prices. */
+const SHARE_FIELDS = [
+  "kind", "sku", "category", "branch", "location",
+  "weightCt", "shape", "color", "clarity", "fluorescence", "lab",
+  "fancyIntensity", "fancyColor", "treatment", "ratio", "measurements",
+  "name", "title", "stoneType", "centerCarat", "totalCarat", "jewelryWeight",
+  "style", "metal", "jewelryType",
+  "rapPrice", "pricePerCt", "priceTotal", "price",
+  "videoUrl", "additionalVideos", "certificateUrl", "certificateImageJpg",
+  "imageUrl", "image", "additionalPictures",
+];
+
+const sharePayload = (it, showPrices) => {
+  const slim = {};
+  for (const k of SHARE_FIELDS) {
+    const v = it[k];
+    if (v != null && v !== "") slim[k] = v;
+  }
+  if (!showPrices) {
+    delete slim.rapPrice;
+    delete slim.pricePerCt;
+    delete slim.priceTotal;
+    delete slim.price;
+  }
+  return slim;
+};
+
+/* base64url — keeps the payload safe inside a PDF link annotation. */
+const encodePayload = (obj) =>
+  window
+    .btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
 /* ───────────────────────── image loading ───────────────────────── */
 
@@ -496,21 +533,24 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     }
 
     // Per-card action buttons — tappable link pills inside the PDF:
-    //   Cert / Video open the stone's certificate & video pages; Share opens
-    //   WhatsApp with the exact same message template the Action sheet sends.
+    //   Cert / Video open our branded /media viewer page (dark ESHED page
+    //   with the media front-and-center — a PDF can't open dialogs, so this
+    //   is the closest equivalent); Share opens WhatsApp with the exact same
+    //   message template the Action sheet sends.
+    const viewerUrl = (type, src) =>
+      `${window.location.origin}/media?type=${type}&sku=${encodeURIComponent(it.sku || "")}&src=${encodeURIComponent(src)}`;
     const buttons = [];
     const certL = itemCertLink(it);
-    if (certL) buttons.push({ label: "CERT", color: brand, url: certL });
+    if (certL) buttons.push({ label: "CERT", color: brand, url: viewerUrl("cert", certL) });
     const videoL = itemVideoLink(it);
-    if (videoL) buttons.push({ label: "VIDEO", color: [2, 132, 199], url: videoL });
-    const shareText = buildStoneShareText(it, { withPrice: showPrices });
-    if (shareText) {
-      buttons.push({
-        label: "SHARE",
-        color: [22, 163, 74],
-        url: `https://wa.me/?text=${encodeURIComponent(shareText)}`,
-      });
-    }
+    if (videoL) buttons.push({ label: "VIDEO", color: [2, 132, 199], url: viewerUrl("video", videoL) });
+    // SHARE opens our composer page — the price can be adjusted there before
+    // the message goes out (a PDF can't show an edit dialog itself).
+    buttons.push({
+      label: "SHARE",
+      color: [22, 163, 74],
+      url: `${window.location.origin}/share-item?p=${showPrices ? 1 : 0}&d=${encodePayload(sharePayload(it, showPrices))}`,
+    });
 
     const cardH = measureCard(it, titleLines, specs, price, buttons);
 
