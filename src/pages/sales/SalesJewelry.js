@@ -173,7 +173,6 @@ const FILTER_DEFAULTS = {
   jewelrySel: [],
   shapeSel: [],
   styleSel: [],
-  sizeSel: [],
   gemTypeSel: [],
   locationSel: [],
   onlyInStock: false,
@@ -304,8 +303,8 @@ export const mapRow = (row) => {
     jewelryWeight:
       row.jewelry_weight != null && row.jewelry_weight !== "" ? Number(row.jewelry_weight) : null,
     totalCarat: row.total_carat != null && row.total_carat !== "" ? Number(row.total_carat) : null,
-    // Ring size / necklace length from the feed, formatted for the Size filter
-    // chips ("6.5", "18"); "" when the piece has no size.
+    // Ring size / necklace length from the feed, cleaned up ("6.5", "18");
+    // shown as a spec row on the product page. "" when the piece has no size.
     size: fmtSize(row.jewelry_size),
     category:
       normalizeJewelryCategory(row.jewelry_type) ||
@@ -390,7 +389,6 @@ const SalesJewelry = () => {
   const [jewelrySel, setJewelrySel] = useState(saved.jewelrySel);
   const [shapeSel, setShapeSel] = useState(saved.shapeSel);
   const [styleSel, setStyleSel] = useState(saved.styleSel);
-  const [sizeSel, setSizeSel] = useState(saved.sizeSel || []);
   const [gemTypeSel, setGemTypeSel] = useState(saved.gemTypeSel);
   const [locationSel, setLocationSel] = useState(saved.locationSel);
   // Guaranteed available — hide pieces that are on memo or on hold.
@@ -471,7 +469,7 @@ const SalesJewelry = () => {
         JSON.stringify({
           t: Date.now(),
           f: {
-            jewelrySel, shapeSel, styleSel, sizeSel, gemTypeSel, locationSel, onlyInStock,
+            jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
             tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
             skuQuery, sortKey, sortDir,
           },
@@ -481,7 +479,7 @@ const SalesJewelry = () => {
       /* storage unavailable — non-fatal */
     }
   }, [
-    jewelrySel, shapeSel, styleSel, sizeSel, gemTypeSel, locationSel, onlyInStock,
+    jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -550,23 +548,6 @@ const SalesJewelry = () => {
     setStyleSel((prev) => prev.filter((s) => styleOptions.includes(s)));
   }, [styleOptions]);
 
-  // Size options follow the jewelry selection too (ring sizes for Rings,
-  // chain lengths for Necklaces, ...), sorted numerically.
-  const sizeOptions = useMemo(() => {
-    const set = new Set();
-    for (const r of rows) {
-      if (!matchesJewelry(r)) continue;
-      if (r.size) set.add(r.size);
-    }
-    return Array.from(set).sort((a, b) => Number(a) - Number(b));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, jewelrySel]);
-
-  // Drop selected sizes that are no longer offered after a jewelry change.
-  useEffect(() => {
-    setSizeSel((prev) => prev.filter((s) => sizeOptions.includes(s)));
-  }, [sizeOptions]);
-
   const filtered = useMemo(() => {
     const q = skuQuery.trim().toLowerCase();
     const out = rows.filter((r) => {
@@ -581,9 +562,6 @@ const SalesJewelry = () => {
       }
       if (styleSel.length && !styleSel.some((s) => s.toLowerCase() === (r.style || "").toLowerCase()))
         return false;
-      // Size — exact chip match; pieces without a size are excluded while the
-      // filter is active (same rule as the numeric range filters).
-      if (sizeSel.length && !sizeSel.includes(r.size)) return false;
       if (locationSel.length) {
         const loc = norm(r.branch);
         if (!locationSel.some((v) => (LOCATION_MATCH[v] || [v]).some((t) => loc.includes(t)))) return false;
@@ -618,7 +596,7 @@ const SalesJewelry = () => {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    rows, jewelrySel, shapeSel, styleSel, sizeSel, gemTypeSel, locationSel, onlyInStock,
+    rows, jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -682,7 +660,6 @@ const SalesJewelry = () => {
     setJewelrySel([]);
     setShapeSel([]);
     setStyleSel([]);
-    setSizeSel([]);
     setGemTypeSel([]);
     setLocationSel([]);
     setOnlyInStock(false);
@@ -713,7 +690,6 @@ const SalesJewelry = () => {
     jewelrySel.length +
     shapeSel.length +
     styleSel.length +
-    sizeSel.length +
     gemTypeSel.length +
     locationSel.length +
     (onlyInStock ? 1 : 0) +
@@ -1008,25 +984,6 @@ const SalesJewelry = () => {
                         <p className="text-[13px] text-app-soft">No styles available.</p>
                       )}
                     </section>
-
-                    {/* Size — ring sizes / chain lengths from the feed. Options
-                        follow the jewelry selection, like Style. */}
-                    {sizeOptions.length > 0 && (
-                      <section>
-                        <FieldLabel showClear={sizeSel.length > 0} onClear={() => setSizeSel([])}>
-                          Size
-                        </FieldLabel>
-                        <div className="scrollbar-hide -mx-5 overflow-x-auto px-5 pb-1">
-                          <div className={`grid grid-flow-col auto-cols-max gap-2 ${sizeOptions.length > 8 ? "grid-rows-2" : "grid-rows-1"}`}>
-                            {sizeOptions.map((s) => (
-                              <Chip key={s} active={sizeSel.includes(s)} onClick={() => toggleIn(setSizeSel)(s)}>
-                                {s}
-                              </Chip>
-                            ))}
-                          </div>
-                        </div>
-                      </section>
-                    )}
 
                     {/* Shape — same set as Emeralds. */}
                     <section>

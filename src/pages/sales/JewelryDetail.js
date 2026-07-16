@@ -221,6 +221,7 @@ const JewelryDetail = () => {
     ["Center stone shape", shape || BLANK],
     ["Style", item.style || BLANK],
     ["Metal", item.metal || BLANK],
+    ["Size", item.size || BLANK],
     ["Branch", branchLabel || BLANK],
     ["Location", exactLoc || branchLabel || BLANK],
   ];
