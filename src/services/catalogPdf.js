@@ -30,6 +30,7 @@ import {
   fluorDisplay,
 } from "../pages/sales/SalesInventory";
 import { getMappedCategories } from "../utils/categoryMap";
+import { buildStoneShareText } from "../utils/shareStones";
 
 /* ───────────────────────── item normalisers ───────────────────────── */
 
@@ -170,6 +171,14 @@ const itemPrice = (it) => {
       : null;
   return { total: money(it.priceTotal), ppc: money(it.pricePerCt), rap };
 };
+
+/* Media links for the per-card action buttons — real http(s) URLs only. */
+const httpOk = (u) => {
+  const s = String(u || "").trim();
+  return /^https?:\/\//i.test(s) ? s : null;
+};
+const itemVideoLink = (it) => httpOk(it.videoUrl) || httpOk(it.additionalVideos);
+const itemCertLink = (it) => httpOk(it.certificateUrl) || httpOk(it.certificateImageJpg);
 
 /* ───────────────────────── image loading ───────────────────────── */
 
@@ -320,17 +329,33 @@ export async function buildCatalogPdf(rawItems, options = {}) {
   };
 
   // Measure a card's height (so we can page-break before drawing).
-  const measureCard = (it, titleLines, specs, price) => {
+  const measureCard = (it, titleLines, specs, price, buttons) => {
     const titleH = titleLines.length * 5.4;
     const catH = 5;
     const dividerGap = 3.5;
     const specsH = specs.length * rowH;
+    const buttonsH = buttons.length ? 9 : 0;
     const priceH = showPrices && price.total ? 12 : 0;
-    const detailsH = titleH + catH + dividerGap + specsH + priceH + 2;
+    const detailsH = titleH + catH + dividerGap + specsH + buttonsH + priceH + 2;
     return Math.max(imgSize, detailsH) + pad * 2;
   };
 
-  const drawCard = (it, img, cardY, titleLines, specs, price, cardH) => {
+  // A small outlined pill with a link annotation — the PDF's "button".
+  const drawLinkPill = (label, x, y, color, url) => {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(7.2);
+    const w = pdf.getTextWidth(label) + 7;
+    const h = 5.8;
+    pdf.setDrawColor(...color);
+    pdf.setLineWidth(0.4);
+    pdf.roundedRect(x, y, w, h, 2.9, 2.9, "S");
+    pdf.setTextColor(...color);
+    pdf.text(label, x + w / 2, y + h / 2 + 0.9, { align: "center" });
+    pdf.link(x, y, w, h, { url });
+    return w;
+  };
+
+  const drawCard = (it, img, cardY, titleLines, specs, price, buttons, cardH) => {
     const cardX = margin;
     // Card frame
     pdf.setDrawColor(...line);
@@ -404,6 +429,14 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       ty += rowH;
     });
 
+    if (buttons.length) {
+      ty += 1.5;
+      let bx = detailsX;
+      buttons.forEach((b) => {
+        bx += drawLinkPill(b.label, bx, ty, b.color, b.url) + 3;
+      });
+    }
+
     if (showPrices && price.total) {
       // Per-carat price and Rap % now live inside the spec table above —
       // the price block carries only the total.
@@ -438,7 +471,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     const specs = itemSpecs(it);
     const price = itemPrice(it);
 
-    // Rap % and price-per-carat sit inside the spec table, just above the
+    // Rap % and price-per-carat sit inside the spec table, right below the
     // Branch row (the total keeps its own block at the bottom of the card).
     if (showPrices) {
       const priceRows = [];
@@ -446,12 +479,29 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       if (price.ppc) priceRows.push(["Price per carat", price.ppc]);
       if (priceRows.length) {
         const branchIdx = specs.findIndex(([label]) => label === "Branch");
-        if (branchIdx >= 0) specs.splice(branchIdx, 0, ...priceRows);
+        if (branchIdx >= 0) specs.splice(branchIdx + 1, 0, ...priceRows);
         else specs.push(...priceRows);
       }
     }
 
-    const cardH = measureCard(it, titleLines, specs, price);
+    // Per-card action buttons — tappable link pills inside the PDF:
+    //   Cert / Video open the stone's certificate & video pages; Share opens
+    //   WhatsApp with the exact same message template the Action sheet sends.
+    const buttons = [];
+    const certL = itemCertLink(it);
+    if (certL) buttons.push({ label: "CERT", color: brand, url: certL });
+    const videoL = itemVideoLink(it);
+    if (videoL) buttons.push({ label: "VIDEO", color: [2, 132, 199], url: videoL });
+    const shareText = buildStoneShareText(it, { withPrice: showPrices });
+    if (shareText) {
+      buttons.push({
+        label: "SHARE",
+        color: [22, 163, 74],
+        url: `https://wa.me/?text=${encodeURIComponent(shareText)}`,
+      });
+    }
+
+    const cardH = measureCard(it, titleLines, specs, price, buttons);
 
     if (!pageStarted) {
       startPage(true);
@@ -460,7 +510,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       startPage(false);
     }
 
-    drawCard(it, images[i], cardY, titleLines, specs, price, cardH);
+    drawCard(it, images[i], cardY, titleLines, specs, price, buttons, cardH);
     cardY += cardH + cardGap;
   }
 
