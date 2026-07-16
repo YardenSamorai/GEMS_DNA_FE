@@ -55,14 +55,25 @@ const PlayOverlay = ({ onClick, hidden }) => (
 /* ---- Native MP4 player (the preferred path) ------------------------------ */
 const NativeVideo = ({ fileUrl, title }) => {
   const videoRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
+  // One-way switch: once playback starts the native controls stay on for the
+  // life of the element. Toggling the `controls` attribute off mid-gesture
+  // (e.g. on the very tap that pauses the video) mutates Safari's hit-test
+  // layers during the touch — a known trigger for iOS "dead taps", where the
+  // whole page stops receiving click events afterwards.
+  const [started, setStarted] = useState(false);
 
-  // Pause before unmount so iOS doesn't hold a dangling media session.
+  // Fully release the media element before unmount. iOS keeps a media
+  // session (and gesture recognizers) alive for <video> elements that are
+  // removed while loaded — pausing AND detaching the source lets WebKit drop
+  // it cleanly, otherwise taps can go dead after navigating Back.
   useEffect(() => {
     const el = videoRef.current;
     return () => {
+      if (!el) return;
       try {
-        el?.pause();
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
       } catch {
         /* non-fatal */
       }
@@ -80,16 +91,14 @@ const NativeVideo = ({ fileUrl, title }) => {
         ref={videoRef}
         src={fileUrl}
         title={title}
-        className="h-full w-full object-contain"
+        className="h-full w-full select-none object-contain"
         playsInline
         loop
-        controls={playing}
+        controls={started}
         preload="metadata"
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
+        onPlay={() => setStarted(true)}
       />
-      <PlayOverlay onClick={handlePlay} hidden={playing} />
+      <PlayOverlay onClick={handlePlay} hidden={started} />
     </div>
   );
 };

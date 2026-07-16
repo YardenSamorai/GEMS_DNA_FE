@@ -1,4 +1,5 @@
 import './utils/apiAuthFetch';
+import { installIosTapRevive } from './utils/iosTapRevive';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
@@ -13,6 +14,11 @@ if (!phublishKey) {
 
   throw new Error("Missing Publishable Key")
 }
+
+// iOS Safari can stop delivering click events page-wide after video
+// interactions (WebKit bug) — this watches every tap and re-dispatches the
+// click if Safari drops it. No-op on non-iOS devices.
+installIosTapRevive();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
