@@ -283,6 +283,8 @@ export const buildStonesMessage = (stones, opts = {}) =>
  * Attachment helpers (stone photo + certificate)
  * ========================================================================== */
 
+const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
+
 const fileNameFor = (url, fallback) => {
   const clean = String(url).split("?")[0];
   return clean.split("/").pop() || fallback;
@@ -299,8 +301,37 @@ const fetchAsFile = async (url, fallbackName, fallbackType) => {
   }
 };
 
-/* Fetch the stone photo + certificate for each stone into File objects.
- * Safe to call ahead of the share gesture (keeps iOS user-activation intact). */
+/* WhatsApp compresses/rejects very large attachments — skip the video file
+ * beyond this size and let the text link carry it instead. */
+const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
+
+/* Fetch the item's Vimeo video as a real MP4 File: resolve the direct
+ * highest-rendition file link through our BE (Vimeo API), then download it.
+ * Sending the actual file preserves the full 1080p quality — a WhatsApp link
+ * preview or the embedded player would degrade it. */
+const fetchVideoFile = async (stone) => {
+  const v = videoUrl(stone);
+  const m = /player\.vimeo\.com\/video\/(\d+)/i.exec(v || "");
+  if (!m) return null;
+  try {
+    const r = await fetch(`${API_BASE}/api/vimeo-file/${m[1]}`);
+    if (!r.ok) return null;
+    const { link } = await r.json();
+    if (!link) return null;
+    const res = await fetch(link, { mode: "cors" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    if (!blob.size || blob.size > MAX_VIDEO_BYTES) return null;
+    const sku = stone?.sku || "stone";
+    return new File([blob], `${sku}.mp4`, { type: "video/mp4" });
+  } catch {
+    return null; // any failure → the text link still carries the video
+  }
+};
+
+/* Fetch the stone photo + video + certificate for each stone into File
+ * objects. Safe to call ahead of the share gesture (keeps iOS user-activation
+ * intact). */
 export const prepareShareFiles = async (stones) => {
   const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
   const files = [];
@@ -311,6 +342,8 @@ export const prepareShareFiles = async (stones) => {
       const f = await fetchAsFile(photo, `${sku}.jpg`, "image/jpeg");
       if (f) files.push(f);
     }
+    const vid = await fetchVideoFile(stone);
+    if (vid) files.push(vid);
     const cert = certUrl(stone);
     if (cert) {
       const isPdf = /\.pdf(\?|$)/i.test(cert);
