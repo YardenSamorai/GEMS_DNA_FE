@@ -193,6 +193,25 @@ const formatOf = (dataUrl) => {
   return "JPEG";
 };
 
+/* The real ESHED logo (same asset the Liran catalog uses) — same-origin
+ * public file, so a plain fetch → data URL is enough. Falls back to the text
+ * wordmark when unavailable. */
+async function loadLogoAsset() {
+  try {
+    const res = await fetch("/images/eshed_logo_dark.png");
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
 /* ───────────────────────── document builder ───────────────────────── */
 
 /**
@@ -202,7 +221,7 @@ const formatOf = (dataUrl) => {
  *   - showPrices (bool, default true) — include the price block per card.
  *   - showLogo   (bool, default true) — include the ESHED wordmark/branding in
  *     the header & footer. When false the document is unbranded (neutral
- *     "Gemstone Catalog" header, no ESHED mark) — useful for white-label sends.
+ *     "Catalog" header, no ESHED mark) — useful for white-label sends.
  */
 export async function buildCatalogPdf(rawItems, options = {}) {
   const { showPrices = true, showLogo = true } = options;
@@ -232,34 +251,52 @@ export async function buildCatalogPdf(rawItems, options = {}) {
   const footerReserve = 16;
   const maxY = pageH - footerReserve;
 
-  // Preload every photo up-front (rendering is synchronous).
-  const images = await Promise.all(items.map((it) => loadImage(itemImageUrl(it))));
+  // Preload every photo (and the brand logo) up-front — rendering is
+  // synchronous.
+  const [logoImg, ...images] = await Promise.all([
+    showLogo ? loadLogoAsset() : Promise.resolve(null),
+    ...items.map((it) => loadImage(itemImageUrl(it))),
+  ]);
 
   const drawHeader = () => {
     pdf.setFillColor(...wash);
     pdf.rect(0, 0, pageW, headerBottom - 4, "F");
 
     if (showLogo) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(18);
-      pdf.setTextColor(...ink);
-      pdf.text("ESHED", margin, 16);
+      let logoDrawn = false;
+      if (logoImg) {
+        try {
+          const lp = pdf.getImageProperties(logoImg);
+          const lh = 11;
+          const lw = (lp.width / lp.height) * lh;
+          pdf.addImage(logoImg, "PNG", margin, 7, lw, lh);
+          logoDrawn = true;
+        } catch (_) {
+          /* fall back to the wordmark */
+        }
+      }
+      if (!logoDrawn) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(18);
+        pdf.setTextColor(...ink);
+        pdf.text("ESHED", margin, 16);
 
-      // Emerald accent under the wordmark.
-      pdf.setDrawColor(...brand);
-      pdf.setLineWidth(1.1);
-      pdf.line(margin, 19, margin + 16, 19);
+        // Emerald accent under the wordmark.
+        pdf.setDrawColor(...brand);
+        pdf.setLineWidth(1.1);
+        pdf.line(margin, 19, margin + 16, 19);
+      }
 
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
       pdf.setTextColor(...soft);
-      pdf.text("Gemstone Catalog", margin, 24.5);
+      pdf.text("Catalog", margin, 24.5);
     } else {
       // Unbranded: a neutral title stands in for the wordmark.
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(15);
       pdf.setTextColor(...ink);
-      pdf.text("Gemstone Catalog", margin, 18);
+      pdf.text("Catalog", margin, 18);
     }
 
     const dateStr = new Date().toLocaleDateString("en-GB", {
@@ -288,7 +325,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     const catH = 5;
     const dividerGap = 3.5;
     const specsH = specs.length * rowH;
-    const priceH = showPrices && price.total ? 15 : 0;
+    const priceH = showPrices && price.total ? 12 : 0;
     const detailsH = titleH + catH + dividerGap + specsH + priceH + 2;
     return Math.max(imgSize, detailsH) + pad * 2;
   };
@@ -368,21 +405,17 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     });
 
     if (showPrices && price.total) {
-      const pY = cardY + cardH - pad - 9;
+      // Per-carat price and Rap % now live inside the spec table above —
+      // the price block carries only the total.
+      const pY = cardY + cardH - pad - 6;
       pdf.setDrawColor(...line);
       pdf.setLineWidth(0.3);
       pdf.line(detailsX, pY - 2.5, detailsX + detailsW, pY - 2.5);
 
-      // Secondary line: p/c · Rap %
-      const sub = [price.ppc ? `${price.ppc}/ct` : null, price.rap ? `Rap ${price.rap}` : null]
-        .filter(Boolean)
-        .join("   ·   ");
-      if (sub) {
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7.6);
-        pdf.setTextColor(...soft);
-        pdf.text(sub, detailsX, pY + 3.5);
-      }
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7.6);
+      pdf.setTextColor(...soft);
+      pdf.text("TOTAL", detailsX, pY + 3.5);
 
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(13);
@@ -404,6 +437,20 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     const titleLines = pdf.splitTextToSize(itemTitle(it) || it.sku || "", detailsW).slice(0, 2);
     const specs = itemSpecs(it);
     const price = itemPrice(it);
+
+    // Rap % and price-per-carat sit inside the spec table, just above the
+    // Branch row (the total keeps its own block at the bottom of the card).
+    if (showPrices) {
+      const priceRows = [];
+      if (price.rap) priceRows.push(["Rap %", price.rap]);
+      if (price.ppc) priceRows.push(["Price per carat", price.ppc]);
+      if (priceRows.length) {
+        const branchIdx = specs.findIndex(([label]) => label === "Branch");
+        if (branchIdx >= 0) specs.splice(branchIdx, 0, ...priceRows);
+        else specs.push(...priceRows);
+      }
+    }
+
     const cardH = measureCard(it, titleLines, specs, price);
 
     if (!pageStarted) {
