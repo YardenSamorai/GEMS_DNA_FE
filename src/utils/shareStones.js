@@ -26,6 +26,8 @@ import { trackShare } from "./activityLog";
  *   - Fallback: a plain wa.me text link for desktop / unsupported contexts.
  * ========================================================================== */
 
+const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
+
 const isDiamondStone = (stone) => {
   const m = getMappedCategories(stone?.category);
   return m.includes("Diamond") || m.includes("Fancy");
@@ -89,6 +91,44 @@ const stoneImageUrl = (stone) => {
 };
 
 const videoUrl = (stone) => httpUrl(stone?.videoUrl) || httpUrl(stone?.additionalVideos);
+
+/* ---- direct (full-quality) video links ------------------------------------
+ * A player.vimeo.com embed link opens Vimeo's adaptive player, which serves
+ * a low rendition on phones. The BE's /api/vimeo-file/:id resolves the direct
+ * 1080p MP4 (Vimeo API) — the same source our in-app player uses — so every
+ * link we hand to a client opens at full quality. Resolutions are cached
+ * in-module; failures fall back to the original embed link. */
+const VIMEO_EMBED_RE = /player\.vimeo\.com\/video\/(\d+)/i;
+const directVideoCache = new Map(); // vimeoId -> direct link | null
+
+export const resolveDirectVideoUrl = async (url) => {
+  const m = VIMEO_EMBED_RE.exec(url || "");
+  if (!m) return url || null;
+  const id = m[1];
+  if (directVideoCache.has(id)) return directVideoCache.get(id) || url;
+  try {
+    const r = await fetch(`${API_BASE}/api/vimeo-file/${id}`);
+    const link = r.ok ? (await r.json())?.link || null : null;
+    directVideoCache.set(id, link);
+    return link || url;
+  } catch {
+    return url; // transient failure — don't poison the cache
+  }
+};
+
+/* Clone the given item(s) with videoUrl swapped to the direct MP4 link.
+ * Call ahead of a share gesture to warm the cache (keeps iOS activation). */
+export const withDirectVideoLinks = async (stones) => {
+  const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
+  return Promise.all(
+    arr.map(async (s) => {
+      const v = videoUrl(s);
+      if (!v) return s;
+      const direct = await resolveDirectVideoUrl(v);
+      return direct && direct !== v ? { ...s, videoUrl: direct } : s;
+    })
+  );
+};
 
 /* Prefer a real certificate image; fall back to the (often PDF) cert file. */
 const certUrl = (stone) => {
@@ -283,8 +323,6 @@ export const buildStonesMessage = (stones, opts = {}) =>
  * Attachment helpers (stone photo + certificate)
  * ========================================================================== */
 
-const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
-
 const fileNameFor = (url, fallback) => {
   const clean = String(url).split("?")[0];
   return clean.split("/").pop() || fallback;
@@ -311,13 +349,10 @@ const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
  * preview or the embedded player would degrade it. */
 const fetchVideoFile = async (stone) => {
   const v = videoUrl(stone);
-  const m = /player\.vimeo\.com\/video\/(\d+)/i.exec(v || "");
-  if (!m) return null;
+  if (!VIMEO_EMBED_RE.test(v || "")) return null;
   try {
-    const r = await fetch(`${API_BASE}/api/vimeo-file/${m[1]}`);
-    if (!r.ok) return null;
-    const { link } = await r.json();
-    if (!link) return null;
+    const link = await resolveDirectVideoUrl(v);
+    if (!link || link === v) return null;
     const res = await fetch(link, { mode: "cors" });
     if (!res.ok) return null;
     const blob = await res.blob();
@@ -370,7 +405,10 @@ export const shareStonesOnWhatsApp = async (
   stones,
   { files, actor, withPrice = true, withRap = false } = {}
 ) => {
-  const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
+  // Swap embed video links for the direct 1080p MP4s so the client gets the
+  // full-quality file, not Vimeo's phone-degraded player. Usually instant —
+  // the detail pages warm the cache when the action sheet opens.
+  const arr = await withDirectVideoLinks(stones);
   const text = buildStonesMessage(arr, { withPrice, withRap });
 
   // Record the send for the sales Dashboard (best effort, never blocks).

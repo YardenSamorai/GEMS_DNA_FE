@@ -30,7 +30,7 @@ import {
   fluorDisplay,
 } from "../pages/sales/SalesInventory";
 import { getMappedCategories } from "../utils/categoryMap";
-import { buildStoneShareText } from "../utils/shareStones";
+import { buildStoneShareText, withDirectVideoLinks } from "../utils/shareStones";
 
 /* ───────────────────────── item normalisers ───────────────────────── */
 
@@ -234,7 +234,9 @@ async function loadLogoAsset() {
  */
 export async function buildCatalogPdf(rawItems, options = {}) {
   const { showPrices = true, showLogo = true } = options;
-  const items = (rawItems || []).filter(Boolean);
+  // Swap Vimeo embed links for the direct 1080p MP4s (BE-resolved) so the
+  // VIDEO buttons and the WhatsApp share text always open at full quality.
+  const items = await withDirectVideoLinks((rawItems || []).filter(Boolean));
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
@@ -335,7 +337,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     const dividerGap = 3.5;
     const specsH = specs.length * rowH;
     const buttonsH = buttons.length ? 9 : 0;
-    const priceH = showPrices && price.total ? 12 : 0;
+    const priceH = showPrices && price.total ? (price.ppc ? 18 : 12) : 0;
     const detailsH = titleH + catH + dividerGap + specsH + buttonsH + priceH + 2;
     return Math.max(imgSize, detailsH) + pad * 2;
   };
@@ -438,12 +440,25 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     }
 
     if (showPrices && price.total) {
-      // Per-carat price and Rap % now live inside the spec table above —
-      // the price block carries only the total.
+      // Price block below the spec table: per-carat price (when present)
+      // right above the total. Rap % stays inside the table.
       const pY = cardY + cardH - pad - 6;
+      const dividerY = price.ppc ? pY - 8.5 : pY - 2.5;
       pdf.setDrawColor(...line);
       pdf.setLineWidth(0.3);
-      pdf.line(detailsX, pY - 2.5, detailsX + detailsW, pY - 2.5);
+      pdf.line(detailsX, dividerY, detailsX + detailsW, dividerY);
+
+      if (price.ppc) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.6);
+        pdf.setTextColor(...muted);
+        pdf.text("PRICE PER CARAT", detailsX, pY - 2.5);
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8.6);
+        pdf.setTextColor(...ink);
+        pdf.text(price.ppc, detailsX + detailsW, pY - 2.5, { align: "right" });
+      }
 
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(7.6);
@@ -471,17 +486,13 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     const specs = itemSpecs(it);
     const price = itemPrice(it);
 
-    // Rap % and price-per-carat sit inside the spec table, right below the
-    // Branch row (the total keeps its own block at the bottom of the card).
-    if (showPrices) {
-      const priceRows = [];
-      if (price.rap) priceRows.push(["Rap %", price.rap]);
-      if (price.ppc) priceRows.push(["Price per carat", price.ppc]);
-      if (priceRows.length) {
-        const branchIdx = specs.findIndex(([label]) => label === "Branch");
-        if (branchIdx >= 0) specs.splice(branchIdx + 1, 0, ...priceRows);
-        else specs.push(...priceRows);
-      }
+    // Rap % sits inside the spec table, right below the Branch row.
+    // Price-per-carat lives in the price block under the table, just above
+    // the total.
+    if (showPrices && price.rap) {
+      const branchIdx = specs.findIndex(([label]) => label === "Branch");
+      if (branchIdx >= 0) specs.splice(branchIdx + 1, 0, ["Rap %", price.rap]);
+      else specs.push(["Rap %", price.rap]);
     }
 
     // Per-card action buttons — tappable link pills inside the PDF:

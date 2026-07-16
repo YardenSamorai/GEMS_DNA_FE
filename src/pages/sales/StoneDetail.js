@@ -101,6 +101,9 @@ const StoneDetail = () => {
   const [withPrice, setWithPrice] = useState(true);
   // Diamonds/fancy only: optionally include the Rap % line in the message.
   const [withRap, setWithRap] = useState(false);
+  // Editable price-per-carat for the outgoing message only — never touches
+  // the stone itself. Re-seeded from the stone every time the sheet opens.
+  const [ppcEdit, setPpcEdit] = useState("");
   // Internal cost is hidden behind a tap (managers/admins only) so it's never
   // shown to a client over the rep's shoulder when the page first opens.
   const [costOpen, setCostOpen] = useState(false);
@@ -179,6 +182,14 @@ const StoneDetail = () => {
     return () => {
       alive = false;
     };
+  }, [actionOpen, stone]);
+
+  // Seed the editable p/c with the stone's real price each time the sheet
+  // opens (so a previous edit never leaks into the next share).
+  useEffect(() => {
+    if (!actionOpen || !stone) return;
+    const n = Number(stone.pricePerCt);
+    setPpcEdit(Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : "");
   }, [actionOpen, stone]);
 
   // ---- Media carousel ------------------------------------------------------
@@ -294,6 +305,23 @@ const StoneDetail = () => {
   const cert = certLink(stone);
   const ppc = money(stone.pricePerCt);
   const total = money(stone.priceTotal);
+
+  // Message-only price override: when the rep edits the p/c in the action
+  // sheet, share a clone with the new p/c and a recomputed total.
+  const ppcEditNum = parseFloat(String(ppcEdit).replace(/[^0-9.]/g, ""));
+  const basePpcNum = Number(stone.pricePerCt);
+  const wtNum2 = Number(stone.weightCt);
+  const ppcEdited =
+    Number.isFinite(ppcEditNum) &&
+    ppcEditNum > 0 &&
+    (!Number.isFinite(basePpcNum) || Math.abs(ppcEditNum - basePpcNum) > 0.004);
+  const shareStone = ppcEdited
+    ? {
+        ...stone,
+        pricePerCt: ppcEditNum,
+        priceTotal: Number.isFinite(wtNum2) ? ppcEditNum * wtNum2 : stone.priceTotal,
+      }
+    : stone;
 
   // Internal cost (manager/admin only). Mirrors the old catalog Cost button,
   // now living inside the product page, just under the location.
@@ -846,11 +874,47 @@ const StoneDetail = () => {
                   </button>
                 )}
 
+                {/* Editable p/c — adjusts the outgoing message only; the
+                    total recomputes from the stone's weight. */}
+                {withPrice && Number.isFinite(basePpcNum) && basePpcNum > 0 && (
+                  <div className="mb-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3">
+                    <span className="block text-[14px] font-semibold tracking-tight text-app-ink">
+                      Price per carat
+                    </span>
+                    <span className="block text-[12px] text-app-soft">
+                      Adjust before sending — the total updates automatically
+                    </span>
+                    <div className="mt-2.5 flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-app-soft">
+                          $
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={ppcEdit}
+                          onChange={(e) => setPpcEdit(e.target.value)}
+                          aria-label="Price per carat for the message"
+                          className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-7 pr-3 text-[15px] font-semibold tabular-nums text-app-ink outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-app-muted">
+                          Total
+                        </span>
+                        <span className={`block text-[16px] font-bold tabular-nums ${ppcEdited ? "text-emerald-600" : "text-app-ink"}`}>
+                          {money(shareStone.priceTotal) || "-"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Share on WhatsApp */}
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(stone, { files: shareFiles, actor, withPrice, withRap });
+                    shareStonesOnWhatsApp(shareStone, { files: shareFiles, actor, withPrice, withRap });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
@@ -886,7 +950,7 @@ const StoneDetail = () => {
                   )}
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(stone, { withPrice, withRap })}
+                  {buildStoneShareText(shareStone, { withPrice, withRap })}
                 </pre>
               </div>
             </motion.div>

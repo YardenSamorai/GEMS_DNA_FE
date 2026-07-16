@@ -76,6 +76,9 @@ const JewelryDetail = () => {
   const [actionOpen, setActionOpen] = useState(false);
   const [shareFiles, setShareFiles] = useState([]);
   const [withPrice, setWithPrice] = useState(true);
+  // Editable price for the outgoing message only — never touches the piece
+  // itself. Re-seeded from the item every time the sheet opens.
+  const [priceEdit, setPriceEdit] = useState("");
 
   // Always open the product page scrolled to the top. On mobile the document is
   // locked and the real scroll lives in an inner <main> container, so
@@ -147,6 +150,14 @@ const JewelryDetail = () => {
     };
   }, [actionOpen, item]);
 
+  // Seed the editable price with the piece's real price each time the sheet
+  // opens (so a previous edit never leaks into the next share).
+  useEffect(() => {
+    if (!actionOpen || !item) return;
+    const n = Number(item.price);
+    setPriceEdit(Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : "");
+  }, [actionOpen, item]);
+
   const images = useMemo(() => (item ? itemImages(item) : []), [item]);
   const video = item ? usableImg(item.videoUrl) : null;
   const slideCount = images.length + (video ? 1 : 0);
@@ -201,6 +212,16 @@ const JewelryDetail = () => {
   const totalCt = Number.isFinite(item.totalCarat) ? `${item.totalCarat.toFixed(2)} ct` : "";
   const cert = certLink(item);
   const total = money(item.price);
+
+  // Message-only price override: when the rep edits the price in the action
+  // sheet, share a clone carrying the new price.
+  const priceEditNum = parseFloat(String(priceEdit).replace(/[^0-9.]/g, ""));
+  const basePriceNum = Number(item.price);
+  const priceEdited =
+    Number.isFinite(priceEditNum) &&
+    priceEditNum > 0 &&
+    (!Number.isFinite(basePriceNum) || Math.abs(priceEditNum - basePriceNum) > 0.004);
+  const shareItem = priceEdited ? { ...item, price: priceEditNum } : item;
 
   // Exact physical place (e.g. "Eiseman Jewels - JN") comes from the linked
   // centre stone and is only present for viewers entitled to it; lower tiers
@@ -501,10 +522,45 @@ const JewelryDetail = () => {
                   </span>
                 </button>
 
+                {/* Editable price — adjusts the outgoing message only. */}
+                {withPrice && Number.isFinite(basePriceNum) && basePriceNum > 0 && (
+                  <div className="mb-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3">
+                    <span className="block text-[14px] font-semibold tracking-tight text-app-ink">
+                      Price
+                    </span>
+                    <span className="block text-[12px] text-app-soft">
+                      Adjust before sending
+                    </span>
+                    <div className="mt-2.5 flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-app-soft">
+                          $
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={priceEdit}
+                          onChange={(e) => setPriceEdit(e.target.value)}
+                          aria-label="Price for the message"
+                          className="w-full rounded-xl border border-app-line bg-app-surface py-2.5 pl-7 pr-3 text-[15px] font-semibold tabular-nums text-app-ink outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-app-muted">
+                          Sends as
+                        </span>
+                        <span className={`block text-[16px] font-bold tabular-nums ${priceEdited ? "text-emerald-600" : "text-app-ink"}`}>
+                          {money(shareItem.price) || "-"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
-                    shareStonesOnWhatsApp(item, { files: shareFiles, actor, withPrice });
+                    shareStonesOnWhatsApp(shareItem, { files: shareFiles, actor, withPrice });
                     setActionOpen(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-app-line bg-app-canvas2 px-4 py-3.5 text-left transition active:scale-[0.99]"
@@ -539,7 +595,7 @@ const JewelryDetail = () => {
                   )}
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(item, { withPrice })}
+                  {buildStoneShareText(shareItem, { withPrice })}
                 </pre>
               </div>
             </motion.div>

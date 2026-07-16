@@ -6,7 +6,7 @@ import { useTeam } from "../context/TeamContext";
 import { GemstoneCard, modeForStone } from "../pages/sales/SalesInventory";
 import { JewelryCard } from "../pages/sales/SalesJewelry";
 import { downloadCatalogPdf } from "../services/catalogPdf";
-import { shareStonesOnWhatsApp } from "../utils/shareStones";
+import { shareStonesOnWhatsApp, withDirectVideoLinks } from "../utils/shareStones";
 
 /* Floating "selection" button — bottom-right counterpart to the catalog's
  * bottom-left filter FAB. Appears once at least one stone is picked, shows the
@@ -31,6 +31,12 @@ const SelectionFab = () => {
   useEffect(() => {
     if (!open) setActionsOpen(false);
   }, [open]);
+
+  // Warm the direct-video-link cache while the sheet is open, so the share
+  // gesture later resolves instantly (no popup-blocking async gap).
+  useEffect(() => {
+    if (open && items.length) withDirectVideoLinks(items).catch(() => {});
+  }, [open, items]);
 
   const handleExportPdf = async (showLogo = true) => {
     if (exporting || count === 0) return;
