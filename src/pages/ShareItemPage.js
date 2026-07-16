@@ -13,6 +13,9 @@ import { buildStoneShareText } from "../utils/shareStones";
  * PDF export time) — no fetch, no auth, works for whoever holds the PDF. When
  * the catalog was exported without prices the payload carries no price fields
  * and the editor is hidden.
+ *
+ * UNBRANDED like /media — no logo or company identity, so a forwarded PDF
+ * never reveals the seller through this page either.
  * ========================================================================== */
 
 const decodePayload = (s) => {
@@ -77,17 +80,10 @@ const ShareItemPage = () => {
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center bg-[#141414] px-4 pb-10 text-white">
-      {/* Header — mirrors the /media viewer. */}
-      <header className="flex flex-col items-center pb-2 pt-8">
-        <img
-          src="/images/eshed_logo_white.png"
-          alt="ESHED"
-          className="h-10 w-auto"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50">
+      {/* Header — unbranded, like the /media viewer: no logo or company
+          identity anywhere on this page. */}
+      <header className="flex flex-col items-center pb-2 pt-10">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50">
           SHARE ON WHATSAPP
         </p>
         <h1 className="mt-1 text-[20px] font-semibold tracking-wide">{item.sku}</h1>
@@ -153,16 +149,7 @@ const ShareItemPage = () => {
         </pre>
       </main>
 
-      <footer className="mt-auto pt-8 text-center">
-        <a
-          href="https://www.eshed.com"
-          target="_blank"
-          rel="noreferrer"
-          className="text-[12px] font-medium uppercase tracking-[0.22em] text-white/45 transition hover:text-white/80"
-        >
-          www.eshed.com
-        </a>
-      </footer>
+      <div className="mt-auto pb-8" aria-hidden />
     </div>
   );
 };
