@@ -43,10 +43,40 @@ const MediaViewer = () => {
 
   const heading = type === "cert" ? "CERTIFICATE" : "VIDEO";
 
+  /* Back to the catalog PDF. When the PDF link navigated in the same tab
+   * there's history to return to; when it opened a fresh tab there isn't,
+   * so closing the tab drops the client back on the PDF instead. */
+  const goBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.close();
+    }
+  };
+
   return (
     <div className="flex min-h-[100dvh] flex-col bg-[#141414] text-white">
       {/* Header — media type + SKU only. No logo or company identity here. */}
-      <header className="flex flex-col items-center px-5 pb-2 pt-10">
+      <header className="relative flex flex-col items-center px-5 pb-2 pt-10">
+        <button
+          type="button"
+          aria-label="Back to catalog"
+          onClick={goBack}
+          className="absolute left-4 top-9 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white/80 transition hover:border-white/40 hover:text-white active:scale-95"
+        >
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+        </button>
         <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50">
           {heading}
         </p>

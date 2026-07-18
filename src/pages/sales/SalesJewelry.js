@@ -173,6 +173,7 @@ const FILTER_DEFAULTS = {
   jewelrySel: [],
   shapeSel: [],
   styleSel: [],
+  secSel: [],
   gemTypeSel: [],
   locationSel: [],
   onlyInStock: false,
@@ -306,6 +307,9 @@ export const mapRow = (row) => {
     // Ring size / necklace length from the feed, cleaned up ("6.5", "18");
     // shown as a spec row on the product page. "" when the piece has no size.
     size: fmtSize(row.jewelry_size),
+    // 1 = must not appear on websites, 2 = website-approved, null =
+    // unclassified (arrived after the last level list was applied).
+    securityLevel: row.security_level ?? null,
     category:
       normalizeJewelryCategory(row.jewelry_type) ||
       normalizeJewelryCategory(row.style) ||
@@ -389,6 +393,8 @@ const SalesJewelry = () => {
   const [jewelrySel, setJewelrySel] = useState(saved.jewelrySel);
   const [shapeSel, setShapeSel] = useState(saved.shapeSel);
   const [styleSel, setStyleSel] = useState(saved.styleSel);
+  // Security level — 1: not for websites, 2: website-approved.
+  const [secSel, setSecSel] = useState(saved.secSel || []);
   const [gemTypeSel, setGemTypeSel] = useState(saved.gemTypeSel);
   const [locationSel, setLocationSel] = useState(saved.locationSel);
   // Guaranteed available — hide pieces that are on memo or on hold.
@@ -469,7 +475,7 @@ const SalesJewelry = () => {
         JSON.stringify({
           t: Date.now(),
           f: {
-            jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
+            jewelrySel, shapeSel, styleSel, secSel, gemTypeSel, locationSel, onlyInStock,
             tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
             skuQuery, sortKey, sortDir,
           },
@@ -479,7 +485,7 @@ const SalesJewelry = () => {
       /* storage unavailable — non-fatal */
     }
   }, [
-    jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
+    jewelrySel, shapeSel, styleSel, secSel, gemTypeSel, locationSel, onlyInStock,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -562,6 +568,9 @@ const SalesJewelry = () => {
       }
       if (styleSel.length && !styleSel.some((s) => s.toLowerCase() === (r.style || "").toLowerCase()))
         return false;
+      // Security level — exact match; unclassified items (null) only show
+      // when no level filter is active.
+      if (secSel.length && !secSel.includes(String(r.securityLevel ?? ""))) return false;
       if (locationSel.length) {
         const loc = norm(r.branch);
         if (!locationSel.some((v) => (LOCATION_MATCH[v] || [v]).some((t) => loc.includes(t)))) return false;
@@ -596,7 +605,7 @@ const SalesJewelry = () => {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    rows, jewelrySel, shapeSel, styleSel, gemTypeSel, locationSel, onlyInStock,
+    rows, jewelrySel, shapeSel, styleSel, secSel, gemTypeSel, locationSel, onlyInStock,
     tcwFrom, tcwTo, tcwBands, priceFrom, priceTo, priceBands,
     skuQuery, sortKey, sortDir,
   ]);
@@ -660,6 +669,7 @@ const SalesJewelry = () => {
     setJewelrySel([]);
     setShapeSel([]);
     setStyleSel([]);
+    setSecSel([]);
     setGemTypeSel([]);
     setLocationSel([]);
     setOnlyInStock(false);
@@ -690,6 +700,7 @@ const SalesJewelry = () => {
     jewelrySel.length +
     shapeSel.length +
     styleSel.length +
+    secSel.length +
     gemTypeSel.length +
     locationSel.length +
     (onlyInStock ? 1 : 0) +
@@ -983,6 +994,28 @@ const SalesJewelry = () => {
                       ) : (
                         <p className="text-[13px] text-app-soft">No styles available.</p>
                       )}
+                    </section>
+
+                    {/* Security level — 1: not for websites, 2: website-approved.
+                        "New" covers items that arrived after the last level list
+                        was applied and haven't been classified yet. */}
+                    <section>
+                      <FieldLabel showClear={secSel.length > 0} onClear={() => setSecSel([])}>
+                        Security level
+                      </FieldLabel>
+                      <div className="flex flex-wrap gap-2">
+                        <Chip active={secSel.includes("1")} onClick={() => toggleIn(setSecSel)("1")}>
+                          Level 1 — not for websites
+                        </Chip>
+                        <Chip active={secSel.includes("2")} onClick={() => toggleIn(setSecSel)("2")}>
+                          Level 2 — websites
+                        </Chip>
+                        {rows.some((r) => r.securityLevel == null) && (
+                          <Chip active={secSel.includes("")} onClick={() => toggleIn(setSecSel)("")}>
+                            New / unclassified
+                          </Chip>
+                        )}
+                      </div>
                     </section>
 
                     {/* Shape — same set as Emeralds. */}
