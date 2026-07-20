@@ -665,6 +665,11 @@ const SalesJewelry = () => {
       return Array.from(new Set([...cur, "NY", "LA"]));
     });
 
+  // "Only sec 2" — one-tap shortcut for the website-approved pieces; tapping
+  // again clears the security-level filter.
+  const sec2Active = secSel.length === 1 && secSel[0] === "2";
+  const toggleSec2 = () => setSecSel(sec2Active ? [] : ["2"]);
+
   const resetFilters = () => {
     setJewelrySel([]);
     setShapeSel([]);
@@ -921,6 +926,7 @@ const SalesJewelry = () => {
                   {[
                     { label: "Guaranteed available", checked: onlyInStock, onToggle: () => setOnlyInStock((v) => !v) },
                     { label: "Only in USA", checked: usaActive, onToggle: toggleUsa },
+                    { label: "Only sec 2", checked: sec2Active, onToggle: toggleSec2 },
                   ].map(({ label, checked, onToggle }) => (
                     <label
                       key={label}
@@ -994,28 +1000,6 @@ const SalesJewelry = () => {
                       ) : (
                         <p className="text-[13px] text-app-soft">No styles available.</p>
                       )}
-                    </section>
-
-                    {/* Security level — 1: not for websites, 2: website-approved.
-                        "New" covers items that arrived after the last level list
-                        was applied and haven't been classified yet. */}
-                    <section>
-                      <FieldLabel showClear={secSel.length > 0} onClear={() => setSecSel([])}>
-                        Security level
-                      </FieldLabel>
-                      <div className="flex flex-wrap gap-2">
-                        <Chip active={secSel.includes("1")} onClick={() => toggleIn(setSecSel)("1")}>
-                          Level 1 — not for websites
-                        </Chip>
-                        <Chip active={secSel.includes("2")} onClick={() => toggleIn(setSecSel)("2")}>
-                          Level 2 — websites
-                        </Chip>
-                        {rows.some((r) => r.securityLevel == null) && (
-                          <Chip active={secSel.includes("")} onClick={() => toggleIn(setSecSel)("")}>
-                            New / unclassified
-                          </Chip>
-                        )}
-                      </div>
                     </section>
 
                     {/* Shape — same set as Emeralds. */}
