@@ -614,7 +614,15 @@ export async function buildCatalogPdf(rawItems, options = {}) {
   return pdf;
 }
 
-/** Build the catalog and trigger a browser download. */
+/** Build the catalog and hand it to the user.
+ *
+ * On phones (Web Share API with files), we open the native share sheet with a
+ * real PDF File named "Catalog YYYY-MM-DD.pdf" and the caption set to the same
+ * string — so WhatsApp gets the file + "Catalog 2026-07-22", never a
+ * `blob:https://…` URL. (jsPDF's pdf.save() on iOS opens a blob: tab; sharing
+ * from there is what was injecting that junk into the message.)
+ *
+ * Desktop (no file-share support) falls back to a normal download. */
 export async function downloadCatalogPdf(items, options = {}) {
   const pdf = await buildCatalogPdf(items, options);
   // Local calendar date (not UTC) so an evening export in Israel doesn't
@@ -624,5 +632,28 @@ export async function downloadCatalogPdf(items, options = {}) {
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
-  pdf.save(`Catalog ${yyyy}-${mm}-${dd}.pdf`);
+  const label = `Catalog ${yyyy}-${mm}-${dd}`;
+  const filename = `${label}.pdf`;
+
+  try {
+    const blob = pdf.output("blob");
+    const file = new File([blob], filename, { type: "application/pdf" });
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [file] })
+    ) {
+      await navigator.share({
+        files: [file],
+        title: label,
+        text: label,
+      });
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // user cancelled the sheet
+    /* otherwise fall through to a plain download */
+  }
+
+  pdf.save(filename);
 }
