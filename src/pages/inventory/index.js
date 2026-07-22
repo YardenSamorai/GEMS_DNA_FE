@@ -3640,20 +3640,20 @@ const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOpt
         <div className="rounded-xl glass-surface p-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1">Min Price</label>
-              <input type="number" value={filters.minPrice} onChange={handleChange('minPrice')} placeholder="Min $" className="input-modern" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1">Max Price</label>
-              <input type="number" value={filters.maxPrice} onChange={handleChange('maxPrice')} placeholder="Max $" className="input-modern" />
-            </div>
-            <div>
               <label className="block text-xs font-medium text-stone-500 mb-1">Min Carats</label>
               <input type="number" step="0.01" value={filters.minCarat} onChange={handleChange('minCarat')} placeholder="Min ct" className="input-modern" />
             </div>
             <div>
               <label className="block text-xs font-medium text-stone-500 mb-1">Max Carats</label>
               <input type="number" step="0.01" value={filters.maxCarat} onChange={handleChange('maxCarat')} placeholder="Max ct" className="input-modern" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Min Price</label>
+              <input type="number" value={filters.minPrice} onChange={handleChange('minPrice')} placeholder="Min $" className="input-modern" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Max Price</label>
+              <input type="number" value={filters.maxPrice} onChange={handleChange('maxPrice')} placeholder="Max $" className="input-modern" />
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -3890,7 +3890,19 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
                 })()}
               </div>
 
-              {/* Row 1: Price */}
+              {/* Row 1: Carat */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Carat</label>
+                  <input type="number" value={filters.minCarat} onChange={handleChange("minCarat")} placeholder="From" step="0.01" className="input-modern" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max Carat</label>
+                  <input type="number" value={filters.maxCarat} onChange={handleChange("maxCarat")} placeholder="To" step="0.01" className="input-modern" />
+                </div>
+              </div>
+
+              {/* Row 2: Price */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Price ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
@@ -3910,19 +3922,11 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
                 </div>
               </div>
 
-              {/* Row 2: Shape */}
+              {/* Row 3: Shape */}
               <ShapeFilter shapes={shapesOptions} activeShapes={filters.shape} onToggle={(shapes) => onChange({ ...filters, shape: shapes })} />
 
-              {/* Row 3: Carat + Measurements */}
+              {/* Row 4: Measurements */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Carat</label>
-                  <input type="number" value={filters.minCarat} onChange={handleChange("minCarat")} placeholder="From" step="0.01" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max Carat</label>
-                  <input type="number" value={filters.maxCarat} onChange={handleChange("maxCarat")} placeholder="To" step="0.01" className="input-modern" />
-                </div>
                 <div>
                   <label className="block text-xs font-medium text-stone-500 mb-1.5">Length Min</label>
                   <input type="number" value={filters.minLength} onChange={handleChange("minLength")} placeholder="mm" step="0.01" className="input-modern" />
@@ -3944,7 +3948,7 @@ const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, dia
               {/* Divider */}
               <div className="border-t border-stone-200/60" />
 
-              {/* Row 4: Dropdowns */}
+              {/* Row 5: Dropdowns */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {inventoryMode === 'gemstones' && (
                   <div>
@@ -7718,39 +7722,39 @@ const StoneSearchPage = () => {
             </div>
 
             {/* Inventory Mode Tabs */}
-            <div className="flex items-center gap-4 border-b border-stone-200 mb-4">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
               <button
                 onClick={() => handleModeSwitch('diamonds')}
-                className={`pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5 border-b-2 -mb-px ${
+                className={`px-5 py-2.5 rounded-xl text-base font-semibold transition-all flex items-center gap-2 border ${
                   inventoryMode === 'diamonds'
-                    ? 'border-blue-600 text-blue-700'
-                    : 'border-transparent text-stone-400 hover:text-stone-600'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
                 }`}
               >
                 Diamonds
-                {!loading && <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${inventoryMode === 'diamonds' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-400'}`}>{diamondCount.toLocaleString()}</span>}
+                {!loading && <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'diamonds' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{diamondCount.toLocaleString()}</span>}
               </button>
               <button
                 onClick={() => handleModeSwitch('gemstones')}
-                className={`pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5 border-b-2 -mb-px ${
+                className={`px-5 py-2.5 rounded-xl text-base font-semibold transition-all flex items-center gap-2 border ${
                   inventoryMode === 'gemstones'
-                    ? 'border-emerald-600 text-emerald-700'
-                    : 'border-transparent text-stone-400 hover:text-stone-600'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
                 }`}
               >
                 Gemstones
-                {!loading && <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${inventoryMode === 'gemstones' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-400'}`}>{gemstoneCount.toLocaleString()}</span>}
+                {!loading && <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'gemstones' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{gemstoneCount.toLocaleString()}</span>}
               </button>
               <button
                 onClick={() => handleModeSwitch('jewelry')}
-                className={`pb-2.5 text-sm font-medium transition-all flex items-center gap-1.5 border-b-2 -mb-px ${
+                className={`px-5 py-2.5 rounded-xl text-base font-semibold transition-all flex items-center gap-2 border ${
                   inventoryMode === 'jewelry'
-                    ? 'border-slate-700 text-slate-800'
-                    : 'border-transparent text-stone-400 hover:text-stone-600'
+                    ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
                 }`}
               >
                 Jewelry
-                <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full ${inventoryMode === 'jewelry' ? 'bg-slate-700 text-white' : 'bg-stone-100 text-stone-400'}`}>{jewelryCount.toLocaleString()}</span>
+                <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'jewelry' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>}
               </button>
             </div>
             
