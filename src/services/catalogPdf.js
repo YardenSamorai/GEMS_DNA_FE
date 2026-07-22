@@ -65,7 +65,6 @@ const itemTitle = (it) => {
   const shape = getDisplayShape(it.shape);
   const lab = it.lab && String(it.lab).toUpperCase() !== "N/A" ? it.lab : "";
   const treatment = it.treatment ? shortTreatment(it.treatment) : "";
-  const fancyDesc = [it.fancyIntensity, it.fancyColor].filter(Boolean).join(" ");
   const gemTypeName =
     mapped.filter((c) => !["Empty", "Diamond", "Fancy", "Emerald"].includes(c))[0] || "";
 
@@ -73,7 +72,8 @@ const itemTitle = (it) => {
     return [
       wt,
       shape,
-      isFancy ? fancyDesc : it.color,
+      // Fancy colour = intensity + overtone + color (white `color` is empty on Fancy).
+      isFancy ? getDisplayColor(it) : it.color,
       isFancy ? "" : it.clarity,
       lab,
       fluorDisplay(it.fluorescence),
@@ -290,14 +290,22 @@ export async function buildCatalogPdf(rawItems, options = {}) {
   const margin = 14;
   const contentW = pageW - margin * 2;
   const headerBottom = 30; // y where the header band ends
-  const cardGap = 7;
-  const pad = 7; // inner padding of each card
-  const imgSize = 56;
+  const footerReserve = 16;
+  const startY = headerBottom + 4; // y of the first card
+  const maxY = pageH - footerReserve;
+
+  // Fixed layout: exactly ROWS_PER_PAGE equal-height cards per page. Each card
+  // gets the same slot height, so pages are uniform regardless of how many
+  // spec rows an item carries (the spec block below adapts to fit its slot).
+  const ROWS_PER_PAGE = 3;
+  const cardGap = 6;
+  const cardH = (maxY - startY - (ROWS_PER_PAGE - 1) * cardGap) / ROWS_PER_PAGE;
+
+  const pad = 6; // inner padding of each card
+  const imgSize = 54;
   const detailsX = margin + pad + imgSize + 9;
   const detailsW = margin + contentW - pad - detailsX;
-  const rowH = 5.1;
-  const footerReserve = 16;
-  const maxY = pageH - footerReserve;
+  const rowH = 5.1; // baseline spec-row height (compressed to fit when needed)
 
   // Preload every photo (and the brand logo) up-front — rendering is
   // synchronous.
@@ -365,18 +373,6 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     pdf.setDrawColor(...line);
     pdf.setLineWidth(0.4);
     pdf.line(margin, headerBottom - 2, pageW - margin, headerBottom - 2);
-  };
-
-  // Measure a card's height (so we can page-break before drawing).
-  const measureCard = (it, titleLines, specs, price, buttons) => {
-    const titleH = titleLines.length * 5.4;
-    const catH = 5;
-    const dividerGap = 3.5;
-    const specsH = specs.length * rowH;
-    const buttonsH = buttons.length ? 9 : 0;
-    const priceH = showPrices && price.total ? (price.ppc ? 18 : 12) : 0;
-    const detailsH = titleH + catH + dividerGap + specsH + buttonsH + priceH + 2;
-    return Math.max(imgSize, detailsH) + pad * 2;
   };
 
   // A small outlined pill with a link annotation — the PDF's "button".
@@ -454,19 +450,51 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     pdf.line(detailsX, ty, detailsX + detailsW, ty);
     ty += 3.5;
 
-    specs.forEach(([label, value]) => {
+    // Space left for the spec block: everything from here down to the price
+    // block (or the card bottom when prices are hidden), minus the button row.
+    // The spec rows compress to fit their slot, and spill into two columns
+    // when there are many — so no card ever overflows into the next.
+    const buttonsH = buttons.length ? 8 : 0;
+    const pY = cardY + cardH - pad - 6;
+    const priceTop =
+      showPrices && price.total
+        ? (price.ppc ? pY - 8.5 : pY - 2.5)
+        : cardY + cardH - pad;
+    const specsAvail = Math.max(6, priceTop - ty - buttonsH - 2.5);
+
+    const twoCol = specs.length > 6;
+    const specRows = twoCol ? Math.ceil(specs.length / 2) : specs.length;
+    const sRowH = specRows ? Math.min(rowH, specsAvail / specRows) : rowH;
+    const colW = (detailsW - 6) / 2;
+
+    const drawSpec = ([label, value], x, y, colWidth) => {
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(7.6);
+      pdf.setFontSize(twoCol ? 6.8 : 7.6);
       pdf.setTextColor(...muted);
-      pdf.text(String(label).toUpperCase(), detailsX, ty);
+      pdf.text(String(label).toUpperCase(), x, y);
 
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8.6);
+      pdf.setFontSize(twoCol ? 7.8 : 8.6);
       pdf.setTextColor(...ink);
-      const v = pdf.splitTextToSize(String(value), detailsW * 0.62);
-      pdf.text(v[0], detailsX + detailsW, ty, { align: "right" });
-      ty += rowH;
-    });
+      const v = pdf.splitTextToSize(String(value), colWidth * 0.6);
+      pdf.text(v[0], x + colWidth, y, { align: "right" });
+    };
+
+    const specsTop = ty;
+    if (twoCol) {
+      specs.forEach((spec, idx) => {
+        const col = idx % 2;
+        const rowIdx = Math.floor(idx / 2);
+        const x = detailsX + col * (colW + 6);
+        drawSpec(spec, x, specsTop + rowIdx * sRowH, colW);
+      });
+      ty = specsTop + specRows * sRowH;
+    } else {
+      specs.forEach((spec, idx) => {
+        drawSpec(spec, detailsX, specsTop + idx * sRowH, detailsW);
+      });
+      ty = specsTop + specs.length * sRowH;
+    }
 
     if (buttons.length) {
       ty += 1.5;
@@ -509,12 +537,14 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     }
   };
 
-  let cardY = headerBottom + 4;
+  let cardY = startY;
+  let rowIndex = 0; // card position within the current page (0..ROWS_PER_PAGE-1)
   let pageStarted = false;
   const startPage = (first) => {
     if (!first) pdf.addPage();
     drawHeader();
-    cardY = headerBottom + 4;
+    cardY = startY;
+    rowIndex = 0;
   };
 
   for (let i = 0; i < items.length; i++) {
@@ -552,17 +582,16 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       url: `${window.location.origin}/share-item?p=${showPrices ? 1 : 0}&d=${encodePayload(sharePayload(it, showPrices))}`,
     });
 
-    const cardH = measureCard(it, titleLines, specs, price, buttons);
-
     if (!pageStarted) {
       startPage(true);
       pageStarted = true;
-    } else if (cardY + cardH > maxY) {
+    } else if (rowIndex >= ROWS_PER_PAGE) {
       startPage(false);
     }
 
     drawCard(it, images[i], cardY, titleLines, specs, price, buttons, cardH);
     cardY += cardH + cardGap;
+    rowIndex += 1;
   }
 
   if (!pageStarted) drawHeader(); // empty selection — still a branded page
@@ -588,6 +617,12 @@ export async function buildCatalogPdf(rawItems, options = {}) {
 /** Build the catalog and trigger a browser download. */
 export async function downloadCatalogPdf(items, options = {}) {
   const pdf = await buildCatalogPdf(items, options);
-  const d = new Date().toISOString().slice(0, 10);
-  pdf.save(`eshed-catalog-${d}.pdf`);
+  // Local calendar date (not UTC) so an evening export in Israel doesn't
+  // slip to yesterday. Filename is just "Catalog" + the export date —
+  // no company name in the file name.
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  pdf.save(`Catalog ${yyyy}-${mm}-${dd}.pdf`);
 }

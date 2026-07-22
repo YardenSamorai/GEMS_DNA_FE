@@ -10,6 +10,7 @@ import { getDisplayShape } from "../inventory/helpers/constants";
 import { DIAMOND_SHAPES } from "./diamondShapes";
 import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle, prettyBranch, modeForStone } from "./SalesInventory";
 import { getCatalogView } from "./salesPrefs";
+import SkuSuggestions, { buildSkuSuggestions } from "../../components/SkuSearchSuggestions";
 
 /* Stone catalog routes by mode — used to hop a SKU search over to the loose
  * stone catalog when the searched SKU belongs to a stone, not a jewelry piece. */
@@ -405,7 +406,17 @@ const SalesJewelry = () => {
   const [priceFrom, setPriceFrom] = useState(saved.priceFrom);
   const [priceTo, setPriceTo] = useState(saved.priceTo);
   const [priceBands, setPriceBands] = useState(saved.priceBands);
-  const [skuQuery, setSkuQuery] = useState(saved.skuQuery);
+  // The SKU search is a transient action, not a saved preference: the page
+  // opens with an EMPTY search box unless the rep is coming Back from a
+  // product (pending scroll restore). Restoring an old query used to
+  // re-trigger the cross-category hop and trap the catalogs in an
+  // un-clearable search loop.
+  const [skuQuery, setSkuQuery] = useState(() => (readScrollPos() ? saved.skuQuery : ""));
+  // True only after the rep TYPES here (or a hop injects a fresh query) —
+  // restored queries must never re-trigger the hop to the stone catalogs.
+  const skuTypedRef = useRef(false);
+  // Search box focus — drives the smart-search suggestions dropdown.
+  const [searchFocused, setSearchFocused] = useState(false);
   const [sortKey, setSortKey] = useState(saved.sortKey);
   const [sortDir, setSortDir] = useState(saved.sortDir);
 
@@ -451,9 +462,13 @@ const SalesJewelry = () => {
 
   // Cross-category SKU search: if the query matches no jewelry piece but does
   // match a loose stone, hop to that stone's catalog (carrying the query).
+  // Only a query the rep actually TYPED here may redirect — restored /
+  // injected queries stay put, otherwise two catalogs bounce the same stale
+  // search back and forth forever.
   useEffect(() => {
     const q = norm(skuQuery);
     if (loading || q.length < 3) return undefined;
+    if (!skuTypedRef.current) return undefined;
     const t = setTimeout(() => {
       if (rows.some((r) => norm(`${r.name} ${r.sku}`).includes(q))) return;
       const match = (allStonesRef.current || []).find(
@@ -461,7 +476,22 @@ const SalesJewelry = () => {
       );
       if (!match) return;
       const route = STONE_ROUTES[modeForStone(match)];
-      if (route) navigate(route, { state: { searchSku: skuQuery } });
+      if (!route) return;
+      // Take the query along and leave this page clean (state + persisted
+      // snapshot) so coming back here never resurrects the search.
+      skuTypedRef.current = false;
+      setSkuQuery("");
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed?.f) {
+          parsed.f.skuQuery = "";
+          localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
+        }
+      } catch {
+        /* non-fatal */
+      }
+      navigate(route, { state: { searchSku: skuQuery } });
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -714,6 +744,29 @@ const SalesJewelry = () => {
     priceBands.length +
     (priceFrom || priceTo ? 1 : 0);
 
+  // Smart search — live suggestions across the WHOLE catalog (jewelry + every
+  // stone category); picking one deep-links straight to the product page.
+  const skuSuggestions = useMemo(
+    () =>
+      buildSkuSuggestions({
+        query: skuQuery,
+        stones: allStonesRef.current,
+        jewelry: rows.map((r) => ({
+          model_number: r.sku,
+          title: r.name,
+          jewelry_type: r.jewelryType,
+        })),
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [skuQuery, rows, loading]
+  );
+  const handleSuggestionPick = (it) => {
+    setSearchFocused(false);
+    // Remember where we were so Back returns to this exact spot in the grid.
+    saveScrollPos(visibleCount);
+    navigate(it.route);
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
       {/* Header row — Filter left, search middle, Sort right. */}
@@ -743,9 +796,21 @@ const SalesJewelry = () => {
           <input
             type="search"
             value={skuQuery}
-            onChange={(e) => setSkuQuery(e.target.value)}
+            onChange={(e) => {
+              skuTypedRef.current = true;
+              setSkuQuery(e.target.value);
+            }}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder="Search name / SKU"
             className="w-full rounded-xl border border-app-line bg-app-surface py-2 pl-9 pr-3 text-sm text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+          />
+          {/* Smart-search suggestions — every matching SKU across jewelry +
+              stones; tapping one opens its product page directly. */}
+          <SkuSuggestions
+            open={searchFocused && skuQuery.trim().length >= 2}
+            items={skuSuggestions}
+            onPick={handleSuggestionPick}
           />
         </label>
 

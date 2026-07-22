@@ -2812,13 +2812,33 @@ const getShortShape = (dnaName) => DNA_TO_SHORT[dnaName] || dnaName;
 
 const getDisplayColor = (stone) => {
   const mapped = getMappedCategories(stone.category);
+  // Keep in sync with helpers/constants.js getDisplayColor — Fancy titles use
+  // Intensity · Overtone · Color (GIA order). Bare grades like "Intense" get
+  // the leading "Fancy" so they read like a lab report.
+  const normalizeIntensity = (raw) => {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    if (/^fancy\b/i.test(s) || /^(faint|very\s+light)\b/i.test(s)) return s;
+    if (/^(intense|vivid|deep|dark|light)$/i.test(s)) {
+      return `Fancy ${s.charAt(0).toUpperCase()}${s.slice(1).toLowerCase()}`;
+    }
+    return s;
+  };
   if (mapped.includes('Fancy')) {
-    return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ') || stone.color || '';
+    return [
+      normalizeIntensity(stone.fancyIntensity),
+      stone.fancyOvertone,
+      stone.fancyColor,
+    ].filter(Boolean).join(' ') || stone.color || '';
   }
   if (mapped.includes('Diamond') || mapped.includes('Emerald')) {
     return stone.color || '';
   }
-  return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ') || stone.color || '';
+  return [
+    normalizeIntensity(stone.fancyIntensity),
+    stone.fancyOvertone,
+    stone.fancyColor,
+  ].filter(Boolean).join(' ') || stone.color || '';
 };
 
 /* ---------------- Shape Icons (faceted line-art) ---------------- */

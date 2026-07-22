@@ -266,19 +266,20 @@ const StoneDetail = () => {
   const shape = getDisplayShape(stone.shape);
   const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : "";
   const treatment = stone.treatment ? shortTreatment(stone.treatment) : "";
-  const fancyDesc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(" ");
   // Clean gem type (Aquamarine / Kunzite / Tanzanite …) for non-emerald stones.
   const gemTypeName =
     mapped.filter((c) => !["Empty", "Diamond", "Fancy", "Emerald"].includes(c))[0] || "";
 
-  // "5.05 Cushion Fancy Intense Green Yellow GIA" (fancy)
+  // "5.05 Cushion Fancy Intense Grayish Yellowish Green GIA" (fancy)
   // "0.51 Round H SI1 None IGI" (white) / "1.16 Pear ICA Minor" (emerald)
   // "1.15 Aquamarine Round EGL" (other gemstones)
+  // Fancy colour = intensity + overtone + color via getDisplayColor — the white
+  // `color` field is always empty on Fancy rows.
   const title = isDiamond
     ? [
         wt,
         shape,
-        isFancy ? fancyDesc : stone.color,
+        isFancy ? getDisplayColor(stone) : stone.color,
         isFancy ? "" : stone.clarity,
         lab,
         fluorDisplay(stone.fluorescence),

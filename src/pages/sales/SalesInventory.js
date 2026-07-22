@@ -9,6 +9,7 @@ import { getMappedCategories } from "../../utils/categoryMap";
 import { DIAMOND_SHAPES, EMERALD_SHAPES } from "./diamondShapes";
 import { getCatalogView } from "./salesPrefs";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
+import SkuSuggestions, { buildSkuSuggestions } from "../../components/SkuSearchSuggestions";
 import placeholderImg from "../../assets/stone-placeholder-eshed.png";
 import { useSelection } from "../../context/SelectionContext";
 import {
@@ -584,13 +585,25 @@ export const prettyBranch = (v) => {
   return BRANCH_LABELS[normLoc(s)] || s;
 };
 
-/* Diamond title: "0.51 Round H SI1 None IGI"
- * weight · shape · color · clarity · fluorescence · cert lab. */
+/* Diamond title:
+ *   white  — "0.51 Round H SI1 None IGI"
+ *   fancy  — "1.23 Cushion Fancy Intense Yellow GIA"
+ * weight · shape · color · clarity (white only) · fluorescence · cert lab.
+ * Fancy colour comes from getDisplayColor (intensity + overtone + color) —
+ * the white `color` field is always empty on Fancy rows. */
 const buildDiamondTitle = (s) => {
   const wt =
     s.weightCt != null && s.weightCt !== "" ? Number(s.weightCt).toFixed(2) : "";
   const shape = getDisplayShape(s.shape);
-  return [wt, shape, s.color, s.clarity, fluorDisplay(s.fluorescence), s.lab]
+  const isFancy = getMappedCategories(s.category).includes("Fancy");
+  return [
+    wt,
+    shape,
+    isFancy ? getDisplayColor(s) : s.color,
+    isFancy ? "" : s.clarity,
+    fluorDisplay(s.fluorescence),
+    s.lab,
+  ]
     .filter(Boolean)
     .join(" ");
 };
@@ -1032,6 +1045,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const filterDrag = useDragControls();
   const sortDrag = useDragControls();
   const [skuQuery, setSkuQuery] = useState("");
+  // True only after the rep TYPES in the search box on this page (reset on
+  // category switch). Restored / injected queries must never re-trigger the
+  // cross-category hop — that's what used to trap the catalog in an
+  // un-clearable search loop.
+  const skuTypedRef = useRef(false);
+  // Search box focus — drives the smart-search suggestions dropdown.
+  const [searchFocused, setSearchFocused] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   // Once the header (Filter / search / Sort) scrolls out of view we surface a
   // floating Filter button so it stays reachable deep down the grid.
@@ -1187,13 +1207,22 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     // hopping between Diamonds / Emeralds / Gemstones — or returning later —
     // keeps every page's results. Panels always reopen in the default layout.
     // A re-run from the activity feed wins over the saved snapshot (once).
+    // Back-from-product flow marker: a pending scroll restore means the rep is
+    // returning to the list they were just browsing (keep their search); any
+    // other entry starts with an EMPTY search box — restoring an old query
+    // used to re-trigger the cross-category hop and trap the user in an
+    // un-clearable search loop.
+    const backFromProduct = !!readScrollPos(mode);
     const replay = location.state?.replayFilters;
     if (replay && !replayAppliedRef.current) {
       replayAppliedRef.current = true;
       applyFilters(replay);
     } else {
       applyFilters(loadSavedFilters(mode));
+      if (!backFromProduct) setSkuQuery("");
     }
+    // Whatever lands in the box now wasn't typed here.
+    skuTypedRef.current = false;
     // Arrived here from a cross-category SKU search (the searched stone lives in
     // this category): override whatever was just restored with that query so the
     // stone shows up immediately. Then CONSUME it — wipe it from history state so
@@ -1290,7 +1319,29 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   useEffect(() => {
     const q = norm(skuQuery);
     if (loading || q.length < 3) return undefined;
+    // Only a query the rep actually typed on THIS page may redirect. Queries
+    // restored from storage or injected by a previous hop stay put — otherwise
+    // two categories bounce the same stale search back and forth forever.
+    if (!skuTypedRef.current) return undefined;
     const matchesSku = (s) => norm(s.sku).includes(q) || norm(s.pairSku).includes(q);
+    // Leaving for another category: take the query along and leave this one
+    // clean (state + persisted snapshot), so coming back here later never
+    // resurrects the search.
+    const hopTo = (route) => {
+      skuTypedRef.current = false;
+      setSkuQuery("");
+      try {
+        const raw = localStorage.getItem(filtersKey(mode));
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed?.f) {
+          parsed.f.skuQuery = "";
+          localStorage.setItem(filtersKey(mode), JSON.stringify(parsed));
+        }
+      } catch {
+        /* non-fatal */
+      }
+      navigate(route, { state: { searchSku: skuQuery } });
+    };
     const t = setTimeout(() => {
       // Found in this category already — stay put.
       if (stones.some(matchesSku)) return;
@@ -1299,7 +1350,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         const targetMode = modeForStone(match);
         if (targetMode === mode) return;
         const route = MODE_ROUTES[targetMode];
-        if (route) navigate(route, { state: { searchSku: skuQuery } });
+        if (route) hopTo(route);
         return;
       }
       // Not a loose stone in any category — maybe it's a jewelry piece. Hop to
@@ -1307,7 +1358,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       const inJewelry = (allJewelryRef.current || []).some((j) =>
         norm(j.model_number).includes(q)
       );
-      if (inJewelry) navigate("/sales/jewelry", { state: { searchSku: skuQuery } });
+      if (inJewelry) hopTo("/sales/jewelry");
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1900,6 +1951,26 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sorted.length, skuQuery, hasActiveFilters]);
 
+  // Smart search — live suggestions across the WHOLE catalog (every stone
+  // category + jewelry), so the rep sees where an SKU lives while typing.
+  // Picking one deep-links straight to the product page.
+  const skuSuggestions = useMemo(
+    () =>
+      buildSkuSuggestions({
+        query: skuQuery,
+        stones: allStonesRef.current,
+        jewelry: allJewelryRef.current,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [skuQuery, loading]
+  );
+  const handleSuggestionPick = (it) => {
+    setSearchFocused(false);
+    // Remember where we were so Back returns to this exact spot in the grid.
+    saveScrollPos(mode, visibleCount);
+    navigate(it.route);
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
       {/* No page title — the bottom dock already shows which catalog you're in.
@@ -1928,9 +1999,21 @@ const SalesInventory = ({ mode = "gemstone" }) => {
           <input
             type="search"
             value={skuQuery}
-            onChange={(e) => setSkuQuery(e.target.value)}
+            onChange={(e) => {
+              skuTypedRef.current = true;
+              setSkuQuery(e.target.value);
+            }}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder="Search SKU"
             className="w-full rounded-xl border border-app-line bg-app-surface py-2 pl-9 pr-10 text-sm text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
+          />
+          {/* Smart-search suggestions — every matching SKU across stones +
+              jewelry; tapping one opens its product page directly. */}
+          <SkuSuggestions
+            open={searchFocused && skuQuery.trim().length >= 2}
+            items={skuSuggestions}
+            onPick={handleSuggestionPick}
           />
           {/* Camera scan — opens the rear camera to read a SKU barcode/QR. */}
           <button
@@ -2003,6 +2086,8 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         isOpen={scanOpen}
         onClose={() => setScanOpen(false)}
         onScan={(text) => {
+          // A scanned SKU counts as user input — the cross-category hop may act on it.
+          skuTypedRef.current = true;
           setSkuQuery(String(text || "").trim());
           setScanOpen(false);
         }}

@@ -1,5 +1,5 @@
 import { getMappedCategories } from "./categoryMap";
-import { getDisplayShape, shortTreatment } from "../pages/inventory/helpers/constants";
+import { getDisplayShape, getDisplayColor, shortTreatment } from "../pages/inventory/helpers/constants";
 import { parseDims, usableImg, prettyBranch } from "../pages/sales/SalesInventory";
 import { logShareEvents } from "../services/stonesApi";
 import { trackShare } from "./activityLog";
@@ -159,13 +159,16 @@ const buildDiamondText = (stone, { withPrice = true, withRap = false } = {}) => 
   const isFancy = isFancyStone(stone);
   const wt = Number(stone.weightCt);
   const wtStr = Number.isFinite(wt) ? wt.toFixed(2) : "";
-  const color = isFancy
-    ? [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(" ")
-    : stone.color;
+  // Fancy colour = intensity + overtone + color (same as the product page /
+  // catalog card). White `color` is always empty on Fancy rows.
+  const color = isFancy ? getDisplayColor(stone) : stone.color;
   const lab = stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : "";
   const fl = stone.fluorescence ? fluorAbbr(stone.fluorescence) : "";
+  const shape = getDisplayShape(stone.shape) || stone.shape;
 
-  const title = [wtStr, stone.shape, color, stone.clarity, fl, lab].filter(Boolean).join(" ");
+  const title = [wtStr, shape, color, isFancy ? "" : stone.clarity, fl, lab]
+    .filter(Boolean)
+    .join(" ");
 
   const lines = [];
   if (title) lines.push(title);

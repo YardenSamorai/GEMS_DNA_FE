@@ -83,15 +83,38 @@ export const DNA_TO_SHORT = {
 
 export const getShortShape = (dnaName) => DNA_TO_SHORT[dnaName] || dnaName;
 
+/* Barak sometimes stores bare grades ("Intense", "Vivid") without the
+ * leading "Fancy". Expand those so titles read like a GIA report
+ * ("Fancy Intense Yellow") instead of the truncated "Intense Yellow". */
+const normalizeFancyIntensity = (raw) => {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (/^fancy\b/i.test(s) || /^(faint|very\s+light)\b/i.test(s)) return s;
+  if (/^(intense|vivid|deep|dark|light)$/i.test(s)) {
+    return `Fancy ${s.charAt(0).toUpperCase()}${s.slice(1).toLowerCase()}`;
+  }
+  return s;
+};
+
+/* Fancy colour description in GIA order: Intensity · Overtone · Color.
+ * Used by catalog cards, the product page title, the PDF catalog and WhatsApp. */
 export const getDisplayColor = (stone) => {
   const mapped = getMappedCategories(stone.category);
   if (mapped.includes('Fancy')) {
-    return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ') || stone.color || '';
+    return [
+      normalizeFancyIntensity(stone.fancyIntensity),
+      stone.fancyOvertone,
+      stone.fancyColor,
+    ].filter(Boolean).join(' ') || stone.color || '';
   }
   if (mapped.includes('Diamond') || mapped.includes('Emerald')) {
     return stone.color || '';
   }
-  return [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ') || stone.color || '';
+  return [
+    normalizeFancyIntensity(stone.fancyIntensity),
+    stone.fancyOvertone,
+    stone.fancyColor,
+  ].filter(Boolean).join(' ') || stone.color || '';
 };
 
 export const shortTreatment = (t) => {
