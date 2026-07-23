@@ -42,6 +42,7 @@ import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import MobileDock from "./components/MobileDock";
 import ActivityTracker from "./components/ActivityTracker";
+import SessionLimitGuard from "./components/SessionLimitGuard";
 import { trackDenied } from "./utils/activityLog";
 import SpinningGem from "./components/SpinningGem";
 import BrandMark from "./components/BrandMark";
@@ -574,6 +575,7 @@ function AppContent() {
         }}
       />
       <Router>
+        <SessionLimitGuard />
         <RouteLoadingProvider>
           <RouteTransitionOverlay />
           <Routes>
