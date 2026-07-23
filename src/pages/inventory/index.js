@@ -7754,7 +7754,7 @@ const StoneSearchPage = () => {
                 }`}
               >
                 Jewelry
-                <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'jewelry' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>}
+                <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'jewelry' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>
               </button>
             </div>
             
