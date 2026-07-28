@@ -6,6 +6,7 @@ import {
   shareStonesOnWhatsApp,
   prepareShareFiles,
   canShareFiles,
+  copyShareText,
 } from "../../utils/shareStones";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
@@ -31,6 +32,7 @@ import {
   prettyBranch,
 } from "./SalesInventory";
 import VimeoEmbed from "./VimeoEmbed";
+import CopyTextButton from "../../components/CopyTextButton";
 
 /* ============================================================================
  * StoneDetail — the per-stone product page behind the sales catalog cards.
@@ -107,6 +109,8 @@ const StoneDetail = () => {
   // Internal cost is hidden behind a tap (managers/admins only) so it's never
   // shown to a client over the rep's shoulder when the page first opens.
   const [costOpen, setCostOpen] = useState(false);
+  // "Copied" confirmation on the preview's Copy button.
+  const [copied, setCopied] = useState(false);
 
   // Always open the product page from the top — never inherit the catalog's
   // scroll position when a new SKU is opened. On mobile the document is locked
@@ -191,6 +195,11 @@ const StoneDetail = () => {
     const n = Number(stone.pricePerCt);
     setPpcEdit(Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : "");
   }, [actionOpen, stone]);
+
+  // Drop the "Copied" confirmation whenever the sheet is reopened.
+  useEffect(() => {
+    if (!actionOpen) setCopied(false);
+  }, [actionOpen]);
 
   // ---- Media carousel ------------------------------------------------------
   const images = useMemo(() => (stone ? stoneImages(stone) : []), [stone]);
@@ -323,6 +332,17 @@ const StoneDetail = () => {
         priceTotal: Number.isFinite(wtNum2) ? ppcEditNum * wtNum2 : stone.priceTotal,
       }
     : stone;
+
+  // Exactly what the preview shows — also what the Copy button puts on the
+  // clipboard, so reps can paste it into email/Telegram/anywhere else.
+  const shareText = buildStoneShareText(shareStone, { withPrice, withRap });
+
+  const handleCopyShareText = async () => {
+    const ok = await copyShareText(shareText);
+    if (!ok) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
 
   // Internal cost (manager/admin only). Mirrors the old catalog Cost button,
   // now living inside the product page, just under the location.
@@ -939,19 +959,22 @@ const StoneDetail = () => {
                 </button>
 
                 {/* Preview of what will be sent. */}
-                <div className="mb-1 mt-4 flex items-center justify-between">
+                <div className="mb-1 mt-4 flex items-center justify-between gap-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">Preview</p>
-                  {canShareFiles(shareFiles) && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5h16v14H4z M4 15l4-4 4 4 4-4 4 4" />
-                      </svg>
-                      Photo &amp; certificate attached
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canShareFiles(shareFiles) && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5h16v14H4z M4 15l4-4 4 4 4-4 4 4" />
+                        </svg>
+                        Photo &amp; certificate attached
+                      </span>
+                    )}
+                    <CopyTextButton copied={copied} onCopy={handleCopyShareText} />
+                  </div>
                 </div>
                 <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-app-line bg-app-canvas2 px-3 py-2.5 text-[12px] leading-relaxed text-app-graphite">
-                  {buildStoneShareText(shareStone, { withPrice, withRap })}
+                  {shareText}
                 </pre>
               </div>
             </motion.div>

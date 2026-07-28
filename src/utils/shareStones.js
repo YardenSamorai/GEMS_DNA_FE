@@ -400,6 +400,39 @@ export const canShareFiles = (files) =>
   typeof navigator.canShare === "function" &&
   navigator.canShare({ files });
 
+/* Copies the share text to the clipboard so reps can paste it into platforms
+ * we don't hand off to directly (email, iMessage, Telegram). Falls back to a
+ * hidden textarea where the async Clipboard API isn't available. */
+export const copyShareText = async (text) => {
+  const value = String(text ?? "");
+  if (!value) return false;
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch (_) {
+    /* fall through to the textarea fallback */
+  }
+
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = value;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (_) {
+    return false;
+  }
+};
+
 /* ============================================================================
  * Entry point
  * ========================================================================== */
