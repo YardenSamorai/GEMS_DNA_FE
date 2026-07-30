@@ -78,8 +78,13 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
 
   // Calculate combined weight
   const combinedWeight = ((stoneA.weightCt || 0) + (stoneB ? stoneB.weightCt || 0 : 0)).toFixed(2);
-  const rawCombinedPrice = ((stoneA.priceTotal || 0) + (stoneB ? stoneB.priceTotal || 0 : 0));
-  const combinedPrice = priceMode === 'neto' ? Math.round(rawCombinedPrice / 2) : rawCombinedPrice;
+  // Scale each stone before summing so the pair total agrees with the two
+  // per-stone figures above it (this used to use the old inverted convention
+  // and showed a pair at half the sum of its own stones).
+  const combinedPrice = Math.round(
+    scaleInventoryPrice(stoneA.priceTotal || 0, stoneA, priceMode) +
+      (stoneB ? scaleInventoryPrice(stoneB.priceTotal || 0, stoneB, priceMode) : 0)
+  );
 
   return (
     <motion.div

@@ -39,6 +39,18 @@ describe("inventoryPriceScale", () => {
     expect(inventoryPriceScale(jewelry, PRICE_MODES.BRUTO)).toBe(1);
   });
 
+  // Diamonds and jewelry are always quoted Neto, so the Bruto toggle must be a
+  // no-op for them no matter how the rest of the app moves the mode around.
+  it("gives diamonds and jewelry one single price in every mode", () => {
+    for (const stone of [diamond, fancy, jewelry]) {
+      const modes = Object.values(PRICE_MODES).map((m) =>
+        scaleInventoryPrice(1000, stone, m)
+      );
+      expect(new Set(modes).size).toBe(1);
+      expect(modes[0]).toBe(1000);
+    }
+  });
+
   // The bug this module exists to prevent was a second, inverted definition of
   // "Neto" (stored / 2) living in other files. Scaling must never shrink.
   it("never returns a fraction", () => {

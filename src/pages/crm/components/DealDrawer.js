@@ -16,6 +16,7 @@ import ItemDetailModal from "./ItemDetailModal";
 import { Skeleton, SkeletonCard, SkeletonText } from "../../../components/ui/Skeleton";
 import AssigneePicker from "../../../components/team/AssigneePicker";
 import { useTeam } from "../../../context/TeamContext";
+import { supportsBrutoMode } from "../../../utils/pricing";
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 const timeAgo = (d) => {
@@ -70,7 +71,9 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
       stoneId: String(s.id),
       sku: s.sku,
       category: s.category,
-      customPrice: s.priceTotal ? Number(s.priceTotal) / 2 : null,
+      // The catalog price already IS the Neto figure — halving it here opened
+      // every deal item at half its true value.
+      customPrice: s.priceTotal ? Math.round(Number(s.priceTotal)) : null,
       snapshot: {
         shape: s.shape,
         weightCt: s.weightCt,
@@ -372,8 +375,10 @@ export default function DealDrawer({ dealId, onClose, onChanged }) {
 function DealItemRow({ item, onPriceChange, onRemove, onOpen }) {
   const snap = item.snapshot || {};
   const [price, setPrice] = useState(item.custom_price || 0);
-  const bruto = snap.priceTotal || 0;
-  const neto = bruto / 2;
+  // The snapshot holds the Neto price verbatim; Bruto is the doubled
+  // negotiation figure and only exists for coloured stones.
+  const neto = snap.priceTotal || 0;
+  const bruto = supportsBrutoMode(snap) ? neto * 2 : null;
 
   return (
     <div className="group flex items-center gap-3 glass-surface rounded-lg p-3 hover:border-stone-400 hover:shadow-sm transition">
@@ -398,8 +403,10 @@ function DealItemRow({ item, onPriceChange, onRemove, onOpen }) {
           <div className="text-xs text-stone-500 truncate">
             {[snap.shape, snap.weightCt && `${snap.weightCt}ct`, snap.color, snap.clarity, snap.lab].filter(Boolean).join(" · ")}
           </div>
-          {bruto > 0 && (
-            <div className="text-[10px] text-stone-400 mt-0.5">List: {fmt(bruto)} bruto · {fmt(neto)} neto</div>
+          {neto > 0 && (
+            <div className="text-[10px] text-stone-400 mt-0.5">
+              List: {fmt(neto)} neto{bruto ? ` · ${fmt(bruto)} bruto` : ""}
+            </div>
           )}
         </div>
       </button>

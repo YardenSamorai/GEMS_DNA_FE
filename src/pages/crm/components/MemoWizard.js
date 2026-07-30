@@ -64,12 +64,12 @@ export default function MemoWizard({ companies: initialCompanies, preselectCompa
     // StonePicker emits both stones (with `id`, `sku`, etc.) and jewelry
     // (with `sku` = model_number, `category` = 'Jewelry'). We map both
     // shapes onto our memo_items contract and seed memoPrice from the
-    // catalog: stones are stored as Bruto (→ neto = ÷2), but jewelry
-    // prices are already neto, so we use them as-is.
+    // catalog price verbatim — that stored figure already IS the Neto price.
+    // This used to halve stones, which opened every memo at half its value.
     const fresh = picked.map((s) => {
       const isJewelry = s.category === "Jewelry";
       const listed = Number(s.priceTotal || 0);
-      const defaultPrice = isJewelry ? listed : (listed ? Math.round(listed / 2) : null);
+      const defaultPrice = listed ? Math.round(listed) : null;
       return {
         itemType: isJewelry ? "jewelry" : "stone",
         itemSku: s.sku,

@@ -10,7 +10,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getMappedCategories } from "../../utils/categoryMap";
-import { inventoryPriceScale, readPriceMode, writePriceMode } from "../../utils/pricing";
+import { inventoryPriceScale, readPriceMode, supportsBrutoMode, writePriceMode } from "../../utils/pricing";
 import { sanitizeText } from "../../utils/helper";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
@@ -1703,6 +1703,12 @@ const ExportModal = ({
 
   if (!isOpen) return null;
 
+  // Diamonds and jewelry are always quoted Neto, so the Bruto toggle never
+  // touches them. The badge has to say so — claiming "Bruto prices" over an
+  // untouched diamond export is how a rep ends up quoting the wrong figure.
+  const showsBrutoPrices =
+    priceMode === "bruto" && selectedStones.some(supportsBrutoMode);
+
   // Base $/ct for a row. Jewelry is priced as a flat total with no per-carat
   // figure, so we derive one from total ÷ carat — otherwise its price would
   // collapse to $0 in the PDF (everything here is computed off $/ct).
@@ -1798,7 +1804,7 @@ const ExportModal = ({
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg sm:text-xl font-bold text-white">{title}</h2>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-white/25 text-white border border-white/30">
-                      {priceMode === "bruto" ? "Bruto prices" : "Neto prices"}
+                      {showsBrutoPrices ? "Bruto prices" : "Neto prices"}
                     </span>
                   </div>
                   <p className="text-white/80 text-xs sm:text-sm">{subtitle || `${selectedStones.length} stones selected`}</p>
@@ -1845,8 +1851,8 @@ const ExportModal = ({
                 </button>
               </div>
               <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${priceMode === "bruto" ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
-                  {priceMode === "bruto" ? "Bruto" : "Neto"}
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${showsBrutoPrices ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
+                  {showsBrutoPrices ? "Bruto" : "Neto"}
                 </span>
                 <span className="text-stone-500">
                   Original: <span className="font-semibold text-stone-700">${totalOriginal.toLocaleString()}</span>
@@ -6099,9 +6105,11 @@ const StoneSearchPage = () => {
     setCurrentPage(1);
     setSmartSearch('');
     setSortConfig({ field: 'sku', direction: 'asc' });
+    // Only gemstones carry a Neto/Bruto split; diamonds and jewelry are always
+    // quoted Neto. Leaving Bruto on here would follow the user back to the
+    // gemstones tab (and the DNA card, which mirrors this preference).
     if (newMode !== 'gemstones') setPriceMode('neto');
     setColumnConfig(getColumnConfig(user?.id || 'default', newMode));
-    if (newMode === 'jewelry') setPriceMode('bruto');
   };
 
   // USB Barcode Scanner Listener (global keyboard listener)
@@ -7155,7 +7163,7 @@ const StoneSearchPage = () => {
       const inJewelry = jewelryItems.find(j => j.sku?.toLowerCase() === initialSearch.toLowerCase());
       if (inJewelry && inventoryMode !== 'jewelry') {
         setInventoryMode('jewelry');
-        setPriceMode('bruto');
+        setPriceMode('neto');
       }
       return;
     }
@@ -7201,7 +7209,7 @@ const StoneSearchPage = () => {
   const handleLoadFilter = (preset) => {
     if (preset.inventory_mode && preset.inventory_mode !== inventoryMode) {
       setInventoryMode(preset.inventory_mode);
-      if (preset.inventory_mode === 'jewelry') setPriceMode('bruto');
+      if (preset.inventory_mode !== 'gemstones') setPriceMode('neto');
       setColumnConfig(getColumnConfig(user?.id || 'default', preset.inventory_mode));
     }
     setFilters(preset.filters || defaultFilters);

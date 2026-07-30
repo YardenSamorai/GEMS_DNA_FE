@@ -347,12 +347,10 @@ export default function StonePicker({ onClose, onSelect }) {
                       </div>
                       {item.priceTotal != null && (
                         <div className="text-right shrink-0">
+                          {/* The catalog price already IS the Neto figure, so it
+                              stands alone — the old halved footnote showed every
+                              stone at half its real value. */}
                           <div className="text-sm font-semibold text-stone-900">${Number(item.priceTotal).toLocaleString()}</div>
-                          {/* Jewelry prices are already neto in the catalog, so the
-                              "$X neto" footnote only applies to stones (Bruto → Neto = ÷2). */}
-                          {tab !== "jewelry" && (
-                            <div className="text-[10px] text-stone-400">${Math.round(Number(item.priceTotal) / 2).toLocaleString()} neto</div>
-                          )}
                         </div>
                       )}
                     </button>
