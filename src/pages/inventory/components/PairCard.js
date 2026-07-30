@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../helpers/constants";
+import { scaleInventoryPrice } from "../../../utils/pricing";
 import { shareToWhatsApp } from "../helpers/whatsappHelpers";
 
 const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSelection, onImageClick, onVideoClick, priceMode }) => {
@@ -58,8 +59,8 @@ const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSe
         </div>
         {/* Price */}
         <div className="pt-1">
-          <span className="text-base font-bold text-stone-900">${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</span>
-          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}/ct)</span>
+          <span className="text-base font-bold text-stone-900">${stone.priceTotal ? Math.round(scaleInventoryPrice(stone.priceTotal, stone, priceMode)).toLocaleString() : '-'}</span>
+          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt ? Math.round(scaleInventoryPrice(stone.pricePerCt, stone, priceMode)).toLocaleString() : '-'}/ct)</span>
         </div>
       </div>
       {/* View DNA button */}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { getMappedCategories } from "../utils/categoryMap";
+import { scaleInventoryPrice } from "../utils/pricing";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
@@ -840,10 +841,8 @@ const HomePage = () => {
 
   const isNeto = qaPriceMode === 'neto';
   const qaMinPpcNum = qaMinPpc ? Number(qaMinPpc) : 0;
-  const getEffectivePpc = (s) => {
-    const raw = s.pricePerCt || 0;
-    return isNeto ? raw / 2 : raw;
-  };
+  const getEffectivePpc = (s) =>
+    Number(scaleInventoryPrice(s.pricePerCt || 0, s, qaPriceMode)) || 0;
   const filterByPpc = (list) => {
     if (!qaMinPpcNum) return list;
     return list.filter(s => getEffectivePpc(s) >= qaMinPpcNum);
@@ -855,7 +854,7 @@ const HomePage = () => {
     }
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats.missingMediaByType, qaMinPpcNum, isNeto]);
+  }, [stats.missingMediaByType, qaMinPpcNum, qaPriceMode]);
   const filteredCertByType = useMemo(() => {
     const result = {};
     for (const type of ['Single', 'Pair', 'Parcel', 'Set']) {
@@ -863,7 +862,7 @@ const HomePage = () => {
     }
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats.missingCertByType, qaMinPpcNum, isNeto]);
+  }, [stats.missingCertByType, qaMinPpcNum, qaPriceMode]);
   const filteredMediaTotal = Object.values(filteredMediaByType).reduce((s, arr) => s + arr.length, 0);
   const filteredCertTotal = Object.values(filteredCertByType).reduce((s, arr) => s + arr.length, 0);
   const formatPpc = (stone) => {
@@ -871,14 +870,12 @@ const HomePage = () => {
     return ppc ? `$${Math.round(ppc).toLocaleString()}/ct` : '';
   };
   const topStonesIsNeto = topStonesMode === 'neto';
-  const getTopStonePrice = (s) => {
-    const raw = s.priceTotal || 0;
-    return topStonesIsNeto ? raw / 2 : raw;
-  };
+  const getTopStonePrice = (s) =>
+    Number(scaleInventoryPrice(s.priceTotal || 0, s, topStonesMode)) || 0;
   const sortedTopStones = useMemo(() => {
     return [...(stats.topStones || [])].sort((a, b) => getTopStonePrice(b) - getTopStonePrice(a));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats.topStones, topStonesIsNeto]);
+  }, [stats.topStones, topStonesMode]);
 
   const handleCopySku = (e, sku) => {
     e.preventDefault();

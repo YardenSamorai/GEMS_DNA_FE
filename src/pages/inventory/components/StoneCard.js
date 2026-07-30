@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../helpers/constants";
+import { scaleInventoryPrice } from "../../../utils/pricing";
 import { createEmailText, createEmailHtml } from "../helpers/exportHelpers";
 import { shareToWhatsApp } from "../helpers/whatsappHelpers";
 import TagSelector from "./TagSelector";
@@ -155,8 +156,8 @@ const StoneCard = ({
             </span>
           </div>
           <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-            <span><span className="opacity-60">Total:</span> <span className="font-medium text-foreground">${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</span></span>
-            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</span>
+            <span><span className="opacity-60">Total:</span> <span className="font-medium text-foreground">${stone.priceTotal ? Math.round(scaleInventoryPrice(stone.priceTotal, stone, priceMode)).toLocaleString() : '-'}</span></span>
+            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt ? Math.round(scaleInventoryPrice(stone.pricePerCt, stone, priceMode)).toLocaleString() : '-'}</span>
             <span><span className="text-stone-400">Measurements:</span> {stone.measurements || 'N/A'}</span>
             <span><span className="text-stone-400">Ratio:</span> {stone.ratio || 'N/A'}</span>
             <span><span className="text-stone-400">Clarity:</span> {shortTreatment(stone.treatment)}</span>

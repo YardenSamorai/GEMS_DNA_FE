@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getMappedCategories } from "../../../utils/categoryMap";
+import { scaleInventoryPrice } from "../../../utils/pricing";
 import { getDisplayShape, getDisplayColor, shortTreatment, DEFAULT_COLUMNS } from "../helpers/constants";
 import { shareToWhatsApp } from "../helpers/whatsappHelpers";
 import { StoneDetails } from "./StoneCard";
@@ -197,8 +198,8 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
       case 'origin': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.origin || ''}</span></td>;
       case 'fluorescence': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.fluorescence || ''}</span></td>;
       case 'lab': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.lab || ''}</span></td>;
-      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}</td>;
-      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}</td>;
+      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(scaleInventoryPrice(stone.pricePerCt, stone, priceMode)).toLocaleString() : '-'}</td>;
+      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(scaleInventoryPrice(stone.priceTotal, stone, priceMode)).toLocaleString() : '-'}</td>;
       case 'location': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.location || ''}</span></td>;
       case 'title': return <td key={colId} className="px-3 py-2 max-w-[200px]"><span className="text-xs text-stone-700 truncate block">{stone.title || '-'}</span></td>;
       case 'jewelryType': return (
@@ -307,10 +308,10 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-stone-900">
-                    ${stone.priceTotal ? Math.round(priceMode === 'neto' ? stone.priceTotal / 2 : stone.priceTotal).toLocaleString() : '-'}
+                    ${stone.priceTotal ? Math.round(scaleInventoryPrice(stone.priceTotal, stone, priceMode)).toLocaleString() : '-'}
                   </p>
                   <p className="text-xs text-stone-500">
-                    ${stone.pricePerCt ? Math.round(priceMode === 'neto' ? stone.pricePerCt / 2 : stone.pricePerCt).toLocaleString() : '-'}/ct
+                    ${stone.pricePerCt ? Math.round(scaleInventoryPrice(stone.pricePerCt, stone, priceMode)).toLocaleString() : '-'}/ct
                   </p>
                 </div>
               </div>

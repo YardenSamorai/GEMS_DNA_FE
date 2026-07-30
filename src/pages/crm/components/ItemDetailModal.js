@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { API_BASE } from "../../inventory/helpers/constants";
+import { PRICE_MODES, scaleInventoryPrice } from "../../../utils/pricing";
 
 /**
  * Detail view for an item attached to a deal.
@@ -102,9 +103,13 @@ export default function ItemDetailModal({ item, onClose }) {
   const description = isJewelry ? sanitize(d.description) : null;
   const fullDescription = isJewelry ? sanitize(d.full_description) : null;
 
-  // Pricing — use snapshot for trustworthy unencrypted values
-  const bruto = snap.priceTotal ? Number(snap.priceTotal) : null;
-  const neto = bruto != null ? Math.round(bruto / 2) : null;
+  // Pricing — use snapshot for trustworthy unencrypted values. The stored
+  // figure IS the Neto price; Bruto is the doubled negotiation figure and only
+  // exists for coloured stones, so diamonds simply don't render that cell.
+  const neto = snap.priceTotal ? Number(snap.priceTotal) : null;
+  const brutoScaled =
+    neto != null ? Number(scaleInventoryPrice(neto, snap, PRICE_MODES.BRUTO)) : null;
+  const bruto = brutoScaled != null && brutoScaled !== neto ? Math.round(brutoScaled) : null;
   const ppc = snap.pricePerCt ? Number(snap.pricePerCt) : null;
   const customPrice = item.custom_price != null ? Number(item.custom_price) : null;
 

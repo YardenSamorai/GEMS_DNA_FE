@@ -5,6 +5,7 @@ import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
 import { barakURL } from "../utils/const";
 import { getMappedCategories } from "../utils/categoryMap";
+import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import InterestedModal from '../components/InterestedModal';
@@ -141,23 +142,15 @@ const DiamondCard = () => {
   }
 
   // Neto/Bruto preference is set on the inventory screen and mirrored here via
-  // localStorage. The stored DB price is already Neto — the exact same model
-  // the inventory uses (Neto = raw value, Bruto = raw × 2):
-  //   Neto  → raw value, no "B" prefix
-  //   Bruto → raw × 2, "B" prefix (gemstones/emeralds only)
-  // Diamonds have no Bruto/Neto split, so they always show the raw Neto value.
-  const priceMode = (() => {
-    try {
-      return localStorage.getItem("gems_price_mode") === "bruto" ? "bruto" : "neto";
-    } catch {
-      return "neto";
-    }
-  })();
+  // localStorage. Scaling itself lives in utils/pricing.js so this page can
+  // never drift from the inventory. A scaled-up figure gets a "B" prefix.
+  const priceMode = readPriceMode();
 
   const priceCodeFor = (encryptedValue) => {
     const full = decryptPrice(encryptedValue);
-    if (!isDiamond() && priceMode === "bruto") {
-      const code = encryptPrice(full * 2);
+    const scaled = scaleInventoryPrice(full, details, priceMode);
+    if (scaled !== full) {
+      const code = encryptPrice(scaled);
       return code === "N/A" ? code : `B${code}`;
     }
     return encryptPrice(full);

@@ -6,6 +6,7 @@ import { fetchJewelryCatalog } from "../../services/jewelryApi";
 import { useTeam } from "../../context/TeamContext";
 import { getDisplayShape, getDisplayColor, shortTreatment } from "../inventory/helpers/constants";
 import { getMappedCategories } from "../../utils/categoryMap";
+import { adjustSalesPrices } from "../../utils/pricing";
 import { DIAMOND_SHAPES, EMERALD_SHAPES } from "./diamondShapes";
 import { getCatalogView } from "./salesPrefs";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
@@ -661,22 +662,10 @@ export const enhanceVimeoUrl = (url) => {
   return `${base}${sep}${params}${frag ? `#${frag}` : ""}`;
 };
 
-/* Sales-floor price policy (applied once at load time so cards, the product
- * page, the price filters, sorting and WhatsApp shares all see the same
- * adjusted figures). The DB now stores real prices, so:
- *   - Diamonds / Fancy / Emeralds → shown as-is (full price, straight from DB).
- *   - Other coloured gemstones → divided by 2 (half off). */
-export const adjustSalesPrices = (s) => {
-  const mapped = getMappedCategories(s.category);
-  const showAsIs =
-    mapped.includes("Diamond") ||
-    mapped.includes("Fancy") ||
-    mapped.includes("Emerald");
-  const divisor = showAsIs ? 1 : 2;
-  const adj = (v) =>
-    v != null && v !== "" && isFinite(Number(v)) ? Number(v) / divisor : v;
-  return { ...s, pricePerCt: adj(s.pricePerCt), priceTotal: adj(s.priceTotal) };
-};
+/* Sales-floor price policy lives in utils/pricing.js — the single place in the
+ * app allowed to scale a price. Re-exported here so existing importers of this
+ * module keep working. */
+export { adjustSalesPrices };
 
 /* The Barak export sets `certificateUrl` to a folder path (".../Certificates/")
  * for almost every stone even when there is no cert, so its mere presence is

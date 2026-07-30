@@ -10,6 +10,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getMappedCategories } from "../../utils/categoryMap";
+import { inventoryPriceScale, readPriceMode, writePriceMode } from "../../utils/pricing";
 import { sanitizeText } from "../../utils/helper";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
@@ -4128,22 +4129,6 @@ const StoneAssignmentChip = ({ stone, onAssign, busy }) => {
   );
 };
 
-/* Per-stone display multiplier for the regular inventory page (NOT sales).
- * Prices are stored in the DB; the screen scales them per category + mode:
- *   - Diamonds (incl. Fancy) → always shown as-is (×1); no Neto/Bruto here.
- *   - Jewelry                → always shown as-is (×1).
- *   - Gemstones (emeralds &   → Neto = DB (×1), Bruto = DB ×2.
- *     other coloured stones)
- * The Neto⇆Bruto toggle only appears on the Gemstones tab, so the 2× gap
- * between the two modes is preserved (Bruto = 2 × Neto). This is intentionally
- * independent of the sales inventory's `adjustSalesPrices`. */
-const inventoryPriceScale = (stone, priceMode) => {
-  const mapped = getMappedCategories(stone?.category);
-  if (mapped.includes("Diamond")) return 1;
-  if (stone?.category === "Jewelry") return 1;
-  return priceMode === "bruto" ? 2 : 1;
-};
-
 const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, priceMode, onAssign, assigningSku }) => (
   <motion.div
     layout
@@ -5703,22 +5688,13 @@ const StoneSearchPage = () => {
   const [viewMode, setViewMode] = useState("table");
   const [pairViewMode, setPairViewMode] = useState("cards");
   const [smartSearch, setSmartSearch] = useState(savedView?.smartSearch || "");
-  const [priceMode, setPriceMode] = useState(() => {
-    // Persisted so the public DNA page (DiamondCard) can mirror the same
-    // Neto/Bruto choice — the toggle lives here but the code is decoded there.
-    try {
-      return localStorage.getItem("gems_price_mode") === "bruto" ? "bruto" : "neto";
-    } catch {
-      return "neto";
-    }
-  }); // 'neto' = /2, 'bruto' = full DB price
+  // Persisted so the public DNA page (DiamondCard) can mirror the same
+  // Neto/Bruto choice — the toggle lives here but the code is decoded there.
+  // Neto = the stored price as-is, Bruto = stored × 2 (see utils/pricing.js).
+  const [priceMode, setPriceMode] = useState(readPriceMode);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("gems_price_mode", priceMode);
-    } catch {
-      /* storage unavailable — DNA page falls back to Neto */
-    }
+    writePriceMode(priceMode);
   }, [priceMode]);
 
   // Snapshot the current view so navigating to a stone's DNA page and coming

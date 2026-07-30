@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { getMappedCategories } from '../utils/categoryMap';
+import { scaleInventoryPrice } from '../utils/pricing';
 import { Skeleton, SkeletonStatCard, SkeletonTableRows } from '../components/ui/Skeleton';
 
 const BARAK_URL = 'https://app.barakdiamonds.com/gemstones/Main.aspx';
@@ -207,11 +208,13 @@ const QAPage = () => {
   const [sortDir, setSortDir] = useState('desc');
   const [priceMode, setPriceMode] = useState('neto');
 
-  const displayPrice = (val) => {
+  // Neto = the stored price as-is, Bruto = stored × 2 (see utils/pricing.js).
+  // Passing the item keeps diamonds and jewelry out of the Bruto doubling.
+  const displayPrice = (val, item) => {
     if (!val) return null;
     const n = Number(val);
     if (!n) return null;
-    return priceMode === 'neto' ? Math.round(n / 2) : Math.round(n);
+    return Math.round(Number(scaleInventoryPrice(n, item, priceMode)));
   };
 
   const fetchData = useCallback(async () => {
@@ -233,6 +236,7 @@ const QAPage = () => {
           title: cleanStr(row.title),
           jewelryType: cleanStr(row.jewelry_type),
           collection: cleanStr(row.collection),
+          category: 'Jewelry',
           priceTotal: row.price || 0,
           imageUrl: images[0] || null,
           allImages: images,
@@ -362,7 +366,7 @@ const QAPage = () => {
       activeTab,
       e.issues.map((i) => i.label).join('; '),
       e.item.weightCt || '',
-      displayPrice(e.item.priceTotal) || '',
+      displayPrice(e.item.priceTotal, e.item) || '',
     ]);
     const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -672,7 +676,7 @@ const QAPage = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-stone-600">{item.weightCt ? `${item.weightCt} ct` : '-'}</td>
-                    <td className="px-4 py-3 text-sm text-stone-600">{displayPrice(item.priceTotal) ? `$${displayPrice(item.priceTotal).toLocaleString()}` : '-'}</td>
+                    <td className="px-4 py-3 text-sm text-stone-600">{displayPrice(item.priceTotal, item) ? `$${displayPrice(item.priceTotal, item).toLocaleString()}` : '-'}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
                         issues.length >= 3 ? 'bg-red-100 text-red-700' : issues.length === 2 ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
