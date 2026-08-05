@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
-import { askAssistant } from "../../services/assistantApi";
+import { ArrowUp, ExternalLink, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import { askAssistant, askAssistantAdvice } from "../../services/assistantApi";
+import { scaleInventoryPrice } from "../../utils/pricing";
 
 /* Thread lives in sessionStorage only — a filter conversation is worth
  * keeping across a page refresh but not across days. */
 const STORAGE_KEY = "inventory.assistant.thread";
 const MAX_TURNS = 40;
+/* Kept in step with SHORTLIST_MAX in the backend, which caps it again. */
+const SHORTLIST_MAX = 20;
+const PREVIEW_MAX = 6;
 
 const HEBREW = /[\u0590-\u05FF]/;
 const dirOf = (text) => (HEBREW.test(String(text || "")) ? "rtl" : "ltr");
@@ -40,6 +44,18 @@ const RANGE_LABELS = {
   maxWidth: (v) => `≤ ${v} mm wide`,
 };
 
+const SORT_LABELS = {
+  pricePerCt: "price/ct",
+  priceTotal: "price",
+  weightCt: "weight",
+  sku: "SKU",
+  color: "colour",
+  clarity: "clarity",
+  lab: "lab",
+  shape: "shape",
+  ratio: "ratio",
+};
+
 export const describeFilterKey = (key, value, inventoryMode) => {
   if (RANGE_LABELS[key]) return RANGE_LABELS[key](value);
   if (MULTI_LABELS[key]) {
@@ -53,10 +69,39 @@ export const describeFilterKey = (key, value, inventoryMode) => {
 
 const isSet = (v) => (Array.isArray(v) ? v.length > 0 : v !== "" && v != null);
 
+/* Fields the assistant is allowed to reason about. Prices are scaled here to
+ * whatever the dealer is currently looking at, so a Bruto view doesn't get
+ * discussed in Neto figures. Cost is never included. */
+const toShortlistRow = (item, priceMode) => ({
+  sku: item.sku,
+  category: item.category || item.jewelryType,
+  shape: item.shape || item.style,
+  weightCt: item.weightCt,
+  color: item.color,
+  clarity: item.clarity,
+  treatment: item.treatment || item.collection,
+  lab: item.lab,
+  origin: item.origin,
+  fluorescence: item.fluorescence,
+  measurements: item.measurements,
+  ratio: item.ratio,
+  pricePerCt: item.pricePerCt != null
+    ? Math.round(scaleInventoryPrice(item.pricePerCt, item, priceMode))
+    : undefined,
+  priceTotal: item.priceTotal != null
+    ? Math.round(scaleInventoryPrice(item.priceTotal, item, priceMode))
+    : undefined,
+  location: item.location,
+  certificateNumber: item.certificateNumber,
+  metalType: item.metalType,
+  stoneType: item.stoneType,
+  title: item.title,
+});
+
 const SUGGESTIONS = [
   "אמרלדים מעל 5 קראט",
+  "מה הכי משתלם בניו יורק?",
   "Round diamonds, GIA, 1–2ct",
-  "כל האבנים בניו יורק",
 ];
 
 const readThread = () => {
@@ -69,36 +114,99 @@ const readThread = () => {
   }
 };
 
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return isMobile;
+};
+
+/** One matched stone, small enough that several fit without scrolling. */
+const ResultCard = ({ item, priceMode, onOpen }) => {
+  const price = item.priceTotal != null
+    ? Math.round(scaleInventoryPrice(item.priceTotal, item, priceMode))
+    : null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(item)}
+      className="flex w-full items-center gap-2.5 rounded-xl border border-app-line bg-app-surface p-2 text-left transition-colors hover:bg-app-canvas-2"
+    >
+      {item.imageUrl ? (
+        <img
+          src={item.imageUrl}
+          alt={item.sku}
+          loading="lazy"
+          className="h-10 w-10 shrink-0 rounded-lg object-cover"
+        />
+      ) : (
+        <div className="h-10 w-10 shrink-0 rounded-lg bg-app-canvas-2" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12px] font-semibold text-app-ink">{item.sku}</div>
+        <div className="truncate text-[10.5px] text-app-muted">
+          {[item.weightCt ? `${item.weightCt}ct` : null, item.color, item.lab || item.metalType]
+            .filter(Boolean)
+            .join(" · ")}
+        </div>
+      </div>
+      {price != null && (
+        <div className="shrink-0 text-[11.5px] font-semibold text-app-ink">{usd(price)}</div>
+      )}
+    </button>
+  );
+};
+
 /**
- * Natural-language filtering for the inventory page.
+ * Natural-language filtering and advice for the inventory page.
  *
- * The panel sends the question and the list of values present in the current
- * inventory — never the stones themselves — and applies the filter it gets
- * back through the page's own filter state, so results always match what
- * manual filtering would produce.
+ * Phase one sends only the question and the values present in the current
+ * inventory, and applies the filter it gets back through the page's own state
+ * so results always match manual filtering. Phase two runs only when the
+ * dealer asked the assistant to choose, and sends the rows already on screen.
  *
  * @param {object}   props
  * @param {string}   props.inventoryMode  diamonds | gemstones | jewelry
  * @param {object}   props.vocabulary     { [filterField]: string[] } from live stock
+ * @param {Array}    props.navTargets     [{ path, label }] this user may open
  * @param {object}   props.filters        the page's live filter state
- * @param {Function} props.onApply        (filters, suggestedMode) => void
+ * @param {Array}    props.results        the filtered, sorted list on screen
+ * @param {string}   props.priceMode      neto | bruto
+ * @param {Function} props.onApply        (filters, suggestedMode, sort) => void
  * @param {Function} props.onRemoveFilter (key) => void
- * @param {number}   props.resultCount    stones currently matching
+ * @param {Function} props.onNavigate     (path) => void
+ * @param {Function} props.onOpenStone    (item) => void
+ * @param {boolean}  props.liftAboveFab   raise the button clear of the export FAB
  */
 const AssistantChat = ({
   inventoryMode,
   vocabulary,
+  navTargets,
   filters,
+  results,
+  priceMode,
   onApply,
   onRemoveFilter,
-  resultCount,
+  onNavigate,
+  onOpenStone,
+  liftAboveFab,
 }) => {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState(readThread);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingAdvice, setPendingAdvice] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     try {
@@ -115,8 +223,8 @@ const AssistantChat = ({
   }, [messages, busy, open]);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+    if (open && !isMobile) inputRef.current?.focus();
+  }, [open, isMobile]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -126,6 +234,34 @@ const AssistantChat = ({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  /* Phase two. Setting pendingAdvice and applying the filter happen in the
+   * same batch, so by the time this runs `results` is the freshly filtered
+   * list — which is exactly what we want the assistant to talk about. */
+  useEffect(() => {
+    if (!pendingAdvice) return;
+    const { message, history, replaceId } = pendingAdvice;
+    setPendingAdvice(null);
+
+    const shortlist = (results || []).slice(0, SHORTLIST_MAX).map((r) => toShortlistRow(r, priceMode));
+
+    askAssistantAdvice({ message, history, shortlist, totalCount: (results || []).length })
+      .then((res) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === replaceId
+              ? { ...m, content: res.reply || m.content, highlightSkus: res.skus || [] }
+              : m
+          )
+        );
+      })
+      .catch((e) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === replaceId ? { ...m, content: e.message, error: true } : m))
+        );
+      })
+      .finally(() => setBusy(false));
+  }, [pendingAdvice, results, priceMode]);
 
   const send = useCallback(
     async (text) => {
@@ -148,225 +284,304 @@ const AssistantChat = ({
           history,
           inventoryMode,
           vocabulary,
+          navTargets,
         });
 
-        const appliedKeys = Object.keys(res.filters || {});
-        if (appliedKeys.length > 0) onApply(res.filters, res.inventoryMode);
+        if (res.navigateTo) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `a${Date.now()}`,
+              role: "assistant",
+              content: res.reply || `Opening ${res.navigateTo.label}.`,
+              navigateTo: res.navigateTo,
+            },
+          ]);
+          onNavigate(res.navigateTo.path);
+          setBusy(false);
+          return;
+        }
 
+        const appliedKeys = Object.keys(res.filters || {});
+        const hasSlice = appliedKeys.length > 0 || !!res.sort;
+        if (hasSlice) onApply(res.filters, res.inventoryMode, res.sort);
+
+        const id = `a${Date.now()}`;
         setMessages((prev) => [
           ...prev,
           {
-            id: `a${Date.now()}`,
+            id,
             role: "assistant",
             content: res.reply || "",
             appliedKeys,
+            sort: res.sort || null,
+            showResults: hasSlice,
             // The tab the filter was built for, so chip labels stay correct
             // even after the user switches tabs later.
             mode: res.inventoryMode || inventoryMode,
           },
         ]);
+
+        if (res.wantsRecommendation && hasSlice) {
+          setPendingAdvice({ message: question, history, replaceId: id });
+          return; // busy stays true until the advice call settles
+        }
+        setBusy(false);
       } catch (e) {
         setMessages((prev) => [
           ...prev,
           { id: `e${Date.now()}`, role: "assistant", content: e.message, error: true },
         ]);
-      } finally {
         setBusy(false);
       }
     },
-    [busy, messages, inventoryMode, vocabulary, onApply]
+    [busy, messages, inventoryMode, vocabulary, navTargets, onApply, onNavigate]
   );
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
+  // Half the screen on a phone so the stone list stays visible behind it —
+  // watching the results change is the whole point.
+  const sheetHeight = isMobile ? (expanded ? "88vh" : "52vh") : "100%";
+
   return (
     <>
-      {/* Left-hand side so it never collides with the export bar on the right.
-          The mobile offset clears the bottom nav. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Ask the inventory assistant"
-        className="fixed left-6 z-40 bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6
-                   flex items-center gap-2 px-4 py-3 rounded-2xl shadow-2xl shadow-stone-500/30
-                   bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900
-                   text-white font-medium transition-all hover:scale-105"
+        className={`fixed right-6 z-40 flex items-center gap-2 rounded-2xl px-4 py-3 font-medium text-white shadow-2xl shadow-stone-500/30 transition-all hover:scale-105
+                    bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900
+                    ${open ? "pointer-events-none opacity-0" : ""}
+                    ${liftAboveFab
+                      ? "bottom-[calc(env(safe-area-inset-bottom,0px)+148px)] md:bottom-24"
+                      : "bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6"}`}
       >
-        <Sparkles className="w-4 h-4" />
-        <span className="hidden sm:inline text-sm">Ask</span>
+        <Sparkles className="h-4 w-4" />
+        <span className="hidden text-sm sm:inline">Ask</span>
       </button>
 
       <AnimatePresence>
         {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-            />
+          /* No backdrop on purpose. The dealer asked to keep seeing the stock
+             while the assistant filters it, so the page stays lit and usable. */
+          <motion.div
+            key="assistant-panel"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            drag={isMobile ? "y" : false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0.03, bottom: 0.5 }}
+            onDragEnd={(e, info) => {
+              if (info.offset.y > 120) setOpen(false);
+              else if (info.offset.y < -70) setExpanded(true);
+              else if (info.offset.y > 45) setExpanded(false);
+            }}
+            style={{ height: sheetHeight }}
+            className="fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-3xl border border-app-line bg-app-surface shadow-2xl
+                       sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[400px] sm:max-w-full sm:rounded-l-3xl sm:rounded-t-none sm:border-b-0 sm:border-r-0 sm:border-t-0"
+          >
+            <div className="flex cursor-grab justify-center pt-3 pb-1 active:cursor-grabbing sm:hidden">
+              <div className="h-1.5 w-12 rounded-full bg-app-line-2" />
+            </div>
 
-            <motion.div
-              initial={{ y: "100%", x: 0 }}
-              animate={{ y: 0, x: 0 }}
-              exit={{ y: "100%", x: 0 }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-app-surface border-app-line border rounded-t-3xl h-[85vh] overflow-hidden shadow-xl
-                         sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[440px] sm:max-w-full sm:h-full sm:rounded-t-none sm:rounded-l-3xl sm:border-r-0 sm:border-t-0 sm:border-b-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="sm:hidden flex justify-center pt-3 pb-1">
-                <div className="w-12 h-1.5 bg-app-line-2 rounded-full" />
+            <div className="flex items-center justify-between border-b border-app-line px-4 py-2.5 sm:px-5 sm:py-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-app-graphite" />
+                <h2 className="text-sm font-semibold text-app-ink">Inventory Assistant</h2>
               </div>
-
-              <div className="flex items-center justify-between border-b border-app-line px-4 py-3 sm:px-5 sm:py-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-app-graphite" />
-                  <h2 className="text-sm font-semibold text-app-ink">Inventory Assistant</h2>
-                </div>
-                <div className="flex items-center gap-1">
-                  {messages.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setMessages([])}
-                      aria-label="Clear conversation"
-                      className="p-2 rounded-full text-app-muted hover:text-app-ink hover:bg-app-canvas-2 transition-colors"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                  )}
+              <div className="flex items-center gap-1">
+                {messages.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setOpen(false)}
-                    aria-label="Close"
-                    className="p-2 rounded-full text-app-muted hover:text-app-ink hover:bg-app-canvas-2 transition-colors"
+                    onClick={() => setMessages([])}
+                    aria-label="Clear conversation"
+                    className="rounded-full p-2 text-app-muted transition-colors hover:bg-app-canvas-2 hover:text-app-ink"
                   >
-                    <X className="w-4 h-4" />
+                    <RotateCcw className="h-4 w-4" />
                   </button>
-                </div>
-              </div>
-
-              <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 sm:px-5 space-y-3">
-                {messages.length === 0 && (
-                  <div className="pt-6 text-center">
-                    <p className="text-sm text-app-muted">
-                      Describe the stock you're looking for, in Hebrew or English.
-                    </p>
-                    <div className="mt-4 flex flex-col items-center gap-2">
-                      {SUGGESTIONS.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          dir={dirOf(s)}
-                          onClick={() => send(s)}
-                          className="px-3 py-1.5 rounded-full glass-surface text-xs text-app-graphite hover:bg-app-surface/85 transition-colors"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="rounded-full p-2 text-app-muted transition-colors hover:bg-app-canvas-2 hover:text-app-ink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-                {messages.map((m) => {
-                  if (m.role === "user") {
-                    return (
-                      <div key={m.id} className="flex justify-end">
-                        <div
-                          dir={dirOf(m.content)}
-                          className="max-w-[85%] rounded-2xl rounded-br-md bg-stone-800 px-3.5 py-2 text-[13px] leading-relaxed text-white"
-                        >
-                          {m.content}
-                        </div>
-                      </div>
-                    );
-                  }
+            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3 sm:px-5">
+              {messages.length === 0 && (
+                <div className="pt-4 text-center">
+                  <p className="text-sm text-app-muted">
+                    Describe the stock you're looking for, in Hebrew or English.
+                  </p>
+                  <div className="mt-4 flex flex-col items-center gap-2">
+                    {SUGGESTIONS.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        dir={dirOf(s)}
+                        onClick={() => send(s)}
+                        className="rounded-full glass-surface px-3 py-1.5 text-xs text-app-graphite transition-colors hover:bg-app-surface/85"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                  // Show a chip only while its filter is still applied, so
-                  // removing one here or in the filter panel keeps them honest.
-                  const chips = (m.appliedKeys || []).filter((k) => isSet(filters[k]));
-
+              {messages.map((m) => {
+                if (m.role === "user") {
                   return (
-                    <div key={m.id} className="flex justify-start">
-                      <div className="max-w-[92%] space-y-2">
-                        {m.content && (
-                          <div
-                            dir={dirOf(m.content)}
-                            className={`rounded-2xl rounded-bl-md px-3.5 py-2 text-[13px] leading-relaxed ${
-                              m.error
-                                ? "bg-red-50 text-red-700"
-                                : "glass-surface text-app-ink"
-                            }`}
-                          >
-                            {m.content}
-                          </div>
-                        )}
-
-                        {chips.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {chips.map((k) => (
-                              <button
-                                key={k}
-                                type="button"
-                                onClick={() => onRemoveFilter(k)}
-                                title="Remove this filter"
-                                className="group inline-flex items-center gap-1 rounded-full bg-app-canvas-2 px-2.5 py-1 text-[11px] font-medium text-app-graphite hover:bg-red-50 hover:text-red-700 transition-colors"
-                              >
-                                {describeFilterKey(k, filters[k], m.mode)}
-                                <X className="w-3 h-3 opacity-50 group-hover:opacity-100" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {chips.length > 0 && m.id === lastAssistantId && (
-                          <p className="text-[11px] text-app-muted">
-                            {resultCount === 1 ? "1 result" : `${resultCount} results`}
-                          </p>
-                        )}
+                    <div key={m.id} className="flex justify-end">
+                      <div
+                        dir={dirOf(m.content)}
+                        className="max-w-[85%] rounded-2xl rounded-br-md bg-stone-800 px-3.5 py-2 text-[13px] leading-relaxed text-white"
+                      >
+                        {m.content}
                       </div>
                     </div>
                   );
-                })}
+                }
 
-                {busy && (
-                  <div className="flex items-center gap-2 text-app-muted">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span className="text-xs">Thinking…</span>
+                // Show a chip only while its filter is still applied, so
+                // removing one here or in the filter panel keeps them honest.
+                const chips = (m.appliedKeys || []).filter((k) => isSet(filters[k]));
+                const isLatest = m.id === lastAssistantId;
+
+                // Only the newest answer previews stones; older ones describe
+                // a slice the page has since moved on from.
+                const preview = isLatest && m.showResults ? (results || []) : [];
+                const highlighted = m.highlightSkus?.length
+                  ? preview.filter((r) => m.highlightSkus.includes(r.sku))
+                  : [];
+                const cards = (highlighted.length ? highlighted : preview).slice(0, PREVIEW_MAX);
+
+                return (
+                  <div key={m.id} className="flex justify-start">
+                    <div className="w-[92%] space-y-2">
+                      {m.content && (
+                        <div
+                          dir={dirOf(m.content)}
+                          className={`rounded-2xl rounded-bl-md px-3.5 py-2 text-[13px] leading-relaxed ${
+                            m.error ? "bg-red-50 text-red-700" : "glass-surface text-app-ink"
+                          }`}
+                        >
+                          {m.content}
+                        </div>
+                      )}
+
+                      {m.navigateTo && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigate(m.navigateTo.path)}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-app-canvas-2 px-3 py-1.5 text-[11px] font-medium text-app-graphite transition-colors hover:bg-app-line"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {m.navigateTo.label}
+                        </button>
+                      )}
+
+                      {(chips.length > 0 || m.sort) && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {chips.map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              onClick={() => onRemoveFilter(k)}
+                              title="Remove this filter"
+                              className="group inline-flex items-center gap-1 rounded-full bg-app-canvas-2 px-2.5 py-1 text-[11px] font-medium text-app-graphite transition-colors hover:bg-red-50 hover:text-red-700"
+                            >
+                              {describeFilterKey(k, filters[k], m.mode)}
+                              <X className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                            </button>
+                          ))}
+                          {m.sort && (
+                            <span className="inline-flex items-center rounded-full bg-app-canvas-2 px-2.5 py-1 text-[11px] font-medium text-app-graphite">
+                              {m.sort.direction === "asc" ? "↑" : "↓"}{" "}
+                              {SORT_LABELS[m.sort.field] || m.sort.field}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {cards.length > 0 && (
+                        <div className="space-y-1.5">
+                          {cards.map((item) => (
+                            <ResultCard
+                              key={item.id || item.sku}
+                              item={item}
+                              priceMode={priceMode}
+                              onOpen={onOpenStone}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {isLatest && m.showResults && (
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          <p className="text-[11px] text-app-muted">
+                            {results.length === 1 ? "1 result" : `${results.length} results`}
+                          </p>
+                          {results.length > cards.length && (
+                            <button
+                              type="button"
+                              onClick={() => (isMobile ? setExpanded(false) : setOpen(false))}
+                              className="text-[11px] font-medium text-app-graphite underline underline-offset-2"
+                            >
+                              See all on the page
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                );
+              })}
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  send(input);
-                }}
-                className="border-t border-app-line px-4 py-3 sm:px-5 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]"
-              >
-                <div className="flex items-end gap-2">
-                  <input
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    dir={dirOf(input)}
-                    maxLength={1000}
-                    placeholder="Ask for a slice of stock…"
-                    className="flex-1 rounded-2xl border border-app-line bg-app-canvas-2 px-3.5 py-2.5 text-[13px] text-app-ink placeholder:text-app-muted focus:outline-none focus:ring-2 focus:ring-stone-300"
-                  />
-                  <button
-                    type="submit"
-                    disabled={busy || !input.trim()}
-                    aria-label="Send"
-                    className="shrink-0 rounded-full bg-stone-800 p-2.5 text-white transition-colors hover:bg-stone-900 disabled:opacity-40 disabled:hover:bg-stone-800"
-                  >
-                    <ArrowUp className="w-4 h-4" />
-                  </button>
+              {busy && (
+                <div className="flex items-center gap-2 text-app-muted">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span className="text-xs">Thinking…</span>
                 </div>
-              </form>
-            </motion.div>
-          </>
+              )}
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                send(input);
+              }}
+              className="border-t border-app-line px-4 py-2.5 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] sm:px-5"
+            >
+              <div className="flex items-end gap-2">
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onFocus={() => isMobile && setExpanded(true)}
+                  dir={dirOf(input)}
+                  maxLength={1000}
+                  placeholder="Ask for a slice of stock…"
+                  className="flex-1 rounded-2xl border border-app-line bg-app-canvas-2 px-3.5 py-2.5 text-[13px] text-app-ink placeholder:text-app-muted focus:outline-none focus:ring-2 focus:ring-stone-300"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  aria-label="Send"
+                  className="shrink-0 rounded-full bg-stone-800 p-2.5 text-white transition-colors hover:bg-stone-900 disabled:opacity-40 disabled:hover:bg-stone-800"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+          </motion.div>
         )}
       </AnimatePresence>
     </>

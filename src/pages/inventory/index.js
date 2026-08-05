@@ -5639,6 +5639,7 @@ const CompareModal = ({ isOpen, onClose, stones }) => {
 const StoneSearchPage = () => {
   const { user } = useUser();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const initialSearch = searchParams.get('search') || '';
 
   // Restore the last inventory view (mode + filters + search) so returning
@@ -7483,14 +7484,32 @@ const StoneSearchPage = () => {
     jewelryStoneTypeOptions, jewelryMetalTypeOptions,
   ]);
 
+  /* Pages the assistant may send this user to. Built from their own section
+   * permissions so it can never route someone into a section the nav itself
+   * would hide from them. */
+  const assistantNavTargets = useMemo(() => {
+    const targets = [];
+    if (team.can('dashboard')) targets.push({ path: '/dashboard', label: 'Dashboard overview' });
+    if (team.can('sales')) {
+      targets.push(
+        { path: '/sales/diamonds', label: 'Sales catalog — diamonds' },
+        { path: '/sales/gemstones', label: 'Sales catalog — coloured gemstones' },
+        { path: '/sales/emeralds', label: 'Sales catalog — emeralds' },
+        { path: '/sales/jewelry', label: 'Sales catalog — jewellery' },
+      );
+    }
+    return targets;
+  }, [team]);
+
   /* Merge rather than replace: a follow-up like "and only GIA" should narrow
    * the current view instead of wiping the filters the user set by hand.
    * Changing tab goes through handleModeSwitch, which also resets the price
    * mode and column config — the queued filter update below then lands on the
    * defaults it just set. */
-  const handleAssistantApply = (incoming, suggestedMode) => {
+  const handleAssistantApply = (incoming, suggestedMode, sort) => {
     if (suggestedMode) handleModeSwitch(suggestedMode);
     setFilters((prev) => ({ ...prev, ...incoming }));
+    if (sort?.field) setSortConfig({ field: sort.field, direction: sort.direction });
     setCurrentPage(1);
   };
 
@@ -8609,15 +8628,20 @@ const StoneSearchPage = () => {
         </div>
       </div>
 
-      {/* Natural-language filtering. Sits on the left so it never overlaps
-          the export FAB on the right. */}
+      {/* Natural-language filtering. Shares the bottom-right corner with the
+          export FAB and steps up out of its way when it appears. */}
       <AssistantChat
         inventoryMode={inventoryMode}
         vocabulary={assistantVocabulary}
+        navTargets={assistantNavTargets}
         filters={filters}
+        results={sortedStones}
+        priceMode={priceMode}
         onApply={handleAssistantApply}
         onRemoveFilter={handleAssistantRemoveFilter}
-        resultCount={filteredStones.length}
+        onNavigate={(path) => navigate(path)}
+        onOpenStone={(item) => setDrawerStone(item)}
+        liftAboveFab={showFloatingExport}
       />
 
       {/* Floating Actions Button.

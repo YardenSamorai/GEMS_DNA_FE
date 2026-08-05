@@ -12,29 +12,41 @@ const json = async (res) => {
   return res.json();
 };
 
+const post = (path, payload, signal) =>
+  fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  }).then(json);
+
 /**
- * Ask the inventory assistant for a filter.
+ * Phase 1 — turn the question into a filter, a sort order, or a page to open.
  *
- * Only the question, the prior turns and the list of values that exist in the
- * caller's inventory are sent — never stone rows. The backend answers with a
- * validated filter object that the inventory page applies locally, so prices,
- * cost and location never leave the browser.
+ * Only the question, the prior turns, the values that exist in this user's
+ * inventory and the pages they may open are sent. No stone data.
  *
  * Auth is attached globally by utils/apiAuthFetch.js.
  *
- * @param {object} payload
- * @param {string} payload.message        the user's question
- * @param {Array}  payload.history        prior [{ role, content }] turns
- * @param {string} payload.inventoryMode  diamonds | gemstones | jewelry
- * @param {object} payload.vocabulary     { [filterField]: string[] } from live stock
- * @param {AbortSignal} [signal]
- * @returns {Promise<{ filters: object, inventoryMode: string|null, reply: string|null,
+ * @returns {Promise<{ filters: object, inventoryMode: string|null, sort: object|null,
+ *                     navigateTo: {path: string, label: string}|null,
+ *                     wantsRecommendation: boolean, reply: string|null,
  *                     needsClarification: boolean, dropped: string[] }>}
  */
-export const askAssistant = ({ message, history = [], inventoryMode, vocabulary }, signal) =>
-  fetch(`${API_BASE}/api/assistant/query`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history, inventoryMode, vocabulary }),
-    signal,
-  }).then(json);
+export const askAssistant = (
+  { message, history = [], inventoryMode, vocabulary, navTargets },
+  signal
+) =>
+  post("/api/assistant/query", { message, history, inventoryMode, vocabulary, navTargets }, signal);
+
+/**
+ * Phase 2 — ask it to choose between the stones now on screen.
+ *
+ * Called only when phase 1 set wantsRecommendation. The rows come from what
+ * the browser is already displaying, which the API masked for this viewer, so
+ * the assistant can never discuss a price or branch its user cannot see.
+ *
+ * @returns {Promise<{ reply: string, skus: string[] }>}
+ */
+export const askAssistantAdvice = ({ message, history = [], shortlist, totalCount }, signal) =>
+  post("/api/assistant/advise", { message, history, shortlist, totalCount }, signal);
