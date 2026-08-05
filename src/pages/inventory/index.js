@@ -4842,6 +4842,39 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefa
   );
 };
 
+/* Spec rows for the mobile stone card.
+ *
+ * Diamonds and coloured stones are graded on different axes, so the card can't
+ * show one fixed list: a diamond has a Clarity grade and Fluorescence, while a
+ * coloured stone has an Origin and a treatment — which the trade sheets label
+ * "Clarity" (same wording as the table columns, see GEMSTONE_DEFAULT_COLUMNS).
+ *
+ * Empty values are dropped rather than rendered as "-", so a sparse stone gets
+ * a short tidy grid instead of a wall of dashes. `wide` spans two columns for
+ * values like measurements that would otherwise truncate on a phone. */
+const getStoneCardSpecs = (stone) => {
+  const mapped = getMappedCategories(stone.category);
+  const isDiamond = mapped.includes('Diamond') || mapped.includes('Fancy');
+
+  const specs = [
+    { label: 'Color', value: getDisplayColor(stone) },
+    isDiamond
+      ? { label: 'Clarity', value: stone.clarity }
+      : { label: 'Clarity', value: stone.treatment ? shortTreatment(stone.treatment) : '' },
+    isDiamond
+      ? { label: 'Fluor.', value: stone.fluorescence }
+      : { label: 'Origin', value: stone.origin },
+    { label: 'Measurements', value: stone.measurements, wide: true },
+    { label: 'Ratio', value: stone.ratio },
+    { label: 'Cert #', value: stone.certificateNumber, wide: true },
+  ];
+
+  return specs.filter((s) => {
+    const v = String(s.value ?? '').trim();
+    return v !== '' && v !== 'N/A';
+  });
+};
+
 /* ---------------- Table (Desktop) ---------------- */
 const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns, stoneStatusMap = {}, onAssign, assigningSku }) => {
   const [showColumnSettings, setShowColumnSettings] = useState(false);
@@ -5083,6 +5116,7 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
   const MobileStoneCard = ({ stone, index }) => {
     const isSelected = selectedStones?.has(stone.id);
     const isExpanded = selectedStone?.id === stone.id;
+    const specs = getStoneCardSpecs(stone);
 
   return (
       <motion.div
@@ -5169,18 +5203,9 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                 </div>
               </div>
 
-              {/* Quick Info Tags */}
+              {/* Lab and location stay pills — they answer "who graded it, where
+                  is it", not how the stone is spec'd. The grades live in the grid. */}
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {stone.origin && (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">
-                    {stone.origin}
-                  </span>
-                )}
-                {stone.treatment && (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                    {stone.treatment}
-                  </span>
-                )}
                 {stone.lab && (
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
                     {stone.lab}
@@ -5192,28 +5217,48 @@ const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConf
                   </span>
                 )}
               </div>
-              
-              {/* Client Tags */}
-              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                {stoneTags?.[stone.sku]?.map((tag) => (
-                  <span
-                    key={tag.id}
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                    style={{ backgroundColor: tag.color }}
-                  >
-                    {tag.name}
-                  </span>
-                ))}
-                <TagSelector
-                  stoneSku={stone.sku}
-                  currentTags={stoneTags?.[stone.sku] || []}
-                  allTags={allTags || []}
-                  onAddTag={onAddTag}
-                  onRemoveTag={onRemoveTag}
-                  onManageTags={onManageTags}
-                />
-              </div>
             </div>
+          </div>
+
+          {/* Specs — full card width rather than inside the column beside the
+              photo, so measurements and cert numbers get room to breathe. */}
+          {specs.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 rounded-xl bg-stone-50 px-3 py-2.5">
+              {specs.map((spec) => (
+                <div key={spec.label} className={`min-w-0 ${spec.wide ? 'col-span-2' : ''}`}>
+                  <div className="text-[9px] font-medium uppercase tracking-wider text-stone-400">
+                    {spec.label}
+                  </div>
+                  <div
+                    className="truncate text-[11px] font-semibold text-stone-800"
+                    title={String(spec.value)}
+                  >
+                    {spec.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Client Tags */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-3">
+            {stoneTags?.[stone.sku]?.map((tag) => (
+              <span
+                key={tag.id}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                style={{ backgroundColor: tag.color }}
+              >
+                {tag.name}
+              </span>
+            ))}
+            <TagSelector
+              stoneSku={stone.sku}
+              currentTags={stoneTags?.[stone.sku] || []}
+              allTags={allTags || []}
+              onAddTag={onAddTag}
+              onRemoveTag={onRemoveTag}
+              onManageTags={onManageTags}
+            />
           </div>
         </div>
 
