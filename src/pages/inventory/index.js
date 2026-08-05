@@ -23,6 +23,7 @@ import { exportCatalogLiran } from "./helpers/catalogLiran";
 import CatalogLiranModal from "./components/CatalogLiranModal";
 import MemberAvatar from "../../components/team/MemberAvatar";
 import AssigneeFilter from "../../components/team/AssigneeFilter";
+import AssistantChat from "../../components/assistant/AssistantChat";
 import { useTeam } from "../../context/TeamContext";
 import toast from "react-hot-toast";
 
@@ -7438,6 +7439,69 @@ const StoneSearchPage = () => {
     return ['All metals', ...Array.from(set).sort()];
   }, [jewelryItems, inventoryMode]);
 
+  /* Vocabulary handed to the AI assistant. It is deliberately built from the
+   * same option lists the dropdowns use, so the model can only pick values
+   * that would actually match something. Location, treatment and grouping are
+   * read straight off the loaded stones rather than a static list — that way
+   * a viewer whose location is masked simply gets no branch to filter by. */
+  const assistantVocabulary = useMemo(() => {
+    const distinct = (getValue) => {
+      const set = new Set();
+      modeFilteredStones.forEach((s) => {
+        const v = String(getValue(s) ?? '').trim();
+        if (v) set.add(v);
+      });
+      return Array.from(set).sort();
+    };
+    const withoutPlaceholder = (list) => (list || []).filter((v) => !/^All /.test(v));
+
+    if (inventoryMode === 'jewelry') {
+      return {
+        category: withoutPlaceholder(jewelryTypeOptions),
+        shape: withoutPlaceholder(jewelryStyleOptions),
+        treatment: withoutPlaceholder(jewelryCollectionOptions),
+        diamondColor: withoutPlaceholder(jewelryStoneTypeOptions),
+        fancyColor: withoutPlaceholder(jewelryMetalTypeOptions),
+      };
+    }
+
+    return {
+      shape: withoutPlaceholder(shapesOptions),
+      category: withoutPlaceholder(categoriesOptions),
+      diamondColor: withoutPlaceholder(diamondColorOptions),
+      fancyColor: withoutPlaceholder(fancyColorOptions),
+      lab: labOptions,
+      treatment: distinct((s) => s.treatment),
+      location: distinct((s) => s.location),
+      groupingType: distinct((s) => s.groupingType),
+      tag: tags.map((t) => t.name),
+    };
+  }, [
+    inventoryMode, modeFilteredStones, tags,
+    shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions,
+    jewelryTypeOptions, jewelryStyleOptions, jewelryCollectionOptions,
+    jewelryStoneTypeOptions, jewelryMetalTypeOptions,
+  ]);
+
+  /* Merge rather than replace: a follow-up like "and only GIA" should narrow
+   * the current view instead of wiping the filters the user set by hand.
+   * Changing tab goes through handleModeSwitch, which also resets the price
+   * mode and column config — the queued filter update below then lands on the
+   * defaults it just set. */
+  const handleAssistantApply = (incoming, suggestedMode) => {
+    if (suggestedMode) handleModeSwitch(suggestedMode);
+    setFilters((prev) => ({ ...prev, ...incoming }));
+    setCurrentPage(1);
+  };
+
+  const handleAssistantRemoveFilter = useCallback((key) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: Array.isArray(prev[key]) ? [] : '',
+    }));
+    setCurrentPage(1);
+  }, []);
+
   const filteredStones = useMemo(() => {
     if (inventoryMode === 'jewelry') {
       return modeFilteredStones.filter((item) => {
@@ -7456,7 +7520,7 @@ const StoneSearchPage = () => {
         if (filters.category.length > 0 && !filters.category.includes(item.jewelryType)) return false;
         if (filters.shape.length > 0 && !filters.shape.includes(item.style)) return false;
         if (filters.treatment.length > 0 && !filters.treatment.includes(item.collection)) return false;
-        if (filters.diamondColor.length > 0 && !filters.diamondColor.includes(item.stoneType.trim())) return false;
+        if (filters.diamondColor.length > 0 && !filters.diamondColor.includes((item.stoneType || '').trim())) return false;
         if (filters.fancyColor.length > 0 && !filters.fancyColor.includes(item.metalType)) return false;
         if (smartSearch) {
           const q = smartSearch.toLowerCase();
@@ -8544,6 +8608,17 @@ const StoneSearchPage = () => {
           )}
         </div>
       </div>
+
+      {/* Natural-language filtering. Sits on the left so it never overlaps
+          the export FAB on the right. */}
+      <AssistantChat
+        inventoryMode={inventoryMode}
+        vocabulary={assistantVocabulary}
+        filters={filters}
+        onApply={handleAssistantApply}
+        onRemoveFilter={handleAssistantRemoveFilter}
+        resultCount={filteredStones.length}
+      />
 
       {/* Floating Actions Button.
           On mobile, push above the MobileDock (h-14 ≈ 56px + iOS safe-area)
