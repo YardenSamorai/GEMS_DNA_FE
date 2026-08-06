@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, ExternalLink, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, ExternalLink, RotateCcw, Sparkles, X } from "lucide-react";
 import { askAssistant, askAssistantAdvice } from "../../services/assistantApi";
 import { scaleInventoryPrice } from "../../utils/pricing";
 
@@ -409,8 +409,9 @@ const AssistantChat = ({
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
   // Half the screen on a phone so the stone list stays visible behind it —
-  // watching the results change is the whole point.
-  const sheetHeight = isMobile ? (expanded ? "88vh" : "52vh") : "100%";
+  // watching the results change is the whole point. On desktop the vertical
+  // insets set the height, so it must not be pinned to 100% as well.
+  const sheetHeight = isMobile ? (expanded ? "88vh" : "52vh") : undefined;
 
   return (
     <>
@@ -425,6 +426,9 @@ const AssistantChat = ({
                       ? "bottom-[calc(env(safe-area-inset-bottom,0px)+148px)] md:bottom-24"
                       : "bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6"}`}
       >
+        {/* Carries the working state over to the button if the panel is
+            dismissed mid-answer, so the reply never arrives unannounced. */}
+        {busy && <span className="assistant-ring" aria-hidden="true" />}
         <Sparkles className="h-4 w-4" />
         <span className="hidden text-sm sm:inline">Ask</span>
       </button>
@@ -435,9 +439,11 @@ const AssistantChat = ({
              while the assistant filters it, so the page stays lit and usable. */
           <motion.div
             key="assistant-panel"
-            initial={{ y: "100%" }}
+            /* Past 100% so the panel clears its own bottom gap on the way
+               out instead of leaving a sliver on screen. */
+            initial={{ y: "110%" }}
             animate={{ y: 0 }}
-            exit={{ y: "100%" }}
+            exit={{ y: "110%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             drag={isMobile ? "y" : false}
             dragConstraints={{ top: 0, bottom: 0 }}
@@ -448,9 +454,15 @@ const AssistantChat = ({
               else if (info.offset.y > 45) setExpanded(false);
             }}
             style={{ height: sheetHeight }}
-            className="fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-3xl border border-app-line bg-app-surface shadow-2xl
-                       sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[400px] sm:max-w-full sm:rounded-l-3xl sm:rounded-t-none sm:border-b-0 sm:border-r-0 sm:border-t-0"
+            /* Held off the viewport edges so the working ring has a full
+               frame to travel around; flush to an edge it would be half
+               off-screen. */
+            className={`fixed inset-x-2 bottom-2 z-50 flex flex-col overflow-hidden rounded-3xl border border-app-line bg-app-surface shadow-2xl
+                       sm:inset-y-3 sm:left-auto sm:right-3 sm:w-[400px] sm:max-w-[calc(100vw-1.5rem)]
+                       ${busy ? "assistant-busy-glow" : ""}`}
           >
+            {busy && <span className="assistant-ring" aria-hidden="true" />}
+
             <div className="flex cursor-grab justify-center pt-3 pb-1 active:cursor-grabbing sm:hidden">
               <div className="h-1.5 w-12 rounded-full bg-app-line-2" />
             </div>
@@ -613,12 +625,11 @@ const AssistantChat = ({
                 );
               })}
 
-              {busy && (
-                <div className="flex items-center gap-2 text-app-muted">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span className="text-xs">Thinking…</span>
-                </div>
-              )}
+              {/* The ring replaced the visible spinner, but it is decoration a
+                  screen reader cannot see. This keeps the state announced. */}
+              <span role="status" aria-live="polite" className="sr-only">
+                {busy ? "Searching your inventory" : ""}
+              </span>
             </div>
 
             <form

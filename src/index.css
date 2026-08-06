@@ -968,3 +968,64 @@ body {
   transform: rotate(45deg);
   opacity: 0.05;
 }
+
+/* ============================================================
+   Assistant working ring
+   A jewel-toned light that travels around the assistant while it
+   is thinking. Deliberately NOT --brand-emerald: that token is
+   reserved for positive-state semantics, and a busy spinner is
+   not a success. These are literal gem hues instead.
+   ============================================================ */
+@property --assistant-ring-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.assistant-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--assistant-ring-angle),
+    transparent      0deg,
+    #0FA968         55deg,
+    #2563EB        120deg,
+    #E11D48        180deg,
+    transparent    250deg,
+    transparent    360deg
+  );
+  /* Punch the middle out so only the 2px frame paints and the chat
+     underneath stays fully legible. */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: assistant-ring-rotate 1.9s linear infinite;
+}
+
+/* Where @property is unsupported the angle cannot interpolate, so the
+   ring sits still rather than animating. It still reads as a lit frame. */
+@keyframes assistant-ring-rotate {
+  to { --assistant-ring-angle: 360deg; }
+}
+
+/* Sits on the panel itself, not a child: the panel clips its children to
+   keep the rounded corners, which would swallow an outward glow. An
+   element's own shadow escapes its overflow. */
+.assistant-busy-glow {
+  animation: assistant-ring-breathe 1.9s ease-in-out infinite;
+}
+
+@keyframes assistant-ring-breathe {
+  0%, 100% { box-shadow: 0 0 18px -6px rgba(37, 99, 235, 0.30); }
+  50%      { box-shadow: 0 0 30px -4px rgba(37, 99, 235, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-ring,
+  .assistant-busy-glow { animation: none; }
+}
