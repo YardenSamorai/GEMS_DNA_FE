@@ -98,9 +98,67 @@ const toShortlistRow = (item, priceMode) => ({
   title: item.title,
 });
 
+/* Aggregates over every match, not just the sample. Totals computed from the
+ * 20-row sample would badly under-report a 200-stone selection, so the whole
+ * set is reduced here and the sample is only ever used to name pieces. */
+const buildSummary = (items, priceMode) => {
+  const scaled = (v, item) =>
+    v != null && isFinite(Number(v)) ? scaleInventoryPrice(Number(v), item, priceMode) : null;
+
+  let totalValue = 0;
+  let totalCarats = 0;
+  let minPricePerCt = null;
+  let maxPricePerCt = null;
+  const groups = { byCategory: new Map(), byLocation: new Map(), byLab: new Map() };
+
+  const bump = (map, key, value, carats) => {
+    if (!key) return;
+    const row = map.get(key) || { key, count: 0, totalValue: 0, totalCarats: 0 };
+    row.count += 1;
+    row.totalValue += value || 0;
+    row.totalCarats += carats || 0;
+    map.set(key, row);
+  };
+
+  for (const item of items) {
+    const value = scaled(item.priceTotal, item) || 0;
+    const carats = Number(item.weightCt) || 0;
+    const ppc = scaled(item.pricePerCt, item);
+
+    totalValue += value;
+    totalCarats += carats;
+    if (ppc != null && ppc > 0) {
+      if (minPricePerCt == null || ppc < minPricePerCt) minPricePerCt = ppc;
+      if (maxPricePerCt == null || ppc > maxPricePerCt) maxPricePerCt = ppc;
+    }
+
+    bump(groups.byCategory, item.category || item.jewelryType, value, carats);
+    bump(groups.byLocation, item.location, value, carats);
+    bump(groups.byLab, item.lab && item.lab !== "N/A" ? item.lab : null, value, carats);
+  }
+
+  const top = (map) =>
+    [...map.values()].sort((a, b) => b.count - a.count).slice(0, 12);
+
+  return {
+    count: items.length,
+    totalValue: Math.round(totalValue),
+    totalCarats: Math.round(totalCarats * 100) / 100,
+    // Blended rather than a mean of the per-carat figures: this is the number
+    // a dealer means by "what am I averaging on this parcel".
+    avgPricePerCt: totalCarats > 0 ? Math.round(totalValue / totalCarats) : null,
+    minPricePerCt: minPricePerCt != null ? Math.round(minPricePerCt) : null,
+    maxPricePerCt: maxPricePerCt != null ? Math.round(maxPricePerCt) : null,
+    priceMode,
+    byCategory: top(groups.byCategory),
+    byLocation: top(groups.byLocation),
+    byLab: top(groups.byLab),
+  };
+};
+
 const SUGGESTIONS = [
   "אמרלדים מעל 5 קראט",
-  "מה הכי משתלם בניו יורק?",
+  "כמה שווה המלאי בניו יורק?",
   "Round diamonds, GIA, 1–2ct",
 ];
 
@@ -243,9 +301,16 @@ const AssistantChat = ({
     const { message, history, replaceId } = pendingAdvice;
     setPendingAdvice(null);
 
-    const shortlist = (results || []).slice(0, SHORTLIST_MAX).map((r) => toShortlistRow(r, priceMode));
+    const matched = results || [];
+    const shortlist = matched.slice(0, SHORTLIST_MAX).map((r) => toShortlistRow(r, priceMode));
 
-    askAssistantAdvice({ message, history, shortlist, totalCount: (results || []).length })
+    askAssistantAdvice({
+      message,
+      history,
+      shortlist,
+      summary: buildSummary(matched, priceMode),
+      totalCount: matched.length,
+    })
       .then((res) => {
         setMessages((prev) =>
           prev.map((m) =>
@@ -322,7 +387,10 @@ const AssistantChat = ({
           },
         ]);
 
-        if (res.wantsRecommendation && hasSlice) {
+        // Deliberately not gated on hasSlice: a question about what is already
+        // on screen carries no new filter. Whether anything actually matched is
+        // decided by the effect below, which sees the settled `results`.
+        if (res.wantsAnswer) {
           setPendingAdvice({ message: question, history, replaceId: id });
           return; // busy stays true until the advice call settles
         }

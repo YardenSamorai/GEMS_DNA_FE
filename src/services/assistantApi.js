@@ -30,7 +30,7 @@ const post = (path, payload, signal) =>
  *
  * @returns {Promise<{ filters: object, inventoryMode: string|null, sort: object|null,
  *                     navigateTo: {path: string, label: string}|null,
- *                     wantsRecommendation: boolean, reply: string|null,
+ *                     wantsAnswer: boolean, reply: string|null,
  *                     needsClarification: boolean, dropped: string[] }>}
  */
 export const askAssistant = (
@@ -40,13 +40,17 @@ export const askAssistant = (
   post("/api/assistant/query", { message, history, inventoryMode, vocabulary, navTargets }, signal);
 
 /**
- * Phase 2 — ask it to choose between the stones now on screen.
+ * Phase 2 — answer a question about the stock now on screen.
  *
- * Called only when phase 1 set wantsRecommendation. The rows come from what
- * the browser is already displaying, which the API masked for this viewer, so
- * the assistant can never discuss a price or branch its user cannot see.
+ * Called only when phase 1 set wantsAnswer. Two payloads: `summary` covers
+ * every match so totals and averages are right, `shortlist` is a sample so
+ * specific pieces can be named. Both are derived from what the browser is
+ * already displaying, which the API masked for this viewer, so the assistant
+ * can never discuss a price or branch its user cannot see.
  *
  * @returns {Promise<{ reply: string, skus: string[] }>}
  */
-export const askAssistantAdvice = ({ message, history = [], shortlist, totalCount }, signal) =>
-  post("/api/assistant/advise", { message, history, shortlist, totalCount }, signal);
+export const askAssistantAdvice = (
+  { message, history = [], shortlist, summary, totalCount },
+  signal
+) => post("/api/assistant/advise", { message, history, shortlist, summary, totalCount }, signal);
