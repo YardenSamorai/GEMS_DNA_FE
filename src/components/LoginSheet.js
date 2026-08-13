@@ -108,6 +108,29 @@ const signUpErrorMessage = (err) => {
   return clerkErrorMessage(err);
 };
 
+const FACTOR_SWITCH_LABEL = {
+  totp: "Use my authenticator app",
+  email_code: "Email me a code instead",
+  phone_code: "Text me a code instead",
+  backup_code: "Use a backup code",
+};
+
+// Second factors we can complete inside the sheet with a code box, best first.
+// `email_link` is deliberately absent — it needs the user to leave for their
+// inbox and come back, which Clerk's hosted page handles properly.
+const CODE_FACTORS = ["totp", "email_code", "phone_code", "backup_code"];
+
+const factorNotice = (factor) => {
+  const to = factor.safeIdentifier;
+  if (factor.strategy === "email_code") {
+    return to ? `We emailed a code to ${to}.` : "We emailed you a code.";
+  }
+  if (factor.strategy === "phone_code") {
+    return to ? `We texted a code to ${to}.` : "We texted you a code.";
+  }
+  return "";
+};
+
 export default function LoginSheet({ children, initialView = "signin", initialEmail = "" }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState(initialView); // "signin" | "signup"
@@ -126,6 +149,13 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
   const [identifier, setIdentifier] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [passkeyLoading, setPasskeyLoading] = useState(false);
+
+  // Second factor (MFA). `factors` mirrors Clerk's supportedSecondFactors so
+  // the user can switch between an authenticator app, SMS and backup codes.
+  const [secondFactor, setSecondFactor] = useState(null);
+  const [sfCode, setSfCode] = useState("");
+  const [sfNotice, setSfNotice] = useState("");
+  const [sfResending, setSfResending] = useState(false);
 
   // Sign-up
   const [suEmail, setSuEmail] = useState(initialEmail);
@@ -155,16 +185,24 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
     }
   }, []);
 
+  const resetSecondFactor = () => {
+    setSecondFactor(null);
+    setSfCode("");
+    setSfNotice("");
+  };
+
   const close = () => {
     setOpen(false);
     setError("");
     setPendingCode(false);
+    resetSecondFactor();
   };
 
   const switchTo = (next) => {
     setError("");
     setPendingCode(false);
     setShowPassword(false);
+    resetSecondFactor();
     setView(next);
   };
 
@@ -206,9 +244,9 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
     setPasskeyLoading(true);
     try {
       const result = await signIn.authenticateWithPasskey({ flow: "discoverable" });
-      if (!(await finishSignIn(result))) {
-        setError("Couldn't complete passkey sign-in — please try another method.");
-      }
+      if (await finishSignIn(result)) return;
+      if (result.status === "needs_second_factor" && (await beginSecondFactor(result))) return;
+      setError("Couldn't complete passkey sign-in \u2014 please try another method.");
     } catch (err) {
       setError(clerkErrorMessage(err));
     } finally {
@@ -234,6 +272,101 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
     }
     await activateSession(sessionId);
     return true;
+  };
+
+  // Emailed and texted codes have to be requested first; authenticator codes
+  // and backup codes are verified directly.
+  const prepareFactor = async (factor) => {
+    if (factor.strategy === "email_code") {
+      await signIn.prepareSecondFactor({
+        strategy: "email_code",
+        emailAddressId: factor.emailAddressId,
+      });
+      return;
+    }
+    if (factor.strategy === "phone_code") {
+      await signIn.prepareSecondFactor({
+        strategy: "phone_code",
+        phoneNumberId: factor.phoneNumberId,
+      });
+    }
+  };
+
+  // Clerk asks for a second factor in two situations: the account has MFA
+  // enrolled (`needs_second_factor`), or Device Trust doesn't recognise the
+  // browser (`needs_client_trust`, still reported as the legacy
+  // `needs_second_factor` on instances that haven't taken the rename).
+  // Either way, prompt for the code here instead of dead-ending the sign-in.
+  const beginSecondFactor = async (attempt) => {
+    const factors = (attempt.supportedSecondFactors || []).filter((f) =>
+      CODE_FACTORS.includes(f.strategy)
+    );
+    if (!factors.length) return false;
+
+    // Honour Clerk's preferred factor, else fall back on our own order.
+    // Backup codes sit last so they're never the opening prompt.
+    const primary =
+      factors.find((f) => f.default && f.strategy !== "backup_code") ||
+      CODE_FACTORS.map((s) => factors.find((f) => f.strategy === s)).find(Boolean);
+
+    await prepareFactor(primary);
+    setSfCode("");
+    setSfNotice(factorNotice(primary));
+    setSecondFactor({
+      factors,
+      active: primary,
+      newDevice: attempt.status === "needs_client_trust",
+    });
+    return true;
+  };
+
+  // Let the user move between the factors their account actually supports.
+  const switchFactor = async (factor) => {
+    if (!secondFactor || submitting) return;
+    setError("");
+    setSfCode("");
+    setSfNotice("");
+    try {
+      await prepareFactor(factor);
+      setSecondFactor((s) => ({ ...s, active: factor }));
+      setSfNotice(factorNotice(factor));
+    } catch (err) {
+      setError(clerkErrorMessage(err));
+    }
+  };
+
+  const resendCode = async () => {
+    if (!secondFactor || sfResending) return;
+    setError("");
+    setSfResending(true);
+    try {
+      await prepareFactor(secondFactor.active);
+      setSfNotice("We sent a new code.");
+    } catch (err) {
+      setError(clerkErrorMessage(err));
+    } finally {
+      setSfResending(false);
+    }
+  };
+
+  const handleSecondFactor = async (e) => {
+    e.preventDefault();
+    if (!isLoaded || submitting || !secondFactor) return;
+    setError("");
+    setSfNotice("");
+    setSubmitting(true);
+    try {
+      const attempt = await signIn.attemptSecondFactor({
+        strategy: secondFactor.active.strategy,
+        code: sfCode.trim(),
+      });
+      if (await finishSignIn(attempt)) return;
+      setError("That code didn't work. Please check it and try again.");
+    } catch (err) {
+      setError(clerkErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -263,8 +396,12 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
         }
       }
 
-      if (attempt.status === "needs_second_factor") {
-        setError("Two-factor authentication is on for this account — please use the full sign-in page.");
+      if (attempt.status === "needs_second_factor" || attempt.status === "needs_client_trust") {
+        if (await beginSecondFactor(attempt)) return;
+        // The only factor on offer is one we can't complete in the sheet (an
+        // email link) — hand off to Clerk's hosted page, which can.
+        navigate(`/sign-in?email=${encodeURIComponent(identifier.trim())}`);
+        close();
         return;
       }
 
@@ -369,18 +506,33 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
   };
 
   const isSignUp = view === "signup";
-  const title = isSignUp
-    ? ticket
-      ? "Accept your invitation"
-      : "Create your account"
-    : "Sign in to GEMS DNA";
-  const subtitle = isSignUp
-    ? pendingCode
-      ? "Enter the verification code we just emailed you"
-      : ticket
-        ? "Set a password to finish setting up your account"
-        : "Create your GEMS DNA account to get started"
-    : "Welcome back — please sign in to continue";
+  const activeStrategy = secondFactor?.active?.strategy;
+  const otherFactors = (secondFactor?.factors || []).filter(
+    (f) => f !== secondFactor.active
+  );
+
+  const title = secondFactor
+    ? "Verify it's you"
+    : isSignUp
+      ? ticket
+        ? "Accept your invitation"
+        : "Create your account"
+      : "Sign in to GEMS DNA";
+  const subtitle = secondFactor
+    ? activeStrategy === "totp"
+      ? "Enter the 6-digit code from your authenticator app"
+      : activeStrategy === "email_code"
+        ? "Enter the code we just emailed you"
+        : activeStrategy === "phone_code"
+          ? "Enter the code we sent to your phone"
+          : "Enter one of your backup codes"
+    : isSignUp
+      ? pendingCode
+        ? "Enter the verification code we just emailed you"
+        : ticket
+          ? "Set a password to finish setting up your account"
+          : "Create your GEMS DNA account to get started"
+      : "Welcome back — please sign in to continue";
 
   const errorBox = error ? (
     <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] text-red-600">{error}</p>
@@ -472,7 +624,92 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
               <div className="mx-auto w-full max-w-[400px]">
-                {!isSignUp ? (
+                {secondFactor ? (
+                  /* ------------------------ SECOND FACTOR (MFA) --------------------- */
+                  <form onSubmit={handleSecondFactor} className="flex flex-col gap-4">
+                    {/* An emailed code is only ever asked for by Device Trust —
+                        account MFA uses SMS, an authenticator app or backup
+                        codes — so we can safely explain it as a new device. */}
+                    {secondFactor.newDevice || activeStrategy === "email_code" ? (
+                      <p className="rounded-lg bg-app-canvas2 px-3 py-2 text-[12.5px] leading-relaxed text-app-muted">
+                        We don&apos;t recognise this browser yet, so we&apos;re making sure
+                        it&apos;s really you. You won&apos;t be asked again on this device.
+                      </p>
+                    ) : null}
+
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor="mfa-code" className="text-[13px] font-medium text-app-graphite">
+                        {activeStrategy === "backup_code" ? "Backup code" : "Verification code"}
+                      </label>
+                      <input
+                        id="mfa-code"
+                        type="text"
+                        inputMode={activeStrategy === "backup_code" ? "text" : "numeric"}
+                        autoComplete="one-time-code"
+                        autoFocus
+                        value={sfCode}
+                        onChange={(ev) => setSfCode(ev.target.value)}
+                        placeholder={
+                          activeStrategy === "backup_code"
+                            ? "Enter a backup code"
+                            : "Enter the 6-digit code"
+                        }
+                        className="w-full rounded-xl border border-app-line bg-app-canvas2 px-3.5 py-3 text-center text-[18px] tracking-[0.3em] text-app-ink placeholder:tracking-normal placeholder:text-app-soft transition focus:border-app-line2 focus:outline-none"
+                      />
+                      {sfNotice ? <p className="text-[12px] text-app-soft">{sfNotice}</p> : null}
+                    </div>
+
+                    {errorBox}
+
+                    <button
+                      type="submit"
+                      disabled={submitting || !sfCode.trim()}
+                      className="mt-1 flex w-full items-center justify-center gap-2 rounded-full bg-app-ink py-3 text-[14.5px] font-semibold tracking-tight text-app-canvas shadow-[0_10px_24px_-12px_rgba(0,0,0,0.6)] transition hover:bg-app-graphite active:scale-[0.99] disabled:opacity-60"
+                    >
+                      {submitting ? <Spinner className="h-4 w-4 text-app-canvas" /> : null}
+                      Verify &amp; continue
+                    </button>
+
+                    {activeStrategy === "email_code" || activeStrategy === "phone_code" ? (
+                      <button
+                        type="button"
+                        onClick={resendCode}
+                        disabled={sfResending}
+                        className="text-[13px] font-medium text-app-ink transition hover:underline disabled:opacity-60"
+                      >
+                        {sfResending ? "Sending\u2026" : "Resend code"}
+                      </button>
+                    ) : null}
+
+                    {otherFactors.length ? (
+                      <div className="flex flex-col items-center gap-2 border-t border-app-line pt-3">
+                        {otherFactors.map((f, i) => (
+                          <button
+                            key={`${f.strategy}-${f.phoneNumberId || i}`}
+                            type="button"
+                            onClick={() => switchFactor(f)}
+                            className="text-[13px] font-medium text-app-graphite transition hover:text-app-ink hover:underline"
+                          >
+                            {FACTOR_SWITCH_LABEL[f.strategy] || "Try another method"}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <p className="text-center text-[13px] text-app-muted">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetSecondFactor();
+                          setError("");
+                        }}
+                        className="font-semibold text-app-ink hover:underline"
+                      >
+                        Back
+                      </button>
+                    </p>
+                  </form>
+                ) : !isSignUp ? (
                   /* ---------------------------- SIGN IN ---------------------------- */
                   <>
                     <button
