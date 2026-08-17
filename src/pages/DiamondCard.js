@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import InterestedModal from '../components/InterestedModal';
 import StoneUsagePanel from '../components/StoneUsagePanel';
+import PairDnaView from '../components/PairDnaView';
 import { Skeleton, SkeletonText } from '../components/ui/Skeleton';
 
 // API base URL from .env
@@ -18,6 +19,8 @@ const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.
 const DiamondCard = () => {
   const { stone_id } = useParams();
   const navigate = useNavigate();
+  // ?single=1 is how the pair screen links through to one stone on its own.
+  const [searchParams] = useSearchParams();
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
@@ -74,8 +77,9 @@ const DiamondCard = () => {
     }
   };
 
-  const handleShareVideo = async () => {
-    const videoUrl = details?.video;
+  // Takes the URL explicitly so the pair screen can fall back to whichever of
+  // the two stones actually has a video.
+  const shareVideoUrl = async (videoUrl) => {
     if (!videoUrl) return toast.error('No video available to share.');
     try {
       if (navigator.share) {
@@ -88,6 +92,8 @@ const DiamondCard = () => {
       toast.error('Sharing canceled or failed.');
     }
   };
+
+  const handleShareVideo = () => shareVideoUrl(details?.video);
 
   if (loading) {
     // Mirror the public stone DNA layout: large media on the left, info
@@ -138,6 +144,45 @@ const DiamondCard = () => {
           </p>
         </div>
       </div>
+    );
+  }
+
+  /* A stone the API confirmed has a genuine partner opens as the pair, since
+     that is how a matched pair is sold. ?single=1 is the way back to one
+     stone on its own, and is what the pair screen's own links use. */
+  if (details.pair && searchParams.get("single") !== "1") {
+    const shareVideo = details.video || details.pair.video;
+    return (
+      <>
+        <PairDnaView
+          a={details}
+          b={details.pair}
+          isSignedIn={isSignedIn}
+          barakURL={barakURL}
+          onBack={goBack}
+          onInterested={() => setInterestedOpen(true)}
+          onShare={handleShare}
+          onShareVideo={() => shareVideoUrl(shareVideo)}
+        />
+        <InterestedModal
+          open={interestedOpen}
+          onClose={() => setInterestedOpen(false)}
+          sku={details.stone_id}
+          snapshot={{
+            sku: details.stone_id,
+            pairSku: details.pair.stone_id,
+            isPair: true,
+            category: details.category,
+            shape: details.shape,
+            weightCt: (Number(details.carat) || 0) + (Number(details.pair.carat) || 0),
+            color: details.color,
+            clarity: details.clarity,
+            lab: details.lab,
+            certificateNumber: details.certificate_number,
+            image: details.picture,
+          }}
+        />
+      </>
     );
   }
 
