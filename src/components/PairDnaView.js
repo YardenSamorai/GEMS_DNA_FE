@@ -100,9 +100,48 @@ const StoneMedia = ({ stone, index }) => (
   </div>
 );
 
+/* Either stone's URL can be the way in, so the two are put in a fixed order
+ * by SKU. Without this, Stone 1 and the order of the switcher below would
+ * swap depending on which half of the pair you happened to open. */
+export const orderPair = (x, y) =>
+  String(x?.stone_id ?? "").localeCompare(String(y?.stone_id ?? "")) <= 0 ? [x, y] : [y, x];
+
+/* Shown on the pair screen and on each stone's own page, so moving between
+ * the three views works in every direction. `current` is either "pair" or a
+ * SKU. */
+export const PairSwitcher = ({ a, b, current }) => {
+  const [first, second] = orderPair(a, b);
+  const base =
+    "flex-1 py-1.5 px-4 rounded-full text-[12.5px] font-medium text-center truncate transition-colors";
+  const on = "bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]";
+  const off = "text-app-graphite hover:text-app-ink";
+
+  const tabs = [
+    { key: "pair", label: "Pair", to: `/${first.stone_id}` },
+    { key: first.stone_id, label: first.stone_id, to: `/${first.stone_id}?single=1` },
+    { key: second.stone_id, label: second.stone_id, to: `/${second.stone_id}?single=1` },
+  ];
+
+  return (
+    <div className="inline-flex gap-1 p-1 rounded-full glass-surface w-full">
+      {tabs.map((tab) =>
+        tab.key === current ? (
+          <span key={tab.key} className={`${base} ${on}`}>
+            {tab.label}
+          </span>
+        ) : (
+          <Link key={tab.key} to={tab.to} className={`${base} ${off}`}>
+            {tab.label}
+          </Link>
+        )
+      )}
+    </div>
+  );
+};
+
 const PairDnaView = ({
-  a,
-  b,
+  a: rawA,
+  b: rawB,
   isSignedIn,
   barakURL,
   onInterested,
@@ -110,6 +149,7 @@ const PairDnaView = ({
   onShareVideo,
   onBack,
 }) => {
+  const [a, b] = orderPair(rawA, rawB);
   const priceMode = readPriceMode();
   const rows = buildComparisonRows(a, b);
 
@@ -186,22 +226,7 @@ const PairDnaView = ({
           </div>
 
           <div className="p-6 sm:p-10 space-y-8">
-            {/* Viewing the pair is the default; these open either stone on its
-                own page, which is the existing single-stone DNA. */}
-            <div className="inline-flex gap-1 p-1 rounded-full glass-surface w-full">
-              <span className="flex-1 py-1.5 px-4 rounded-full text-[12.5px] font-medium text-center bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]">
-                Pair
-              </span>
-              {[a, b].map((stone) => (
-                <Link
-                  key={stone.stone_id}
-                  to={`/${stone.stone_id}?single=1`}
-                  className="flex-1 py-1.5 px-4 rounded-full text-[12.5px] font-medium text-center text-app-graphite hover:text-app-ink transition-colors truncate"
-                >
-                  {stone.stone_id}
-                </Link>
-              ))}
-            </div>
+            <PairSwitcher a={a} b={b} current="pair" />
 
             <div className="grid grid-cols-2 gap-4 sm:gap-6">
               <StoneMedia stone={a} index={1} />

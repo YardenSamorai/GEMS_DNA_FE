@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import InterestedModal from '../components/InterestedModal';
 import StoneUsagePanel from '../components/StoneUsagePanel';
-import PairDnaView from '../components/PairDnaView';
+import PairDnaView, { PairSwitcher } from '../components/PairDnaView';
 import { Skeleton, SkeletonText } from '../components/ui/Skeleton';
 
 // API base URL from .env
@@ -273,6 +273,13 @@ const DiamondCard = () => {
           </div>
 
           <div className="p-6 sm:p-10">
+            {/* Half of a pair, opened on its own — the way back to the pair. */}
+            {details.pair && (
+              <div className="mb-8">
+                <PairSwitcher a={details} b={details.pair} current={details.stone_id} />
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <div className="relative rounded-2xl overflow-hidden bg-app-canvas-2 aspect-square">
@@ -418,7 +425,10 @@ const DiamondCard = () => {
                       </>
                     )}
                     
-                    {details.pair_stone && (
+                    {/* Only when the pair could not be confirmed — otherwise the
+                        switcher above already leads to the partner, and two
+                        routes to the same stone just read as clutter. */}
+                    {details.pair_stone && !details.pair && (
                       <div className="flex items-center justify-between p-4 rounded-2xl glass-surface">
                         <div className="flex items-center gap-3">
                           <span className="w-2 h-2 rounded-full bg-app-line2" />
