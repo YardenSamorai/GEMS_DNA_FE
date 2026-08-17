@@ -321,13 +321,59 @@ const encodePayload = (obj) =>
 
 /* ───────────────────────── image loading ───────────────────────── */
 
+/* Suppliers send photos in whatever aspect ratio they happen to shoot, and
+ * fitting those inside the well left every card with a differently sized
+ * picture — a wide shot printed short, a tall one printed narrow. Each photo is
+ * therefore re-drawn centred and cropped to one fixed square before it reaches
+ * the document, so every card shows the same size picture filling its frame. */
+const PHOTO_PX = 600; // ≈300 dpi at the 54 mm single-card well
+
+function squareCrop(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = PHOTO_PX;
+        canvas.height = PHOTO_PX;
+        const ctx = canvas.getContext("2d");
+        // JPEG carries no alpha — without a white ground a transparent PNG
+        // would come out black.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, PHOTO_PX, PHOTO_PX);
+
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        if (!side) return resolve(dataUrl);
+        ctx.drawImage(
+          img,
+          (img.naturalWidth - side) / 2,
+          (img.naturalHeight - side) / 2,
+          side,
+          side,
+          0,
+          0,
+          PHOTO_PX,
+          PHOTO_PX
+        );
+        return resolve(canvas.toDataURL("image/jpeg", 0.85));
+      } catch (_) {
+        // Tainted canvas or an unsupported codec — the original still prints.
+        return resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
 async function loadImage(url) {
   if (!url) return null;
   try {
     const res = await fetch(`${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`);
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.image && data.image.startsWith("data:") ? data.image : null;
+    if (!data?.image || !data.image.startsWith("data:")) return null;
+    return await squareCrop(data.image);
   } catch (_) {
     return null;
   }
@@ -498,16 +544,30 @@ export async function buildCatalogPdf(rawItems, options = {}) {
 
   // One square photo well, filled or captioned "No image".
   const drawPhoto = (img, x, y, size) => {
+    const radius = 2.5;
     pdf.setFillColor(...wash);
-    pdf.roundedRect(x, y, size, size, 2.5, 2.5, "F");
+    pdf.roundedRect(x, y, size, size, radius, radius, "F");
     if (img) {
       try {
         const props = pdf.getImageProperties(img);
-        const box = size - 5;
-        const ratio = Math.min(box / props.width, box / props.height);
-        const w = props.width * ratio;
-        const h = props.height * ratio;
-        pdf.addImage(img, formatOf(img), x + (size - w) / 2, y + (size - h) / 2, w, h);
+        // Photos reach here pre-cropped to a square and cover the well edge to
+        // edge. Anything that slipped past the crop is centred at its own
+        // proportions rather than stretched.
+        const square = Math.abs(props.width - props.height) / props.width < 0.01;
+        const fit = square ? 1 : Math.min(size / props.width, size / props.height);
+        const w = square ? size : props.width * fit;
+        const h = square ? size : props.height * fit;
+
+        pdf.saveGraphicsState();
+        try {
+          pdf.roundedRect(x, y, size, size, radius, radius, null);
+          pdf.clip();
+          pdf.discardPath();
+          pdf.addImage(img, formatOf(img), x + (size - w) / 2, y + (size - h) / 2, w, h);
+        } finally {
+          // A leaked clip would blank everything drawn after it on the page.
+          pdf.restoreGraphicsState();
+        }
         return;
       } catch (_) {
         /* leave the well empty on a bad image */
