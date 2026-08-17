@@ -160,6 +160,108 @@ const itemSpecs = (it) => {
   ]);
 };
 
+/* ───────────────────────────── pairs ───────────────────────────── */
+
+const skuOf = (it) => String(it?.sku ?? "").trim();
+
+/* Collapse the picked list into cards: a matched pair becomes one unit, and
+ * everything else stays on its own. Mirrors the rule the DNA page uses, so a
+ * pair printed here is the same pair a customer sees at gems-dna.com/{sku} —
+ * the partner must be present and must not point at some third stone.
+ *
+ * Only pairs where BOTH halves were picked are joined; pulling in an unpicked
+ * partner would put stones in the catalog the sender never selected. */
+const groupPairs = (items) => {
+  const bySku = new Map();
+  for (const it of items) {
+    if (!isJewelry(it) && skuOf(it)) bySku.set(skuOf(it), it);
+  }
+
+  const used = new Set();
+  const units = [];
+
+  for (const it of items) {
+    const sku = skuOf(it);
+    // Jewelry can reach here without a SKU, so an empty one is never treated
+    // as "already printed" — every picked item must appear exactly once.
+    if (sku && used.has(sku)) continue;
+
+    const partnerSku = isJewelry(it) ? "" : String(it?.pairSku ?? "").trim();
+    const partner = partnerSku && partnerSku !== sku ? bySku.get(partnerSku) : null;
+    const partnerPointsAt = partner ? String(partner.pairSku ?? "").trim() : "";
+    const contradicted = partner && partnerPointsAt && partnerPointsAt !== sku;
+
+    if (partner && !contradicted && !used.has(partnerSku)) {
+      used.add(sku);
+      used.add(partnerSku);
+      // Fixed order by SKU so a pair reads the same whichever half was picked
+      // first.
+      const [a, b] = sku.localeCompare(partnerSku) <= 0 ? [it, partner] : [partner, it];
+      units.push({ pair: true, a, b });
+      continue;
+    }
+
+    if (sku) used.add(sku);
+    units.push({ pair: false, a: it });
+  }
+
+  return units;
+};
+
+const pairWeight = (a, b) => (Number(a?.weightCt) || 0) + (Number(b?.weightCt) || 0);
+
+const dropLeadingWeight = (title) => String(title).replace(/^\s*\d+(\.\d+)?\s*/, "");
+
+const pairTitle = (a, b) => {
+  const total = pairWeight(a, b);
+  // What follows the weight is the same phrase for both halves of a real pair,
+  // so it is stated once; a mismatched pair says so rather than describing
+  // both stones with one stone's grades.
+  const ra = dropLeadingWeight(itemTitle(a));
+  const rb = dropLeadingWeight(itemTitle(b));
+  const rest = ra === rb ? ra : `${ra} / ${rb}`;
+  return [total ? `${total.toFixed(2)} ct total` : "", rest].filter(Boolean).join(" ");
+};
+
+/* One spec table for two stones: a value both stones share is stated once, and
+ * where they differ both are shown. Same idea as the comparison table on the
+ * pair DNA page. */
+const pairSpecs = (a, b) => {
+  const sa = itemSpecs(a);
+  const sb = new Map(itemSpecs(b).map(([label, value]) => [label, value]));
+
+  const rows = sa.map(([label, va]) => {
+    const vb = sb.get(label);
+    if (label === "SKU") return [label, `${skuOf(a)} + ${skuOf(b)}`];
+    if (vb == null || String(vb) === String(va)) return [label, va];
+    return [label, `${va} / ${vb}`];
+  });
+
+  const wa = Number(a?.weightCt) || 0;
+  const wb = Number(b?.weightCt) || 0;
+  if (wa && wb) rows.splice(1, 0, ["Weights", `${wa} + ${wb} ct`]);
+
+  return rows;
+};
+
+const pairPrice = (a, b) => {
+  const ta = Number(a?.priceTotal) || 0;
+  const tb = Number(b?.priceTotal) || 0;
+  const total = ta + tb;
+  if (!total) return { total: null, ppc: null, rap: null };
+
+  // Price per carat is a rate: the pair's figure is the combined price over
+  // the combined weight, never the two rates added together.
+  const ct = pairWeight(a, b);
+  const rapA = itemPrice(a).rap;
+  const rapB = itemPrice(b).rap;
+  return {
+    total: money(total),
+    ppc: ct ? money(total / ct) : null,
+    rap: rapA && rapB && rapA !== rapB ? `${rapA} / ${rapB}` : rapA || rapB || null,
+  };
+};
+
 const itemPrice = (it) => {
   if (isJewelry(it)) return { total: money(it.price), ppc: null, rap: null };
   const mapped = getMappedCategories(it.category) || [];
@@ -303,6 +405,10 @@ export async function buildCatalogPdf(rawItems, options = {}) {
 
   const pad = 6; // inner padding of each card
   const imgSize = 54;
+  // A pair card trades details width for a wider media column, so two photos
+  // still print big enough to judge a stone by.
+  const PAIR_PHOTO_W = 76;
+  const PAIR_PHOTO_GAP = 4;
   const detailsX = margin + pad + imgSize + 9;
   const detailsW = margin + contentW - pad - detailsX;
   const rowH = 5.1; // baseline spec-row height (compressed to fit when needed)
@@ -390,7 +496,30 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     return w;
   };
 
-  const drawCard = (it, img, cardY, titleLines, specs, price, buttons, cardH) => {
+  // One square photo well, filled or captioned "No image".
+  const drawPhoto = (img, x, y, size) => {
+    pdf.setFillColor(...wash);
+    pdf.roundedRect(x, y, size, size, 2.5, 2.5, "F");
+    if (img) {
+      try {
+        const props = pdf.getImageProperties(img);
+        const box = size - 5;
+        const ratio = Math.min(box / props.width, box / props.height);
+        const w = props.width * ratio;
+        const h = props.height * ratio;
+        pdf.addImage(img, formatOf(img), x + (size - w) / 2, y + (size - h) / 2, w, h);
+        return;
+      } catch (_) {
+        /* leave the well empty on a bad image */
+      }
+    }
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(size >= imgSize ? 8 : 6.5);
+    pdf.setTextColor(...muted);
+    pdf.text("No image", x + size / 2, y + size / 2, { align: "center" });
+  };
+
+  const drawCard = (it, imgs, cardY, titleLines, specs, price, buttons, cardH, pair) => {
     const cardX = margin;
     // Card frame
     pdf.setDrawColor(...line);
@@ -398,36 +527,30 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     pdf.setFillColor(255, 255, 255);
     pdf.roundedRect(cardX, cardY, contentW, cardH, 3.5, 3.5, "FD");
 
-    // Photo well (vertically centred within the card)
+    /* A pair needs two photos, so its card gives the media column more width
+       and takes it back off the details column. These shadow the single-card
+       values above, which the rest of this function reads unchanged. */
+    const photoW = pair ? PAIR_PHOTO_W : imgSize;
+    const detailsX = cardX + pad + photoW + 9;
+    const detailsW = margin + contentW - pad - detailsX;
+
     const imgX = cardX + pad;
-    const imgY = cardY + (cardH - imgSize) / 2;
-    pdf.setFillColor(...wash);
-    pdf.roundedRect(imgX, imgY, imgSize, imgSize, 2.5, 2.5, "F");
-    if (img) {
-      try {
-        const props = pdf.getImageProperties(img);
-        const box = imgSize - 5;
-        const ratio = Math.min(box / props.width, box / props.height);
-        const w = props.width * ratio;
-        const h = props.height * ratio;
-        pdf.addImage(
-          img,
-          formatOf(img),
-          imgX + (imgSize - w) / 2,
-          imgY + (imgSize - h) / 2,
-          w,
-          h
-        );
-      } catch (_) {
-        /* leave the well empty on a bad image */
-      }
-    } else {
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8);
-      pdf.setTextColor(...muted);
-      pdf.text("No image", imgX + imgSize / 2, imgY + imgSize / 2, {
-        align: "center",
+    if (pair) {
+      const size = (photoW - PAIR_PHOTO_GAP) / 2;
+      const imgY = cardY + (cardH - size) / 2 - 2;
+      [pair.a, pair.b].forEach((stone, idx) => {
+        const x = imgX + idx * (size + PAIR_PHOTO_GAP);
+        drawPhoto(imgs[idx], x, imgY, size);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(6.4);
+        pdf.setTextColor(...muted);
+        pdf.text(skuOf(stone), x + size / 2, imgY + size + 3.4, {
+          align: "center",
+          maxWidth: size,
+        });
       });
+    } else {
+      drawPhoto(imgs[0], imgX, cardY + (cardH - imgSize) / 2, imgSize);
     }
 
     // Details column
@@ -442,7 +565,11 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(7);
     pdf.setTextColor(...brand);
-    pdf.text(categoryLabel(it), detailsX, ty + 0.5);
+    pdf.text(
+      pair ? `MATCHED PAIR  ·  ${categoryLabel(it)}` : categoryLabel(it),
+      detailsX,
+      ty + 0.5
+    );
     ty += 4;
 
     pdf.setDrawColor(...line);
@@ -463,38 +590,85 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     const specsAvail = Math.max(6, priceTop - ty - buttonsH - 2.5);
 
     const twoCol = specs.length > 6;
-    const specRows = twoCol ? Math.ceil(specs.length / 2) : specs.length;
-    const sRowH = specRows ? Math.min(rowH, specsAvail / specRows) : rowH;
     const colW = (detailsW - 6) / 2;
 
+    /* Two-column layout with an escape hatch: a row whose value can't be read
+       in half the width — a pair's "3.65-3.62-2.24 / 3.66-3.61-2.25" — takes
+       the full width instead of being clipped to look like a single figure. */
+    const fitsHalf = ([label, value]) => {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(6.8);
+      const labelW = pdf.getTextWidth(String(label).toUpperCase());
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(5.6); // the smallest size drawSpec will shrink a value to
+      return pdf.getTextWidth(String(value)) <= colW - labelW - 2;
+    };
+
+    const layout = [];
+    let specRows = 0;
+    if (twoCol) {
+      let row = 0;
+      let held = null;
+      const flushHeld = () => {
+        if (!held) return;
+        layout.push({ spec: held, x: detailsX, w: colW, row });
+        held = null;
+        row += 1;
+      };
+      for (const spec of specs) {
+        if (!fitsHalf(spec)) {
+          flushHeld();
+          layout.push({ spec, x: detailsX, w: detailsW, row });
+          row += 1;
+        } else if (!held) {
+          held = spec;
+        } else {
+          layout.push({ spec: held, x: detailsX, w: colW, row });
+          layout.push({ spec, x: detailsX + colW + 6, w: colW, row });
+          held = null;
+          row += 1;
+        }
+      }
+      flushHeld();
+      specRows = row;
+    } else {
+      specs.forEach((spec, idx) => {
+        layout.push({ spec, x: detailsX, w: detailsW, row: idx });
+      });
+      specRows = specs.length;
+    }
+
+    const sRowH = specRows ? Math.min(rowH, specsAvail / specRows) : rowH;
+
     const drawSpec = ([label, value], x, y, colWidth) => {
+      const text = String(label).toUpperCase();
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(twoCol ? 6.8 : 7.6);
       pdf.setTextColor(...muted);
-      pdf.text(String(label).toUpperCase(), x, y);
+      pdf.text(text, x, y);
+      const labelW = pdf.getTextWidth(text);
 
+      /* Values shrink to fit the space the label leaves rather than being cut
+         at a fixed width — a pair states two measurements in one row, and half
+         a measurement silently printed as the whole is worse than small type. */
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(twoCol ? 7.8 : 8.6);
       pdf.setTextColor(...ink);
-      const v = pdf.splitTextToSize(String(value), colWidth * 0.6);
-      pdf.text(v[0], x + colWidth, y, { align: "right" });
+      const v = String(value);
+      const avail = Math.max(6, colWidth - labelW - 2);
+      let size = twoCol ? 7.8 : 8.6;
+      pdf.setFontSize(size);
+      while (size > 5.6 && pdf.getTextWidth(v) > avail) {
+        size -= 0.3;
+        pdf.setFontSize(size);
+      }
+      pdf.text(pdf.splitTextToSize(v, avail)[0], x + colWidth, y, { align: "right" });
     };
 
     const specsTop = ty;
-    if (twoCol) {
-      specs.forEach((spec, idx) => {
-        const col = idx % 2;
-        const rowIdx = Math.floor(idx / 2);
-        const x = detailsX + col * (colW + 6);
-        drawSpec(spec, x, specsTop + rowIdx * sRowH, colW);
-      });
-      ty = specsTop + specRows * sRowH;
-    } else {
-      specs.forEach((spec, idx) => {
-        drawSpec(spec, detailsX, specsTop + idx * sRowH, detailsW);
-      });
-      ty = specsTop + specs.length * sRowH;
-    }
+    layout.forEach(({ spec, x, w, row }) => {
+      drawSpec(spec, x, specsTop + row * sRowH, w);
+    });
+    ty = specsTop + specRows * sRowH;
 
     if (buttons.length) {
       ty += 1.5;
@@ -547,11 +721,22 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     rowIndex = 0;
   };
 
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const titleLines = pdf.splitTextToSize(itemTitle(it) || it.sku || "", detailsW).slice(0, 2);
-    const specs = itemSpecs(it);
-    const price = itemPrice(it);
+  const units = groupPairs(items);
+  const imageByItem = new Map(items.map((it, idx) => [it, images[idx]]));
+  const imageOf = (it) => imageByItem.get(it) || null;
+
+  for (let i = 0; i < units.length; i++) {
+    const unit = units[i];
+    const it = unit.a;
+    const pair = unit.pair ? unit : null;
+
+    // A pair card's details column is narrower, so its title wraps sooner.
+    const titleW = pair ? detailsW - (PAIR_PHOTO_W - imgSize) : detailsW;
+    const titleLines = pdf
+      .splitTextToSize((pair ? pairTitle(unit.a, unit.b) : itemTitle(it)) || it.sku || "", titleW)
+      .slice(0, 2);
+    const specs = pair ? pairSpecs(unit.a, unit.b) : itemSpecs(it);
+    const price = pair ? pairPrice(unit.a, unit.b) : itemPrice(it);
 
     // Rap % sits inside the spec table, right below the Branch row.
     // Price-per-carat lives in the price block under the table, just above
@@ -567,20 +752,37 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     //   with the media front-and-center — a PDF can't open dialogs, so this
     //   is the closest equivalent); Share opens WhatsApp with the exact same
     //   message template the Action sheet sends.
-    const viewerUrl = (type, src) =>
-      `${window.location.origin}/media?type=${type}&sku=${encodeURIComponent(it.sku || "")}&src=${encodeURIComponent(src)}`;
+    const viewerUrl = (type, src, stone) =>
+      `${window.location.origin}/media?type=${type}&sku=${encodeURIComponent(stone.sku || "")}&src=${encodeURIComponent(src)}`;
+    const VIDEO_BLUE = [2, 132, 199];
     const buttons = [];
-    const certL = itemCertLink(it);
-    if (certL) buttons.push({ label: "CERT", color: brand, url: viewerUrl("cert", certL) });
-    const videoL = itemVideoLink(it);
-    if (videoL) buttons.push({ label: "VIDEO", color: [2, 132, 199], url: viewerUrl("video", videoL) });
-    // SHARE opens our composer page — the price can be adjusted there before
-    // the message goes out (a PDF can't show an edit dialog itself).
-    buttons.push({
-      label: "SHARE",
-      color: [22, 163, 74],
-      url: `${window.location.origin}/share-item?p=${showPrices ? 1 : 0}&d=${encodePayload(sharePayload(it, showPrices))}`,
-    });
+
+    if (pair) {
+      // Each half keeps its own cert and video, so the pills are numbered to
+      // match the SKUs printed under the two photos. SHARE is left off: the
+      // composer it opens sends one stone, and a pair split across two
+      // messages is exactly what this card exists to avoid.
+      [unit.a, unit.b].forEach((stone, idx) => {
+        const c = itemCertLink(stone);
+        if (c) buttons.push({ label: `CERT ${idx + 1}`, color: brand, url: viewerUrl("cert", c, stone) });
+      });
+      [unit.a, unit.b].forEach((stone, idx) => {
+        const v = itemVideoLink(stone);
+        if (v) buttons.push({ label: `VIDEO ${idx + 1}`, color: VIDEO_BLUE, url: viewerUrl("video", v, stone) });
+      });
+    } else {
+      const certL = itemCertLink(it);
+      if (certL) buttons.push({ label: "CERT", color: brand, url: viewerUrl("cert", certL, it) });
+      const videoL = itemVideoLink(it);
+      if (videoL) buttons.push({ label: "VIDEO", color: VIDEO_BLUE, url: viewerUrl("video", videoL, it) });
+      // SHARE opens our composer page — the price can be adjusted there before
+      // the message goes out (a PDF can't show an edit dialog itself).
+      buttons.push({
+        label: "SHARE",
+        color: [22, 163, 74],
+        url: `${window.location.origin}/share-item?p=${showPrices ? 1 : 0}&d=${encodePayload(sharePayload(it, showPrices))}`,
+      });
+    }
 
     if (!pageStarted) {
       startPage(true);
@@ -589,7 +791,10 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       startPage(false);
     }
 
-    drawCard(it, images[i], cardY, titleLines, specs, price, buttons, cardH);
+    const cardImgs = pair
+      ? [imageOf(unit.a), imageOf(unit.b)]
+      : [imageOf(it)];
+    drawCard(it, cardImgs, cardY, titleLines, specs, price, buttons, cardH, pair);
     cardY += cardH + cardGap;
     rowIndex += 1;
   }
