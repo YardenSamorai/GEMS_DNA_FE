@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import { getMappedCategories } from "../utils/categoryMap";
+import { PRICE_MODES, scaleInventoryPrice } from "../utils/pricing";
 
 export const LABEL_W = 176;
 export const LABEL_H = 96;
@@ -267,9 +268,13 @@ const getTextForElement = (id, stone) => {
     case "price":     return stone.priceTotal ? `$${Math.round(stone.priceTotal).toLocaleString()}` : "";
     case "priceCode": {
       if (stone.pricePerCt && stone.pricePerCt > 50000) return "";
-      const mapped = getMappedCategories(stone.category);
-      const isDiamond = mapped.includes('Diamond') || mapped.includes('Fancy');
-      const price = isDiamond ? (stone.pricePerCt / 2) : stone.pricePerCt;
+      /* The leading B says the figure is Bruto, so Bruto is what gets encoded.
+       * Halving diamonds and passing coloured stones through was correct while
+       * the importer stored doubled prices; once it started storing the real
+       * price that same branch printed diamonds at half value and stamped a B
+       * on a Neto figure. The scale now comes from utils/pricing, which is
+       * also the only place that knows diamonds have no Bruto figure at all. */
+      const price = scaleInventoryPrice(stone.pricePerCt, stone, PRICE_MODES.BRUTO);
       return encodePriceB(price);
     }
     case "origin":    return stone.origin || "";

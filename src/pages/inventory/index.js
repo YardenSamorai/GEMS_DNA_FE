@@ -10,7 +10,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getMappedCategories } from "../../utils/categoryMap";
-import { inventoryPriceScale, readPriceMode, supportsBrutoMode, writePriceMode } from "../../utils/pricing";
+import { inventoryPriceScale, PRICE_MODES, readPriceMode, scaleInventoryPrice, supportsBrutoMode, writePriceMode } from "../../utils/pricing";
 import { sanitizeText } from "../../utils/helper";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
@@ -160,7 +160,14 @@ const exportForLabels = async (selectedStones, shareMode = false) => {
 
   // Add data rows
   selectedStones.forEach((stone) => {
-    const priceCode = encodePriceBARELOVSK(stone.pricePerCt); // Price per carat
+    /* The code on a tag is the Bruto price per carat — that is what its
+     * leading B means — and it stays Bruto whichever way the screen's
+     * Neto/Bruto toggle happens to be set, so the same stone never leaves the
+     * office wearing two different tags. Callers therefore hand this export
+     * unscaled stones and the Bruto figure is derived here. */
+    const priceCode = encodePriceBARELOVSK(
+      scaleInventoryPrice(stone.pricePerCt, stone, PRICE_MODES.BRUTO)
+    );
     const mapped = getMappedCategories(stone.category);
     const sku = (stone.sku || '').toUpperCase();
     
@@ -7994,7 +8001,7 @@ const StoneSearchPage = () => {
                             or when the user wants to keep a paper trail. The
                             xlsx is shaped for the official NIIMBOT app. */}
                         <button
-                          onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
+                          onClick={() => exportForLabels(allItems.filter(s => selectedStones.has(s.id)), false)}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                         >
                           <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -8144,7 +8151,7 @@ const StoneSearchPage = () => {
                           or when the user wants to keep a paper trail. The
                           xlsx is shaped for the official NIIMBOT app. */}
                       <button
-                        onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
+                        onClick={() => exportForLabels(allItems.filter(s => selectedStones.has(s.id)), false)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                       >
                         <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -8771,7 +8778,7 @@ const StoneSearchPage = () => {
                     or when the user wants to keep a paper trail. The
                     xlsx is shaped for the official NIIMBOT app. */}
                 <button
-                  onClick={() => exportForLabels(applyPriceMode(allItems.filter(s => selectedStones.has(s.id))), false)}
+                  onClick={() => exportForLabels(allItems.filter(s => selectedStones.has(s.id)), false)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
                 >
                   <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
