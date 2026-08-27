@@ -205,11 +205,11 @@ const PairDnaView = ({
                   </span>
                 </div>
                 <h1 className="text-[28px] sm:text-[38px] font-semibold tracking-tight text-app-ink leading-tight">
-                  {a.shape} · {totalCarat ? totalCarat.toFixed(2) : "—"} ct
-                  <span className="text-app-graphite"> total</span>
+                  Two stones sold together
+                  <span className="text-app-graphite"> · {a.carat} ct + {b.carat} ct</span>
                 </h1>
                 <p className="text-app-muted text-[13px] mt-1.5">
-                  Two stones sold together · {a.carat} ct + {b.carat} ct
+                  {a.shape} · {totalCarat ? totalCarat.toFixed(2) : "—"} ct total
                 </p>
               </div>
               {isSignedIn && (
