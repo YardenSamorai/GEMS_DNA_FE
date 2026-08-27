@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import InterestedModal from '../components/InterestedModal';
 import StoneUsagePanel from '../components/StoneUsagePanel';
 import PairDnaView, { PairSwitcher } from '../components/PairDnaView';
+import SetDnaView from '../components/SetDnaView';
 import { Skeleton, SkeletonText } from '../components/ui/Skeleton';
 
 // API base URL from .env
@@ -144,6 +145,45 @@ const DiamondCard = () => {
           </p>
         </div>
       </div>
+    );
+  }
+
+  /* A set is one record describing a whole lot, so its weight and price mean
+     something entirely different from a single stone's. Rendered here first,
+     because the plain view below would present a 27-stone, 164 ct lot as one
+     impossibly large emerald. */
+  if (details.set) {
+    return (
+      <>
+        <SetDnaView
+          stone={details}
+          set={details.set}
+          isSignedIn={isSignedIn}
+          barakURL={barakURL}
+          onBack={goBack}
+          onInterested={() => setInterestedOpen(true)}
+          onShare={handleShare}
+          onShareVideo={handleShareVideo}
+        />
+        <InterestedModal
+          open={interestedOpen}
+          onClose={() => setInterestedOpen(false)}
+          sku={details.stone_id}
+          snapshot={{
+            sku: details.stone_id,
+            isSet: true,
+            stones: details.set.stones,
+            category: details.category,
+            shape: details.shape,
+            weightCt: Number(details.set.total_carat) || Number(details.carat) || 0,
+            color: details.color,
+            clarity: details.clarity,
+            lab: details.lab,
+            certificateNumber: details.certificate_number,
+            image: details.picture,
+          }}
+        />
+      </>
     );
   }
 
