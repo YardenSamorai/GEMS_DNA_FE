@@ -12,6 +12,7 @@ import "jspdf-autotable";
 import { getMappedCategories } from "../../utils/categoryMap";
 import { inventoryPriceScale, PRICE_MODES, readPriceMode, scaleInventoryPrice, supportsBrutoMode, writePriceMode } from "../../utils/pricing";
 import { sanitizeText } from "../../utils/helper";
+import { buildSkuIndex, canonicalSku, parseSkuQuery } from "../../utils/skuQuery";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import { isBluetoothAvailable } from "../../services/niimbotPrint";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
@@ -7290,6 +7291,20 @@ const StoneSearchPage = () => {
     });
   }, [stones, jewelryItems, inventoryMode, jewelrySourceFilter]);
 
+  /* The SKU box accepts a list separated however the rep happened to paste it.
+     Whitespace can only be trusted to separate two SKUs by checking them
+     against the ones that exist — 198 stones are named "BAG SET-0001" and the
+     like — so the parser is handed every SKU on the current tab. */
+  const skuIndex = useMemo(
+    () => buildSkuIndex((inventoryMode === 'jewelry' ? jewelryItems : stones).map((s) => s.sku)),
+    [inventoryMode, stones, jewelryItems]
+  );
+
+  const skuQuery = useMemo(
+    () => parseSkuQuery(filters.sku, skuIndex),
+    [filters.sku, skuIndex]
+  );
+
   const diamondCount = useMemo(() => stones.filter(s => getMappedCategories(s.category).includes('Diamond')).length, [stones]);
   const gemstoneCount = useMemo(() => stones.filter(s => !getMappedCategories(s.category).includes('Diamond')).length, [stones]);
   const jewelryCount = jewelryItems.length;
@@ -7531,13 +7546,10 @@ const StoneSearchPage = () => {
   const filteredStones = useMemo(() => {
     if (inventoryMode === 'jewelry') {
       return modeFilteredStones.filter((item) => {
-        if (filters.sku) {
-          const skuList = filters.sku.split(/[,\n]/).map(s => s.trim().toLowerCase()).filter(Boolean);
-          if (skuList.length > 0) {
-            const itemSku = (item.sku || '').toLowerCase();
-            const itemTitle = (item.title || '').toLowerCase();
-            if (!skuList.some(q => itemSku.includes(q) || itemTitle.includes(q))) return false;
-          }
+        if (skuQuery.terms.length > 0) {
+          const itemSku = canonicalSku(item.sku);
+          const itemTitle = canonicalSku(item.title);
+          if (!skuQuery.terms.some(q => itemSku.includes(q) || itemTitle.includes(q))) return false;
         }
         if (filters.minPrice && item.priceTotal < Number(filters.minPrice)) return false;
         if (filters.maxPrice && item.priceTotal > Number(filters.maxPrice)) return false;
@@ -7569,18 +7581,11 @@ const StoneSearchPage = () => {
     };
 
     return modeFilteredStones.filter((stone) => {
-      if (filters.sku) {
-        const skuList = filters.sku
-          .split(/[,\n]/)
-          .map(s => s.trim().toLowerCase())
-          .filter(s => s.length > 0);
-        
-        if (skuList.length > 0) {
-          const stoneSku = stone.sku?.toLowerCase() || '';
-          // Check if stone SKU exactly matches any of the filter SKUs
-          const matches = skuList.some(filterSku => stoneSku === filterSku);
-          if (!matches) return false;
-        }
+      if (skuQuery.terms.length > 0) {
+        // Matching stays exact per SKU — a rep pasting a list wants those
+        // stones, not everything whose SKU contains them.
+        const stoneSku = canonicalSku(stone.sku);
+        if (!skuQuery.terms.some(term => stoneSku === term)) return false;
       }
       const priceScale = inventoryPriceScale(stone, priceMode);
       const effectiveTotal = stone.priceTotal != null ? stone.priceTotal * priceScale : stone.priceTotal;
@@ -7715,7 +7720,7 @@ const StoneSearchPage = () => {
       
       return true;
     });
-  }, [filters, modeFilteredStones, stoneTags, parsedSearch, priceMode, inventoryMode, smartSearch]);
+  }, [filters, skuQuery, modeFilteredStones, stoneTags, parsedSearch, priceMode, inventoryMode, smartSearch]);
 
   const sortedStones = useMemo(() => {
     const sorted = [...filteredStones];
@@ -8215,8 +8220,10 @@ const StoneSearchPage = () => {
 
           {/* Primary search — by SKU. This is the box people reach for first, so
               it owns the prominent top slot. The natural-language "smart search"
-              now lives inside the Filters panel (advanced). Accepts one SKU or a
-              comma / newline separated list; matching is exact per SKU. */}
+              now lives inside the Filters panel (advanced). Accepts one SKU or
+              a list separated by spaces, commas, tabs or newlines — see
+              utils/skuQuery for why a space alone can't be trusted to split
+              one SKU from the next. Matching is exact per SKU. */}
           <div className="mb-4">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -8228,7 +8235,7 @@ const StoneSearchPage = () => {
                 type="text"
                 value={filters.sku}
                 onChange={(e) => setFilters((f) => ({ ...f, sku: e.target.value }))}
-                placeholder="Search by SKU… e.g. T9548 or M1413  (comma-separate for multiple)"
+                placeholder="Search by SKU… e.g. T9548 or M1413  (paste a list — spaces, commas or lines)"
                 className="w-full pl-9 pr-9 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-all"
               />
               {filters.sku && (
@@ -8242,9 +8249,19 @@ const StoneSearchPage = () => {
                 </button>
               )}
             </div>
-            {(filters.sku?.includes(',') || filters.sku?.includes('\n')) && (
+            {skuQuery.terms.length > 1 && (
+              /* Says how the list was read, so a rep who pasted eight SKUs and
+                 got six rows can see whether two were dropped as unknown or
+                 two of the eight were simply the same stone twice. */
               <p className="text-[11px] text-emerald-600 mt-1.5">
-                Searching {filters.sku.split(/[,\n]/).filter(s => s.trim()).length} SKUs
+                Searching {skuQuery.terms.length} SKUs
+                {skuQuery.unknown.length > 0 && (
+                  <span className="text-amber-600">
+                    {" "}· {skuQuery.unknown.length} not in this tab:{" "}
+                    {skuQuery.unknown.slice(0, 3).join(", ").toUpperCase()}
+                    {skuQuery.unknown.length > 3 ? "…" : ""}
+                  </span>
+                )}
               </p>
             )}
           </div>
