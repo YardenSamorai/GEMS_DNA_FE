@@ -31,3 +31,12 @@ export const mirrorSupplierUrl = (url) =>
 export const SUPPLIER_FALLBACK_IMAGE = mirrorSupplierUrl(
   "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg"
 );
+
+/* Roughly one photo in thirty is named in the feed but was never uploaded, so
+ * the only way to find out is to let the load fail. Falls back to the
+ * placeholder rather than leaving a torn-page icon on a public product page.
+ * Guarded so a placeholder that is itself unreachable cannot loop. */
+export const onImageError = (event) => {
+  const img = event.currentTarget;
+  if (img.src !== SUPPLIER_FALLBACK_IMAGE) img.src = SUPPLIER_FALLBACK_IMAGE;
+};

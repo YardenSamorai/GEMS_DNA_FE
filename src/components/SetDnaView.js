@@ -5,7 +5,7 @@ import { decryptPrice } from "../utils/decrypt";
 import { encryptPrice } from "../utils/helper";
 import { getMappedCategories } from "../utils/categoryMap";
 import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
-import { SUPPLIER_FALLBACK_IMAGE } from "../utils/supplierMedia";
+import { SUPPLIER_FALLBACK_IMAGE, onImageError } from "../utils/supplierMedia";
 
 /* ============================================================================
  * A set is one record standing for a lot of matched stones, not a group of
@@ -229,6 +229,7 @@ const SetDnaView = ({
                   <img
                     src={stone.picture || FALLBACK_IMAGE}
                     alt={`Set of ${stones} stones`}
+                    onError={onImageError}
                     className="w-full h-full object-cover"
                   />
                   <span className="absolute top-3 left-3 text-[10.5px] font-medium tracking-[0.08em] uppercase text-white bg-black/55 backdrop-blur-md px-2.5 py-1 rounded-full">

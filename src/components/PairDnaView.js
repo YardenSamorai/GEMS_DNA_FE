@@ -5,7 +5,7 @@ import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
 import { getMappedCategories } from "../utils/categoryMap";
 import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
-import { SUPPLIER_FALLBACK_IMAGE } from "../utils/supplierMedia";
+import { SUPPLIER_FALLBACK_IMAGE, onImageError } from "../utils/supplierMedia";
 
 const FALLBACK_IMAGE = SUPPLIER_FALLBACK_IMAGE;
 
@@ -86,6 +86,7 @@ const StoneMedia = ({ stone, index }) => (
         <img
           src={stone.picture || FALLBACK_IMAGE}
           alt={`Stone ${index}`}
+          onError={onImageError}
           className="w-full h-full object-cover"
         />
       )}

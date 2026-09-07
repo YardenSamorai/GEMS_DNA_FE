@@ -27,6 +27,10 @@ const DiamondCard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [interestedOpen, setInterestedOpen] = useState(false);
+  /* Around 3.5% of the stones that claim a photo name a file the supplier
+   * never uploaded, and the page has no way to know until the load fails.
+   * Without this the visitor gets a torn-page icon on a public product page. */
+  const [photoFailed, setPhotoFailed] = useState(false);
   const { isSignedIn } = useUser();
 
   // Back to wherever the rep came from (their filtered inventory list). Inside
@@ -53,6 +57,7 @@ const DiamondCard = () => {
   useEffect(() => {
     if (!stone_id) return;
 
+    setPhotoFailed(false);
     fetch(`${API_BASE}/api/stones/${stone_id}`)
       .then((res) => res.json())
       .then((data) => {
@@ -333,20 +338,22 @@ const DiamondCard = () => {
                     ></iframe>
                   ) : (
                     <img 
-                      src={details.picture || SUPPLIER_FALLBACK_IMAGE} 
+                      src={details.picture && !photoFailed ? details.picture : SUPPLIER_FALLBACK_IMAGE} 
                       alt="Stone"
+                      onError={() => setPhotoFailed(true)}
                       className="w-full h-full object-cover"
                     />
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  {details.picture && (
+                  {details.picture && !photoFailed && (
                     <div className="relative group">
                       <div className="rounded-xl overflow-hidden bg-app-canvas-2 aspect-square">
                         <img
                           src={details.picture}
                           alt="Stone"
+                          onError={() => setPhotoFailed(true)}
                           className="w-full h-full object-cover"
                         />
                       </div>
