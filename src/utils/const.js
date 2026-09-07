@@ -1,3 +1,5 @@
+import { mirrorSupplierUrl } from "./supplierMedia";
+
 export const mapping = {
     "000": "Z",
     "00": "Y",
@@ -13,4 +15,9 @@ export const mapping = {
     "9": "K",
   };
 
-export const barakURL = "https://app.barakdiamonds.com/Gemstones/Output/Certificates";
+/* Certificate numbers get appended to this to build a PDF URL. It points at
+ * our own mirror because the supplier forbids browsers from displaying its
+ * files on any other origin — see utils/supplierMedia.js. */
+export const barakURL = mirrorSupplierUrl(
+  "https://app.barakdiamonds.com/Gemstones/Output/Certificates"
+);

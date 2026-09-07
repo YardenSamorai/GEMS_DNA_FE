@@ -5,9 +5,9 @@ import { decryptPrice } from "../utils/decrypt";
 import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
 import { getMappedCategories } from "../utils/categoryMap";
 import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
+import { SUPPLIER_FALLBACK_IMAGE } from "../utils/supplierMedia";
 
-const FALLBACK_IMAGE =
-  "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg";
+const FALLBACK_IMAGE = SUPPLIER_FALLBACK_IMAGE;
 
 const certUrlOf = (stone, barakURL) =>
   stone.certificate_url ||

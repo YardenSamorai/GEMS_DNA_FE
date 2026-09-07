@@ -6,6 +6,7 @@ import { changeMeasurementsFormat, encryptPrice } from "../utils/helper";
 import { barakURL } from "../utils/const";
 import { getMappedCategories } from "../utils/categoryMap";
 import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
+import { SUPPLIER_FALLBACK_IMAGE } from "../utils/supplierMedia";
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import InterestedModal from '../components/InterestedModal';
@@ -332,7 +333,7 @@ const DiamondCard = () => {
                     ></iframe>
                   ) : (
                     <img 
-                      src={details.picture || "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg"} 
+                      src={details.picture || SUPPLIER_FALLBACK_IMAGE} 
                       alt="Stone"
                       className="w-full h-full object-cover"
                     />

@@ -5,6 +5,7 @@ import { decryptPrice } from "../utils/decrypt";
 import { encryptPrice } from "../utils/helper";
 import { getMappedCategories } from "../utils/categoryMap";
 import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
+import { SUPPLIER_FALLBACK_IMAGE } from "../utils/supplierMedia";
 
 /* ============================================================================
  * A set is one record standing for a lot of matched stones, not a group of
@@ -19,8 +20,7 @@ import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
  * stone, which reads at a glance and needs no data we don't have.
  * ========================================================================== */
 
-const FALLBACK_IMAGE =
-  "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/Eshed_no_image_2.jpg";
+const FALLBACK_IMAGE = SUPPLIER_FALLBACK_IMAGE;
 
 const num = (v) => (v == null || v === "" || !isFinite(Number(v)) ? null : Number(v));
 
