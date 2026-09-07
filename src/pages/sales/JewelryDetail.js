@@ -167,7 +167,19 @@ const JewelryDetail = () => {
     if (!actionOpen) setCopied(false);
   }, [actionOpen]);
 
-  const images = useMemo(() => (item ? itemImages(item) : []), [item]);
+  /* Same as the stone page: a URL in the feed is not a promise that the file
+   * exists, so a photo that 404s drops out of the carousel rather than
+   * showing a customer a torn-page icon. */
+  const [brokenImages, setBrokenImages] = useState(() => new Set());
+  useEffect(() => {
+    setBrokenImages(new Set());
+  }, [item?.sku]);
+
+  const allImages = useMemo(() => (item ? itemImages(item) : []), [item]);
+  const images = useMemo(
+    () => allImages.filter((u) => !brokenImages.has(u)),
+    [allImages, brokenImages]
+  );
   const video = item ? usableImg(item.videoUrl) : null;
   const slideCount = images.length + (video ? 1 : 0);
   const [slide, setSlide] = useState(0);
@@ -311,7 +323,14 @@ const JewelryDetail = () => {
           >
             {images.map((src) => (
               <div key={src} className="aspect-square w-full shrink-0 snap-center">
-                <img src={src} alt={title} className="h-full w-full object-cover" />
+                <img
+                  src={src}
+                  alt={title}
+                  onError={() =>
+                    setBrokenImages((prev) => new Set(prev).add(src))
+                  }
+                  className="h-full w-full object-cover"
+                />
               </div>
             ))}
             {video && (

@@ -202,7 +202,22 @@ const StoneDetail = () => {
   }, [actionOpen]);
 
   // ---- Media carousel ------------------------------------------------------
-  const images = useMemo(() => (stone ? stoneImages(stone) : []), [stone]);
+  /* A URL in the feed is not a promise that the file exists: about one photo
+   * in thirty names a file the supplier never uploaded, and there is no way
+   * to tell until the load fails. Dropping those from the carousel keeps the
+   * slide count, the dots and the arrows honest, and lets a stone whose only
+   * photo is dead fall through to the placeholder instead of showing a
+   * customer a torn-page icon. */
+  const [brokenImages, setBrokenImages] = useState(() => new Set());
+  useEffect(() => {
+    setBrokenImages(new Set());
+  }, [stone?.sku]);
+
+  const allImages = useMemo(() => (stone ? stoneImages(stone) : []), [stone]);
+  const images = useMemo(
+    () => allImages.filter((u) => !brokenImages.has(u)),
+    [allImages, brokenImages]
+  );
   // Folder-only video URLs are as common as folder-only images — same filter.
   const video = stone ? usableImg(stone.videoUrl) : null;
   // Secondary videos (additional_videos, ';'-separated). Some legacy URLs come
@@ -464,7 +479,14 @@ const StoneDetail = () => {
           >
             {images.map((src) => (
               <div key={src} className="aspect-square w-full shrink-0 snap-center">
-                <img src={src} alt={title || stone.sku} className="h-full w-full object-cover" />
+                <img
+                  src={src}
+                  alt={title || stone.sku}
+                  onError={() =>
+                    setBrokenImages((prev) => new Set(prev).add(src))
+                  }
+                  className="h-full w-full object-cover"
+                />
               </div>
             ))}
             {videos.map((src, vi) => (
