@@ -67,7 +67,8 @@ const BLANK = "-";
 const JewelryDetail = () => {
   const { sku } = useParams();
   const navigate = useNavigate();
-  const { actor } = useTeam();
+  // canViewCost gates the internal-cost reveal further down the page.
+  const { actor, canViewCost } = useTeam();
   const routerState = useLocation().state;
   const [item, setItem] = useState(routerState?.item || null);
   const [loading, setLoading] = useState(!routerState?.item);
@@ -81,6 +82,9 @@ const JewelryDetail = () => {
   // Editable price for the outgoing message only — never touches the piece
   // itself. Re-seeded from the item every time the sheet opens.
   const [priceEdit, setPriceEdit] = useState("");
+  // Internal cost is hidden behind a tap (managers/admins only) so it's never
+  // shown to a client over the rep's shoulder when the page first opens.
+  const [costOpen, setCostOpen] = useState(false);
   // "Copied" confirmation on the preview's Copy button.
   const [copied, setCopied] = useState(false);
 
@@ -233,6 +237,19 @@ const JewelryDetail = () => {
   const totalCt = Number.isFinite(item.totalCarat) ? `${item.totalCarat.toFixed(2)} ct` : "";
   const cert = certLink(item);
   const total = money(item.price);
+
+  // Internal cost (manager/admin only) — a flat figure per piece, unlike a
+  // stone's per-carat rate. The API sends null to anyone not cleared for it,
+  // so a missing value and a forbidden one look the same here, as they should.
+  const costNum = Number(item.cost);
+  const priceNum = Number(item.price);
+  const showCost = canViewCost && Number.isFinite(costNum) && costNum > 0;
+  // A cost on its own says little; what a manager is actually deciding from is
+  // what is left after it. Both are stated, and a piece that costs more than
+  // it is priced at reads as a negative rather than being quietly hidden.
+  const profit =
+    showCost && Number.isFinite(priceNum) && priceNum > 0 ? priceNum - costNum : null;
+  const marginPct = profit != null ? (profit / priceNum) * 100 : null;
 
   // Message-only price override: when the rep edits the price in the action
   // sheet, share a clone carrying the new price.
@@ -462,6 +479,100 @@ const JewelryDetail = () => {
             <SpecRow key={label} label={label} value={value} />
           ))}
         </div>
+
+        {/* Internal cost — manager/admin only. Behind a tap so it is never
+            visible at a glance, same as the stone page. */}
+        {showCost && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setCostOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-app-line bg-app-surface px-3 py-1.5 text-[12px] font-semibold text-app-graphite shadow-sm transition active:scale-95 hover:text-app-ink"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M7 7h.01M7 3h5.6a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-4.6 4.6a2 2 0 01-2.8 0L6.6 11.6A2 2 0 016 10.2V4a1 1 0 011-1z"
+                />
+              </svg>
+              View cost
+            </button>
+          </div>
+        )}
+
+        {/* Internal-cost dialog — small centered modal, opened by the button. */}
+        <AnimatePresence>
+          {showCost && costOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+                onClick={() => setCostOpen(false)}
+                aria-hidden
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 6 }}
+                transition={{ type: "spring", damping: 26, stiffness: 320 }}
+                className="relative w-full max-w-[300px] rounded-2xl border border-app-line bg-app-surface p-4 shadow-[0_24px_60px_-18px_rgba(0,0,0,0.5)]"
+                role="dialog"
+                aria-label="Internal cost"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-app-muted">
+                      Internal cost
+                    </p>
+                    <p className="mt-0.5 truncate text-[13px] font-medium text-app-muted">
+                      {item.sku || "Piece"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCostOpen(false)}
+                    aria-label="Close"
+                    className="-mr-1 -mt-1 flex h-8 w-8 items-center justify-center rounded-full text-app-soft transition hover:bg-app-canvas2 hover:text-app-ink"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-2.5 tabular-nums">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[13px] text-app-muted">Cost</span>
+                    <span className="text-[17px] font-semibold text-app-ink">{money(costNum)}</span>
+                  </div>
+                  {profit != null && (
+                    <div className="flex items-baseline justify-between gap-3 border-t border-app-line pt-2.5">
+                      <span className="text-[13px] text-app-muted">
+                        {profit < 0 ? "Loss" : "Profit"}
+                      </span>
+                      <span
+                        className={`text-[17px] font-semibold ${
+                          profit < 0 ? "text-red-600" : "text-app-ink"
+                        }`}
+                      >
+                        {money(Math.abs(profit))}
+                        <span className="ml-1.5 text-[13px] font-medium opacity-70">
+                          {marginPct < 0 ? "" : "+"}
+                          {marginPct.toFixed(0)}%
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {total && (
           <div className="mt-7 overflow-hidden rounded-2xl bg-app-ink text-app-canvas">
