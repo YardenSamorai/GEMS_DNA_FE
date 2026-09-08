@@ -320,6 +320,9 @@ export const mapRow = (row) => {
     image: firstImage,
     images,
     price: price || 0,
+    // What the piece cost us (feed's real_unit_cost). The BE sends null to
+    // anyone not cleared for cost, so its absence is the permission check.
+    cost: row.real_unit_cost != null && row.real_unit_cost !== "" ? Number(row.real_unit_cost) : null,
     // When the piece was first imported — drives the default newest-first order.
     createdAt: row.first_seen_at || null,
   };

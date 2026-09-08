@@ -15,7 +15,7 @@ import { shareStonesOnWhatsApp, withDirectVideoLinks } from "../utils/shareStone
  * dock on phones and drops to a normal bottom margin on desktop. */
 const SelectionFab = () => {
   const { items, count, clear } = useSelection();
-  const { actor } = useTeam();
+  const { actor, canViewCost } = useTeam();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -38,12 +38,12 @@ const SelectionFab = () => {
     if (open && items.length) withDirectVideoLinks(items).catch(() => {});
   }, [open, items]);
 
-  const handleExportPdf = async (showLogo = true) => {
+  const handleExportPdf = async (showLogo = true, showCost = false) => {
     if (exporting || count === 0) return;
     setActionsOpen(false);
     setExporting(true);
     try {
-      await downloadCatalogPdf(items, { showLogo });
+      await downloadCatalogPdf(items, { showLogo, showCost });
     } catch (err) {
       console.error("[catalog pdf] export failed", err);
       alert("Could not generate the PDF. Please try again.");
@@ -210,6 +210,33 @@ const SelectionFab = () => {
                               </svg>
                               Without logo
                             </button>
+                            {/* The costed export is a different kind of
+                                document — it carries what we paid, and the two
+                                entries above it are the ones that go to
+                                customers. Kept apart, in red, and hidden
+                                outright from anyone who may not see cost. */}
+                            {canViewCost && (
+                              <>
+                                <div className="mx-3 my-1 h-px bg-app-line" aria-hidden />
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => handleExportPdf(true, true)}
+                                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13.5px] font-medium text-red-600 transition hover:bg-red-50"
+                                >
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M14 3v5h5M9 14h6" />
+                                  </svg>
+                                  <span className="min-w-0">
+                                    <span className="block">With cost</span>
+                                    <span className="block text-[11px] font-normal text-red-500">
+                                      Internal only — not for customers
+                                    </span>
+                                  </span>
+                                </button>
+                              </>
+                            )}
                           </div>
                         </>
                       )}

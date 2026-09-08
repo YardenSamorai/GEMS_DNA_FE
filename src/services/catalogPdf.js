@@ -262,6 +262,31 @@ const pairPrice = (a, b) => {
   };
 };
 
+/* Internal cost basis for one item, as a total. A jewelry piece carries a flat
+ * figure straight from the feed; a stone carries a per-carat rate, which is
+ * only a total once multiplied by the weight. Null when the item has no cost —
+ * which is also how a viewer who may not see cost arrives here, since the API
+ * withholds the field rather than sending a zero. */
+const itemCost = (it) => {
+  if (isJewelry(it)) {
+    const flat = Number(it.cost);
+    return Number.isFinite(flat) && flat > 0 ? flat : null;
+  }
+  const perCt = Number(it.costPerCt);
+  const ct = Number(it.weightCt);
+  if (!Number.isFinite(perCt) || perCt <= 0 || !Number.isFinite(ct) || ct <= 0) return null;
+  return perCt * ct;
+};
+
+/* A pair costs what the two stones cost together. One half priced and the
+ * other not would understate the pair, so that prints nothing at all rather
+ * than half a figure under a full-pair heading. */
+const pairCost = (a, b) => {
+  const ca = itemCost(a);
+  const cb = itemCost(b);
+  return ca && cb ? ca + cb : null;
+};
+
 const itemPrice = (it) => {
   if (isJewelry(it)) return { total: money(it.price), ppc: null, rap: null };
   const mapped = getMappedCategories(it.category) || [];
@@ -416,9 +441,13 @@ async function loadLogoAsset() {
  *   - showLogo   (bool, default true) — include the ESHED wordmark/branding in
  *     the header & footer. When false the document is unbranded (neutral
  *     "Catalog" header, no ESHED mark) — useful for white-label sends.
+ *   - showCost   (bool, default false) — add the internal cost basis to each
+ *     card. This turns the document into an internal one: it is stamped
+ *     INTERNAL on every page and saved under a different name, because the
+ *     same export is routinely sent straight to a customer over WhatsApp.
  */
 export async function buildCatalogPdf(rawItems, options = {}) {
-  const { showPrices = true, showLogo = true } = options;
+  const { showPrices = true, showLogo = true, showCost = false } = options;
   // Swap Vimeo embed links for the direct 1080p MP4s (BE-resolved) so the
   // VIDEO buttons and the WhatsApp share text always open at full quality.
   const items = await withDirectVideoLinks((rawItems || []).filter(Boolean));
@@ -434,6 +463,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
   const line = [228, 232, 238];
   const wash = [248, 249, 251];
   const brand = [5, 150, 105];
+  const danger = [190, 30, 45];
 
   const margin = 14;
   const contentW = pageW - margin * 2;
@@ -505,6 +535,16 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       pdf.setFontSize(15);
       pdf.setTextColor(...ink);
       pdf.text("Catalog", margin, 18);
+    }
+
+    /* Stamped between the wordmark and the date, on every page — whoever ends
+       up holding this document has to be able to tell at a glance that it is
+       not the one to forward to a customer. */
+    if (showCost) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...danger);
+      pdf.text("INTERNAL · INCLUDES COST", pageW / 2, 16, { align: "center" });
     }
 
     const dateStr = new Date().toLocaleDateString("en-GB", {
@@ -807,6 +847,14 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       else specs.push(["Rap %", price.rap]);
     }
 
+    // Cost joins the spec table rather than the price block below it: that
+    // block is sized for at most two figures, and the table already compresses
+    // and re-columns itself to fit whatever it is given.
+    if (showCost) {
+      const cost = pair ? pairCost(unit.a, unit.b) : itemCost(it);
+      if (cost) specs.push(["Cost", money(cost)]);
+    }
+
     // Per-card action buttons — tappable link pills inside the PDF:
     //   Cert / Video open our branded /media viewer page (dark ESHED page
     //   with the media front-and-center — a PDF can't open dialogs, so this
@@ -892,12 +940,14 @@ export async function downloadCatalogPdf(items, options = {}) {
   const pdf = await buildCatalogPdf(items, options);
   // Local calendar date (not UTC) so an evening export in Israel doesn't
   // slip to yesterday. Filename is just "Catalog" + the export date —
-  // no company name in the file name.
+  // no company name in the file name. A costed export says so in the name:
+  // the share sheet shows the filename as the caption, so this is the last
+  // chance to catch it before it lands in a customer's chat.
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
-  const label = `Catalog ${yyyy}-${mm}-${dd}`;
+  const label = `${options.showCost ? "Catalog Internal" : "Catalog"} ${yyyy}-${mm}-${dd}`;
   const filename = `${label}.pdf`;
 
   try {
