@@ -1,4 +1,10 @@
-import { buildSkuIndex, canonicalSku, parseSkuQuery } from "./skuQuery";
+import {
+  appendSku,
+  buildSkuIndex,
+  canonicalSku,
+  endSkuTerm,
+  parseSkuQuery,
+} from "./skuQuery";
 
 /* SKUs shaped like the real ones, including the spaced lots that make a plain
  * whitespace split wrong. */
@@ -114,5 +120,58 @@ describe("canonicalSku", () => {
   it("matches the same SKU written with odd spacing or case", () => {
     expect(canonicalSku("  Bag   SET-0001 ")).toBe("bag set-0001");
     expect(canonicalSku("EC\u00A0SET\u00A00002")).toBe("ec set 0002");
+  });
+});
+
+describe("appendSku", () => {
+  it("starts the list with the first scan", () => {
+    expect(appendSku("", "T9548")).toBe("T9548");
+    expect(appendSku(null, "T9548")).toBe("T9548");
+  });
+
+  it("separates each further scan with a comma", () => {
+    expect(appendSku("T9548", "MTPS-0298")).toBe("T9548, MTPS-0298");
+    expect(appendSku("T9548, MTPS-0298", "BAG SET-0001")).toBe(
+      "T9548, MTPS-0298, BAG SET-0001"
+    );
+  });
+
+  it("does not double a separator the box already ends with", () => {
+    expect(appendSku("T9548, ", "MTPS-0298")).toBe("T9548, MTPS-0298");
+    expect(appendSku("T9548 ; ", "MTPS-0298")).toBe("T9548, MTPS-0298");
+  });
+
+  it("leaves the box alone when the scan read nothing", () => {
+    expect(appendSku("T9548", "")).toBe("T9548");
+    expect(appendSku("T9548, ", "   ")).toBe("T9548");
+  });
+
+  it("commits a scanner's own odd spacing to one clean SKU", () => {
+    expect(appendSku("", "  BAG   SET-0001 ")).toBe("BAG SET-0001");
+  });
+});
+
+describe("endSkuTerm", () => {
+  it("closes the current SKU so the next scan starts on its own", () => {
+    expect(endSkuTerm("T9548")).toBe("T9548, ");
+  });
+
+  it("does nothing to an empty box", () => {
+    expect(endSkuTerm("")).toBe("");
+    expect(endSkuTerm("   ")).toBe("");
+  });
+
+  it("does not stack separators when pressed twice", () => {
+    expect(endSkuTerm(endSkuTerm("T9548"))).toBe("T9548, ");
+  });
+
+  it("builds a searchable list out of a scanner gun's run", () => {
+    // Gun types the code, sends Enter, types the next one, and so on.
+    let box = "";
+    for (const code of ["T9548", "MTPS-0298", "T9549"]) {
+      box = `${box}${code}`;
+      box = endSkuTerm(box);
+    }
+    expect(parseSkuQuery(box, index).terms).toEqual(["t9548", "mtps-0298", "t9549"]);
   });
 });

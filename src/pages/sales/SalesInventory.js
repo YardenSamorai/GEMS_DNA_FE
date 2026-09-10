@@ -11,6 +11,7 @@ import { DIAMOND_SHAPES, EMERALD_SHAPES } from "./diamondShapes";
 import { getCatalogView } from "./salesPrefs";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import SkuSuggestions, { buildSkuSuggestions } from "../../components/SkuSearchSuggestions";
+import { appendSku, endSkuTerm } from "../../utils/skuQuery";
 // A pasted list of SKUs is answered across every category at once, so this
 // page renders finished pieces alongside loose stones. Both live outside
 // SalesJewelry so importing them here can't create an import cycle.
@@ -1327,6 +1328,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     // A list is already being answered from every category right here, so
     // there is nowhere to hop to.
     if (skuList.active) return undefined;
+    // Mid-scan the query is one code long and about to become several, so a
+    // hop here would unmount the camera between the first stone and the second.
+    if (scanOpen) return undefined;
     // Only a query the rep actually typed on THIS page may redirect. Queries
     // restored from storage or injected by a previous hop stay put — otherwise
     // two categories bounce the same stale search back and forth forever.
@@ -1368,7 +1372,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skuQuery, stones, loading, mode, skuList.active]);
+  }, [skuQuery, stones, loading, mode, skuList.active, scanOpen]);
 
   // Track sort changes — fire when the sort sheet closes with an active sort,
   // so we log the settled order (a readable label) rather than every toggle.
@@ -2012,6 +2016,16 @@ const SalesInventory = ({ mode = "gemstone" }) => {
               skuTypedRef.current = true;
               setSkuQuery(e.target.value);
             }}
+            onKeyDown={(e) => {
+              // A handheld scanner types the code and presses Enter, which in a
+              // single-line box does nothing — so a run of scans arrives as one
+              // glued-together word. Enter closes off the current SKU instead,
+              // which is also the sensible reading of it for a person.
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              skuTypedRef.current = true;
+              setSkuQuery((prev) => endSkuTerm(prev));
+            }}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             placeholder="Search SKU"
@@ -2108,15 +2122,19 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         Filter
       </button>
 
-      {/* Camera-based SKU scanner (rear camera; works on iOS Safari). */}
+      {/* Camera-based SKU scanner (rear camera; works on iOS Safari). Stays
+          open and appends, so a rep can walk a tray and search the lot in one
+          pass; the scanner itself refuses to add the same code twice. */}
       <BarcodeScanner
         isOpen={scanOpen}
+        continuous
         onClose={() => setScanOpen(false)}
         onScan={(text) => {
+          const code = String(text || "").trim();
+          if (!code) return;
           // A scanned SKU counts as user input — the cross-category hop may act on it.
           skuTypedRef.current = true;
-          setSkuQuery(String(text || "").trim());
-          setScanOpen(false);
+          setSkuQuery((prev) => appendSku(prev, code));
         }}
       />
 

@@ -65,6 +65,37 @@ export const buildSkuIndex = (skus) => {
 
 export const EMPTY_SKU_QUERY = { terms: [], unknown: [] };
 
+/* -----------------------------------------------------------------------------
+ * Building the box's text from a scanner rather than a keyboard
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Add one scanned SKU to whatever the box already holds.
+ *
+ * A comma is used rather than a space because it is the one separator that
+ * still works when none of the scanned codes turn out to be stock we hold —
+ * a spaced list of unknown codes reads as a phrase (see parseSkuQuery), and a
+ * scan that found nothing is exactly when the rep needs to be told so.
+ */
+export const appendSku = (current, sku) => {
+  const code = normalizeSpace(sku);
+  const base = String(current ?? "").replace(/[\s,;]+$/, "");
+  if (!code) return base;
+  return base ? `${base}, ${code}` : code;
+};
+
+/**
+ * Close off the SKU being written so the next one starts on its own.
+ *
+ * A handheld scanner ends every read with Enter, which in a single-line box
+ * otherwise does nothing at all — leaving one run of scans glued into a single
+ * unsearchable word.
+ */
+export const endSkuTerm = (current) => {
+  const base = String(current ?? "").replace(/[\s,;]+$/, "");
+  return base ? `${base}, ` : "";
+};
+
 /* Longest-run-first walk across one chunk's words. Returns the pieces plus
  * whether any of them is a real SKU, which is what decides if the chunk was a
  * list at all. */

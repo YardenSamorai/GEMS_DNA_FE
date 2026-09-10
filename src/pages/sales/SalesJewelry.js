@@ -18,6 +18,7 @@ import {
 } from "./SalesInventory";
 import { getCatalogView } from "./salesPrefs";
 import SkuSuggestions, { buildSkuSuggestions } from "../../components/SkuSearchSuggestions";
+import { endSkuTerm } from "../../utils/skuQuery";
 // The card and the row mapper moved to their own modules so the stone catalog
 // can use them too (a SKU list is answered across every category at once).
 // Both are re-exported below, so existing importers still find them here.
@@ -739,6 +740,17 @@ const SalesJewelry = () => {
             onChange={(e) => {
               skuTypedRef.current = true;
               setSkuQuery(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              // A handheld scanner types the code and presses Enter, which in a
+              // single-line box does nothing — so a run of scans arrives as one
+              // glued-together word. Enter closes off the current SKU instead.
+              // A name search is unaffected: it ends up with a trailing comma,
+              // which the parser drops.
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              skuTypedRef.current = true;
+              setSkuQuery((prev) => endSkuTerm(prev));
             }}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
