@@ -17,7 +17,9 @@ const norm = (v) => String(v || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
 /**
  * @param query   raw search-box text
  * @param stones  loose stones (raw /api/soap-stones rows: sku, pairSku, ...)
- * @param jewelry jewelry pieces (raw /api/jewelry rows: model_number, title, ...)
+ * @param jewelry jewelry pieces, either raw /api/jewelry rows (model_number,
+ *                title) or ones already mapped for the catalog (sku, name) —
+ *                the callers hold them in whichever form suits them
  * @param limit   max suggestions returned
  */
 export const buildSkuSuggestions = ({ query, stones, jewelry, limit = 8 }) => {
@@ -51,15 +53,16 @@ export const buildSkuSuggestions = ({ query, stones, jewelry, limit = 8 }) => {
   }
 
   for (const j of jewelry || []) {
-    if (!j?.model_number) continue;
-    if (!norm(j.model_number).includes(q)) continue;
+    const sku = j?.model_number || j?.sku;
+    if (!sku) continue;
+    if (!norm(sku).includes(q)) continue;
     out.push({
       kind: "jewelry",
-      sku: j.model_number,
-      detail: j.title || j.jewelry_type || "",
+      sku,
+      detail: j.title || j.name || j.jewelry_type || j.jewelryType || "",
       tag: "Jewelry",
-      route: `/sales/jewelry/${encodeURIComponent(j.model_number)}`,
-      rank: rank(j.model_number),
+      route: `/sales/jewelry/${encodeURIComponent(sku)}`,
+      rank: rank(sku),
     });
   }
 

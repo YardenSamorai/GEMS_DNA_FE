@@ -4,13 +4,27 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchJewelryCatalog } from "../../services/jewelryApi";
 import { fetchSoapStones } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
-import { decryptPrice } from "../../utils/decrypt";
-import { sanitizeText, normalizeJewelryCategory } from "../../utils/helper";
 import { getDisplayShape } from "../inventory/helpers/constants";
 import { DIAMOND_SHAPES } from "./diamondShapes";
-import { StonePlaceholder, SHAPE_MATCH, norm, SelectToggle, prettyBranch, modeForStone } from "./SalesInventory";
+import { adjustSalesPrices } from "../../utils/pricing";
+import {
+  StonePlaceholder,
+  SHAPE_MATCH,
+  norm,
+  SelectToggle,
+  prettyBranch,
+  modeForStone,
+  GemstoneCard,
+} from "./SalesInventory";
 import { getCatalogView } from "./salesPrefs";
 import SkuSuggestions, { buildSkuSuggestions } from "../../components/SkuSearchSuggestions";
+// The card and the row mapper moved to their own modules so the stone catalog
+// can use them too (a SKU list is answered across every category at once).
+// Both are re-exported below, so existing importers still find them here.
+import { JewelryCard } from "./JewelryCard";
+import { mapRow } from "./jewelryRow";
+import { useMultiSkuSearch } from "./multiSkuSearch";
+import SkuListSummary from "./SkuListSummary";
 
 /* Stone catalog routes by mode — used to hop a SKU search over to the loose
  * stone catalog when the searched SKU belongs to a stone, not a jewelry piece. */
@@ -162,14 +176,6 @@ const PRICE_PRESETS = [
   { label: "100K & Up", from: "100000", to: "" },
 ];
 
-/* Format a raw jewelry_size ("6.500", "18.000") into a clean chip label
- * ("6.5", "18"). Returns "" when the size is missing/zero. */
-const fmtSize = (v) => {
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) return "";
-  return String(parseFloat(n.toFixed(2)));
-};
-
 const FILTER_DEFAULTS = {
   jewelrySel: [],
   shapeSel: [],
@@ -251,81 +257,6 @@ const matchGemType = (stoneType, selected) => {
     if (sel === "Other") return !t;
     return false;
   });
-};
-
-/* Map a raw jewelry_products row into the flat shape the card + filters use. */
-export const mapRow = (row) => {
-  const images = (row.all_pictures_link || "")
-    .split(";")
-    .map((u) => u.trim())
-    .filter(Boolean);
-  const firstImage = images[0] || null;
-  // The WooCommerce feed sends `price` as a plain number ("1000", "10000"),
-  // but some older rows may still be AES-encrypted. Try a direct numeric parse
-  // first and only fall back to decryption when that isn't a finite number.
-  let price = 0;
-  const rawPrice = row.price;
-  if (rawPrice != null && String(rawPrice).trim() !== "") {
-    const direct = Number(rawPrice);
-    if (Number.isFinite(direct)) {
-      price = direct;
-    } else {
-      try {
-        price = Number(decryptPrice(rawPrice)) || 0;
-      } catch {
-        price = 0;
-      }
-    }
-  }
-  // Location surface (mirrors loose stones). `branch` + `exactLocation` come
-  // from the linked centre stone (masked per viewer on the BE); `location`
-  // stays branch-backward-compatible. on memo/hold flags drive the catalog tags.
-  const branch = row.branch ? String(row.branch).trim() : (row.shipping_from ? String(row.shipping_from).trim() : "");
-  const exactLocation = row.exact_location ? String(row.exact_location).trim() : "";
-  return {
-    kind: "jewelry",
-    id: row.model_number,
-    sku: row.model_number || "",
-    name: sanitizeText(row.title) || row.model_number || "Untitled",
-    location: branch,
-    branch,
-    exactLocation,
-    holder: row.holder ? String(row.holder).trim() : "",
-    onMemo: !!row.on_memo,
-    onHold: !!row.on_hold,
-    videoUrl: row.video_link ? String(row.video_link).trim() : "",
-    certificateUrl: row.certificate_link ? String(row.certificate_link).trim() : "",
-    certificateNumber: row.certificate_number ? String(row.certificate_number).trim() : "",
-    jewelryType: row.jewelry_type ? String(row.jewelry_type).trim() : "",
-    style: row.style ? String(row.style).trim() : "",
-    stoneType: row.stone_type ? String(row.stone_type).trim() : "",
-    shape: row.center_stone_shape ? String(row.center_stone_shape).trim() : "",
-    centerCarat:
-      row.center_stone_carat != null && row.center_stone_carat !== "" ? Number(row.center_stone_carat) : null,
-    jewelryWeight:
-      row.jewelry_weight != null && row.jewelry_weight !== "" ? Number(row.jewelry_weight) : null,
-    totalCarat: row.total_carat != null && row.total_carat !== "" ? Number(row.total_carat) : null,
-    // Ring size / necklace length from the feed, cleaned up ("6.5", "18");
-    // shown as a spec row on the product page. "" when the piece has no size.
-    size: fmtSize(row.jewelry_size),
-    // 1 = must not appear on websites, 2 = website-approved, null =
-    // unclassified (arrived after the last level list was applied).
-    securityLevel: row.security_level ?? null,
-    category:
-      normalizeJewelryCategory(row.jewelry_type) ||
-      normalizeJewelryCategory(row.style) ||
-      normalizeJewelryCategory(row.category) ||
-      "",
-    metal: row.metal_type ? String(row.metal_type).trim() : "",
-    image: firstImage,
-    images,
-    price: price || 0,
-    // What the piece cost us (feed's real_unit_cost). The BE sends null to
-    // anyone not cleared for cost, so its absence is the permission check.
-    cost: row.real_unit_cost != null && row.real_unit_cost !== "" ? Number(row.real_unit_cost) : null,
-    // When the piece was first imported — drives the default newest-first order.
-    createdAt: row.first_seen_at || null,
-  };
 };
 
 /* Collapsible section header — same hairline + center label + chevron as the
@@ -433,7 +364,10 @@ const SalesJewelry = () => {
 
   // Loose stones (every category) — lets a SKU search recognise a stone that
   // lives in the loose catalog and hop the rep over to it.
-  const allStonesRef = useRef([]);
+  // Every loose stone, for the reverse SKU hop and for answering a pasted list
+  // here rather than sending the rep to another catalog for half of it. State,
+  // not a ref, because the grid has to re-render when they arrive.
+  const [allStones, setAllStones] = useState([]);
 
   // Arrived from a cross-category SKU search (the searched SKU is a jewelry
   // piece): seed the search box with the query, then CONSUME it from history
@@ -446,14 +380,17 @@ const SalesJewelry = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Preload loose stones once (per actor) for the reverse SKU hop.
+  // Preload loose stones once (per actor) for the reverse SKU hop and for the
+  // stone half of a pasted SKU list. Prices go through the same sales
+  // adjustment the stone catalog applies, or a stone shown here would be
+  // priced differently from the identical card one tab over.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const data = await fetchSoapStones(actor, { assignedTo: "all" });
         const list = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
-        if (!cancelled) allStonesRef.current = list;
+        if (!cancelled) setAllStones(list.map(adjustSalesPrices));
       } catch {
         /* ignore */
       }
@@ -463,6 +400,11 @@ const SalesJewelry = () => {
     };
   }, [actor?.id]);
 
+  // A list of SKUs in the search box turns this page into a catalog-wide
+  // lookup: see multiSkuSearch.js for why the filters and the jewelry-only
+  // scope step aside once the rep names more than one item.
+  const skuList = useMultiSkuSearch(skuQuery, allStones, rows);
+
   // Cross-category SKU search: if the query matches no jewelry piece but does
   // match a loose stone, hop to that stone's catalog (carrying the query).
   // Only a query the rep actually TYPED here may redirect — restored /
@@ -471,10 +413,13 @@ const SalesJewelry = () => {
   useEffect(() => {
     const q = norm(skuQuery);
     if (loading || q.length < 3) return undefined;
+    // A list is already being answered from every category right here, so
+    // there is nowhere to hop to.
+    if (skuList.active) return undefined;
     if (!skuTypedRef.current) return undefined;
     const t = setTimeout(() => {
       if (rows.some((r) => norm(`${r.name} ${r.sku}`).includes(q))) return;
-      const match = (allStonesRef.current || []).find(
+      const match = allStones.find(
         (s) => norm(s.sku).includes(q) || norm(s.pairSku).includes(q)
       );
       if (!match) return;
@@ -498,7 +443,7 @@ const SalesJewelry = () => {
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skuQuery, rows, loading]);
+  }, [skuQuery, rows, loading, skuList.active]);
 
   // Persist the chosen filters so the page reopens exactly as it was left.
   useEffect(() => {
@@ -751,17 +696,9 @@ const SalesJewelry = () => {
   // stone category); picking one deep-links straight to the product page.
   const skuSuggestions = useMemo(
     () =>
-      buildSkuSuggestions({
-        query: skuQuery,
-        stones: allStonesRef.current,
-        jewelry: rows.map((r) => ({
-          model_number: r.sku,
-          title: r.name,
-          jewelry_type: r.jewelryType,
-        })),
-      }),
+      buildSkuSuggestions({ query: skuQuery, stones: allStones, jewelry: rows }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [skuQuery, rows, loading]
+    [skuQuery, rows, allStones]
   );
   const handleSuggestionPick = (it) => {
     setSearchFocused(false);
@@ -809,9 +746,11 @@ const SalesJewelry = () => {
             className="w-full rounded-xl border border-app-line bg-app-surface py-2 pl-9 pr-3 text-sm text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
           />
           {/* Smart-search suggestions — every matching SKU across jewelry +
-              stones; tapping one opens its product page directly. */}
+              stones; tapping one opens its product page directly. A list is
+              already showing every one of its items, so the dropdown (which
+              only ever leads to a single piece) stands down. */}
           <SkuSuggestions
-            open={searchFocused && skuQuery.trim().length >= 2}
+            open={searchFocused && !skuList.active && skuQuery.trim().length >= 2}
             items={skuSuggestions}
             onPick={handleSuggestionPick}
           />
@@ -826,7 +765,23 @@ const SalesJewelry = () => {
         </button>
       </div>
 
-      {!loading && !error && (
+      {/* A list of SKUs replaces the tally with its own summary — the count
+          below describes the jewelry filters, which a list ignores. */}
+      {!loading && !error && skuList.active && (
+        <SkuListSummary
+          terms={skuList.terms}
+          items={skuList.items}
+          missing={skuList.missing}
+          stoneCount={skuList.stoneCount}
+          jewelryCount={skuList.jewelryCount}
+          onClear={() => {
+            skuTypedRef.current = false;
+            setSkuQuery("");
+          }}
+        />
+      )}
+
+      {!loading && !error && !skuList.active && (
         <div className="mt-2 flex items-center justify-between gap-3 pl-1">
           <p className="text-[12px] font-medium text-app-soft">
             {filtered.length.toLocaleString()} {filtered.length === 1 ? "result" : "results"}
@@ -895,7 +850,57 @@ const SalesJewelry = () => {
         </div>
       )}
 
-      {!loading && !error && filtered.length === 0 && (
+      {/* Empty — a list that found nothing says so in its own words, since
+          "no jewelry matches your filters" would be doubly wrong. */}
+      {!loading && !error && skuList.active && skuList.items.length === 0 && (
+        <div className="mt-8 rounded-2xl glass-surface p-10 text-center">
+          <p className="text-[14px] font-medium text-app-ink">
+            None of these {skuList.terms.length} SKUs are in inventory
+          </p>
+        </div>
+      )}
+
+      {/* A SKU list — every match, finished pieces and loose stones together,
+          in the order it was pasted. Never paged: the rep named the items, so
+          the list is already as short as they made it. */}
+      {!loading && !error && skuList.active && skuList.items.length > 0 && (
+        <div
+          className={
+            catalogView === "rows"
+              ? "mt-4 flex flex-col gap-2"
+              : "mt-4 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4"
+          }
+        >
+          {skuList.items.map((item, idx) => {
+            const isJewelry = item.kind === "jewelry";
+            return (
+              <Link
+                key={`${isJewelry ? "j" : "s"}:${item.id ?? item.sku ?? idx}`}
+                to={`/sales/${isJewelry ? "jewelry" : "stone"}/${encodeURIComponent(item.sku || "")}`}
+                state={isJewelry ? { item } : { stone: item }}
+                onClick={() => saveScrollPos(visibleCount)}
+                className={
+                  catalogView === "rows"
+                    ? "rounded-2xl border border-app-line bg-app-surface p-3 transition hover:bg-app-canvas2 active:opacity-80"
+                    : "transition active:opacity-80"
+                }
+              >
+                {isJewelry ? (
+                  <JewelryCard item={item} layout={catalogView === "rows" ? "row" : "grid"} />
+                ) : (
+                  <GemstoneCard
+                    stone={item}
+                    mode={modeForStone(item)}
+                    layout={catalogView === "rows" ? "row" : "grid"}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && !error && !skuList.active && filtered.length === 0 && (
         <div className="mt-8 rounded-2xl glass-surface p-10 text-center">
           <p className="text-[14px] font-medium text-app-ink">
             {rows.length === 0 ? "No jewelry in catalog" : "No jewelry matches your filters"}
@@ -903,7 +908,7 @@ const SalesJewelry = () => {
         </div>
       )}
 
-      {!loading && !error && filtered.length > 0 && (
+      {!loading && !error && !skuList.active && filtered.length > 0 && (
         <>
           <div
             className={
@@ -1323,66 +1328,6 @@ const SalesJewelry = () => {
   );
 };
 
-/* One value-only detail line (hidden when empty). */
-const Line = ({ value }) =>
-  value == null || value === "" ? null : (
-    <p className="text-[12.5px] leading-snug text-app-muted">{value}</p>
-  );
-
-/* Catalog card — square image, then each spec stacked on its own line:
- *   center-stone weight, total weight (g), Shape, Jewelry type, Gem type,
- *   then SKU, then price. */
-export const JewelryCard = ({ item, layout = "grid" }) => {
-  const isRow = layout === "row";
-  const [imgFailed, setImgFailed] = useState(false);
-  const showImage = item.image && !imgFailed;
-  const centerCt = Number.isFinite(item.centerCarat) ? `${item.centerCarat.toFixed(2)} ct` : null;
-  const price = money(item.price);
-  return (
-    // "grid" = classic card (image on top); "row" = thumbnail left, details
-    // right — the list view picked in Dashboard → Settings.
-    <div className={isRow ? "flex items-start gap-3" : "flex flex-col"}>
-      <div
-        className={`relative shrink-0 overflow-hidden rounded-xl bg-app-canvas2 ${
-          isRow ? "h-24 w-24 sm:h-28 sm:w-28" : "aspect-square w-full"
-        }`}
-      >
-        {showImage ? (
-          <img
-            src={item.image}
-            alt={item.name}
-            loading="lazy"
-            onError={() => setImgFailed(true)}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <StonePlaceholder alt={item.name} />
-        )}
-        <SelectToggle stone={item} />
-      </div>
-      <div className={`${isRow ? "min-w-0 flex-1" : "mt-2.5"} flex flex-col gap-0.5`}>
-        {/* Only "Memo out" is relevant for jewelry availability. */}
-        {item.onMemo && (
-          <div className="mb-0.5 flex flex-wrap items-center gap-1">
-            <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-amber-700">
-              Memo out
-            </span>
-          </div>
-        )}
-        {/* Title leads, then labelled spec lines. */}
-        <h3 className="text-[14px] font-semibold leading-snug text-app-ink">{item.name || item.sku}</h3>
-        <Line value={centerCt ? `Center stone weight: ${centerCt}` : null} />
-        <Line value={item.branch ? `Branch: ${prettyBranch(item.branch)}` : null} />
-        <Line value={item.style ? `Style: ${item.style}` : null} />
-        <Line value={item.sku ? `SKU: ${item.sku}` : null} />
-        {price && (
-          <div className="mt-1.5">
-            <span className="text-[14px] font-semibold tabular-nums text-app-ink">Total: {price}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+export { JewelryCard, mapRow };
 
 export default SalesJewelry;

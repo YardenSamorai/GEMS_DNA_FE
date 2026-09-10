@@ -11,6 +11,13 @@ import { DIAMOND_SHAPES, EMERALD_SHAPES } from "./diamondShapes";
 import { getCatalogView } from "./salesPrefs";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import SkuSuggestions, { buildSkuSuggestions } from "../../components/SkuSearchSuggestions";
+// A pasted list of SKUs is answered across every category at once, so this
+// page renders finished pieces alongside loose stones. Both live outside
+// SalesJewelry so importing them here can't create an import cycle.
+import { JewelryCard } from "./JewelryCard";
+import { mapRow as mapJewelryRow } from "./jewelryRow";
+import { useMultiSkuSearch } from "./multiSkuSearch";
+import SkuListSummary from "./SkuListSummary";
 import placeholderImg from "../../assets/stone-placeholder-eshed.png";
 import { useSelection } from "../../context/SelectionContext";
 import {
@@ -1008,12 +1015,13 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const replayAppliedRef = useRef(false);
-  // Full fetched catalog (every category, before this mode's slice) — used so a
-  // SKU search can find a stone that lives in another category and jump there.
-  const allStonesRef = useRef([]);
-  // Jewelry model numbers — lets a SKU search detect a piece that lives in the
-  // (separate) jewelry catalog and hop the rep over to it.
-  const allJewelryRef = useRef([]);
+  // Full fetched catalog (every category, before this mode's slice) and the
+  // jewelry catalog beside it. A single-SKU search uses them to find a stone
+  // living elsewhere and jump there; a pasted list is answered from them
+  // directly, which is why they're state rather than refs — the grid has to
+  // re-render when they arrive.
+  const [allStones, setAllStones] = useState([]);
+  const [allJewelry, setAllJewelry] = useState([]);
   const [stones, setStones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1239,9 +1247,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         const rows = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
         if (!cancelled) {
           const all = rows.map(adjustSalesPrices);
-          // Keep the full catalog so a SKU search can detect a stone living in a
-          // different category and hop the user over to it.
-          allStonesRef.current = all;
+          // Keep the full catalog so a SKU search can reach a stone living in a
+          // different category — by hopping there, or by listing it inline when
+          // the rep pasted a list.
+          setAllStones(all);
           setStones(all.filter((s) => cfg.test(getMappedCategories(s.category))));
           // If we're returning from a product page, reveal enough cards and
           // remember where to scroll back to (restored once the grid renders).
@@ -1263,16 +1272,18 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     };
   }, [mode, actor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load jewelry model numbers once (per actor) so a SKU search can recognise a
-  // jewelry piece and hop the rep to the jewelry catalog. Failures are silent —
-  // the jewelry hop just won't be available.
+  // Load the jewelry catalog once (per actor) so a SKU search can recognise a
+  // finished piece — to hop the rep over to it, or to show it inline among the
+  // stones when a list was pasted. Mapped here rather than at match time so the
+  // cards get the same shape the jewelry catalog builds. Failures are silent:
+  // the stone side of the search carries on without it.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const data = await fetchJewelryCatalog(actor);
         const rows = Array.isArray(data?.jewelry) ? data.jewelry : Array.isArray(data) ? data : [];
-        if (!cancelled) allJewelryRef.current = rows;
+        if (!cancelled) setAllJewelry(rows.map(mapJewelryRow));
       } catch {
         /* ignore */
       }
@@ -1292,6 +1303,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     requestAnimationFrame(() => requestAnimationFrame(() => setScrollY(y)));
   }, [loading]);
 
+  // A list of SKUs in the search box turns this page into a catalog-wide
+  // lookup: see multiSkuSearch.js for why the category slice and the facet
+  // filters step aside once the rep names more than one item.
+  const skuList = useMultiSkuSearch(skuQuery, allStones, allJewelry);
+
   // Track SKU searches for the Team activity feed — debounced so we log the
   // settled query, not every keystroke.
   useEffect(() => {
@@ -1308,6 +1324,9 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   useEffect(() => {
     const q = norm(skuQuery);
     if (loading || q.length < 3) return undefined;
+    // A list is already being answered from every category right here, so
+    // there is nowhere to hop to.
+    if (skuList.active) return undefined;
     // Only a query the rep actually typed on THIS page may redirect. Queries
     // restored from storage or injected by a previous hop stay put — otherwise
     // two categories bounce the same stale search back and forth forever.
@@ -1334,7 +1353,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     const t = setTimeout(() => {
       // Found in this category already — stay put.
       if (stones.some(matchesSku)) return;
-      const match = (allStonesRef.current || []).find(matchesSku);
+      const match = allStones.find(matchesSku);
       if (match) {
         const targetMode = modeForStone(match);
         if (targetMode === mode) return;
@@ -1344,14 +1363,12 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       }
       // Not a loose stone in any category — maybe it's a jewelry piece. Hop to
       // the jewelry catalog carrying the query so it shows up there.
-      const inJewelry = (allJewelryRef.current || []).some((j) =>
-        norm(j.model_number).includes(q)
-      );
+      const inJewelry = allJewelry.some((j) => norm(j.sku).includes(q));
       if (inJewelry) hopTo("/sales/jewelry");
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skuQuery, stones, loading, mode]);
+  }, [skuQuery, stones, loading, mode, skuList.active]);
 
   // Track sort changes — fire when the sort sheet closes with an active sort,
   // so we log the settled order (a readable label) rather than every toggle.
@@ -1920,7 +1937,10 @@ const SalesInventory = ({ mode = "gemstone" }) => {
   useEffect(() => {
     const q = skuQuery.trim();
     const hasCriteria = !!q || hasActiveFilters;
-    if (sorted.length === 0 && hasCriteria && stones.length > 0) {
+    // A list ignores the facet filters, so the count the rep actually saw is
+    // the list's — `sorted` is empty during a list search no matter what.
+    const shown = skuList.active ? skuList.items.length : sorted.length;
+    if (shown === 0 && hasCriteria && stones.length > 0) {
       if (zeroFiredRef.current) return undefined;
       zeroFiredRef.current = true;
       const t = setTimeout(() => {
@@ -1938,7 +1958,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     zeroFiredRef.current = false;
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sorted.length, skuQuery, hasActiveFilters]);
+  }, [sorted.length, skuQuery, hasActiveFilters, skuList.active, skuList.items.length]);
 
   // Smart search — live suggestions across the WHOLE catalog (every stone
   // category + jewelry), so the rep sees where an SKU lives while typing.
@@ -1947,11 +1967,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
     () =>
       buildSkuSuggestions({
         query: skuQuery,
-        stones: allStonesRef.current,
-        jewelry: allJewelryRef.current,
+        stones: allStones,
+        jewelry: allJewelry,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [skuQuery, loading]
+    [skuQuery, allStones, allJewelry]
   );
   const handleSuggestionPick = (it) => {
     setSearchFocused(false);
@@ -1998,9 +2018,11 @@ const SalesInventory = ({ mode = "gemstone" }) => {
             className="w-full rounded-xl border border-app-line bg-app-surface py-2 pl-9 pr-10 text-sm text-app-ink placeholder:text-app-soft focus:border-app-ink focus:outline-none"
           />
           {/* Smart-search suggestions — every matching SKU across stones +
-              jewelry; tapping one opens its product page directly. */}
+              jewelry; tapping one opens its product page directly. A list is
+              already showing every one of its items, so the dropdown (which
+              only ever leads to a single piece) stands down. */}
           <SkuSuggestions
-            open={searchFocused && skuQuery.trim().length >= 2}
+            open={searchFocused && !skuList.active && skuQuery.trim().length >= 2}
             items={skuSuggestions}
             onPick={handleSuggestionPick}
           />
@@ -2029,10 +2051,26 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         </button>
       </div>
 
+      {/* A list of SKUs replaces the tally with its own summary — the counts
+          below describe this category's filters, which a list ignores. */}
+      {!loading && !error && skuList.active && (
+        <SkuListSummary
+          terms={skuList.terms}
+          items={skuList.items}
+          missing={skuList.missing}
+          stoneCount={skuList.stoneCount}
+          jewelryCount={skuList.jewelryCount}
+          onClear={() => {
+            skuTypedRef.current = false;
+            setSkuQuery("");
+          }}
+        />
+      )}
+
       {/* Live tally of how many stones match the active filters — sits just
           under the Filter / Search / Sort row, aligned under Filter. The Reset
           button appears here only while at least one facet filter is active. */}
-      {!loading && !error && (
+      {!loading && !error && !skuList.active && (
         <div className="mt-2 flex items-center justify-between gap-3 pl-1">
           <p className="text-[12px] font-medium text-app-soft">
             {filtered.length.toLocaleString()}{" "}
@@ -2120,8 +2158,18 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         </div>
       )}
 
+      {/* Empty — a list that found nothing says so in its own words, since
+          "no diamonds match your filters" would be doubly wrong. */}
+      {!loading && !error && skuList.active && skuList.items.length === 0 && (
+        <div className="mt-8 rounded-2xl glass-surface p-10 text-center">
+          <p className="text-[14px] font-medium text-app-ink">
+            None of these {skuList.terms.length} SKUs are in inventory
+          </p>
+        </div>
+      )}
+
       {/* Empty */}
-      {!loading && !error && filtered.length === 0 && (
+      {!loading && !error && !skuList.active && filtered.length === 0 && (
       <div className="mt-8 rounded-2xl glass-surface p-10 text-center">
           <p className="text-[14px] font-medium text-app-ink">
             {stones.length === 0 ? `No ${cfg.noun} in inventory` : `No ${cfg.noun} match your filters`}
@@ -2129,9 +2177,49 @@ const SalesInventory = ({ mode = "gemstone" }) => {
       </div>
       )}
 
+      {/* A SKU list — every match, stones and finished pieces together, in the
+          order it was pasted. Never paged: the rep named the items, so the list
+          is already as short as they made it. */}
+      {!loading && !error && skuList.active && skuList.items.length > 0 && (
+        <div
+          className={
+            catalogView === "rows"
+              ? "mt-4 flex flex-col gap-2"
+              : "mt-4 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4"
+          }
+        >
+          {skuList.items.map((item, idx) => {
+            const isJewelry = item.kind === "jewelry";
+            return (
+              <Link
+                key={`${isJewelry ? "j" : "s"}:${item.id ?? item.sku ?? idx}`}
+                to={`/sales/${isJewelry ? "jewelry" : "stone"}/${encodeURIComponent(item.sku || "")}`}
+                state={isJewelry ? { item } : { stone: item }}
+                onClick={() => saveScrollPos(mode, visibleCount)}
+                className={
+                  catalogView === "rows"
+                    ? "rounded-2xl border border-app-line bg-app-surface p-3 transition hover:bg-app-canvas2 active:opacity-80"
+                    : "transition active:opacity-80"
+                }
+              >
+                {isJewelry ? (
+                  <JewelryCard item={item} layout={catalogView === "rows" ? "row" : "grid"} />
+                ) : (
+                  <GemstoneCard
+                    stone={item}
+                    mode={modeForStone(item)}
+                    layout={catalogView === "rows" ? "row" : "grid"}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       {/* Results — grid (2-up cards) or rows (full-width list), per the rep's
           Dashboard → Settings preference. Same data on both. */}
-      {!loading && !error && filtered.length > 0 && (
+      {!loading && !error && !skuList.active && filtered.length > 0 && (
         <>
           <div
             className={
