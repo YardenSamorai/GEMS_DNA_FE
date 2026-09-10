@@ -7,12 +7,21 @@ import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion
  *
  * Lets the user (a) reorder the selected items with drag & drop — the PDF
  * grid follows this order — (b) type an optional "Website text" per item
- * which is printed in the PDF instead of the blank fill-in lines, and
- * (c) manually add items that aren't in the inventory (image upload +
- * SKU + jewelry type + website text).
+ * which is printed in the PDF instead of the blank fill-in lines, (c) manually
+ * add items that aren't in the inventory (image upload + SKU + jewelry type +
+ * website text + price), and (d) choose whether the catalog carries prices.
  */
 
 const JEWELRY_TYPES = ["Ring", "Bracelet", "Necklace", "Earrings", "Pendant", "Brooch", "Jewelry"];
+
+/* Asking price of one item, or null when it has none. Same field and
+ * formatting the PDF uses, so what this dialog shows and counts is exactly
+ * what will print. */
+const priceLabel = (stone) => {
+  const n = Number(stone?.priceTotal);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `$${Math.round(n).toLocaleString("en-US")}`;
+};
 
 // Re-encode an uploaded image to a JPEG data URL (max 1000px on the long
 // side) so jsPDF gets a format it always supports, at a sane size.
@@ -66,8 +75,9 @@ const PositionJumper = ({ index, total, onCommit }) => {
   );
 };
 
-const RowItem = ({ row, index, total, onTextChange, onRemove, onMoveTo }) => {
+const RowItem = ({ row, index, total, showPrices, onTextChange, onRemove, onMoveTo }) => {
   const controls = useDragControls();
+  const price = priceLabel(row.stone);
   return (
     <Reorder.Item
       value={row}
@@ -138,6 +148,19 @@ const RowItem = ({ row, index, total, onTextChange, onRemove, onMoveTo }) => {
                 Manual
               </span>
             )}
+            {/* What this card will print — including the ones that will come
+                out blank, which is the thing worth catching before you send. */}
+            {showPrices && (
+              price ? (
+                <span className="ml-auto text-xs font-semibold tabular-nums text-emerald-700 shrink-0">
+                  {price}
+                </span>
+              ) : (
+                <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0">
+                  No price
+                </span>
+              )
+            )}
           </div>
           <input
             type="text"
@@ -169,6 +192,7 @@ const AddItemForm = ({ onAdd, onCancel }) => {
   const [sku, setSku] = useState("");
   const [type, setType] = useState("Ring");
   const [text, setText] = useState("");
+  const [price, setPrice] = useState("");
   const fileRef = useRef(null);
 
   const handleFile = async (e) => {
@@ -219,13 +243,25 @@ const AddItemForm = ({ onAdd, onCancel }) => {
               {JEWELRY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Website text (optional)"
-            className="w-full text-sm px-2.5 py-1.5 rounded-lg border border-stone-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none placeholder:text-stone-300"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Website text (optional)"
+              className="flex-1 min-w-0 text-sm px-2.5 py-1.5 rounded-lg border border-stone-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none placeholder:text-stone-300"
+            />
+            {/* Only printed when the catalog is generated with prices. */}
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Price $"
+              className="w-28 shrink-0 text-sm px-2.5 py-1.5 rounded-lg border border-stone-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none placeholder:text-stone-300"
+            />
+          </div>
         </div>
       </div>
 
@@ -240,7 +276,15 @@ const AddItemForm = ({ onAdd, onCancel }) => {
         <button
           type="button"
           disabled={!sku.trim()}
-          onClick={() => onAdd({ image, sku: sku.trim(), type, text: text.trim() })}
+          onClick={() =>
+            onAdd({
+              image,
+              sku: sku.trim(),
+              type,
+              text: text.trim(),
+              price: Number(price) > 0 ? Number(price) : null,
+            })
+          }
           className="px-4 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50"
         >
           Add item
@@ -918,6 +962,9 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
   const [showAddForm, setShowAddForm] = useState(false);
   const [showAdvancedSort, setShowAdvancedSort] = useState(false);
   const [orientation, setOrientation] = useState("portrait");
+  // The sheet is a website worksheet by default, so it prints without prices
+  // unless this is turned on for the run.
+  const [showPrices, setShowPrices] = useState(false);
 
   // Re-seed rows whenever the dialog opens with a fresh selection.
   // Website text starts as the item's title (site title for catalog jewelry,
@@ -934,8 +981,15 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
       setRows((stones || []).map((stone) => ({ id: stone.id, stone, websiteText: defaultTitle(stone) })));
       setShowAddForm(false);
       setShowAdvancedSort(false);
+      // Prices are a per-export decision, never a sticky one — the next
+      // catalog out of here is far more likely to be the plain worksheet.
+      setShowPrices(false);
     }
   }, [isOpen, stones]);
+
+  // How many of the selected pieces actually carry a price, so the footer can
+  // warn before a catalog goes out with blank cards in it.
+  const pricedCount = useMemo(() => rows.filter((r) => priceLabel(r.stone)).length, [rows]);
 
   const handleTextChange = (id, text) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, websiteText: text } : r)));
@@ -1006,7 +1060,7 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
     }));
   };
 
-  const handleAddManual = ({ image, sku, type, text }) => {
+  const handleAddManual = ({ image, sku, type, text, price }) => {
     const id = `manual-${Date.now()}`;
     setRows((prev) => [
       ...prev,
@@ -1014,7 +1068,14 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
         id,
         manual: true,
         websiteText: text,
-        stone: { id, sku, category: "Jewelry", jewelryType: type, imageUrl: image || null },
+        stone: {
+          id,
+          sku,
+          category: "Jewelry",
+          jewelryType: type,
+          imageUrl: image || null,
+          priceTotal: price,
+        },
       },
     ]);
     setShowAddForm(false);
@@ -1144,6 +1205,7 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                     row={row}
                     index={idx}
                     total={rows.length}
+                    showPrices={showPrices}
                     onTextChange={handleTextChange}
                     onRemove={handleRemove}
                     onMoveTo={handleMoveTo}
@@ -1153,7 +1215,39 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-4 border-t border-stone-200 bg-white rounded-b-none sm:rounded-b-2xl flex items-center justify-between gap-3">
+            <div className="px-5 py-4 border-t border-stone-200 bg-white rounded-b-none sm:rounded-b-2xl flex flex-wrap items-center justify-between gap-3">
+              {/* Price picker — the plain worksheet or a priced catalog. */}
+              <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPrices(false)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    !showPrices ? "bg-white text-stone-800 shadow-sm" : "text-stone-500 hover:text-stone-700"
+                  }`}
+                  title="Print the catalog without prices"
+                >
+                  No prices
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrices(true)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    showPrices ? "bg-white text-emerald-700 shadow-sm" : "text-stone-500 hover:text-stone-700"
+                  }`}
+                  title="Print each item's asking price on its card"
+                >
+                  With prices
+                  {showPrices && pricedCount < rows.length && (
+                    <span
+                      className="text-[10px] font-semibold text-amber-600"
+                      title={`${rows.length - pricedCount} item(s) have no price and will print blank`}
+                    >
+                      {pricedCount}/{rows.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
               {/* Page orientation picker */}
               <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-1">
                 <button
@@ -1189,7 +1283,7 @@ const CatalogLiranModal = ({ isOpen, stones, onClose, onGenerate, isGenerating }
                 Cancel
               </button>
               <button
-                onClick={() => onGenerate(rows.map((r) => ({ ...r.stone, websiteText: r.websiteText.trim() })), { orientation })}
+                onClick={() => onGenerate(rows.map((r) => ({ ...r.stone, websiteText: r.websiteText.trim() })), { orientation, showPrices })}
                 disabled={isGenerating || rows.length === 0}
                 className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 rounded-lg shadow-md transition-all disabled:opacity-60 flex items-center gap-2"
               >

@@ -157,10 +157,22 @@ const itemTypeLabel = (stone) => {
   return stone.category || "Gemstone";
 };
 
+// Asking price, whole dollars — same field and formatting the rest of the
+// inventory exports use. Returns null for a piece with no price on it, so the
+// card can leave the line blank rather than print "$0".
+const priceLabel = (stone) => {
+  const n = Number(stone?.priceTotal);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `$${Math.round(n).toLocaleString("en-US")}`;
+};
+
 
 export const exportCatalogLiran = async (selectedStones, options = {}) => {
   const orientation = options.orientation === "landscape" ? "landscape" : "portrait";
   const isLandscape = orientation === "landscape";
+  // Prices are off unless asked for: this sheet started life as a worksheet
+  // Liran fills in for the website, and that version still gets printed.
+  const showPrices = options.showPrices === true;
   const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -388,7 +400,8 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       // already cropped to the jewel itself (trimWhitespace), and each one is
       // scaled so its LARGEST side hits the same uniform square slot. That
       // way every piece prints at the same visual size, original aspect kept.
-      const TEXT_BLOCK = 16; // sku + type + title/blanks + link, tight
+      // A priced catalog gives the image 4mm less so the extra line has room.
+      const TEXT_BLOCK = (showPrices ? 20 : 16); // sku + type [+ price] + title/blanks + link
       const areaW = cellW - 2;
       const areaH = cellH - TEXT_BLOCK - 5;
       const areaX = x + (cellW - areaW) / 2;
@@ -425,6 +438,21 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
       pdf.setTextColor(120, 120, 120);
       pdf.text(itemTypeLabel(stone), x + cellW / 2, textY, { align: "center" });
       textY += 3.8;
+
+      // Asking price — the loudest thing on the card after the photo, so it
+      // reads at a glance across a full page. The line is reserved even for a
+      // piece with no price, or one blank card would shunt everything below it
+      // up and break the grid.
+      if (showPrices) {
+        const price = priceLabel(stone);
+        if (price) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(8);
+          pdf.setTextColor(17, 17, 17);
+          pdf.text(price, x + cellW / 2, textY, { align: "center" });
+        }
+        textY += 4;
+      }
 
       // Website text (item title) — printed when typed in the dialog,
       // otherwise blank fill-in lines so the sheet still works as a
@@ -567,6 +595,9 @@ export const exportCatalogLiran = async (selectedStones, options = {}) => {
   pdf.setTextColor(220, 220, 220);
   pdf.text(ESHED.email, sepRight + 4, cFooterY, { align: "left" });
 
-  const filename = `ESHED_Jewelry_Catalog_${new Date().toISOString().split("T")[0]}_${selectedStones.length}pcs.pdf`;
+  // The two versions are otherwise identical on disk, and the priced one is
+  // the one you don't want to attach to the wrong mail — so it says so.
+  const priced = showPrices ? "_Priced" : "";
+  const filename = `ESHED_Jewelry_Catalog${priced}_${new Date().toISOString().split("T")[0]}_${selectedStones.length}pcs.pdf`;
   pdf.save(filename);
 };
