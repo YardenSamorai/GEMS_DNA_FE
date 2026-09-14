@@ -12,6 +12,7 @@ import { getCatalogView } from "./salesPrefs";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import SkuSuggestions, { buildSkuSuggestions } from "../../components/SkuSearchSuggestions";
 import { appendSku, endSkuTerm } from "../../utils/skuQuery";
+import { usableMediaUrl } from "../../utils/mediaUrl";
 // A pasted list of SKUs is answered across every category at once, so this
 // page renders finished pieces alongside loose stones. Both live outside
 // SalesJewelry so importing them here can't create an import cycle.
@@ -638,18 +639,11 @@ export const stoneTitle = (stone) => {
   return buildTitle(stone);
 };
 
-/* Many soap_stones rows carry a folder-only image URL (e.g. ".../StoneImages/")
- * with no filename — the Barak export emits the directory even when no photo
- * was uploaded, so the URL 404s and renders as a broken thumbnail. Treat those
- * as "no image": require a filename after the last slash, otherwise fall back
- * to the first usable additional picture, else show the placeholder. */
-export const usableImg = (u) => {
-  if (!u || typeof u !== "string") return null;
-  const trimmed = u.trim();
-  if (!trimmed) return null;
-  const file = trimmed.split("?")[0].split("/").pop();
-  return file ? trimmed : null;
-};
+/* Feed URLs need cleaning before they can be used as a src — folder-only
+ * paths dropped, HTML entities decoded, http upgraded to https. The rules and
+ * the reasons behind each live in utils/mediaUrl; the name is kept here
+ * because half the app imports it from this module. */
+export const usableImg = usableMediaUrl;
 
 export const stoneImage = (s) => {
   const main = usableImg(s.imageUrl);

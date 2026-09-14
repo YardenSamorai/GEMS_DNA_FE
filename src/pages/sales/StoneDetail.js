@@ -220,13 +220,13 @@ const StoneDetail = () => {
   );
   // Folder-only video URLs are as common as folder-only images — same filter.
   const video = stone ? usableImg(stone.videoUrl) : null;
-  // Secondary videos (additional_videos, ';'-separated). Some legacy URLs come
-  // HTML-encoded ("&amp;"), so decode before validating. The primary video
-  // stays first; extras follow as their own slides.
+  // Secondary videos (additional_videos, ';'-separated). The primary video
+  // stays first; extras follow as their own slides. Entity decoding and the
+  // https upgrade both happen inside usableImg.
   const videos = useMemo(() => {
     const list = video ? [video] : [];
     for (const raw of String(stone?.additionalVideos || "").split(";")) {
-      const u = usableImg(raw.trim().replace(/&amp;/gi, "&"));
+      const u = usableImg(raw);
       if (u && /^https?:\/\//i.test(u) && !list.includes(u)) list.push(u);
     }
     return list;
