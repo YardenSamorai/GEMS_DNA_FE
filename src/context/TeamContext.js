@@ -12,7 +12,7 @@ import { fetchTeamMe, colorFromSeed } from "../services/teamApi";
 // Nav sections the admin can grant per-user. Keep in sync with the BE
 // NAV_SECTION_KEYS and the PERMISSION_SECTIONS config in App.js.
 export const ALL_SECTION_KEYS = [
-  "dashboard", "inventory", "crm", "sales", "team", "tools",
+  "dashboard", "inventory", "crm", "sales", "team", "tools", "photos",
 ];
 // Stone-location visibility tiers. Keep in sync with BE LOCATION_VIEWS and
 // teamUtils.LOCATION_VIEW_OPTIONS.

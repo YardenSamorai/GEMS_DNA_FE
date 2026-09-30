@@ -28,6 +28,7 @@ export const PERMISSION_SECTIONS = [
   { key: "sales", label: "Sales Inventory", landing: "/sales/emeralds", match: (p) => p.startsWith("/sales") },
   { key: "team", label: "Team", landing: "/team", match: (p) => p.startsWith("/team") },
   { key: "tools", label: "Data Quality", landing: "/qa-data", match: (p) => p === "/qa-data" || p === "/qa" },
+  { key: "photos", label: "Photo Station", landing: "/photos", match: (p) => p.startsWith("/photos") },
 ];
 
 // Which section does a path belong to (null when it maps to none — e.g. a

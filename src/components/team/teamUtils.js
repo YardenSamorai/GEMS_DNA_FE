@@ -18,6 +18,7 @@ export const SECTION_OPTIONS = [
   { key: "sales", label: "Sales Inventory" },
   { key: "team", label: "Team" },
   { key: "tools", label: "Data Quality" },
+  { key: "photos", label: "Photo Station" },
 ];
 
 // Stone-location visibility tiers, most → least detail. Enforced server-side
