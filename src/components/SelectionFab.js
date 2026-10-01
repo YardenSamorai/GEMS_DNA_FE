@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelection } from "../context/SelectionContext";
@@ -6,6 +6,7 @@ import { useTeam } from "../context/TeamContext";
 import { GemstoneCard, modeForStone } from "../pages/sales/SalesInventory";
 import { JewelryCard } from "../pages/sales/SalesJewelry";
 import { downloadCatalogPdf } from "../services/catalogPdf";
+import { CATALOG_SORTS, sortCatalogItems } from "../services/catalogOrder";
 import { shareStonesOnWhatsApp, withDirectVideoLinks } from "../utils/shareStones";
 
 /* Floating "selection" button — bottom-right counterpart to the catalog's
@@ -20,6 +21,15 @@ const SelectionFab = () => {
   const [open, setOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // The order the sheet shows is the order the PDF prints and WhatsApp sends.
+  const [sort, setSort] = useState({ key: "picked", dir: "desc" });
+  const ordered = useMemo(() => sortCatalogItems(items, sort), [items, sort]);
+  const pickSort = (key) =>
+    setSort((cur) =>
+      cur.key === key && key !== "picked"
+        ? { key, dir: cur.dir === "desc" ? "asc" : "desc" }
+        : { key, dir: "desc" }
+    );
 
   // Close the sheet whenever the route changes (e.g. tapping through to a
   // stone's page) so it never lingers over a different screen.
@@ -43,7 +53,7 @@ const SelectionFab = () => {
     setActionsOpen(false);
     setExporting(true);
     try {
-      await downloadCatalogPdf(items, { showLogo, showCost });
+      await downloadCatalogPdf(ordered, { showLogo, showCost });
     } catch (err) {
       console.error("[catalog pdf] export failed", err);
       alert("Could not generate the PDF. Please try again.");
@@ -57,7 +67,7 @@ const SelectionFab = () => {
   const handleShareWhatsApp = (withPrice) => {
     if (count === 0) return;
     setActionsOpen(false);
-    shareStonesOnWhatsApp(items, { actor, withPrice });
+    shareStonesOnWhatsApp(ordered, { actor, withPrice });
   };
 
   return (
@@ -264,6 +274,37 @@ const SelectionFab = () => {
                 </div>
               </div>
 
+              {count > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto px-5 pb-3">
+                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-app-soft">
+                    Order
+                  </span>
+                  {CATALOG_SORTS.map((opt) => {
+                    const active = sort.key === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => pickSort(opt.key)}
+                        aria-pressed={active}
+                        className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition active:scale-95 ${
+                          active
+                            ? "border-app-ink bg-app-ink text-app-surface"
+                            : "border-app-line text-app-ink hover:bg-app-canvas2"
+                        }`}
+                      >
+                        {opt.label}
+                        {active && opt.key !== "picked" && (
+                          <span aria-label={sort.dir === "desc" ? "high to low" : "low to high"}>
+                            {sort.dir === "desc" ? "↓" : "↑"}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Body */}
               <div className="flex-1 overflow-y-auto px-5 pb-6 pt-1">
                 {count === 0 ? (
@@ -276,7 +317,7 @@ const SelectionFab = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-                    {items.map((stone, idx) => {
+                    {ordered.map((stone, idx) => {
                       const isJewelry = stone.kind === "jewelry";
                       const to = isJewelry
                         ? `/sales/jewelry/${encodeURIComponent(stone.sku || "")}`

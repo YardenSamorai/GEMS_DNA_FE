@@ -17,6 +17,7 @@
  *   - downloadCatalogPdf(items, opts) → builds + triggers a file download
  */
 import jsPDF from "jspdf";
+import { groupPairs, isJewelry, pairWeight, skuOf } from "./catalogOrder";
 import {
   API_BASE,
   getDisplayShape,
@@ -33,8 +34,6 @@ import { getMappedCategories } from "../utils/categoryMap";
 import { withDirectVideoLinks } from "../utils/shareStones";
 
 /* ───────────────────────── item normalisers ───────────────────────── */
-
-const isJewelry = (it) => it?.kind === "jewelry";
 
 const itemImageUrl = (it) => (isJewelry(it) ? it.image || null : stoneImage(it));
 
@@ -161,54 +160,6 @@ const itemSpecs = (it) => {
 };
 
 /* ───────────────────────────── pairs ───────────────────────────── */
-
-const skuOf = (it) => String(it?.sku ?? "").trim();
-
-/* Collapse the picked list into cards: a matched pair becomes one unit, and
- * everything else stays on its own. Mirrors the rule the DNA page uses, so a
- * pair printed here is the same pair a customer sees at gems-dna.com/{sku} —
- * the partner must be present and must not point at some third stone.
- *
- * Only pairs where BOTH halves were picked are joined; pulling in an unpicked
- * partner would put stones in the catalog the sender never selected. */
-const groupPairs = (items) => {
-  const bySku = new Map();
-  for (const it of items) {
-    if (!isJewelry(it) && skuOf(it)) bySku.set(skuOf(it), it);
-  }
-
-  const used = new Set();
-  const units = [];
-
-  for (const it of items) {
-    const sku = skuOf(it);
-    // Jewelry can reach here without a SKU, so an empty one is never treated
-    // as "already printed" — every picked item must appear exactly once.
-    if (sku && used.has(sku)) continue;
-
-    const partnerSku = isJewelry(it) ? "" : String(it?.pairSku ?? "").trim();
-    const partner = partnerSku && partnerSku !== sku ? bySku.get(partnerSku) : null;
-    const partnerPointsAt = partner ? String(partner.pairSku ?? "").trim() : "";
-    const contradicted = partner && partnerPointsAt && partnerPointsAt !== sku;
-
-    if (partner && !contradicted && !used.has(partnerSku)) {
-      used.add(sku);
-      used.add(partnerSku);
-      // Fixed order by SKU so a pair reads the same whichever half was picked
-      // first.
-      const [a, b] = sku.localeCompare(partnerSku) <= 0 ? [it, partner] : [partner, it];
-      units.push({ pair: true, a, b });
-      continue;
-    }
-
-    if (sku) used.add(sku);
-    units.push({ pair: false, a: it });
-  }
-
-  return units;
-};
-
-const pairWeight = (a, b) => (Number(a?.weightCt) || 0) + (Number(b?.weightCt) || 0);
 
 const dropLeadingWeight = (title) => String(title).replace(/^\s*\d+(\.\d+)?\s*/, "");
 
