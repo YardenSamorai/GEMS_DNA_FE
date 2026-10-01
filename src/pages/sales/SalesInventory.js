@@ -597,9 +597,8 @@ export const prettyBranch = (v) => {
 
 /* Diamond title:
  *   white  — "0.51 Round H SI1 None IGI"
- *   fancy  — "1.23 Cushion Fancy Intense Yellow None VS1 GIA"
- * white: weight · shape · color · clarity · fluorescence · cert lab.
- * fancy: weight · shape · color · fluorescence · clarity · cert lab.
+ *   fancy  — "1.23 Cushion Fancy Intense Yellow VS1 None GIA"
+ * weight · shape · color · clarity · fluorescence · cert lab.
  * Fancy colour comes from getDisplayColor (intensity + overtone + color) —
  * the white `color` field is always empty on Fancy rows. */
 const buildDiamondTitle = (s) => {
@@ -611,9 +610,8 @@ const buildDiamondTitle = (s) => {
     wt,
     shape,
     isFancy ? getDisplayColor(s) : s.color,
-    isFancy ? "" : s.clarity,
+    s.clarity,
     fluorDisplay(s.fluorescence),
-    isFancy ? s.clarity : "",
     s.lab,
   ]
     .filter(Boolean)
