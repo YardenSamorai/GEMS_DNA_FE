@@ -21,6 +21,7 @@ import JewelryDetail from "./pages/sales/JewelryDetail";
 import SalesDashboard from "./pages/sales/SalesDashboard";
 import QAPage from "./pages/QAPage";
 import PhotoStation from "./pages/photos/PhotoStation";
+import ApiAccess from "./pages/api/ApiAccess";
 import PhotoReview from "./pages/photos/PhotoReview";
 import CrmLayout from "./pages/crm/CrmLayout";
 import CrmContacts from "./pages/crm/CrmContacts";
@@ -246,6 +247,17 @@ const NAV_SECTIONS = [
           </svg>
         ),
       },
+      {
+        anyOf: ["sales", "inventory"],
+        to: "/api-access",
+        label: "API Access",
+        matches: (path) => path.startsWith("/api-access"),
+        icon: (cls) => (
+          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+        ),
+      },
     ],
   },
 ];
@@ -260,7 +272,7 @@ const navSectionsFor = (sections, can) =>
   sections
     .map((s) => ({
       ...s,
-      items: s.items.filter((it) => !it.key || can(it.key)),
+      items: s.items.filter((it) => (it.anyOf ? it.anyOf.some(can) : !it.key || can(it.key))),
     }))
     .filter((s) => s.items.length > 0);
 
@@ -633,6 +645,7 @@ function AppContent() {
             {/* Back-compat: old /qa URL still resolves to the same data-quality page. */}
             <Route path="/qa" element={<Navigate to="/qa-data" replace />} />
             <Route path="/photos" element={<PhotoStation />} />
+            <Route path="/api-access" element={<ApiAccess />} />
             <Route path="/photos/review" element={<PhotoReview />} />
             {/* Sprint 3 — sales-rep management (admin) + per-rep KPIs. */}
             <Route path="/team" element={<TeamSettings />} />
