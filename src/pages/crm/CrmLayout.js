@@ -179,10 +179,10 @@ export default function CrmLayout() {
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `relative inline-flex items-center gap-2 px-3.5 py-1.5 text-[12.5px] font-medium whitespace-nowrap rounded-full transition-colors ${
+                  `relative inline-flex items-center gap-2 px-3.5 py-1.5 [@media(pointer:coarse)]:min-h-[44px] text-[12.5px] font-medium whitespace-nowrap rounded-full select-none transition-colors ${
                     isActive
                       ? "bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]"
-                      : "text-app-graphite hover:text-app-ink"
+                      : "text-app-graphite active:text-app-ink [@media(hover:hover)_and_(pointer:fine)]:hover:text-app-ink"
                   }`
                 }
               >

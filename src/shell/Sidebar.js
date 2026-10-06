@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import BrandMark from "../components/BrandMark";
@@ -43,8 +43,30 @@ const NavGroup = ({ item, path, rail, open, onToggle }) => {
 
   useEffect(() => { setPopOpen(false); }, [path, rail]);
 
+  // Fixed to the viewport so a scrolling rail can't clip it; kept on screen.
+  useLayoutEffect(() => {
+    const pop = popRef.current;
+    const btn = btnRef.current;
+    if (!popOpen || !pop || !btn) return;
+    const r = btn.getBoundingClientRect();
+    const top = Math.min(r.top - 6, window.innerHeight - pop.offsetHeight - 8);
+    pop.style.left = `${r.right + 10}px`;
+    pop.style.top = `${Math.max(8, top)}px`;
+  }, [popOpen]);
+
   useEffect(() => {
-    if (popOpen) popRef.current?.querySelector("a")?.focus();
+    if (!popOpen) return undefined;
+    popRef.current?.querySelector("a")?.focus({ preventScroll: true });
+    const close = (e) => {
+      if (e.type === "scroll" && popRef.current?.contains(e.target)) return;
+      setPopOpen(false);
+    };
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
   }, [popOpen]);
 
   const onPopKey = (e) => {

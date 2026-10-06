@@ -12,6 +12,35 @@
   :root { --shell-dock-h: 56px; }
 }
 
+/* Every shell control has its own :active state, so the browser's grey tap
+   flash goes. `manipulation` drops double-tap zoom (and its click delay)
+   but keeps pinch-zoom. */
+.gd-shell,
+.gd-more {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+/* Phones scroll <main>; a drag that starts on a bar must not rubber-band
+   the whole shell. */
+@media (max-width: 767px) {
+  html:has(.gd-shell) { overscroll-behavior: none; }
+}
+/* Controls, not content: long-press neither selects the label nor opens
+   the link callout. */
+.gd-item,
+.gd-pop-item,
+.gd-tab,
+.gd-cat,
+.gd-more-row,
+.gd-brand-link,
+.gd-icon-btn,
+.gd-account-btn,
+.gd-menu-item {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 /* The shell canvas is #1c1c1e in dark, so surfaces step one level up. */
 [data-theme="dark"] .gd {
   --dna-surface: #2c2c2e;
@@ -75,7 +104,9 @@
   z-index: 40;
   height: 100vh;
   height: 100dvh;
-  width: 232px;
+  /* Landscape phones put the notch on this edge. */
+  width: calc(232px + env(safe-area-inset-left, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
   flex: none;
   flex-direction: column;
   border-right: 1px solid var(--dna-hairline);
@@ -84,7 +115,7 @@
 @media (min-width: 768px) {
   .gd-sidebar { display: flex; }
 }
-.gd-sidebar[data-rail] { width: 64px; }
+.gd-sidebar[data-rail] { width: calc(64px + env(safe-area-inset-left, 0px)); }
 
 .gd-brand {
   height: 48px;
@@ -119,8 +150,14 @@
   padding: 10px 10px 12px;
   scrollbar-width: thin;
 }
-/* Tooltips and the group popover sit outside the 64px rail. */
+/* Tooltips sit outside the 64px rail. */
 .gd-sidebar[data-rail] .gd-nav { overflow: visible; }
+/* Landscape phones: the rail is taller than the screen, so it scrolls.
+   The group popover is fixed-position and is not clipped. */
+@media (max-height: 520px) {
+  .gd-sidebar[data-rail] .gd-nav { overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+  .gd-sidebar[data-rail] .gd-nav::-webkit-scrollbar { display: none; }
+}
 
 .gd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
 .gd-group + .gd-group { margin-top: 20px; }
@@ -170,7 +207,6 @@
   cursor: pointer;
   transition: background-color 0.12s, color 0.12s;
 }
-.gd-item:hover { background: var(--dna-track); color: var(--dna-text); }
 .gd-item-icon { flex: none; display: inline-flex; color: var(--dna-text-2); transition: color 0.12s; }
 .gd-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gd-item-chev { flex: none; color: var(--dna-text-4); transition: transform 0.2s var(--dna-ease-out); }
@@ -228,17 +264,14 @@
   transform: translate(-4px, -50%);
   transition: opacity 0.12s, transform 0.12s var(--dna-ease-out);
 }
-.gd-item:hover .gd-tip,
-.gd-icon-btn:hover .gd-tip { opacity: 1; transform: translate(0, -50%); transition-delay: 0.3s; }
 .gd-item:focus-visible .gd-tip,
 .gd-icon-btn:focus-visible .gd-tip { opacity: 1; transform: translate(0, -50%); }
 @media (hover: none) { .gd-tip { display: none; } }
 
 .gd-group-item { position: relative; }
+/* top/left are set from the trigger's rect when it opens. */
 .gd-pop {
-  position: absolute;
-  top: -6px;
-  left: calc(100% + 10px);
+  position: fixed;
   z-index: 70;
   width: 200px;
   padding: 6px;
@@ -259,12 +292,11 @@
   font-size: 13.5px;
   text-decoration: none;
 }
-.gd-pop-item:hover,
 .gd-pop-item:focus-visible { background: var(--dna-track); color: var(--dna-text); outline: none; }
 .gd-pop-item[aria-current="page"] { color: var(--dna-accent); font-weight: 600; }
 
-.gd-sidebar-foot { flex: none; padding: 8px 10px 12px; }
-.gd-sidebar[data-rail] .gd-sidebar-foot { display: flex; justify-content: center; padding: 8px 0 12px; }
+.gd-sidebar-foot { flex: none; padding: 8px 10px calc(12px + env(safe-area-inset-bottom, 0px)); }
+.gd-sidebar[data-rail] .gd-sidebar-foot { display: flex; justify-content: center; padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0px)); }
 
 .gd-icon-btn {
   position: relative;
@@ -280,7 +312,6 @@
   cursor: pointer;
   transition: background-color 0.12s, color 0.12s;
 }
-.gd-icon-btn:hover { background: var(--dna-track); color: var(--dna-text); }
 
 @keyframes gd-pop-in {
   from { opacity: 0; transform: scale(0.97); }
@@ -302,6 +333,8 @@
 }
 @media (min-width: 768px) {
   .gd-topbar {
+    /* The sidebar already clears the left inset. */
+    padding-left: 0;
     background: rgb(var(--app-canvas) / 0.78);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
@@ -340,7 +373,6 @@
   border-radius: 4px;
   transition: color 0.12s;
 }
-.gd-crumb-parent a:hover { color: var(--dna-text); }
 .gd-crumb-current { min-width: 0; }
 .gd-crumb-current > * {
   display: block;
@@ -374,7 +406,6 @@
   cursor: pointer;
   transition: background-color 0.12s;
 }
-.gd-account-btn:hover,
 .gd-account-btn[aria-expanded="true"] { background: var(--dna-track); }
 .gd-account-id { display: none; min-width: 0; flex-direction: column; align-items: flex-start; line-height: 1.15; }
 @media (min-width: 1024px) {
@@ -461,7 +492,6 @@
   cursor: pointer;
 }
 .gd-menu-item svg { flex: none; color: var(--dna-text-2); }
-.gd-menu-item:hover,
 .gd-menu-item:focus-visible { background: var(--dna-track); color: var(--dna-text); outline: none; }
 .gd-menu-item:disabled { opacity: 0.6; cursor: default; }
 .gd-menu-item .gd-menu-check { margin-left: auto; color: var(--dna-accent); }
@@ -552,7 +582,6 @@
   font-weight: 500;
   text-decoration: none;
 }
-.gd-cat:hover { background: var(--dna-track); color: var(--dna-text); }
 .gd-cat[aria-current="page"] { background: var(--dna-track); color: var(--dna-text); font-weight: 600; }
 .gd-cat[aria-current="page"] svg { color: var(--dna-accent); }
 
@@ -595,6 +624,46 @@
 .gd-more-row[aria-current="page"] { font-weight: 600; }
 .gd-more-row[aria-current="page"] .gd-more-icon,
 .gd-more-check { color: var(--dna-accent); }
+
+@media (min-width: 768px) {
+  .gd-main { padding-right: env(safe-area-inset-right, 0px); }
+}
+
+/* ---------------------------------------------------------------- input */
+
+/* Touch has no hover: an ungated :hover sticks after a tap. */
+@media (hover: hover) and (pointer: fine) {
+  .gd-item:hover,
+  .gd-icon-btn:hover,
+  .gd-pop-item:hover,
+  .gd-menu-item:hover,
+  .gd-cat:hover { background: var(--dna-track); color: var(--dna-text); }
+  .gd-account-btn:hover { background: var(--dna-track); }
+  .gd-crumb-parent a:hover { color: var(--dna-text); }
+  .gd-item:hover .gd-tip,
+  .gd-icon-btn:hover .gd-tip { opacity: 1; transform: translate(0, -50%); transition-delay: 0.3s; }
+}
+
+/* Press feedback the moment the finger lands. */
+.gd-item:active,
+.gd-icon-btn:active,
+.gd-pop-item:active,
+.gd-menu-item:active,
+.gd-cat:active,
+.gd-account-btn:active { background: var(--dna-press); }
+.gd-crumb-parent a:active { color: var(--dna-text); }
+
+@media (pointer: coarse) {
+  .gd-item,
+  .gd-subitem,
+  .gd-pop-item { height: 44px; }
+  .gd-sidebar[data-rail] .gd-item { width: 44px; height: 44px; }
+  .gd-icon-btn { width: 44px; height: 44px; }
+  .gd-account-btn { height: 44px; min-width: 44px; }
+  /* Hit areas grow; the visible layout does not move. */
+  .gd-brand-link { padding: 9px; margin: -9px; }
+  .gd-crumb-parent a { padding: 12px 8px; margin: -12px -8px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .gd-sidebar,

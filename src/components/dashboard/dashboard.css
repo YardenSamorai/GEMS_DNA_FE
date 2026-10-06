@@ -58,7 +58,6 @@
   text-decoration: none;
   transition: color 0.12s, background-color 0.12s;
 }
-.gd-seg-btn:hover { color: var(--dna-text); }
 .gd-seg-btn[aria-current="page"] {
   background: var(--dna-surface);
   color: var(--dna-text);
@@ -66,7 +65,7 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 @media (pointer: coarse) {
-  .gd-seg-btn { height: 36px; }
+  .gd-seg-btn { height: 40px; }
 }
 
 .gd-dash-bar :focus-visible,
@@ -147,7 +146,6 @@
   cursor: pointer;
   border-radius: 4px;
 }
-.gd-sec-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .gd-panel {
   background: var(--dna-surface);
@@ -181,7 +179,6 @@
   border-radius: 0;
   transition: background-color 0.12s;
 }
-a.gd-row:hover { background: var(--dna-hover); }
 a.gd-row:active { background: var(--dna-press); }
 .gd-rows > li:first-child > .gd-row { border-top-left-radius: var(--dna-r-card); border-top-right-radius: var(--dna-r-card); }
 .gd-rows > li:last-child > .gd-row { border-bottom-left-radius: var(--dna-r-card); border-bottom-right-radius: var(--dna-r-card); }
@@ -285,7 +282,6 @@ a.gd-row:active { background: var(--dna-press); }
   font-weight: 500;
   cursor: pointer;
 }
-.gd-btn:hover { background: var(--dna-press); }
 
 .gd-more-toggle {
   appearance: none;
@@ -299,7 +295,32 @@ a.gd-row:active { background: var(--dna-press); }
   cursor: pointer;
   border-radius: 4px;
 }
-.gd-more-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .gd-seg-btn:hover { color: var(--dna-text); }
+  a.gd-row:hover { background: var(--dna-hover); }
+  .gd-btn:hover { background: var(--dna-press); }
+  .gd-sec-link:hover,
+  .gd-more-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
+}
+.gd-seg-btn:active { color: var(--dna-text); }
+.gd-btn:active { background: var(--dna-press); }
+.gd-sec-link:active,
+.gd-more-toggle:active { opacity: 0.6; }
+.gd-seg-btn,
+.gd-btn,
+.gd-sec-link,
+.gd-more-toggle {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+@media (pointer: coarse) {
+  .gd-btn { height: 44px; }
+  /* Text links keep their place; only the hit area grows. */
+  .gd-sec-link { padding: 12px 0; margin: -12px 0; }
+  .gd-more-toggle { padding: 12px 0; margin: 2px 4px -6px; }
+}
 
 .gd-row--skeleton { min-height: 60px; }
 .gd-sk {

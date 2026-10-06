@@ -218,9 +218,11 @@
    `pointer: coarse` so the desktop layout keeps its 14px fields.
    ============================================================ */
 @media (pointer: coarse) {
+  /* `:not([hidden])` lifts select/textarea above single Tailwind text
+     classes (`text-xs`), which otherwise win and bring the zoom back. */
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  select,
-  textarea {
+  select:not([hidden]),
+  textarea:not([hidden]) {
     font-size: 16px;
   }
 }
