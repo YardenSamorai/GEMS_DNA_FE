@@ -1233,6 +1233,493 @@
   letter-spacing: 0.01em;
 }
 
+/* ---------------- Matched pair ---------------- */
+
+.dna-pairnav {
+  display: flex;
+  justify-content: center;
+  margin-bottom: clamp(20px, 3vw, 32px);
+}
+
+.dna-pairnav .dna-seg {
+  width: min(100%, 440px);
+}
+
+.dna-seg--block .dna-seg-btn {
+  min-width: 0;
+}
+
+@media (max-width: 767.98px) {
+  .dna-pairnav {
+    display: none;
+  }
+}
+
+/* Both stones share one surface — one object, not two cards. */
+.dna-pairstage {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, 1.6vw, 16px);
+  padding: clamp(12px, 2.2vw, 22px) clamp(10px, 2vw, 20px) clamp(6px, 1.2vw, 12px);
+  border-radius: var(--dna-r-hero);
+  background: var(--dna-surface);
+  box-shadow: var(--dna-sh-panel);
+}
+
+.dna-pairstage-cell {
+  min-width: 0;
+  margin: 0;
+}
+
+.dna-pairstage-media {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.dna-pairstage-photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: #fff;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.dna-pairstage-photo img,
+.dna-pairstage-fallback {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Glass earned: it floats over the photo. */
+.dna-pairstage-chip {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-glass-chip);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  color: var(--dna-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease-out;
+}
+
+.dna-pairstage-chip::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.dna-pairstage-chip:active {
+  transform: scale(0.94);
+}
+
+.dna-pairstage-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 4px 8px;
+  border: 0;
+  border-radius: var(--dna-r-thumb);
+  background: none;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.1s ease-out, background-color 0.2s var(--dna-ease-out);
+}
+
+.dna-pairstage-caption:hover {
+  background: var(--dna-hover);
+}
+
+.dna-pairstage-caption:active {
+  transform: scale(0.97);
+}
+
+.dna-pairstage-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dna-text-3);
+}
+
+.dna-pairstage-weight {
+  font-size: clamp(16px, 2vw, 19px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--dna-text);
+}
+
+.dna-pairstage-sku {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  font-size: 12px;
+  color: var(--dna-accent);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.dna-pairstage-sku svg {
+  flex: none;
+}
+
+/* Stones list */
+.dna-stonerow {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 88px;
+  padding: 12px clamp(16px, 3vw, 24px);
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s var(--dna-ease-out);
+}
+
+.dna-stonerow + .dna-stonerow {
+  border-top: 1px solid var(--dna-hairline);
+}
+
+.dna-stonerow:hover {
+  background: var(--dna-hover);
+}
+
+.dna-stonerow:active {
+  background: var(--dna-press);
+}
+
+.dna-stonerow-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--dna-r-thumb);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--dna-hairline);
+  overflow: hidden;
+}
+
+.dna-stonerow-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dna-stonerow-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dna-stonerow-eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dna-text-3);
+  overflow-wrap: anywhere;
+}
+
+.dna-stonerow-title {
+  margin-top: 2px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--dna-text);
+}
+
+.dna-stonerow-sub {
+  font-size: 14px;
+  color: var(--dna-text-2);
+}
+
+.dna-stonerow-chevron {
+  color: var(--dna-text-4);
+}
+
+/* Pair certificates */
+.dna-paircert {
+  border-radius: var(--dna-r-panel);
+  background: var(--dna-surface);
+  box-shadow: var(--dna-sh-panel);
+  overflow: hidden;
+}
+
+.dna-paircert-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: clamp(20px, 3vw, 28px) clamp(20px, 3.5vw, 32px) 0;
+}
+
+.dna-paircert-lab {
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.dna-paircert-items {
+  display: grid;
+}
+
+@media (min-width: 760px) {
+  .dna-paircert-items {
+    grid-template-columns: repeat(var(--dna-reports, 2), minmax(0, 1fr));
+  }
+  .dna-paircert-item + .dna-paircert-item {
+    border-left: 1px solid var(--dna-hairline);
+  }
+}
+
+.dna-paircert-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(16px, 2.4vw, 24px);
+  padding: clamp(20px, 3vw, 28px) clamp(20px, 3.5vw, 32px);
+}
+
+@media (max-width: 759.98px) {
+  .dna-paircert-item + .dna-paircert-item {
+    border-top: 1px solid var(--dna-hairline);
+  }
+}
+
+.dna-doc--small {
+  width: clamp(84px, 11vw, 112px);
+  gap: 6px;
+  padding: 12px 11px;
+  border-radius: 8px;
+}
+
+.dna-doc--small .dna-doc-lab {
+  font-size: 15px;
+}
+
+.dna-doc--small .dna-doc-no {
+  font-size: 9.5px;
+  overflow-wrap: anywhere;
+}
+
+.dna-doc--small .dna-doc-lines {
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.dna-doc--small .dna-doc-lines span {
+  height: 4px;
+}
+
+.dna-doc--small .dna-doc-open {
+  font-size: 11.5px;
+}
+
+.dna-paircert-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.dna-paircert-stone {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dna-text-2);
+  overflow-wrap: anywhere;
+}
+
+.dna-paircert-meta dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.dna-paircert-meta dt {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dna-text-3);
+}
+
+.dna-paircert-meta dd {
+  margin: 2px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.dna-btn--compact {
+  height: 44px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+/* Side-by-side record */
+.dna-compare-head,
+.dna-compare-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  padding: 12px clamp(18px, 3vw, 24px);
+}
+
+.dna-compare-head {
+  padding-top: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--dna-hairline);
+}
+
+.dna-compare-head .dna-compare-label {
+  display: none;
+}
+
+.dna-compare-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dna-compare-col-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dna-text-3);
+}
+
+.dna-compare-col-sku {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.dna-compare-group {
+  padding: 20px clamp(18px, 3vw, 24px) 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dna-accent);
+}
+
+.dna-compare-row + .dna-compare-row {
+  border-top: 1px solid var(--dna-hairline);
+}
+
+.dna-compare-row .dna-compare-label {
+  grid-column: 1 / -1;
+  margin-bottom: 3px;
+  font-size: 12.5px;
+  color: var(--dna-text-3);
+}
+
+.dna-compare-value {
+  display: inline-block;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  overflow-wrap: anywhere;
+}
+
+.dna-compare-value.dna-row-link {
+  display: inline-flex;
+  margin: -12px 0 -12px -8px;
+}
+
+.dna-compare-value.is-missing {
+  color: var(--dna-text-4);
+  font-weight: 400;
+}
+
+.dna-compare-value.is-both {
+  grid-column: 1 / -1;
+}
+
+.dna-compare-both {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dna-text-3);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .dna-compare-head,
+  .dna-compare-row {
+    grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+  .dna-compare-row {
+    min-height: 52px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+  .dna-compare-head .dna-compare-label {
+    display: block;
+  }
+  .dna-compare-row .dna-compare-label {
+    grid-column: auto;
+    margin: 0;
+    font-size: 15px;
+    color: var(--dna-text-2);
+  }
+  .dna-compare-value.is-both {
+    grid-column: 2 / -1;
+  }
+}
+
+/* Live sheet content (360° viewer) paints over its placeholder as it loads. */
+.dna-sheet-body--live iframe {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+/* Phones: the pair switcher rides above the actions, under the thumb. */
+@media (max-width: 767.98px) {
+  .dna-main--pair {
+    padding-bottom: calc(168px + env(safe-area-inset-bottom));
+  }
+  .dna-actionbar--stacked {
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+  }
+  .dna-actionbar--stacked .dna-seg-btn {
+    height: 36px;
+  }
+  .dna-actionbar-row {
+    display: flex;
+    gap: 10px;
+  }
+}
+
 /* ---------------- Loading + not found ---------------- */
 
 .dna-skel {
@@ -1317,7 +1804,8 @@
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
-  .dna-stage-expand {
+  .dna-stage-expand,
+  .dna-pairstage-chip {
     background: var(--dna-surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

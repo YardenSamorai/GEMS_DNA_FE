@@ -12,7 +12,7 @@ export const present = (value) => {
   return text !== "" && !BLANKS.has(text.toUpperCase());
 };
 
-const clean = (value) => (present(value) ? String(value).trim() : null);
+export const clean = (value) => (present(value) ? String(value).trim() : null);
 
 const toNumber = (value) => {
   if (!present(value)) return null;

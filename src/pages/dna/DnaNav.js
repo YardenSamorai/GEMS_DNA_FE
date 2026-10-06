@@ -4,7 +4,7 @@ import { ChevronLeft, ShareIcon } from "./icons";
 /* Glass bar: content scrolls beneath it, so translucency is earned. The
    hairline appears only once something is underneath, and the stone's name
    slides in when the page title has scrolled away. */
-const DnaNav = ({ title, titleRef, onBack, onShare }) => {
+const DnaNav = ({ title, titleRef, titleEl, onBack, onShare }) => {
   const [scrolled, setScrolled] = useState(false);
   const [condensed, setCondensed] = useState(false);
 
@@ -16,7 +16,7 @@ const DnaNav = ({ title, titleRef, onBack, onShare }) => {
   }, []);
 
   useEffect(() => {
-    const el = titleRef?.current;
+    const el = titleEl || titleRef?.current;
     if (!el || typeof IntersectionObserver === "undefined") return undefined;
     const io = new IntersectionObserver(
       ([entry]) => setCondensed(!entry.isIntersecting && entry.boundingClientRect.top < 0),
@@ -24,7 +24,7 @@ const DnaNav = ({ title, titleRef, onBack, onShare }) => {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [titleRef]);
+  }, [titleRef, titleEl]);
 
   return (
     <header className={`dna-nav${scrolled ? " is-scrolled" : ""}${condensed ? " is-condensed" : ""}`}>

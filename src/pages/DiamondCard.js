@@ -8,9 +8,10 @@ import { readPriceMode, scaleInventoryPrice } from "../utils/pricing";
 import toast from 'react-hot-toast';
 import InterestedModal from '../components/InterestedModal';
 import StoneUsagePanel from '../components/StoneUsagePanel';
-import PairDnaView from '../components/PairDnaView';
 import SetDnaView from '../components/SetDnaView';
 import GemstoneDnaPage from './dna/GemstoneDnaPage';
+import DnaPairPage from './dna/DnaPairPage';
+import { orderPair, pairPriceCodes } from './dna/pairModel';
 import { DnaNotFound, DnaSkeleton } from './dna/DnaStates';
 import { certificateUrl } from './dna/dnaModel';
 
@@ -42,20 +43,28 @@ const DiamondCard = () => {
     }
   };
 
+  const [loadedFor, setLoadedFor] = useState(null);
+
   useEffect(() => {
     if (!stone_id) return;
 
+    let stale = false;
     setPhotoFailed(false);
     fetch(`${API_BASE}/api/stones/${stone_id}`)
       .then((res) => res.json())
       .then((data) => {
+        if (stale) return;
         setDetails(data);
+        setLoadedFor(stone_id);
         setLoading(false);
       })
       .catch((err) => {
+        if (stale) return;
         console.error("❌ Error fetching stone:", err);
+        setLoadedFor(stone_id);
         setLoading(false);
       });
+    return () => { stale = true; };
   }, [stone_id]);
 
   const handleShare = async () => {
@@ -90,7 +99,10 @@ const DiamondCard = () => {
 
   const handleShareVideo = () => shareVideoUrl(details?.video);
 
-  if (loading) return <DnaSkeleton />;
+  // Moving to the other half of a pair renders at once from the record already
+  // here; any other SKU waits for its own record rather than showing this one.
+  const onScreen = details && (details.stone_id === stone_id || details.pair?.stone_id === stone_id);
+  if (loading || (loadedFor !== stone_id && !onScreen)) return <DnaSkeleton />;
 
   // A 404 still parses as JSON ({ error }), so "no stone_id" is the real miss.
   if (!details || !details.stone_id) {
@@ -136,28 +148,68 @@ const DiamondCard = () => {
     );
   }
 
+  // Neto/Bruto preference is set on the inventory screen and mirrored here via
+  // localStorage. Scaling itself lives in utils/pricing.js so this page can
+  // never drift from the inventory. A scaled-up figure gets a "B" prefix.
+  const priceMode = readPriceMode();
+
+  const priceCodeFor = (encryptedValue, stone = details) => {
+    const full = decryptPrice(encryptedValue);
+    const scaled = scaleInventoryPrice(full, stone, priceMode);
+    if (scaled !== full) {
+      const code = encryptPrice(scaled);
+      return code === "N/A" ? code : `B${code}`;
+    }
+    return encryptPrice(full);
+  };
+
   /* A stone the API confirmed has a genuine partner opens as the pair, since
-     that is how a matched pair is sold. ?single=1 is the way back to one
-     stone on its own, and is what the pair screen's own links use. */
-  if (details.pair && searchParams.get("single") !== "1") {
-    const shareVideo = details.video || details.pair.video;
+     that is how a matched pair is sold. ?single=1 is the way to one stone on
+     its own. All three views come from this one record, so moving between
+     them is instant; the URL still changes so each view stays shareable. */
+  if (details.pair) {
+    const pairStones = [details, details.pair];
+    const [first] = orderPair(details, details.pair);
+    const singleSku = searchParams.get("single") === "1" ? stone_id : null;
+    const viewed = pairStones.find((s) => s.stone_id === singleSku) || null;
+    const pairVideo = details.video || details.pair.video;
+
     return (
       <>
-        <PairDnaView
+        <DnaPairPage
           a={details}
           b={details.pair}
+          view={viewed ? viewed.stone_id : "pair"}
+          onSelect={(key) => navigate(key === "pair" ? `/${first.stone_id}` : `/${key}?single=1`, { state: { quietTransition: true } })}
           isSignedIn={isSignedIn}
-          barakURL={barakURL}
+          certUrlFor={(s) => certificateUrl(s, barakURL)}
+          pairPrices={isSignedIn ? pairPriceCodes(details, details.pair) : null}
+          pricesFor={isSignedIn ? (s) => ({
+            perCarat: priceCodeFor(s.price_per_carat, s),
+            total: priceCodeFor(s.total_price, s),
+          }) : null}
           onBack={goBack}
           onInterested={() => setInterestedOpen(true)}
           onShare={handleShare}
-          onShareVideo={() => shareVideoUrl(shareVideo)}
+          pairShareVideo={pairVideo ? () => shareVideoUrl(pairVideo) : null}
+          shareVideoFor={(s) => (s.video ? () => shareVideoUrl(s.video) : null)}
+          staffPanelFor={isSignedIn ? (s) => <StoneUsagePanel sku={s.stone_id} /> : null}
         />
         <InterestedModal
           open={interestedOpen}
           onClose={() => setInterestedOpen(false)}
-          sku={details.stone_id}
-          snapshot={{
+          sku={viewed ? viewed.stone_id : details.stone_id}
+          snapshot={viewed ? {
+            sku: viewed.stone_id,
+            category: viewed.category,
+            shape: viewed.shape,
+            weightCt: Number(viewed.carat) || 0,
+            color: viewed.color,
+            clarity: viewed.clarity,
+            lab: viewed.lab,
+            certificateNumber: viewed.certificate_number,
+            image: viewed.picture,
+          } : {
             sku: details.stone_id,
             pairSku: details.pair.stone_id,
             isPair: true,
@@ -174,21 +226,6 @@ const DiamondCard = () => {
       </>
     );
   }
-
-  // Neto/Bruto preference is set on the inventory screen and mirrored here via
-  // localStorage. Scaling itself lives in utils/pricing.js so this page can
-  // never drift from the inventory. A scaled-up figure gets a "B" prefix.
-  const priceMode = readPriceMode();
-
-  const priceCodeFor = (encryptedValue) => {
-    const full = decryptPrice(encryptedValue);
-    const scaled = scaleInventoryPrice(full, details, priceMode);
-    if (scaled !== full) {
-      const code = encryptPrice(scaled);
-      return code === "N/A" ? code : `B${code}`;
-    }
-    return encryptPrice(full);
-  };
 
   return (
     <>

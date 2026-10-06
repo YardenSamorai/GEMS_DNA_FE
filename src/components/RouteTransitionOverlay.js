@@ -42,12 +42,17 @@ export default function RouteTransitionOverlay() {
   const [fadingOut, setFadingOut] = useState(false);
   const fadeTimerRef = useRef(null);
 
+  // In-page switches that already have their content (the DNA pair's
+  // Pair / Stone 1 / Stone 2) navigate with { quietTransition: true }.
+  const quiet = Boolean(location.state?.quietTransition);
+
   // 1) Open the minimum window on every route change.
   useEffect(() => {
+    if (quiet) return undefined;
     setWithinMinWindow(true);
     const t = setTimeout(() => setWithinMinWindow(false), MIN_DURATION_MS);
     return () => clearTimeout(t);
-  }, [location.pathname]);
+  }, [location.pathname, quiet]);
 
   // 2) Decide whether the overlay should be on screen. We combine the
   //    "in flight" signals and animate the fade-out when they all

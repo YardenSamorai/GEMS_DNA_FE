@@ -9,6 +9,7 @@ import {
 import { SUPPLIER_FALLBACK_IMAGE } from "../../utils/supplierMedia";
 import { CloseIcon, ExpandIcon } from "./icons";
 import { FADE, FADE_FAST, SPRING, SPRING_EXIT, shouldDismiss } from "./motion";
+import { InOverlayHost } from "./overlayHost";
 
 const RADIUS = 26;
 
@@ -36,7 +37,7 @@ export const MediaSwitch = ({ modes, mode, onChange, label = "Media", idPrefix =
   </div>
 );
 
-const PhotoViewer = ({ src, alt, caption, layoutId, onClose }) => {
+export const PhotoViewer = ({ src, alt, caption, layoutId, onClose }) => {
   const reduce = useReducedMotion();
   const closeRef = useRef(null);
   const y = useMotionValue(0);
@@ -60,6 +61,7 @@ const PhotoViewer = ({ src, alt, caption, layoutId, onClose }) => {
   }, [onClose]);
 
   return (
+    <InOverlayHost>
     <div className="dna-lightbox" role="dialog" aria-modal="true" aria-label={alt}>
       <motion.div
         style={{ position: "absolute", inset: 0 }}
@@ -114,6 +116,7 @@ const PhotoViewer = ({ src, alt, caption, layoutId, onClose }) => {
         </motion.div>
       )}
     </div>
+    </InOverlayHost>
   );
 };
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
 import { ChevronRight, CloseIcon, ExternalIcon, ShieldCheckIcon } from "./icons";
 import { FADE, FADE_FAST, SPRING, SPRING_EXIT, shouldDismiss } from "./motion";
+import { InOverlayHost } from "./overlayHost";
 
 const useIsPhone = () => {
   const query = "(max-width: 767.98px)";
@@ -16,7 +17,7 @@ const useIsPhone = () => {
 };
 
 // Only where the lab publishes a stable lookup URL keyed by report number.
-const labLookupUrl = (lab, number) => {
+export const labLookupUrl = (lab, number) => {
   if (!lab || !number) return null;
   const key = String(lab).trim().toUpperCase();
   const no = String(number).trim();
@@ -24,7 +25,17 @@ const labLookupUrl = (lab, number) => {
   return null;
 };
 
-const CertificateSheet = ({ url, lab, number, onClose }) => {
+export const CertificateSheet = ({
+  url,
+  lab,
+  number,
+  onClose,
+  title: titleOverride,
+  subtitle,
+  openLabel = "Open PDF",
+  footLabel = "Open full PDF",
+  live = false,
+}) => {
   const reduce = useReducedMotion();
   const phone = useIsPhone();
   const drag = useDragControls();
@@ -58,9 +69,11 @@ const CertificateSheet = ({ url, lab, number, onClose }) => {
           transition: SPRING,
         };
 
-  const title = lab ? `${lab} report` : "Laboratory report";
+  const title = titleOverride || (lab ? `${lab} report` : "Laboratory report");
+  const caption = subtitle || (number ? `No. ${number}` : null);
 
   return (
+    <InOverlayHost>
     <div className="dna-overlay" role="dialog" aria-modal="true" aria-label={title}>
       <motion.div
         className="dna-scrim"
@@ -88,28 +101,29 @@ const CertificateSheet = ({ url, lab, number, onClose }) => {
         <div className="dna-sheet-head" onPointerDown={(e) => phone && drag.start(e)}>
           <div className="dna-sheet-title">
             <strong>{title}</strong>
-            {number && <span>No. {number}</span>}
+            {caption && <span>{caption}</span>}
           </div>
           <a className="dna-btn dna-btn--quiet" href={url} target="_blank" rel="noopener noreferrer" style={{ display: phone ? "none" : undefined }}>
-            Open PDF
+            {openLabel}
             <ExternalIcon size={16} />
           </a>
-          <button ref={closeRef} type="button" className="dna-icon-btn" onClick={onClose} aria-label="Close report">
+          <button ref={closeRef} type="button" className="dna-icon-btn" onClick={onClose} aria-label={`Close ${title}`}>
             <CloseIcon />
           </button>
         </div>
-        <div className="dna-sheet-body">
+        <div className={`dna-sheet-body${live ? " dna-sheet-body--live" : ""}`}>
           {!loaded && <div className="dna-skel" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
           <iframe src={url} title={title} onLoad={() => setLoaded(true)} />
         </div>
         <div className="dna-sheet-foot">
           <a className="dna-btn-primary" href={url} target="_blank" rel="noopener noreferrer">
-            Open full PDF
+            {footLabel}
             <ExternalIcon size={18} />
           </a>
         </div>
       </motion.div>
     </div>
+    </InOverlayHost>
   );
 };
 

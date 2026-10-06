@@ -40,7 +40,7 @@ const CopySku = ({ sku }) => {
   );
 };
 
-export const PriceSummary = ({ perCarat, total }) => (
+export const PriceSummary = ({ perCarat, total, perCaratLabel = "Price per carat", totalLabel = "Total price" }) => (
   <div className="dna-price">
     <div className="dna-price-caption">
       <LockIcon size={13} />
@@ -48,21 +48,21 @@ export const PriceSummary = ({ perCarat, total }) => (
     </div>
     <div className="dna-price-panel">
       <div className="dna-price-cell">
-        <div className="dna-price-label">Price per carat</div>
+        <div className="dna-price-label">{perCaratLabel}</div>
         <div className="dna-price-value">{perCarat}</div>
       </div>
       <div className="dna-price-cell">
-        <div className="dna-price-label">Total price</div>
+        <div className="dna-price-label">{totalLabel}</div>
         <div className="dna-price-value dna-price-value--total">{total}</div>
       </div>
     </div>
   </div>
 );
 
-export const InlineActions = ({ onInterested, onShare, onShareVideo }) => (
+export const InlineActions = ({ onInterested, onShare, onShareVideo, interestedLabel = "I'm interested" }) => (
   <div className="dna-actions dna-actions--inline" style={{ "--dna-secondary": onShareVideo ? 2 : 1 }}>
     <button type="button" className="dna-btn-primary" onClick={onInterested}>
-      I'm interested
+      {interestedLabel}
     </button>
     <button type="button" className="dna-btn" onClick={onShare}>
       <ShareIcon size={18} />
@@ -79,7 +79,7 @@ export const InlineActions = ({ onInterested, onShare, onShareVideo }) => (
 
 /* Identity first: what the stone is, in the words a grading report would
    use, then the handful of facts a buyer checks before anything else. */
-const GemstoneIdentity = ({ stone, title, subtitle, facts, titleRef, children }) => {
+const GemstoneIdentity = ({ stone, title, subtitle, facts, titleRef, children, eyebrow = "Gemstone DNA", skus }) => {
   const reduce = useReducedMotion();
   const rise = (i) => ({
     initial: { opacity: 0, y: reduce ? 0 : 10 },
@@ -92,9 +92,11 @@ const GemstoneIdentity = ({ stone, title, subtitle, facts, titleRef, children })
       <motion.div className="dna-eyebrow" {...rise(0)}>
         <span className="dna-eyebrow-mark">
           <span className="dna-brand-dot" aria-hidden="true" />
-          Gemstone DNA
+          {eyebrow}
         </span>
-        <CopySku sku={stone.stone_id} />
+        {(skus || [stone.stone_id]).map((sku) => (
+          <CopySku key={sku} sku={sku} />
+        ))}
       </motion.div>
 
       <motion.h1 ref={titleRef} className="dna-title dna-num" {...rise(1)}>
