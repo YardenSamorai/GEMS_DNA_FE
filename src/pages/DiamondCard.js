@@ -272,9 +272,8 @@ const DiamondCard = () => {
 
         {/* Header Card — v1.0.5 glass shell. The legacy emerald-gradient title
             bar is replaced by an ink-tone editorial header: lab badge, copyable
-            SKU, large display title, and a discreet price slot for signed-in
-            staff. No saturated chrome — the flagship public surface for the
-            brand. */}
+            SKU and a large display title. No saturated chrome — the flagship
+            public surface for the brand. */}
         <div className="rounded-3xl glass-surface-strong overflow-hidden mb-6">
           <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-app-line">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
@@ -305,16 +304,6 @@ const DiamondCard = () => {
                   ) : null}
                 </h1>
               </div>
-              {isSignedIn && (
-                <div className="flex flex-col items-start sm:items-end shrink-0">
-                  <span className="text-app-soft text-[10.5px] font-medium uppercase tracking-[0.14em] mb-1">
-                    Total price
-                  </span>
-                  <span className="text-[26px] sm:text-[28px] font-semibold tracking-tight text-app-ink">
-                    {priceCodeFor(details.total_price)}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -493,17 +482,6 @@ const DiamondCard = () => {
                         </Link>
                       </div>
                     )}
-
-                    {isSignedIn && (
-                      <div className="mt-6 p-4 rounded-2xl glass-surface">
-                        <div className="flex items-center justify-between">
-                          <span className="text-app-muted font-medium text-[12.5px]">Price per carat</span>
-                          <span className="text-[16px] font-semibold tracking-tight text-app-ink">
-                            {priceCodeFor(details.price_per_carat)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
                   </motion.div>
                 )}
 
@@ -563,6 +541,28 @@ const DiamondCard = () => {
                       </>
                     )}
                   </motion.div>
+                )}
+
+                {/* Pricing — staff only, shown under either tab. */}
+                {isSignedIn && (
+                  <div className="grid grid-cols-2 rounded-2xl glass-surface divide-x divide-app-line overflow-hidden">
+                    <div className="p-4 sm:p-5">
+                      <div className="text-app-soft text-[10.5px] font-medium uppercase tracking-[0.14em] mb-1.5">
+                        Price per carat
+                      </div>
+                      <div className="text-[20px] sm:text-[22px] font-semibold tracking-tight text-app-graphite">
+                        {priceCodeFor(details.price_per_carat)}
+                      </div>
+                    </div>
+                    <div className="p-4 sm:p-5 text-right">
+                      <div className="text-app-soft text-[10.5px] font-medium uppercase tracking-[0.14em] mb-1.5">
+                        Total price
+                      </div>
+                      <div className="text-[24px] sm:text-[28px] font-semibold tracking-tight text-app-ink">
+                        {priceCodeFor(details.total_price)}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Action buttons — primary ink CTA, glass secondaries */}
