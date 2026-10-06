@@ -269,10 +269,17 @@ export const getColumnConfig = (userId, mode = 'diamonds') => {
     if (stored) {
       const parsed = JSON.parse(stored);
       const knownIds = new Set(defaults.map(c => c.id));
-      const storedIds = new Set(parsed.map(c => c.id));
-      const merged = parsed.filter(c => knownIds.has(c.id));
+      const seen = new Set();
+      const merged = [];
+      parsed.forEach(c => {
+        if (knownIds.has(c.id) && !seen.has(c.id)) {
+          seen.add(c.id);
+          merged.push(c);
+        }
+      });
       defaults.forEach(col => {
-        if (!storedIds.has(col.id)) {
+        if (!seen.has(col.id)) {
+          seen.add(col.id);
           merged.push({ id: col.id, visible: true });
         }
       });

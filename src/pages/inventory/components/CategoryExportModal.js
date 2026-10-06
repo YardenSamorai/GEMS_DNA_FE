@@ -1,6 +1,8 @@
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
+/* ---------------- Category Export Choice Modal ---------------- */
+export const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
   if (!isOpen) return null;
   
   const emeraldCount = categories.emeralds || 0;
@@ -21,12 +23,12 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-background rounded-lg border border-border shadow-lg w-full max-w-md overflow-hidden"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
         >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Export Options</h2>
-            <p className="text-muted-foreground text-sm mt-1">
+          <div className="bg-gradient-to-r from-emerald-500 to-blue-500 px-6 py-4">
+            <h2 className="text-xl font-bold text-white">Export Options</h2>
+            <p className="text-white/80 text-sm mt-1">
               You selected multiple categories
             </p>
           </div>
@@ -37,17 +39,17 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
             <div className="flex flex-wrap gap-2 mb-6">
               {emeraldCount > 0 && (
                 <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  נ' Emeralds: {emeraldCount}
+                  Emeralds: {emeraldCount}
                 </span>
               )}
               {diamondCount > 0 && (
                 <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                  נ' Diamonds: {diamondCount}
+                  Diamonds: {diamondCount}
                 </span>
               )}
               {otherCount > 0 && (
                 <span className="px-3 py-1.5 bg-stone-100 text-stone-700 rounded-full text-sm font-medium">
-                  נ"· Other: {otherCount}
+                  Other: {otherCount}
                 </span>
               )}
             </div>
@@ -95,7 +97,7 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
           </div>
           
           {/* Footer */}
-          <div className="px-6 py-4 bg-muted/50 border-t border-border">
+          <div className="px-6 py-4 bg-stone-50 border-t border-stone-200">
             <button
               onClick={onClose}
               className="w-full py-2.5 text-stone-600 hover:text-stone-800 font-medium transition-colors"
@@ -109,5 +111,6 @@ const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
   );
 };
 
+/* ---------------- PDF Options Modal ---------------- */
+
 export default CategoryExportModal;
-export { CategoryExportModal };

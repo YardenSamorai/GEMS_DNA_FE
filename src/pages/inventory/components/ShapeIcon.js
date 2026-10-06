@@ -1,8 +1,8 @@
 import React from "react";
 
-const ShapeIcon = ({ shape, isActive }) => {
-  const c = isActive ? '#059669' : '#a8a29e';
-  const size = 32;
+/* ---------------- Shape Icons (faceted line-art) ---------------- */
+export const ShapeIcon = ({ shape, isActive, color, size = 32 }) => {
+  const c = color || (isActive ? '#059669' : '#a8a29e');
   const sw = '1.3';
   const fw = '0.6';
   
@@ -327,4 +327,3 @@ const ShapeIcon = ({ shape, isActive }) => {
 };
 
 export default ShapeIcon;
-export { ShapeIcon };

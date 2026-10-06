@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating }) => {
+export const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating }) => {
   const [layout, setLayout] = useState('grid');
   const [showPrices, setShowPrices] = useState(true);
 
@@ -21,11 +21,11 @@ const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-background rounded-lg border border-border shadow-lg w-full max-w-md overflow-hidden"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
         >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <div className="bg-gradient-to-r from-red-500 to-pink-500 px-6 py-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
@@ -98,7 +98,7 @@ const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating
             </div>
 
             {/* Preview info */}
-            <div className="p-4 rounded-md bg-destructive/5 border border-destructive/20">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 border border-red-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -118,7 +118,7 @@ const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 px-6 py-4 bg-muted/50 border-t border-border">
+          <div className="flex gap-3 px-6 py-4 bg-stone-50 border-t border-stone-200">
             <button
               onClick={onClose}
               className="flex-1 py-2.5 text-stone-600 hover:text-stone-800 font-medium transition-colors rounded-lg hover:bg-stone-100"
@@ -128,7 +128,7 @@ const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating
             <button
               onClick={() => onGenerate({ layout, showPrices })}
               disabled={isGenerating}
-              className="flex-1 h-10 bg-destructive text-destructive-foreground hover:bg-destructive/90 font-medium rounded-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isGenerating ? (
                 <>
@@ -155,4 +155,3 @@ const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating
 };
 
 export default PDFOptionsModal;
-export { PDFOptionsModal };

@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TAG_COLORS } from "../helpers/constants";
 
-const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTag }) => {
+/* ---------------- Tags Management Modal ---------------- */
+export const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTag }) => {
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#10b981");
   const [editingTag, setEditingTag] = useState(null);
@@ -37,7 +38,7 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
           initial={{ opacity: 0, y: 100 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 100 }}
-          className="bg-background rounded-lg border border-border shadow-lg w-full sm:max-w-md max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
+          className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Mobile drag handle */}
@@ -46,20 +47,20 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
           </div>
           
           {/* Header */}
-          <div className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-border bg-card">
+          <div className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r from-blue-500 to-blue-600">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
-                  <svg className="w-4 h-4 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-semibold text-foreground">Manage Client Tags</h2>
-                  <p className="text-muted-foreground text-xs">{tags.length} tags</p>
+                  <h2 className="text-base sm:text-lg font-bold text-white">Manage Client Tags</h2>
+                  <p className="text-blue-100 text-xs">{tags.length} tags</p>
                 </div>
               </div>
-              <button onClick={onClose} className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/20 transition-colors text-white">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -68,7 +69,7 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
           </div>
 
           {/* Create New Tag */}
-          <div className="flex-shrink-0 p-4 border-b border-border bg-muted/50">
+          <div className="flex-shrink-0 p-4 border-b border-stone-100 bg-stone-50">
             <p className="text-xs font-medium text-stone-500 mb-3">Create New Tag</p>
             
             <div className="space-y-3">
@@ -132,7 +133,7 @@ const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTa
                 {tags.map((tag) => (
                   <div
                     key={tag.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-stone-200 hover:border-stone-300 hover:shadow-sm transition-all"
+                    className="flex items-center gap-3 p-3 rounded-xl glass-surface hover:bg-app-surface/80 transition-all"
                   >
                     {editingTag?.id === tag.id ? (
                       <div className="flex-1 space-y-3">

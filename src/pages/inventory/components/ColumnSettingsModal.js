@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DEFAULT_COLUMNS } from "../helpers/constants";
 
-const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefaultColumns }) => {
-  const defaultCols = activeDefaultColumns || [];
+/* ---------------- Column Settings Modal ---------------- */
+export const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefaultColumns }) => {
+  const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
   const [localConfig, setLocalConfig] = useState(columnConfig);
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
@@ -67,7 +69,7 @@ const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefa
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="relative bg-background rounded-lg border border-border shadow-lg w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">

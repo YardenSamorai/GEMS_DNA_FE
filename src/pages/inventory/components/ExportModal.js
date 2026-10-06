@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getMappedCategories } from "../../../utils/categoryMap";
+import { supportsBrutoMode } from "../../../utils/pricing";
 import { getDisplayShape } from "../helpers/constants";
 
-const ExportModal = ({ 
+/* ---------------- Export Modal ---------------- */
+export const ExportModal = ({ 
   isOpen, 
   onClose, 
   selectedStones, 
@@ -12,13 +14,15 @@ const ExportModal = ({
   subtitle = null,
   buttonText = "Export",
   buttonColor = "from-emerald-500 to-emerald-600",
-  showHidePricesOption = true
+  showHidePricesOption = true,
+  priceMode = "neto"
 }) => {
   const [globalMarkup, setGlobalMarkup] = useState(0);
   const [priceOverrides, setPriceOverrides] = useState({});
   const [includeAppendix, setIncludeAppendix] = useState(false);
   const [hidePrices, setHidePrices] = useState(false);
 
+  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setGlobalMarkup(0);
@@ -41,29 +45,48 @@ const ExportModal = ({
 
   if (!isOpen) return null;
 
+  // Diamonds and jewelry are always quoted Neto, so the Bruto toggle never
+  // touches them. The badge has to say so — claiming "Bruto prices" over an
+  // untouched diamond export is how a rep ends up quoting the wrong figure.
+  const showsBrutoPrices =
+    priceMode === "bruto" && selectedStones.some(supportsBrutoMode);
+
+  // Base $/ct for a row. Jewelry is priced as a flat total with no per-carat
+  // figure, so we derive one from total ÷ carat — otherwise its price would
+  // collapse to $0 in the PDF (everything here is computed off $/ct).
+  const basePricePerCt = (stone) => {
+    if (stone.pricePerCt && stone.pricePerCt > 0) return stone.pricePerCt;
+    const wt = stone.weightCt || 0;
+    const total = stone.priceTotal || 0;
+    return wt > 0 ? total / wt : 0;
+  };
+
+  // Calculate adjusted prices (based on Price Per Carat)
   const getAdjustedPricePerCt = (stone) => {
     if (priceOverrides[stone.id] !== undefined) {
       return priceOverrides[stone.id];
     }
-    const original = stone.pricePerCt || 0;
-    return original * (1 + globalMarkup / 100);
+    return basePricePerCt(stone) * (1 + globalMarkup / 100);
   };
 
   const getAdjustedTotal = (stone) => {
-    const pricePerCt = getAdjustedPricePerCt(stone);
     const weight = stone.weightCt || 0;
-    return pricePerCt * weight;
+    if (weight > 0) return getAdjustedPricePerCt(stone) * weight;
+    // No carat weight (some jewelry): scale the stored total directly so the
+    // price survives instead of becoming $0.
+    return (stone.priceTotal || 0) * (1 + globalMarkup / 100);
   };
 
+  // Apply global markup to all
   const applyGlobalMarkup = () => {
     const newOverrides = {};
     selectedStones.forEach((stone) => {
-      const original = stone.pricePerCt || 0;
-      newOverrides[stone.id] = original * (1 + globalMarkup / 100);
+      newOverrides[stone.id] = basePricePerCt(stone) * (1 + globalMarkup / 100);
     });
     setPriceOverrides(newOverrides);
   };
 
+  // Reset single stone price
   const resetPrice = (stoneId) => {
     setPriceOverrides((prev) => {
       const newOverrides = { ...prev };
@@ -72,15 +95,18 @@ const ExportModal = ({
     });
   };
 
+  // Reset all prices
   const resetAllPrices = () => {
     setPriceOverrides({});
     setGlobalMarkup(0);
   };
 
+  // Calculate totals
   const totalOriginal = selectedStones.reduce((sum, s) => sum + (s.priceTotal || 0), 0);
   const totalAdjusted = selectedStones.reduce((sum, s) => sum + getAdjustedTotal(s), 0);
   const totalWeight = selectedStones.reduce((sum, s) => sum + (s.weightCt || 0), 0);
 
+  // Handle export with modified prices
   const handleExport = () => {
     const stonesWithAdjustedPrices = selectedStones.map((stone) => ({
       ...stone,
@@ -104,26 +130,31 @@ const ExportModal = ({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-background rounded-lg border border-border shadow-lg w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden fixed sm:relative bottom-0 sm:bottom-auto"
+          className="bg-white rounded-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden fixed sm:relative bottom-0 sm:bottom-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
+          <div className={`px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r ${buttonColor}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center">
-                  <svg className="w-4 h-4 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-semibold text-foreground">{title}</h2>
-                  <p className="text-muted-foreground text-xs sm:text-sm">{subtitle || `${selectedStones.length} stones selected`}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg sm:text-xl font-bold text-white">{title}</h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-white/25 text-white border border-white/30">
+                      {showsBrutoPrices ? "Bruto prices" : "Neto prices"}
+                    </span>
+                  </div>
+                  <p className="text-white/80 text-xs sm:text-sm">{subtitle || `${selectedStones.length} stones selected`}</p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted transition-colors text-muted-foreground"
+                className="p-2 rounded-lg hover:bg-white/20 transition-colors text-white"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -134,7 +165,7 @@ const ExportModal = ({
 
           {/* Global Markup Section */}
           {!hidePrices && (
-          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-muted/50 border-b border-border">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-stone-50 border-b border-stone-200">
             <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 sm:gap-4">
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <label className="text-sm font-medium text-stone-700 whitespace-nowrap">Markup:</label>
@@ -162,6 +193,9 @@ const ExportModal = ({
                 </button>
               </div>
               <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${showsBrutoPrices ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
+                  {showsBrutoPrices ? "Bruto" : "Neto"}
+                </span>
                 <span className="text-stone-500">
                   Original: <span className="font-semibold text-stone-700">${totalOriginal.toLocaleString()}</span>
                 </span>
@@ -178,7 +212,7 @@ const ExportModal = ({
             {/* Mobile Cards View */}
             <div className="sm:hidden divide-y divide-stone-100">
               {selectedStones.map((stone, index) => {
-                const originalPricePerCt = stone.pricePerCt || 0;
+                const originalPricePerCt = basePricePerCt(stone);
                 const adjustedPricePerCt = getAdjustedPricePerCt(stone);
                 const adjustedTotal = getAdjustedTotal(stone);
                 const priceDiff = adjustedPricePerCt - originalPricePerCt;
@@ -236,7 +270,7 @@ const ExportModal = ({
                               onClick={() => resetPrice(stone.id)}
                               className="text-xs text-stone-400 hover:text-stone-600"
                             >
-                              ↻
+                              Γז║
                             </button>
                           )}
                         </div>
@@ -267,7 +301,7 @@ const ExportModal = ({
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {selectedStones.map((stone, index) => {
-                  const originalPricePerCt = stone.pricePerCt || 0;
+                  const originalPricePerCt = basePricePerCt(stone);
                   const adjustedPricePerCt = getAdjustedPricePerCt(stone);
                   const adjustedTotal = getAdjustedTotal(stone);
                   const priceDiff = adjustedPricePerCt - originalPricePerCt;
@@ -321,7 +355,7 @@ const ExportModal = ({
                             onClick={() => resetPrice(stone.id)}
                             className="text-xs text-stone-500 hover:text-stone-700 underline"
                           >
-                            ↻
+                            Γז║
                           </button>
                         )}
                       </td>
@@ -334,7 +368,7 @@ const ExportModal = ({
           </div>
 
           {/* Footer */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border bg-muted/50">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-stone-200 bg-stone-50">
             {/* Options Row */}
             <div className="flex flex-wrap items-center gap-4 mb-3 pb-3 border-b border-stone-200">
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -367,7 +401,7 @@ const ExportModal = ({
                   <span className="text-stone-400">|</span>
                   <span>Orig: <span className="font-medium text-stone-500">${totalOriginal.toLocaleString()}</span></span>
                   <span className={`font-semibold ${totalAdjusted !== totalOriginal ? 'text-emerald-600' : 'text-stone-700'}`}>
-                    → Total: ${Math.round(totalAdjusted).toLocaleString()}
+                    Γזע Total: ${Math.round(totalAdjusted).toLocaleString()}
                   </span>
                   </>}
                 </div>
@@ -375,13 +409,13 @@ const ExportModal = ({
               <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={onClose}
-                  className="flex-1 sm:flex-none h-9 px-4 text-xs sm:text-sm font-medium text-foreground bg-background border border-input rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleExport}
-                  className="flex-1 sm:flex-none h-9 px-4 text-xs sm:text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors flex items-center justify-center gap-2"
+                  className={`flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-white bg-gradient-to-r ${buttonColor} rounded-xl hover:opacity-90 shadow-lg transition-all flex items-center justify-center gap-2`}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

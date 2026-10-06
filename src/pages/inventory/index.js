@@ -1,5982 +1,682 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
-import { useRouteLoading } from "../../components/RouteLoadingContext";
-import { motion, AnimatePresence } from "framer-motion";
-import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
-import { Html5Qrcode } from "html5-qrcode";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import toast from "react-hot-toast";
+import {
+  BookOpen,
+  FileSpreadsheet,
+  FileText,
+  MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Printer,
+  SlidersHorizontal,
+  Table2,
+  Tag,
+  Users,
+} from "lucide-react";
+
 import { getMappedCategories } from "../../utils/categoryMap";
-import { inventoryPriceScale, PRICE_MODES, readPriceMode, scaleInventoryPrice, supportsBrutoMode, writePriceMode } from "../../utils/pricing";
-import { sanitizeText } from "../../utils/helper";
-import { buildSkuIndex, canonicalSku, parseSkuQuery } from "../../utils/skuQuery";
+import { inventoryPriceScale, readPriceMode, writePriceMode } from "../../utils/pricing";
+import { buildSkuIndex, parseSkuQuery } from "../../utils/skuQuery";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
-import { isBluetoothAvailable } from "../../services/niimbotPrint";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
-import StoneUsagePanel from "../../components/StoneUsagePanel";
-import ItemTierManager from "../../components/catalog/ItemTierManager";
-import { fetchStoneInventoryStatus, STONE_STATUS_LABELS, STONE_STATUS_PILL, fetchSoapStones, assignStone } from "../../services/stonesApi";
-import InternalExcelModal from "./components/InternalExcelModal";
-import { exportCatalogLiran } from "./helpers/catalogLiran";
-import CatalogLiranModal from "./components/CatalogLiranModal";
-import MemberAvatar from "../../components/team/MemberAvatar";
-import AssigneeFilter from "../../components/team/AssigneeFilter";
 import AssistantChat from "../../components/assistant/AssistantChat";
 import { useTeam } from "../../context/TeamContext";
-import toast from "react-hot-toast";
+import { useSelection } from "../../context/SelectionContext";
+import { assignStone, fetchSoapStones, fetchStoneInventoryStatus } from "../../services/stonesApi";
 
-const ITEMS_PER_PAGE = 50;
-// API base URL from .env
-const API_BASE = process.env.REACT_APP_API_URL || 'https://gems-dna-be.onrender.com';
+import {
+  API_BASE,
+  DIAMOND_DEFAULT_COLUMNS,
+  GEMSTONE_DEFAULT_COLUMNS,
+  JEWELRY_DEFAULT_COLUMNS,
+  getColumnConfig,
+  parseSmartSearch,
+  saveColumnConfig,
+} from "./helpers/constants";
+import { exportForLabels } from "./helpers/labelExport";
+import { generatePDFCatalog } from "./helpers/pdfCatalog";
+import { shareMultipleToWhatsApp, shareToWhatsApp } from "./helpers/whatsappHelpers";
+import { exportToExcel, exportToExcelSeparate, exportToInternalExcel, getCategoryBreakdown } from "./helpers/excelExport";
+import { exportCatalogLiran } from "./helpers/catalogLiran";
+import BarcodeScanner from "./components/BarcodeScanner";
+import CatalogLiranModal from "./components/CatalogLiranModal";
+import CategoryExportModal from "./components/CategoryExportModal";
+import ColumnSettingsModal from "./components/ColumnSettingsModal";
+import CompareModal from "./components/CompareModal";
+import ExportModal from "./components/ExportModal";
+import InternalExcelModal from "./components/InternalExcelModal";
+import PDFOptionsModal from "./components/PDFOptionsModal";
+import TagsModal from "./components/TagsModal";
 
-/* ---------------- Tag Colors ---------------- */
-const TAG_COLORS = [
-  { name: "Emerald", value: "#10b981" },
-  { name: "Blue", value: "#3b82f6" },
-  { name: "Purple", value: "#8b5cf6" },
-  { name: "Pink", value: "#ec4899" },
-  { name: "Orange", value: "#f97316" },
-  { name: "Yellow", value: "#eab308" },
-  { name: "Red", value: "#ef4444" },
-  { name: "Cyan", value: "#06b6d4" },
-];
+import {
+  ITEMS_PER_PAGE,
+  activeFilterChips,
+  applyChipRemoval,
+  buildCategoryOptions,
+  buildDiamondColorOptions,
+  buildFancyColorOptions,
+  buildJewelryOptions,
+  buildLabOptions,
+  buildPairGroups,
+  buildShapeOptions,
+  DEFAULT_SORT,
+  describeSort,
+  distinctValues,
+  dnaPathFor,
+  emptyFilters,
+  filterItems,
+  isPairOnly,
+  itemsForMode,
+  MODES,
+  normalizeCatalogJewelry,
+  normalizeStone,
+  normalizeWorkshopJewelry,
+  sortItems,
+  sortOptionsFor,
+  stoneMode,
+} from "./model/inventoryModel";
+import { buildUrlParams, convertPriceUnits, hasInventoryParams, parseUrlState } from "./model/inventoryUrl";
 
-/* ---------------- WhatsApp Quick Share ---------------- */
-const shareToWhatsApp = (stone, includePrice = false) => {
-  const dnaUrl = `https://gems-dna.com/${stone.sku}`;
-  
-  let message = `*${getDisplayShape(stone.shape) || 'Gemstone'}* - ${stone.weightCt || '?'}ct\n\n`;
-  message += `*Details:*\n`;
-  message += `SKU: ${stone.sku}\n`;
-  message += `Color: ${getDisplayColor(stone) || 'N/A'}\n`;
-  message += `Clarity: ${stone.clarity || 'N/A'}\n`;
-  message += `Treatment: ${stone.treatment || 'N/A'}\n`;
-  message += `Origin: ${stone.origin || 'N/A'}\n`;
-  message += `Lab: ${stone.lab || 'N/A'}\n`;
-  if (stone.measurements) {
-    message += `Size: ${stone.measurements}\n`;
-  }
-  
-  if (includePrice && stone.priceTotal) {
-    message += `\n*Price: $${stone.priceTotal.toLocaleString()}*\n`;
-  }
-  
-  message += `\nView DNA: ${dnaUrl}`;
-  
-  if (stone.imageUrl) {
-    message += `\n\nImage: ${stone.imageUrl}`;
-  }
-  
-  const encodedMessage = encodeURIComponent(message);
-  window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+import "./ui/inventory.css";
+import InventoryHeader from "./ui/InventoryHeader";
+import SearchField from "./ui/SearchField";
+import FilterPanel from "./ui/FilterPanel";
+import ActiveFilters from "./ui/ActiveFilters";
+import Toolbar, { SelectAll } from "./ui/Toolbar";
+import { PairResults, ResultsGallery, ResultsList, ResultsTable } from "./ui/Results";
+import { EmptyState, ErrorState, Pagination, SkeletonRows } from "./ui/States";
+import QuickLook from "./ui/QuickLook";
+import SelectionBar from "./ui/SelectionBar";
+import Sheet from "./ui/Sheet";
+import Lightbox from "./ui/Lightbox";
+import { getScroller, getScrollTop, setScrollTop, useLatest, useMediaQuery } from "./ui/hooks";
+
+const VIEW_KEY = "inventory.viewState";
+const SELECTION_KEY = "inventory.selection";
+const SCROLL_KEY = "inventory.scroll";
+const LAYOUT_KEY = "inventory.layout";
+const RAIL_KEY = "inventory.rail";
+const ASSIGNEE_KEY = "inventory.assigneeFilter";
+const REVALIDATE_MS = 60_000;
+
+const DEFAULT_COLUMNS_BY_MODE = {
+  diamonds: DIAMOND_DEFAULT_COLUMNS,
+  gemstones: GEMSTONE_DEFAULT_COLUMNS,
+  jewelry: JEWELRY_DEFAULT_COLUMNS,
 };
+const NOUNS = { diamonds: "diamonds", gemstones: "gemstones", jewelry: "pieces" };
 
-/* ---------------- WhatsApp Bulk Share (multiple stones) ---------------- */
-const shareMultipleToWhatsApp = (selectedStonesArray) => {
-  if (!selectedStonesArray || selectedStonesArray.length === 0) return;
+const pairIds = (pair) => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])];
 
-  let message = `*${selectedStonesArray.length} Stones - DNA Links*\n\n`;
+/* Survives navigating to a stone's DNA page and back, so the list renders
+ * immediately and refreshes quietly instead of showing a skeleton again. */
+const cache = { stones: new Map(), jewelry: new Map(), tags: null };
 
-  selectedStonesArray.forEach((stone, idx) => {
-    const dnaUrl = `https://gems-dna.com/${stone.sku}`;
-    message += `${idx + 1}. *${getDisplayShape(stone.shape) || 'Gemstone'}* ${stone.weightCt || '?'}ct`;
-    if (getDisplayColor(stone)) message += ` | ${getDisplayColor(stone)}`;
-    message += ` | SKU: ${stone.sku}\n`;
-    message += `   ${dnaUrl}\n\n`;
-  });
-
-  const encodedMessage = encodeURIComponent(message.trim());
-  window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
-};
-
-// sessionStorage key for restoring the inventory view (mode/filters/search)
-// after visiting a stone's DNA page.
-const INVENTORY_VIEW_KEY = "inventory.viewState";
-
-/* ---------------- Price Encoding (BARELOVSK) ---------------- */
-const encodePriceBARELOVSK = (price) => {
-  if (!price || price <= 0) return "B-";
-  
-  const rounded = Math.round(price);
-  const priceStr = rounded.toString();
-  
-  const digitToLetter = {
-    '1': 'H', '2': 'A', '3': 'R', '4': 'E', '5': 'L',
-    '6': 'O', '7': 'V', '8': 'S', '9': 'K'
-  };
-  
-  let encoded = 'B';
-  let i = 0;
-  
-  while (i < priceStr.length) {
-    if (priceStr[i] === '0') {
-      let zeroCount = 0;
-      while (i < priceStr.length && priceStr[i] === '0') {
-        zeroCount++;
-        i++;
-      }
-      // Order: I(0) Γזע Y(00) Γזע Z(000)
-      const remainder = zeroCount % 3;
-      const zCount = Math.floor(zeroCount / 3);
-      if (remainder === 1) encoded += 'I';
-      if (remainder === 2) encoded += 'Y';
-      for (let j = 0; j < zCount; j++) encoded += 'Z';
-    } else {
-      encoded += digitToLetter[priceStr[i]];
-      i++;
-    }
-  }
-  
-  return encoded;
-};
-
-/* ---------------- Export for Niimbot Labels ---------------- */
-const exportForLabels = async (selectedStones, shareMode = false) => {
-  if (!selectedStones || selectedStones.length === 0) {
-    alert("Please select stones to export");
-    return;
-  }
-
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Gemstar Labels";
-  workbook.created = new Date();
-
-  const worksheet = workbook.addWorksheet("Labels");
-
-  // Set column widths
-  worksheet.columns = [
-    { key: "details", width: 25 },
-    { key: "qr", width: 35 },
-  ];
-
-  // Add header row
-  const headerRow = worksheet.addRow(["Details", "QR Code URL"]);
-  headerRow.font = { bold: true, size: 12 };
-  headerRow.alignment = { horizontal: "center", vertical: "middle" };
-  headerRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-  headerRow.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
-
-  // Add data rows
-  selectedStones.forEach((stone) => {
-    /* The code on a tag is the Bruto price per carat — that is what its
-     * leading B means — and it stays Bruto whichever way the screen's
-     * Neto/Bruto toggle happens to be set, so the same stone never leaves the
-     * office wearing two different tags. Callers therefore hand this export
-     * unscaled stones and the Bruto figure is derived here. */
-    const priceCode = encodePriceBARELOVSK(
-      scaleInventoryPrice(stone.pricePerCt, stone, PRICE_MODES.BRUTO)
-    );
-    const mapped = getMappedCategories(stone.category);
-    const sku = (stone.sku || '').toUpperCase();
-    
-    const isDiamondOrFancy = mapped.includes('Diamond') || sku.startsWith('T');
-    
-    // Clarity: "insignificant" Γזע "Ins."
-    const clarity = (stone.clarity || '').toLowerCase() === 'insignificant' 
-      ? 'Ins' 
-      : (stone.clarity || '');
-    
-    // Treatment: "insignificant" Γזע "Ins.", default to "Minor" if empty
-    const rawTreatment = stone.treatment || 'Minor';
-    const treatment = rawTreatment.toLowerCase() === 'insignificant' ? 'Ins' : rawTreatment;
-    
-    // Hide price if ΓיÑ50K per carat
-    const showPrice = stone.pricePerCt < 50000;
-    
-    const lab = (stone.lab && stone.lab.toUpperCase() !== 'N/A') ? stone.lab : null;
-    
-    let details;
-    if (isDiamondOrFancy) {
-      details = [
-        `${stone.weightCt || '?'}`,
-        lab,
-        `${getDisplayColor(stone) || ''}   ${clarity}`.trim() || null
-      ].filter(Boolean).join('\n');
-    } else {
-      details = [
-        `${stone.weightCt || '?'}`,
-        lab,
-        treatment,
-        showPrice ? priceCode : null
-      ].filter(Boolean).join('\n');
-    }
-
-    const qrUrl = `https://gems-dna.com/${stone.sku}`;
-
-    const row = worksheet.addRow([details, qrUrl]);
-    
-    // Style the row - centered
-    row.height = 80; // Taller rows for multi-line content
-    
-    // Center the details column
-    row.getCell(1).alignment = { 
-      horizontal: "center", 
-      vertical: "middle",
-      wrapText: true
-    };
-    
-    // Center the QR URL column
-    row.getCell(2).alignment = { 
-      horizontal: "center", 
-      vertical: "middle"
-    };
-  });
-
-  // Generate file
-  const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `Labels_${new Date().toISOString().split("T")[0]}_${selectedStones.length}pcs.xlsx`;
-  
-  // Share mode - use Web Share API
-  if (shareMode && navigator.canShare) {
-    const file = new File([buffer], filename, {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    
-    if (navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: "Niimbot Labels",
-          text: `${selectedStones.length} stone labels for printing`,
-        });
-        return;
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.log("Share failed, falling back to download");
-        } else {
-          return; // User cancelled
-        }
-      }
-    }
-  }
-  
-  // Fallback: Download
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  saveAs(blob, filename);
-};
-
-/* ---------------- PDF Catalog Helper: Fonts ---------------- */
-const _fetchFontAsBase64 = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Font not found: ${url}`);
-  const blob = await res.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
-
-let _catalogFontsCache = null;
-const loadCatalogFonts = async () => {
-  if (_catalogFontsCache) return _catalogFontsCache;
+const readJson = (storage, key) => {
   try {
-    const [playfair, latoLight] = await Promise.all([
-      _fetchFontAsBase64('/fonts/PlayfairDisplay-Regular.ttf'),
-      _fetchFontAsBase64('/fonts/Lato-Light.ttf'),
-    ]);
-    _catalogFontsCache = { playfair, latoLight };
-    return _catalogFontsCache;
-  } catch (e) {
-    console.warn('[PDF] Custom fonts could not be loaded, falling back to Helvetica.', e);
+    const raw = storage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
     return null;
   }
 };
-
-const registerCatalogFonts = (pdf, fonts) => {
-  if (!fonts) return { title: 'helvetica', body: 'helvetica', titleStyle: 'normal', bodyStyle: 'normal' };
-  pdf.addFileToVFS('PlayfairDisplay-Regular.ttf', fonts.playfair);
-  pdf.addFont('PlayfairDisplay-Regular.ttf', 'PlayfairDisplay', 'normal');
-  pdf.addFileToVFS('Lato-Light.ttf', fonts.latoLight);
-  pdf.addFont('Lato-Light.ttf', 'LatoLight', 'normal');
-  return { title: 'PlayfairDisplay', body: 'LatoLight', titleStyle: 'normal', bodyStyle: 'normal' };
-};
-
-/* ---------------- Office Contacts (by Clerk publicMetadata.location) ----------------
- * To assign a user to a specific office: Clerk Dashboard -> Users -> open user ->
- * Metadata -> Public metadata -> { "location": "IL" }   (or "NY", "HK", "LA")
- *
- * The catalog and exports will pick the matching phone / email / website.
- * If no location is set, we fall back to the legacy email-based detection
- * (so existing users keep working until you migrate them).
- */
-const OFFICE_CONTACTS_BY_LOCATION = {
-  IL: { phone: '+972-3-575-1137',  email: 'info@gems.net', site: 'www.gems.net', label: 'Tel Aviv' },
-  NY: { phone: '+1.917.309.2523',  email: 'info@gems.net', site: 'www.gems.net', label: 'New York' },
-  HK: { phone: '+852-3568-7021',   email: 'info@gems.net', site: 'www.gems.net', label: 'Hong Kong' },
-  LA: { phone: '+1-213-622-9819',  email: 'info@gems.net', site: 'www.gems.net', label: 'Los Angeles' },
-};
-// Backward compatibility - "US" used to be the default code; map it to NY.
-OFFICE_CONTACTS_BY_LOCATION.US = OFFICE_CONTACTS_BY_LOCATION.NY;
-const DEFAULT_OFFICE_CONTACT = OFFICE_CONTACTS_BY_LOCATION.NY;
-
-const LEGACY_ISRAEL_EMAILS = [
-  'yarden@eshed.com',
-  'eyal@eshed.com',
-  'meirav@eshed.com',
-  'le@gems.net',
-];
-
-const getOfficeContact = ({ location, email } = {}) => {
-  if (location && OFFICE_CONTACTS_BY_LOCATION[location]) {
-    return OFFICE_CONTACTS_BY_LOCATION[location];
-  }
-  if (email && LEGACY_ISRAEL_EMAILS.includes(String(email).toLowerCase())) {
-    return OFFICE_CONTACTS_BY_LOCATION.IL;
-  }
-  return DEFAULT_OFFICE_CONTACT;
-};
-
-/* ---------------- PDF Catalog Generator ---------------- */
-const generatePDFCatalog = async (selectedStones, options = {}) => {
-  if (!selectedStones || selectedStones.length === 0) {
-    alert("Please select stones to generate PDF");
-    return;
-  }
-
-  const {
-    layout = 'grid',
-    showPrices = true,
-    itemsPerPage = 4,
-    userLocation,
-    userEmail,
-  } = options;
-
-  const office = getOfficeContact({ location: userLocation, email: userEmail });
-
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 15;
-  const contentWidth = pageWidth - margin * 2;
-
-  const green = [0, 168, 107];
-  const dark = [24, 24, 24];
-  const black = [0, 0, 0];
-  const gray = [140, 140, 140];
-  const lightGray = [200, 200, 200];
-
-  const fonts = await loadCatalogFonts();
-  const PDF_FONTS = registerCatalogFonts(pdf, fonts);
-  console.log('[PDF Catalog] Fonts:', fonts ? 'loaded ✓' : 'fallback (Helvetica)');
-
-  let logoBase64 = null;
-  let logoCoverBase64 = null;
-  let coverBgBase64 = null;
-  try { logoBase64 = await imageToBase64('/gemstar-logo-footer.png'); } catch (e) { /* no logo */ }
+const writeJson = (storage, key, value) => {
   try {
-    logoCoverBase64 = await imageToBase64('/images/Gemstar_logo%201.png');
-    console.log('[PDF Catalog] Cover logo: loaded ✓');
-  } catch (e) {
-    console.warn('[PDF Catalog] Cover logo failed to load:', e);
+    storage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
   }
-  try {
-    coverBgBase64 = await imageToBase64('/images/A4_cover_bg.png');
-    console.log('[PDF Catalog] Cover background: loaded ✓');
-  } catch (e) {
-    console.warn('[PDF Catalog] Cover background failed to load:', e);
-  }
+};
 
-  const loadImage = async (url) => {
-    if (!url) return null;
-    try {
-      const res = await fetch(`${API_BASE}/api/image-proxy?url=${encodeURIComponent(url)}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      return (data.image && data.image.startsWith('data:')) ? data.image : null;
-    } catch (e) { return null; }
-  };
-
-  const isJewelryItem = (stone) => stone.category === 'Jewelry';
-
-  const getCategoryLabel = (stone) => {
-    if (isJewelryItem(stone)) return (stone.jewelryType || 'Jewelry').toUpperCase();
-    const mapped = getMappedCategories(stone.category);
-    if (mapped.includes('Emerald')) return 'EMERALD';
-    if (mapped.includes('Diamond')) return 'DIAMOND';
-    const label = mapped.find(m => m !== 'Empty' && m !== 'Fancy');
-    return (label || 'GEMSTONE').toUpperCase();
-  };
-
-  const getStoneDetails = (stone) => {
-    const mapped = getMappedCategories(stone.category);
-    const isEmeraldType = !mapped.includes('Diamond');
+/* URL wins (refresh, shared link, DNA → Back); otherwise the last view in
+ * this tab; otherwise defaults. */
+const initialView = (params, priceMode) => {
+  if (hasInventoryParams(params)) {
+    const url = parseUrlState(params);
     return {
-      shape: getDisplayShape(stone.shape) || '-',
-      color: getDisplayColor(stone) || '-',
-      clarity: isEmeraldType ? (stone.treatment || '-') : (stone.clarity || '-'),
-      lab: stone.lab || '-',
-      sku: stone.sku || '-',
+      mode: url.mode || "diamonds",
+      filters: convertPriceUnits(url.filters, url.priceUnit, priceMode),
+      smartSearch: url.smartSearch,
+      sort: url.sort,
+      page: url.page,
+      jewelrySource: url.jewelrySource,
+      legacySearch: !url.mode && url.filters.sku ? url.filters.sku : "",
     };
-  };
-
-  // Compact metal label so it fits a narrow cell: "18K White Gold" -> "18K WG".
-  const shortMetal = (m) => {
-    if (!m) return '-';
-    return String(m)
-      .replace(/\bWhite Gold\b/i, 'WG')
-      .replace(/\bYellow Gold\b/i, 'YG')
-      .replace(/\bRose Gold\b/i, 'RG')
-      .replace(/\bPlatinum\b/i, 'Plat')
-      .replace(/\bGold\b/i, 'Gold')
-      .replace(/\s+/g, ' ')
-      .trim() || '-';
-  };
-
-  // Per-card spec columns. Stones show Shape/Color/Clarity/Lab; jewelry shows
-  // the data that actually matters for a piece: metal, center stone shape +
-  // carat, and center colour (clarity/lab are dropped — almost always empty).
-  const getSpecFields = (stone) => {
-    if (isJewelryItem(stone)) {
-      const center = getDisplayShape(stone.shape) || stone.stoneType || '-';
-      const ctrCt = stone.centerStoneCarat ? `${Number(stone.centerStoneCarat)}ct` : '-';
-      return {
-        cols: ['Metal', 'Center', 'Ctr ct', 'Color'],
-        vals: [shortMetal(stone.metalType), center, ctrCt, stone.color || '-'],
-      };
-    }
-    const d = getStoneDetails(stone);
-    return {
-      cols: ['Shape', 'Color', 'Clarity', 'Lab'],
-      vals: [d.shape, d.color, shortenClarity(d.clarity), d.lab],
-    };
-  };
-
-  // Shorten long multi-word Clarity values so they don't overflow the cell.
-  // Example: "Insignificant to Minor" -> "Ins - Min"
-  // Rule: take the first 3 chars of each meaningful word, joined with " - ".
-  // Connector words (to / and / & / or / of / the) are dropped.
-  // Single-word or already-short values are returned unchanged.
-  const shortenClarity = (clarity) => {
-    if (!clarity) return '-';
-    const text = String(clarity).trim();
-    if (!text || text === '-') return '-';
-    const STOP = new Set(['to', 'and', '&', 'or', 'of', 'the']);
-    const words = text.split(/\s+/).filter((w) => !STOP.has(w.toLowerCase()));
-    if (words.length <= 1) return text;
-    if (text.length <= 12) return text;
-    return words.map((w) => (w.length > 3 ? w.substring(0, 3) : w)).join(' - ');
-  };
-
-  const addFooter = (pageNum, totalContentPages) => {
-    const footerY = pageHeight - 12;
-    pdf.setDrawColor(...lightGray);
-    pdf.setLineWidth(0.3);
-    pdf.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
-    pdf.setFontSize(8);
-    pdf.setTextColor(...gray);
-    pdf.setFont('helvetica', 'normal');
-    const dateStr = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-    pdf.text(dateStr, margin, footerY);
-    pdf.text(`Page ${pageNum} of ${totalContentPages}`, pageWidth - margin, footerY, { align: 'right' });
-  };
-
-  const totalContentPages = Math.ceil(selectedStones.length / itemsPerPage);
-  const totalWeight = selectedStones.reduce((sum, s) => sum + (s.weightCt || 0), 0);
-
-  // ==================== COVER PAGE ====================
-  if (coverBgBase64) {
-    try {
-      pdf.addImage(coverBgBase64, 'PNG', 0, 0, pageWidth, pageHeight);
-    } catch (e) {
-      pdf.setFillColor(...dark);
-      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-    }
-  } else {
-    pdf.setFillColor(...dark);
-    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
   }
-
-  const coverLogo = logoCoverBase64 || logoBase64;
-  if (coverLogo) {
-    try {
-      const props = pdf.getImageProperties(coverLogo);
-      const logoW = 45;
-      const logoH = logoW * (props.height / props.width);
-      pdf.addImage(
-        coverLogo,
-        'PNG',
-        pageWidth / 2 - logoW / 2,
-        40,
-        logoW,
-        logoH
-      );
-    } catch (e) { /* skip */ }
-  }
-
-  pdf.setDrawColor(255, 255, 255);
-  pdf.setLineWidth(0.4);
-  pdf.line(pageWidth / 2 - 32, 86, pageWidth / 2 + 32, 86);
-
-  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(11);
-  pdf.setTextColor(255, 255, 255);
-  pdf.text('Premium Gemstones & Diamonds', pageWidth / 2, 93, { align: 'center' });
-
-  pdf.setDrawColor(255, 255, 255);
-  pdf.setLineWidth(0.4);
-  pdf.line(pageWidth / 2 - 32, 98, pageWidth / 2 + 32, 98);
-
-  pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-  pdf.setFontSize(30);
-  pdf.setTextColor(255, 255, 255);
-  pdf.text('STONE CATALOG', pageWidth / 2, pageHeight * 0.55, { align: 'center' });
-
-  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(15);
-  pdf.setTextColor(220, 220, 220);
-  pdf.text(
-    `${selectedStones.length} Stones   |   ${totalWeight.toFixed(2)} Total Carats`,
-    pageWidth / 2,
-    pageHeight * 0.55 + 10,
-    { align: 'center' }
-  );
-
-  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(9);
-  pdf.setTextColor(200, 200, 200);
-  const dateStr = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-  pdf.text(dateStr, pageWidth / 2, pageHeight - 30, { align: 'center' });
-
-  pdf.setDrawColor(180, 180, 180);
-  pdf.setLineWidth(0.3);
-  pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-
-  pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-  pdf.setFontSize(8);
-  pdf.setTextColor(220, 220, 220);
-  const footerY = pageHeight - 12;
-  const sepLeft = pageWidth / 2 - 32;
-  const sepRight = pageWidth / 2 + 32;
-  pdf.text(office.site, sepLeft - 4, footerY, { align: 'right' });
-  pdf.setTextColor(150, 150, 150);
-  pdf.text('|', sepLeft, footerY, { align: 'center' });
-  pdf.setTextColor(220, 220, 220);
-  pdf.text(office.phone, pageWidth / 2, footerY, { align: 'center' });
-  pdf.setTextColor(150, 150, 150);
-  pdf.text('|', sepRight, footerY, { align: 'center' });
-  pdf.setTextColor(220, 220, 220);
-  pdf.text(office.email, sepRight + 4, footerY, { align: 'left' });
-
-  // ==================== CONTENT PAGES ====================
-  const coverLogoForHeader = logoCoverBase64 || logoBase64;
-  const drawInnerHeader = () => {
-    const HEADER_H = 28;
-    if (coverBgBase64) {
-      try { pdf.addImage(coverBgBase64, 'PNG', 0, 0, pageWidth, HEADER_H); } catch (e) {
-        pdf.setFillColor(...dark);
-        pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
-      }
-    } else {
-      pdf.setFillColor(...dark);
-      pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
-    }
-    if (coverLogoForHeader) {
-      try {
-        const lp = pdf.getImageProperties(coverLogoForHeader);
-        const lh = 16;
-        const lw = lh * (lp.width / lp.height);
-        pdf.addImage(coverLogoForHeader, 'PNG', margin, (HEADER_H - lh) / 2, lw, lh);
-      } catch (e) { /* skip */ }
-    }
-    pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text(
-      'N e w   Y o r k   |   T e l   A v i v   |   H o n g   K o n g   |   L o s   A n g e l e s',
-      pageWidth - margin,
-      HEADER_H / 2 - 1,
-      { align: 'right' }
-    );
-    pdf.setFontSize(7);
-    pdf.setTextColor(220, 220, 220);
-    pdf.text(
-      `${office.site}   |   ${office.phone}   |   ${office.email}`,
-      pageWidth - margin,
-      HEADER_H / 2 + 5,
-      { align: 'right' }
-    );
-    return HEADER_H;
+  const saved = readJson(sessionStorage, VIEW_KEY);
+  const mode = MODES.includes(saved?.inventoryMode) ? saved.inventoryMode : "diamonds";
+  return {
+    mode,
+    filters: { ...emptyFilters(), ...(saved?.filters || {}) },
+    smartSearch: saved?.smartSearch || "",
+    sort: saved?.sort?.field ? saved.sort : { ...DEFAULT_SORT },
+    page: saved?.page || 1,
+    jewelrySource: saved?.jewelrySource || "all",
+    legacySearch: "",
   };
-
-  const drawInnerFooter = (pageNum) => {
-    const fY = pageHeight - 10;
-    pdf.setDrawColor(220, 220, 220);
-    pdf.setLineWidth(0.3);
-    pdf.line(margin, fY - 5, pageWidth - margin, fY - 5);
-    pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-    pdf.setFontSize(8);
-    pdf.setTextColor(120, 120, 120);
-    const fDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-    pdf.text(fDate, margin, fY);
-    pdf.text(`Page ${pageNum} of ${totalContentPages}`, pageWidth - margin, fY, { align: 'right' });
-  };
-
-  if (layout === 'list') {
-    const HEADER_H = 28;
-    const FOOTER_RESERVE = 20;
-    const startY = HEADER_H + 6;
-    const cardSlot = (pageHeight - startY - FOOTER_RESERVE) / itemsPerPage;
-    const cardHeight = Math.min(cardSlot - 4, 55);
-    const imgSize = Math.min(cardHeight - 4, 50);
-    let pageNum = 0;
-
-    for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
-      pdf.addPage();
-      pageNum++;
-      drawInnerHeader();
-
-      const pageStones = selectedStones.slice(i, i + itemsPerPage);
-
-      for (let j = 0; j < pageStones.length; j++) {
-        const stone = pageStones[j];
-        const details = getStoneDetails(stone);
-        const catLabel = getCategoryLabel(stone);
-
-        const y = startY + j * cardSlot;
-
-        // ---------- Image (left, square with thin frame) ----------
-        const imgY = y + (cardHeight - imgSize) / 2;
-        pdf.setDrawColor(220, 220, 220);
-        pdf.setLineWidth(0.3);
-        pdf.rect(margin, imgY, imgSize, imgSize, 'S');
-
-        if (stone.imageUrl) {
-          try {
-            const imgData = await loadImage(stone.imageUrl);
-            if (imgData) {
-              pdf.addImage(imgData, 'JPEG', margin + 1.5, imgY + 1.5, imgSize - 3, imgSize - 3);
-            }
-          } catch (e) { /* skip */ }
-        }
-
-        // ---------- Right side text area ----------
-        const textX = margin + imgSize + 10;
-        const rightEdge = pageWidth - margin;
-        const textWidth = rightEdge - textX;
-
-        // Specs row — stones: Shape | Color | Clarity | Lab | SKU;
-        // jewelry: Metal | Center | Ctr ct | Color | SKU (labels gray, values black)
-        const baseSpec = getSpecFields(stone);
-        const specCols = [...baseSpec.cols, 'SKU'];
-        const specVals = [...baseSpec.vals, details.sku];
-        const sColW = textWidth / specCols.length;
-        const labelY = y + 5;
-        const valY = labelY + 5.5;
-
-        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(7);
-        pdf.setTextColor(150, 150, 150);
-        specCols.forEach((label, ci) => {
-          pdf.text(label, textX + ci * sColW, labelY);
-        });
-
-        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(10);
-        pdf.setTextColor(20, 20, 20);
-        specVals.forEach((val, ci) => {
-          pdf.text(String(val), textX + ci * sColW, valY);
-        });
-
-        // Category name (large serif, left-aligned)
-        const catY = valY + 9;
-        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(15);
-        pdf.setTextColor(20, 20, 20);
-        pdf.text(catLabel, textX, catY);
-
-        // Divider between category and weight/price row
-        const divY = catY + 4;
-        pdf.setDrawColor(230, 230, 230);
-        pdf.setLineWidth(0.2);
-        pdf.line(textX, divY, rightEdge, divY);
-
-        // ---------- Weight + Price + View DNA button ----------
-        const bottomY = divY + 7;
-
-        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(9);
-        pdf.setTextColor(120, 120, 120);
-        pdf.text('WEIGHT:', textX, bottomY);
-        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(10);
-        pdf.setTextColor(...green);
-        pdf.text(`${stone.weightCt || '?'}ct`, textX + 18, bottomY);
-
-        if (showPrices && stone.priceTotal) {
-          pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-          pdf.setFontSize(9);
-          pdf.setTextColor(120, 120, 120);
-          pdf.text('PRICE:', textX + 44, bottomY);
-          pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-          pdf.setFontSize(10);
-          pdf.setTextColor(...green);
-          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, textX + 58, bottomY);
-        }
-
-        // View DNA pill button (right-aligned)
-        const btnW = 32;
-        const btnH = 7.5;
-        const btnX = rightEdge - btnW;
-        const btnY = bottomY - 5.5;
-        pdf.setFillColor(...green);
-        pdf.roundedRect(btnX, btnY, btnW, btnH, 1, 1, 'F');
-        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(8);
-        pdf.setTextColor(255, 255, 255);
-        pdf.textWithLink('View DNA', btnX + btnW / 2, btnY + 5, {
-          url: `https://gems-dna.com/${stone.sku}`,
-          align: 'center',
-        });
-
-        // Divider between cards
-        if (j < pageStones.length - 1) {
-          const sepY = y + cardSlot - 2;
-          pdf.setDrawColor(230, 230, 230);
-          pdf.setLineWidth(0.2);
-          pdf.line(margin, sepY, pageWidth - margin, sepY);
-        }
-      }
-
-      drawInnerFooter(pageNum);
-    }
-  } else {
-    // Grid layout: 2x2 = 4 per page
-    const HEADER_H = 28;
-    const FOOTER_H = 18;
-    const GUTTER = 8;
-    const colWidth = (contentWidth - GUTTER) / 2;
-    const cardHeight = (pageHeight - HEADER_H - FOOTER_H - GUTTER - 6) / 2;
-    let pageNum = 0;
-
-    for (let i = 0; i < selectedStones.length; i += itemsPerPage) {
-      pdf.addPage();
-      pageNum++;
-
-      // ---------- Header (dark rocky band) ----------
-      if (coverBgBase64) {
-        try { pdf.addImage(coverBgBase64, 'PNG', 0, 0, pageWidth, HEADER_H); } catch (e) {
-          pdf.setFillColor(...dark);
-          pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
-        }
-      } else {
-        pdf.setFillColor(...dark);
-        pdf.rect(0, 0, pageWidth, HEADER_H, 'F');
-      }
-
-      // Header logo (left)
-      if (coverLogo) {
-        try {
-          const lp = pdf.getImageProperties(coverLogo);
-          const lh = 16;
-          const lw = lh * (lp.width / lp.height);
-          pdf.addImage(coverLogo, 'PNG', margin, (HEADER_H - lh) / 2, lw, lh);
-        } catch (e) { /* skip */ }
-      }
-
-      // Header right column (locations + contact)
-      pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text(
-        'N e w   Y o r k   |   T e l   A v i v   |   H o n g   K o n g   |   L o s   A n g e l e s',
-        pageWidth - margin,
-        HEADER_H / 2 - 1,
-        { align: 'right' }
-      );
-      pdf.setFontSize(7);
-      pdf.setTextColor(220, 220, 220);
-      pdf.text(
-        `${office.site}   |   ${office.phone}   |   ${office.email}`,
-        pageWidth - margin,
-        HEADER_H / 2 + 5,
-        { align: 'right' }
-      );
-
-      const startY = HEADER_H + 8;
-      const pageStones = selectedStones.slice(i, i + itemsPerPage);
-
-      for (let j = 0; j < pageStones.length; j++) {
-        const stone = pageStones[j];
-        const details = getStoneDetails(stone);
-        const catLabel = getCategoryLabel(stone);
-        const col = j % 2;
-        const row = Math.floor(j / 2);
-        const x = margin + col * (colWidth + GUTTER);
-        const y = startY + row * (cardHeight + GUTTER);
-
-        // ---------- Image area (top of card, square) ----------
-        const imgPad = 2;
-        const imgH = Math.min(colWidth - 4, cardHeight * 0.55);
-        const imgW = imgH;
-        const imgX = x + (colWidth - imgW) / 2;
-        const imgY = y;
-
-        pdf.setDrawColor(220, 220, 220);
-        pdf.setLineWidth(0.3);
-        pdf.rect(imgX, imgY, imgW, imgH, 'S');
-
-        if (stone.imageUrl) {
-          try {
-            const imgData = await loadImage(stone.imageUrl);
-            if (imgData) {
-              pdf.addImage(imgData, 'JPEG', imgX + imgPad, imgY + imgPad, imgW - imgPad * 2, imgH - imgPad * 2);
-            }
-          } catch (e) { /* skip */ }
-        }
-
-        // ---------- Specs row (Shape | Color | Clarity | Lab) ----------
-        const specsY = imgY + imgH + 8;
-        const { cols: specCols, vals: specVals } = getSpecFields(stone);
-        const sColW = colWidth / specCols.length;
-
-        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(7);
-        pdf.setTextColor(150, 150, 150);
-        specCols.forEach((label, ci) => {
-          pdf.text(label, x + ci * sColW + sColW / 2, specsY, { align: 'center' });
-        });
-
-        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(10);
-        pdf.setTextColor(20, 20, 20);
-        specVals.forEach((val, ci) => {
-          pdf.text(String(val), x + ci * sColW + sColW / 2, specsY + 5, { align: 'center' });
-        });
-
-        // Divider 1
-        const div1Y = specsY + 10;
-        pdf.setDrawColor(220, 220, 220);
-        pdf.setLineWidth(0.3);
-        pdf.line(x, div1Y, x + colWidth, div1Y);
-
-        // ---------- Category (centered, serif) ----------
-        const catY = div1Y + 6;
-        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(11);
-        pdf.setTextColor(20, 20, 20);
-        pdf.text(catLabel, x + colWidth / 2, catY, { align: 'center' });
-
-        // ---------- Weight + Price ----------
-        const wpY = catY + 8;
-        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(10);
-        pdf.setTextColor(120, 120, 120);
-        pdf.text('WEIGHT:', x + 2, wpY);
-        pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-        pdf.setFontSize(11.5);
-        pdf.setTextColor(...green);
-        pdf.text(`${stone.weightCt || '?'}ct`, x + 20, wpY);
-
-        if (showPrices && stone.priceTotal) {
-          pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-          pdf.setFontSize(10);
-          pdf.setTextColor(120, 120, 120);
-          pdf.text('PRICE:', x + colWidth / 2, wpY);
-          pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
-          pdf.setFontSize(11.5);
-          pdf.setTextColor(...green);
-          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, x + colWidth / 2 + 15, wpY);
-        }
-
-        // Divider 2
-        const div2Y = wpY + 4;
-        pdf.setDrawColor(230, 230, 230);
-        pdf.setLineWidth(0.2);
-        pdf.line(x, div2Y, x + colWidth, div2Y);
-
-        // ---------- SKU + View DNA button ----------
-        const btnY = div2Y + 6;
-        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(8);
-        pdf.setTextColor(140, 140, 140);
-        pdf.text(details.sku, x + 2, btnY + 0.5);
-
-        const btnW = 36;
-        const btnH = 7;
-        const btnX = x + colWidth - btnW;
-        const btnTopY = btnY - 4;
-        pdf.setFillColor(...green);
-        pdf.roundedRect(btnX, btnTopY, btnW, btnH, 1, 1, 'F');
-        pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-        pdf.setFontSize(8);
-        pdf.setTextColor(255, 255, 255);
-        pdf.textWithLink('View DNA', btnX + btnW / 2, btnTopY + 4.7, {
-          url: `https://gems-dna.com/${stone.sku}`,
-          align: 'center',
-        });
-      }
-
-      // ---------- Footer ----------
-      const fY = pageHeight - 10;
-      pdf.setDrawColor(220, 220, 220);
-      pdf.setLineWidth(0.3);
-      pdf.line(margin, fY - 5, pageWidth - margin, fY - 5);
-
-      pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
-      pdf.setFontSize(8);
-      pdf.setTextColor(120, 120, 120);
-      const fDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-      pdf.text(fDate, margin, fY);
-      pdf.text(`Page ${pageNum} of ${totalContentPages}`, pageWidth - margin, fY, { align: 'right' });
-    }
-  }
-
-  const filename = `Gemstar_Catalog_${new Date().toISOString().split('T')[0]}_${selectedStones.length}pcs.pdf`;
-  pdf.save(filename);
 };
 
-/* ---------------- Category Export Choice Modal ---------------- */
-const CategoryExportModal = ({ isOpen, onClose, categories, onChoose }) => {
-  if (!isOpen) return null;
-  
-  const emeraldCount = categories.emeralds || 0;
-  const diamondCount = categories.diamonds || 0;
-  const otherCount = categories.other || 0;
-  
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          onClick={(e) => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-        >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-500 to-blue-500 px-6 py-4">
-            <h2 className="text-xl font-bold text-white">Export Options</h2>
-            <p className="text-white/80 text-sm mt-1">
-              You selected multiple categories
-            </p>
-          </div>
-          
-          {/* Content */}
-          <div className="p-6">
-            {/* Summary */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {emeraldCount > 0 && (
-                <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  Emeralds: {emeraldCount}
-                </span>
-              )}
-              {diamondCount > 0 && (
-                <span className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                  Diamonds: {diamondCount}
-                </span>
-              )}
-              {otherCount > 0 && (
-                <span className="px-3 py-1.5 bg-stone-100 text-stone-700 rounded-full text-sm font-medium">
-                  Other: {otherCount}
-                </span>
-              )}
-            </div>
-            
-            {/* Options */}
-            <div className="space-y-3">
-              <button
-                onClick={() => onChoose('separate')}
-                className="w-full p-4 border-2 border-emerald-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition-all text-left group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                    <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-stone-800">Separate Sheets</h3>
-                    <p className="text-sm text-stone-500">
-                      Each category in its own sheet with specific columns
-                    </p>
-                  </div>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => onChoose('combined')}
-                className="w-full p-4 border-2 border-blue-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-left group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-stone-800">Combined Sheet</h3>
-                    <p className="text-sm text-stone-500">
-                      All stones in one sheet with all columns
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-          
-          {/* Footer */}
-          <div className="px-6 py-4 bg-stone-50 border-t border-stone-200">
-            <button
-              onClick={onClose}
-              className="w-full py-2.5 text-stone-600 hover:text-stone-800 font-medium transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-/* ---------------- PDF Options Modal ---------------- */
-const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating }) => {
-  const [layout, setLayout] = useState('grid');
-  const [showPrices, setShowPrices] = useState(true);
-
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          onClick={(e) => e.stopPropagation()}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-        >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-red-500 to-pink-500 px-6 py-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              PDF Catalog
-            </h2>
-            <p className="text-white/80 text-sm mt-1">
-              Generate a professional catalog with {stoneCount} stones
-            </p>
-          </div>
-
-          {/* Content */}
-          <div className="p-6 space-y-6">
-            {/* Layout Selection */}
-            <div>
-              <h3 className="font-semibold text-stone-700 mb-3">Layout Style</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setLayout('grid')}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    layout === 'grid'
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-stone-200 hover:border-stone-300'
-                  }`}
-                >
-                  <div className="grid grid-cols-2 gap-1 mb-2">
-                    {[1,2,3,4].map(i => (
-                      <div key={i} className={`h-4 rounded ${layout === 'grid' ? 'bg-red-300' : 'bg-stone-300'}`} />
-                    ))}
-                  </div>
-                  <span className={`text-sm font-medium ${layout === 'grid' ? 'text-red-700' : 'text-stone-600'}`}>
-                    Grid (6/page)
-                  </span>
-                </button>
-                
-                <button
-                  onClick={() => setLayout('list')}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    layout === 'list'
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-stone-200 hover:border-stone-300'
-                  }`}
-                >
-                  <div className="space-y-1 mb-2">
-                    {[1,2,3].map(i => (
-                      <div key={i} className={`h-3 rounded ${layout === 'list' ? 'bg-red-300' : 'bg-stone-300'}`} />
-                    ))}
-                  </div>
-                  <span className={`text-sm font-medium ${layout === 'list' ? 'text-red-700' : 'text-stone-600'}`}>
-                    List (4/page)
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Options */}
-            <div>
-              <h3 className="font-semibold text-stone-700 mb-3">Options</h3>
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 cursor-pointer hover:bg-stone-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={showPrices}
-                  onChange={(e) => setShowPrices(e.target.checked)}
-                  className="w-5 h-5 rounded border-stone-300 text-red-500 focus:ring-red-500"
-                />
-                <div>
-                  <span className="font-medium text-stone-700">Show Prices</span>
-                  <p className="text-xs text-stone-500">Include price information in the catalog</p>
-                </div>
-              </label>
-            </div>
-
-            {/* Preview info */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 border border-red-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-red-700">
-                    {Math.ceil(stoneCount / (layout === 'grid' ? 6 : 4)) + 1} pages
-                  </p>
-                  <p className="text-xs text-red-600">
-                    Including cover page
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex gap-3 px-6 py-4 bg-stone-50 border-t border-stone-200">
-            <button
-              onClick={onClose}
-              className="flex-1 py-2.5 text-stone-600 hover:text-stone-800 font-medium transition-colors rounded-lg hover:bg-stone-100"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => onGenerate({ layout, showPrices })}
-              disabled={isGenerating}
-              className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isGenerating ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Generate PDF
-                </>
-              )}
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-/* ---------------- SVG to PNG Helper for Excel Logo ---------------- */
-const svgToPngBase64 = (svgUrl, width = 600, height = 340) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      const scale = Math.min(width / img.width, height / img.height) * 0.85;
-      const x = (width - img.width * scale) / 2;
-      const y = (height - img.height * scale) / 2;
-      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-      const base64 = canvas.toDataURL('image/png').split(',')[1];
-      resolve(base64);
-    };
-    img.onerror = () => reject(new Error('Failed to load SVG'));
-    img.src = svgUrl;
-  });
-};
-
-const imageToBase64 = (url) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL('image/png').split(',')[1]);
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = url;
-  });
-};
-
-/* ---------------- Column Configurations ---------------- */
-const EMERALD_COLUMNS = [
-  { key: "num", header: "#", width: 5 },
-  { key: "sku", header: "SKU", width: 18 },
-  { key: "pairSku", header: "Pair SKU", width: 18 },
-  { key: "shape", header: "Shape", width: 12 },
-  { key: "weight", header: "Weight (ct)", width: 12 },
-  { key: "measurements", header: "Measurements", width: 20 },
-  { key: "ratio", header: "Ratio", width: 8 },
-  { key: "treatment", header: "Clarity", width: 18 },
-  { key: "origin", header: "Origin", width: 12 },
-  { key: "lab", header: "Lab", width: 10 },
-  { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
-  { key: "priceTotal", header: "Total ($)", width: 14 },
-  { key: "dna", header: "DNA", width: 12 },
-  { key: "certificate", header: "Certificate", width: 15 },
-  { key: "appendix", header: "Appendix", width: 14 },
-  { key: "image", header: "Image", width: 12 },
-  { key: "video", header: "Video", width: 12 },
-];
-
-const DIAMOND_COLUMNS = [
-  { key: "num", header: "#", width: 5 },
-  { key: "sku", header: "SKU", width: 18 },
-  { key: "pairSku", header: "Pair SKU", width: 18 },
-  { key: "shape", header: "Shape", width: 12 },
-  { key: "weight", header: "Weight (ct)", width: 12 },
-  { key: "color", header: "Color", width: 8 },
-  { key: "clarity", header: "Clarity", width: 10 },
-  { key: "measurements", header: "Measurements", width: 20 },
-  { key: "ratio", header: "Ratio", width: 8 },
-  { key: "lab", header: "Lab", width: 10 },
-  { key: "fluorescence", header: "Fluor.", width: 10 },
-  { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
-  { key: "priceTotal", header: "Total ($)", width: 14 },
-  { key: "rapPrice", header: "Rap %", width: 10 },
-  { key: "cut", header: "Cut", width: 10 },
-  { key: "polish", header: "Polish", width: 10 },
-  { key: "symmetry", header: "Symmetry", width: 10 },
-  { key: "tablePercent", header: "Table %", width: 10 },
-  { key: "depthPercent", header: "Depth %", width: 10 },
-  { key: "dna", header: "DNA", width: 12 },
-  { key: "certificate", header: "Certificate", width: 15 },
-  { key: "appendix", header: "Appendix", width: 14 },
-  { key: "image", header: "Image", width: 12 },
-  { key: "video", header: "Video", width: 12 },
-];
-
-const FANCY_COLUMNS = [
-  { key: "num", header: "#", width: 5 },
-  { key: "sku", header: "SKU", width: 18 },
-  { key: "pairSku", header: "Pair SKU", width: 18 },
-  { key: "shape", header: "Shape", width: 12 },
-  { key: "weight", header: "Weight (ct)", width: 12 },
-  { key: "fancyIntensity", header: "Intensity", width: 12 },
-  { key: "fancyColor", header: "Fancy Color", width: 14 },
-  { key: "fancyOvertone", header: "Overtone", width: 12 },
-  { key: "clarity", header: "Clarity", width: 10 },
-  { key: "measurements", header: "Measurements", width: 20 },
-  { key: "ratio", header: "Ratio", width: 8 },
-  { key: "lab", header: "Lab", width: 10 },
-  { key: "fluorescence", header: "Fluor.", width: 10 },
-  { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
-  { key: "priceTotal", header: "Total ($)", width: 14 },
-  { key: "rapPrice", header: "Rap %", width: 10 },
-  { key: "cut", header: "Cut", width: 10 },
-  { key: "polish", header: "Polish", width: 10 },
-  { key: "symmetry", header: "Symmetry", width: 10 },
-  { key: "tablePercent", header: "Table %", width: 10 },
-  { key: "depthPercent", header: "Depth %", width: 10 },
-  { key: "dna", header: "DNA", width: 12 },
-  { key: "certificate", header: "Certificate", width: 15 },
-  { key: "appendix", header: "Appendix", width: 14 },
-  { key: "image", header: "Image", width: 12 },
-  { key: "video", header: "Video", width: 12 },
-];
-
-/* ---------------- Tags Management Modal ---------------- */
-const TagsModal = ({ isOpen, onClose, tags, onCreateTag, onDeleteTag, onUpdateTag }) => {
-  const [newTagName, setNewTagName] = useState("");
-  const [newTagColor, setNewTagColor] = useState("#10b981");
-  const [editingTag, setEditingTag] = useState(null);
-
-  if (!isOpen) return null;
-
-  const handleCreate = () => {
-    if (newTagName.trim()) {
-      onCreateTag(newTagName.trim(), newTagColor);
-      setNewTagName("");
-      setNewTagColor("#10b981");
-    }
-  };
-
-  const handleUpdate = () => {
-    if (editingTag && editingTag.name.trim()) {
-      onUpdateTag(editingTag.id, editingTag.name, editingTag.color);
-      setEditingTag(null);
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 100 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 100 }}
-          className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Mobile drag handle */}
-          <div className="sm:hidden flex justify-center pt-2 pb-1">
-            <div className="w-10 h-1 rounded-full bg-stone-300"></div>
-          </div>
-          
-          {/* Header */}
-          <div className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r from-blue-500 to-blue-600">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-white">Manage Client Tags</h2>
-                  <p className="text-blue-100 text-xs">{tags.length} tags</p>
-                </div>
-              </div>
-              <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/20 transition-colors text-white">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Create New Tag */}
-          <div className="flex-shrink-0 p-4 border-b border-stone-100 bg-stone-50">
-            <p className="text-xs font-medium text-stone-500 mb-3">Create New Tag</p>
-            
-            <div className="space-y-3">
-              {/* Tag Name Input */}
-              <input
-                type="text"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="Enter client name..."
-                className="w-full px-4 py-3 text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              />
-              
-              {/* Color Selection */}
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-stone-400 mb-2">Choose Color</p>
-                <div className="grid grid-cols-8 gap-2">
-                  {TAG_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      onClick={() => setNewTagColor(c.value)}
-                      className={`aspect-square rounded-xl transition-all ${
-                        newTagColor === c.value 
-                          ? "ring-2 ring-offset-2 ring-blue-500 scale-105 shadow-lg" 
-                          : "hover:scale-110"
-                      }`}
-                      style={{ backgroundColor: c.value }}
-                      title={c.name}
-                    />
-                  ))}
-                </div>
-              </div>
-              
-              {/* Add Button */}
-              <button
-                onClick={handleCreate}
-                disabled={!newTagName.trim()}
-                className="w-full py-3 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Tag
-              </button>
-            </div>
-          </div>
-
-          {/* Tags List */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <p className="text-[10px] uppercase tracking-wider text-stone-400 mb-3">Your Tags</p>
-            {tags.length === 0 ? (
-              <div className="text-center py-8 text-stone-400">
-                <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-                <p>No tags yet</p>
-                <p className="text-xs">Create your first client tag above</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {tags.map((tag) => (
-                  <div
-                    key={tag.id}
-                    className="flex items-center gap-3 p-3 rounded-xl glass-surface hover:bg-app-surface/80 transition-all"
-                  >
-                    {editingTag?.id === tag.id ? (
-                      <div className="flex-1 space-y-3">
-                        <input
-                          type="text"
-                          value={editingTag.name}
-                          onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
-                          className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          autoFocus
-                        />
-                        <div className="grid grid-cols-8 gap-1.5">
-                          {TAG_COLORS.map((c) => (
-                            <button
-                              key={c.value}
-                              onClick={() => setEditingTag({ ...editingTag, color: c.value })}
-                              className={`aspect-square rounded-lg transition-transform ${editingTag.color === c.value ? "scale-110 ring-2 ring-offset-1 ring-blue-500" : "hover:scale-105"}`}
-                              style={{ backgroundColor: c.value }}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={handleUpdate} className="flex-1 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600">
-                            Save
-                          </button>
-                          <button onClick={() => setEditingTag(null)} className="flex-1 py-2 bg-stone-200 text-stone-600 rounded-lg text-sm font-medium hover:bg-stone-300">
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div
-                          className="w-5 h-5 rounded-full flex-shrink-0 shadow-sm"
-                          style={{ backgroundColor: tag.color }}
-                        />
-                        <span className="flex-1 font-medium text-stone-700">{tag.name}</span>
-                        <span className="text-xs text-stone-400 bg-stone-100 px-2 py-1 rounded-full">{tag.stone_count || 0} stones</span>
-                        <button
-                          onClick={() => setEditingTag({ id: tag.id, name: tag.name, color: tag.color })}
-                          className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
-                          title="Edit tag"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => onDeleteTag(tag.id)}
-                          className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
-                          title="Delete tag"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-/* ---------------- Tag Selector (for adding tags to stones) ---------------- */
-const TagSelector = ({ stoneSku, currentTags, allTags, onAddTag, onRemoveTag, onManageTags }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  const buttonRef = useRef(null);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target) && 
-          buttonRef.current && !buttonRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Keep the `position: fixed` menu glued to its button while open: re-anchor
-  // it on scroll/resize so it scrolls off with the row instead of floating in
-  // place. `capture: true` also catches scrolls on inner scroll containers.
-  useEffect(() => {
-    if (!isOpen) return;
-    const updatePos = () => {
-      if (!buttonRef.current) return;
-      const rect = buttonRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 4,
-        left: Math.min(rect.left, window.innerWidth - 200),
-      });
-    };
-    updatePos();
-    window.addEventListener("scroll", updatePos, true);
-    window.addEventListener("resize", updatePos);
-    return () => {
-      window.removeEventListener("scroll", updatePos, true);
-      window.removeEventListener("resize", updatePos);
-    };
-  }, [isOpen]);
-
-  const handleOpen = (e) => {
-    e.stopPropagation();
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 4,
-        left: Math.min(rect.left, window.innerWidth - 200)
-      });
-    }
-    setIsOpen(!isOpen);
-  };
-
-  const availableTags = allTags.filter((t) => !currentTags.some((ct) => ct.id === t.id));
-
-  return (
-    <div className="relative">
-      <button
-        ref={buttonRef}
-        onClick={handleOpen}
-        className="flex items-center gap-1 px-2 py-1 text-xs bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg transition-colors"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-        </svg>
-        Tag
-      </button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            ref={dropdownRef}
-            initial={{ opacity: 0, y: -5, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -5, scale: 0.95 }}
-            className="fixed w-48 bg-white rounded-xl shadow-2xl border border-stone-200 overflow-hidden"
-            style={{ 
-              zIndex: 9999,
-              top: position.top,
-              left: position.left
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Current Tags */}
-            {currentTags.length > 0 && (
-              <div className="p-2 border-b border-stone-100">
-                <p className="text-[10px] uppercase text-stone-400 mb-1.5 px-1">Current</p>
-                <div className="flex flex-wrap gap-1">
-                  {currentTags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white"
-                      style={{ backgroundColor: tag.color }}
-                    >
-                      {tag.name}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveTag(stoneSku, tag.id);
-                        }}
-                        className="hover:bg-white/20 rounded-full p-1.5 min-w-[24px] min-h-[24px] flex items-center justify-center touch-manipulation"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Available Tags */}
-            <div className="max-h-40 overflow-y-auto">
-              {availableTags.length > 0 ? (
-                <div className="p-1">
-                  {availableTags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      onClick={() => {
-                        onAddTag(stoneSku, tag.id);
-                        setIsOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-stone-50 transition-colors text-left"
-                    >
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                      <span className="text-sm text-stone-700">{tag.name}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-3 text-center text-stone-400 text-xs">
-                  {allTags.length === 0 ? "No tags created yet" : "All tags assigned"}
-                </div>
-              )}
-            </div>
-
-            {/* Manage Tags Button */}
-            <div className="p-2 border-t border-stone-100">
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onManageTags();
-                }}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Manage Tags
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-/* ---------------- Export Modal ---------------- */
-const ExportModal = ({ 
-  isOpen, 
-  onClose, 
-  selectedStones, 
-  onExport,
-  title = "Export Preview",
-  subtitle = null,
-  buttonText = "Export",
-  buttonColor = "from-emerald-500 to-emerald-600",
-  showHidePricesOption = true,
-  priceMode = "neto"
-}) => {
-  const [globalMarkup, setGlobalMarkup] = useState(0);
-  const [priceOverrides, setPriceOverrides] = useState({});
-  const [includeAppendix, setIncludeAppendix] = useState(false);
-  const [hidePrices, setHidePrices] = useState(false);
-
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setGlobalMarkup(0);
-      setPriceOverrides({});
-      setIncludeAppendix(true);
-      setHidePrices(false);
-    }
-  }, [isOpen]);
-
-  const getCategoryDot = (category) => {
-    const mapped = getMappedCategories(category);
-    if (mapped.includes('Emerald')) {
-      return <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" title="Emerald" />;
-    }
-    if (mapped.includes('Diamond')) {
-      return <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" title="Diamond" />;
-    }
-    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-stone-400" title={mapped[0] || 'Other'} />;
-  };
-
-  if (!isOpen) return null;
-
-  // Diamonds and jewelry are always quoted Neto, so the Bruto toggle never
-  // touches them. The badge has to say so — claiming "Bruto prices" over an
-  // untouched diamond export is how a rep ends up quoting the wrong figure.
-  const showsBrutoPrices =
-    priceMode === "bruto" && selectedStones.some(supportsBrutoMode);
-
-  // Base $/ct for a row. Jewelry is priced as a flat total with no per-carat
-  // figure, so we derive one from total ÷ carat — otherwise its price would
-  // collapse to $0 in the PDF (everything here is computed off $/ct).
-  const basePricePerCt = (stone) => {
-    if (stone.pricePerCt && stone.pricePerCt > 0) return stone.pricePerCt;
-    const wt = stone.weightCt || 0;
-    const total = stone.priceTotal || 0;
-    return wt > 0 ? total / wt : 0;
-  };
-
-  // Calculate adjusted prices (based on Price Per Carat)
-  const getAdjustedPricePerCt = (stone) => {
-    if (priceOverrides[stone.id] !== undefined) {
-      return priceOverrides[stone.id];
-    }
-    return basePricePerCt(stone) * (1 + globalMarkup / 100);
-  };
-
-  const getAdjustedTotal = (stone) => {
-    const weight = stone.weightCt || 0;
-    if (weight > 0) return getAdjustedPricePerCt(stone) * weight;
-    // No carat weight (some jewelry): scale the stored total directly so the
-    // price survives instead of becoming $0.
-    return (stone.priceTotal || 0) * (1 + globalMarkup / 100);
-  };
-
-  // Apply global markup to all
-  const applyGlobalMarkup = () => {
-    const newOverrides = {};
-    selectedStones.forEach((stone) => {
-      newOverrides[stone.id] = basePricePerCt(stone) * (1 + globalMarkup / 100);
-    });
-    setPriceOverrides(newOverrides);
-  };
-
-  // Reset single stone price
-  const resetPrice = (stoneId) => {
-    setPriceOverrides((prev) => {
-      const newOverrides = { ...prev };
-      delete newOverrides[stoneId];
-      return newOverrides;
-    });
-  };
-
-  // Reset all prices
-  const resetAllPrices = () => {
-    setPriceOverrides({});
-    setGlobalMarkup(0);
-  };
-
-  // Calculate totals
-  const totalOriginal = selectedStones.reduce((sum, s) => sum + (s.priceTotal || 0), 0);
-  const totalAdjusted = selectedStones.reduce((sum, s) => sum + getAdjustedTotal(s), 0);
-  const totalWeight = selectedStones.reduce((sum, s) => sum + (s.weightCt || 0), 0);
-
-  // Handle export with modified prices
-  const handleExport = () => {
-    const stonesWithAdjustedPrices = selectedStones.map((stone) => ({
-      ...stone,
-      pricePerCt: hidePrices ? 0 : getAdjustedPricePerCt(stone),
-      priceTotal: hidePrices ? 0 : getAdjustedTotal(stone),
-    }));
-    onExport(stonesWithAdjustedPrices, { includeAppendix, hidePrices });
-    onClose();
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white rounded-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden fixed sm:relative bottom-0 sm:bottom-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className={`px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-200 bg-gradient-to-r ${buttonColor}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-lg sm:text-xl font-bold text-white">{title}</h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide bg-white/25 text-white border border-white/30">
-                      {showsBrutoPrices ? "Bruto prices" : "Neto prices"}
-                    </span>
-                  </div>
-                  <p className="text-white/80 text-xs sm:text-sm">{subtitle || `${selectedStones.length} stones selected`}</p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg hover:bg-white/20 transition-colors text-white"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Global Markup Section */}
-          {!hidePrices && (
-          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-stone-50 border-b border-stone-200">
-            <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 sm:gap-4">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <label className="text-sm font-medium text-stone-700 whitespace-nowrap">Markup:</label>
-                <div className="relative flex-1 sm:flex-none">
-                  <input
-                    type="number"
-                    value={globalMarkup}
-                    onChange={(e) => setGlobalMarkup(parseFloat(e.target.value) || 0)}
-                    className="w-full sm:w-24 px-3 py-2 pr-8 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    placeholder="0"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 text-sm">%</span>
-                </div>
-                <button
-                  onClick={applyGlobalMarkup}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 transition-colors whitespace-nowrap"
-                >
-                  Apply
-                </button>
-                <button
-                  onClick={resetAllPrices}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors whitespace-nowrap"
-                >
-                  Reset
-                </button>
-              </div>
-              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 text-xs sm:text-sm w-full sm:w-auto sm:ml-auto">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${showsBrutoPrices ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
-                  {showsBrutoPrices ? "Bruto" : "Neto"}
-                </span>
-                <span className="text-stone-500">
-                  Original: <span className="font-semibold text-stone-700">${totalOriginal.toLocaleString()}</span>
-                </span>
-                <span className="text-emerald-600">
-                  Adjusted: <span className="font-bold text-emerald-700">${totalAdjusted.toLocaleString()}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-          )}
-
-          {/* Stones List - Cards for Mobile, Table for Desktop */}
-          <div className="overflow-auto max-h-[50vh] sm:max-h-[45vh]">
-            {/* Mobile Cards View */}
-            <div className="sm:hidden divide-y divide-stone-100">
-              {selectedStones.map((stone, index) => {
-                const originalPricePerCt = basePricePerCt(stone);
-                const adjustedPricePerCt = getAdjustedPricePerCt(stone);
-                const adjustedTotal = getAdjustedTotal(stone);
-                const priceDiff = adjustedPricePerCt - originalPricePerCt;
-                const percentChange = originalPricePerCt > 0 ? ((priceDiff / originalPricePerCt) * 100).toFixed(1) : 0;
-                const isModified = priceOverrides[stone.id] !== undefined || globalMarkup !== 0;
-
-                return (
-                  <div key={stone.id} className={`p-3 ${index % 2 === 0 ? "bg-white" : "bg-stone-50/50"}`}>
-                    {/* Top Row: SKU, Shape, Weight */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {getCategoryDot(stone.category)}
-                        <span className="font-mono text-sm font-bold text-emerald-600">{stone.sku}</span>
-                        <span className="text-xs text-stone-500 bg-stone-100 px-2 py-0.5 rounded">{getDisplayShape(stone.shape)}</span>
-                      </div>
-                      <span className="text-sm font-medium text-stone-700">{stone.weightCt}ct</span>
-                    </div>
-                    
-                    {/* Price Row */}
-                    {!hidePrices && (
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-stone-400 uppercase">Original $/ct</span>
-                        <span className="text-sm text-stone-500">${originalPricePerCt.toLocaleString()}</span>
-                      </div>
-                      
-                      <div className="flex flex-col items-center">
-                        <span className="text-[10px] text-stone-400 uppercase">New $/ct</span>
-                        <input
-                          type="number"
-                          value={Math.round(adjustedPricePerCt)}
-                          onChange={(e) => {
-                            const newPricePerCt = parseFloat(e.target.value) || 0;
-                            setPriceOverrides((prev) => ({ ...prev, [stone.id]: newPricePerCt }));
-                          }}
-                          className={`w-24 px-2 py-1.5 text-sm text-center border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
-                            isModified ? "border-emerald-400 bg-emerald-50" : "border-stone-300"
-                          }`}
-                        />
-                      </div>
-                      
-                      <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-1">
-                          {priceDiff !== 0 && (
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                              priceDiff > 0 
-                                ? "text-emerald-700 bg-emerald-100" 
-                                : "text-red-700 bg-red-100"
-                            }`}>
-                              {priceDiff > 0 ? "+" : ""}{percentChange}%
-                            </span>
-                          )}
-                          {isModified && (
-                            <button
-                              onClick={() => resetPrice(stone.id)}
-                              className="text-xs text-stone-400 hover:text-stone-600"
-                            >
-                              Γז║
-                            </button>
-                          )}
-                        </div>
-                        <span className="text-sm font-bold text-stone-800">${Math.round(adjustedTotal).toLocaleString()}</span>
-                      </div>
-                    </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Desktop Table View */}
-            <table className="w-full hidden sm:table">
-              <thead className="bg-stone-100 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600 uppercase">SKU</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-stone-600 uppercase">Shape</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase">Weight</th>
-                  {!hidePrices && <>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-stone-600 uppercase">Orig $/ct</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase">New $/ct</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase">+/-</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-stone-600 uppercase">Total</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-stone-600 uppercase"></th>
-                  </>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {selectedStones.map((stone, index) => {
-                  const originalPricePerCt = basePricePerCt(stone);
-                  const adjustedPricePerCt = getAdjustedPricePerCt(stone);
-                  const adjustedTotal = getAdjustedTotal(stone);
-                  const priceDiff = adjustedPricePerCt - originalPricePerCt;
-                  const percentChange = originalPricePerCt > 0 ? ((priceDiff / originalPricePerCt) * 100).toFixed(1) : 0;
-                  const isModified = priceOverrides[stone.id] !== undefined || globalMarkup !== 0;
-
-                  return (
-                    <tr key={stone.id} className={index % 2 === 0 ? "bg-white" : "bg-stone-50/50"}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          {getCategoryDot(stone.category)}
-                          <span className="font-mono text-sm font-medium text-emerald-600">{stone.sku}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-stone-700">{getDisplayShape(stone.shape)}</td>
-                      <td className="px-4 py-3 text-sm text-stone-700 text-center">{stone.weightCt}ct</td>
-                      {!hidePrices && <>
-                      <td className="px-4 py-3 text-sm text-stone-500 text-right">
-                        ${originalPricePerCt.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          value={Math.round(adjustedPricePerCt)}
-                          onChange={(e) => {
-                            const newPricePerCt = parseFloat(e.target.value) || 0;
-                            setPriceOverrides((prev) => ({ ...prev, [stone.id]: newPricePerCt }));
-                          }}
-                          className={`w-28 px-3 py-1.5 text-sm text-center border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
-                            isModified ? "border-emerald-400 bg-emerald-50" : "border-stone-300"
-                          }`}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {priceDiff !== 0 && (
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            priceDiff > 0 
-                              ? "text-emerald-700 bg-emerald-100" 
-                              : "text-red-700 bg-red-100"
-                          }`}>
-                            {priceDiff > 0 ? "+" : ""}{percentChange}%
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-stone-700 text-right font-medium">
-                        ${Math.round(adjustedTotal).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {isModified && (
-                          <button
-                            onClick={() => resetPrice(stone.id)}
-                            className="text-xs text-stone-500 hover:text-stone-700 underline"
-                          >
-                            Γז║
-                          </button>
-                        )}
-                      </td>
-                      </>}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-stone-200 bg-stone-50">
-            {/* Options Row */}
-            <div className="flex flex-wrap items-center gap-4 mb-3 pb-3 border-b border-stone-200">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={includeAppendix}
-                  onChange={(e) => setIncludeAppendix(e.target.checked)}
-                  className="w-4 h-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
-                />
-                <span className="text-xs sm:text-sm text-stone-700 font-medium">Include GRS Appendix</span>
-              </label>
-              {showHidePricesOption && (
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={hidePrices}
-                  onChange={(e) => setHidePrices(e.target.checked)}
-                  className="w-4 h-4 rounded border-stone-300 text-red-500 focus:ring-red-500"
-                />
-                <span className="text-xs sm:text-sm text-stone-700 font-medium">Hide Prices</span>
-              </label>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="text-xs sm:text-sm text-stone-600 text-center sm:text-left space-y-1 sm:space-y-0">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1">
-                  <span><span className="font-medium">{selectedStones.length}</span> stones</span>
-                  <span><span className="font-medium">{totalWeight.toFixed(2)}</span> ct</span>
-                  {!hidePrices && <>
-                  <span className="text-stone-400">|</span>
-                  <span>Orig: <span className="font-medium text-stone-500">${totalOriginal.toLocaleString()}</span></span>
-                  <span className={`font-semibold ${totalAdjusted !== totalOriginal ? 'text-emerald-600' : 'text-stone-700'}`}>
-                    Γזע Total: ${Math.round(totalAdjusted).toLocaleString()}
-                  </span>
-                  </>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={onClose}
-                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-stone-700 bg-white border border-stone-300 rounded-xl hover:bg-stone-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleExport}
-                  className={`flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-medium text-white bg-gradient-to-r ${buttonColor} rounded-xl hover:opacity-90 shadow-lg transition-all flex items-center justify-center gap-2`}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span>{buttonText}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-/* ---------------- Barcode Scanner Modal ---------------- */
-const BarcodeScanner = ({ isOpen, onClose, onScan }) => {
-  const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState(null);
-  const [lastResult, setLastResult] = useState(null);
-  const scannerRef = useRef(null);
-  const html5QrCodeRef = useRef(null);
-
-  const startScanner = useCallback(async () => {
-    if (!scannerRef.current || html5QrCodeRef.current) return;
-    
-    try {
-      setError(null);
-      setScanning(true);
-      
-      const html5QrCode = new Html5Qrcode("barcode-reader");
-      html5QrCodeRef.current = html5QrCode;
-
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 280, height: 180 },
-          aspectRatio: 1.5,
-        },
-        (decodedText) => {
-          // Success - barcode found
-          setLastResult(decodedText);
-          onScan(decodedText);
-          stopScanner();
-        },
-        () => {
-          // Ignore scan errors (no barcode found yet)
-        }
-      );
-    } catch (err) {
-      setError(err.message || "Failed to start camera");
-      setScanning(false);
-    }
-  }, [onScan]);
-
-  const stopScanner = useCallback(async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current = null;
-      } catch (err) {
-        console.error("Error stopping scanner:", err);
-      }
-    }
-    setScanning(false);
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        startScanner();
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      stopScanner();
-    }
-  }, [isOpen, startScanner, stopScanner]);
-
-  useEffect(() => {
-    return () => {
-      stopScanner();
-    };
-  }, [stopScanner]);
-
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-        onClick={() => {
-          stopScanner();
-          onClose();
-        }}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          className="bg-stone-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-stone-700 bg-gradient-to-r from-emerald-600 to-emerald-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Scan Barcode</h2>
-                  <p className="text-emerald-100 text-xs">Point camera at barcode or QR code</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  stopScanner();
-                  onClose();
-                }}
-                className="p-2 rounded-lg hover:bg-white/20 transition-colors text-white"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Scanner Area */}
-          <div className="p-4">
-            <div className="relative rounded-xl overflow-hidden bg-black">
-              <div 
-                id="barcode-reader" 
-                ref={scannerRef}
-                className="w-full aspect-[4/3]"
-              />
-              
-              {/* Scanning overlay */}
-              {scanning && (
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-64 h-40 border-2 border-emerald-400 rounded-lg relative">
-                      <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg"></div>
-                      <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg"></div>
-                      <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg"></div>
-                      <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg"></div>
-                      {/* Scanning line animation */}
-                      <motion.div
-                        className="absolute left-2 right-2 h-0.5 bg-emerald-400"
-                        animate={{ top: ["10%", "90%", "10%"] }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Status */}
-            <div className="mt-4 text-center">
-              {error ? (
-                <div className="text-red-400 text-sm bg-red-900/30 rounded-lg p-3">
-                  <p className="font-medium">Camera Error</p>
-                  <p className="text-xs mt-1">{error}</p>
-                </div>
-              ) : scanning ? (
-                <p className="text-emerald-400 text-sm flex items-center justify-center gap-2">
-                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                  Scanning... Point at barcode
-                </p>
-              ) : (
-                <p className="text-stone-400 text-sm">Initializing camera...</p>
-              )}
-            </div>
-
-            {/* Last Result */}
-            {lastResult && (
-              <div className="mt-4 p-3 bg-emerald-900/30 rounded-lg border border-emerald-700">
-                <p className="text-xs text-emerald-300">Last scanned:</p>
-                <p className="text-sm font-mono text-emerald-400 font-semibold">{lastResult}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-5 py-4 border-t border-stone-700 bg-stone-800/50">
-            <div className="flex items-center justify-between text-xs text-stone-400">
-              <span>Supports: Code128, QR Code</span>
-              <button
-                onClick={() => {
-                  stopScanner();
-                  onClose();
-                }}
-                className="px-4 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-/* ---------------- DNA Drawer (Stone Preview) ---------------- */
-const DNADrawer = ({ isOpen, onClose, stone, onPrintLabel, priceMode = 'neto' }) => {
-  const [activeTab, setActiveTab] = useState('details');
-  const [activeImgIdx, setActiveImgIdx] = useState(0);
-  const navigate = useNavigate();
-
-  if (!isOpen || !stone) return null;
-
-  const isJewelry = stone.category === 'Jewelry';
-  // Workshop pieces don't have a public DNA page — share the workshop
-  // detail (owner-only) so reps can deep-link the row from the team
-  // chat. Catalog jewelry stays on /jewelry/:modelNumber (public DNA).
-  const shareUrl = isJewelry
-    ? (stone.source === 'workshop'
-        ? `https://gems-dna.com/jewelry/items/${stone.workshopId}`
-        : `https://gems-dna.com/jewelry/${stone.sku}`)
-    : `https://gems-dna.com/${stone.sku}`;
-
-  // Inside the installed PWA there is no browser chrome (no back button), so a
-  // new-tab DNA link strands the rep. Detect standalone display mode and route
-  // in-app instead, which keeps history so the DNA page's Back button returns
-  // here with filters intact. Regular browsers keep the new-tab behavior.
-  const inAppDnaPath = shareUrl.replace(/^https?:\/\/gems-dna\.com/i, "") || "/";
-  const isStandalonePwa = typeof window !== "undefined" && (
-    window.matchMedia?.("(display-mode: standalone)")?.matches ||
-    window.navigator.standalone === true
-  );
-  const handleOpenDna = (e) => {
-    if (isStandalonePwa) {
-      e.preventDefault();
-      onClose?.();
-      navigate(inAppDnaPath);
-    }
-  };
-
-  const images = isJewelry ? (stone.allImages || (stone.imageUrl ? [stone.imageUrl] : [])) : [];
-  const videoUrl = isJewelry ? stone.videoLink : stone.videoUrl;
-  const certUrl = isJewelry ? stone.certificateLink : stone.certificateUrl;
-
-  const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: isJewelry ? 'Check out this jewelry!' : 'Check out this gem!', text: `View the full DNA:`, url: shareUrl });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Link copied to clipboard!');
-      }
-    } catch (error) {
-      console.log('Sharing canceled');
-    }
-  };
-
-  const DetailRow = ({ label, value }) => (
-    <div className="flex justify-between items-center py-2 border-b border-app-line last:border-0">
-      <span className="text-app-muted text-sm">{label}</span>
-      <span className="text-app-ink font-medium text-sm">{value || '-'}</span>
-    </div>
-  );
-
-  return (
-    <AnimatePresence>
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Drawer */}
-      <motion.div
-        initial={{ y: "100%", x: 0 }}
-        animate={{ y: 0, x: 0 }}
-        exit={{ y: "100%", x: 0 }}
-        transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed inset-x-0 bottom-0 z-50 bg-app-surface border-app-line border rounded-t-3xl max-h-[92vh] overflow-hidden shadow-xl
-                   sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[480px] sm:max-w-full sm:rounded-t-none sm:rounded-l-3xl sm:border-r-0 sm:border-t-0 sm:border-b-0 sm:max-h-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Drag Handle (Mobile) */}
-        <div className="sm:hidden flex justify-center pt-3 pb-2">
-          <div className="w-12 h-1.5 bg-app-line-2 rounded-full" />
-        </div>
-
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-app-surface border-b border-app-line px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                {isJewelry ? (
-                  <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-graphite bg-app-canvas-2 px-2 py-0.5 rounded-full">
-                    {stone.jewelryType || 'Jewelry'}
-                  </span>
-                ) : stone.lab ? (
-                  <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-graphite bg-app-canvas-2 px-2 py-0.5 rounded-full">
-                    {stone.lab}
-                  </span>
-                ) : null}
-                <span className="text-xs text-app-muted">SKU: {stone.sku}</span>
-              </div>
-              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-app-ink">
-                {isJewelry
-                  ? (sanitizeText(stone.title) || `${stone.jewelryType || 'Jewelry'}`)
-                  : `${getDisplayShape(stone.shape)} \u00b7 ${stone.weightCt}ct`
-                }
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full bg-app-canvas-2 hover:bg-app-line transition-colors text-app-ink"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(92vh - 140px)' }}>
-          <div className="p-4 sm:p-6">
-            {/* Media Section */}
-            {isJewelry ? (
-              <>
-                {/* Jewelry Video */}
-                {videoUrl && (
-                  <div className="relative rounded-2xl overflow-hidden bg-app-ink aspect-video mb-4">
-                    <iframe
-                      className="w-full h-full absolute inset-0"
-                      src={videoUrl}
-                      title="Video Preview"
-                      allowFullScreen
-                    />
-                  </div>
-                )}
-                {/* Jewelry Image Gallery */}
-                {images.length > 0 && (
-                  <div className="mb-4">
-                    <div className="relative rounded-2xl overflow-hidden bg-white aspect-square mb-3 border border-app-line">
-                      <img
-                        src={images[activeImgIdx] || images[0]}
-                        alt={stone.title || stone.sku}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    {images.length > 1 && (
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {images.map((img, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setActiveImgIdx(i)}
-                            className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-app-ink' : 'border-app-line hover:border-app-line-2'}`}
-                          >
-                            <img src={img} alt="" className="w-full h-full object-cover" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {/* Certificate thumbnail */}
-                {certUrl && (
-                  <div className="mb-6">
-                    <a href={certUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-surface text-app-graphite text-sm font-medium hover:bg-app-surface/85 transition-colors">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      View Certificate
-                    </a>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Stone Video/Image */}
-                <div className="relative rounded-2xl overflow-hidden bg-white aspect-square mb-4 border border-app-line">
-                  {stone.videoUrl ? (
-                    <iframe className="w-full h-full absolute inset-0" src={stone.videoUrl} title="Video Preview" allowFullScreen />
-                  ) : stone.imageUrl ? (
-                    <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-app-soft">
-                      <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                {/* Stone Thumbnails */}
-                <div className="grid grid-cols-3 gap-2 mb-6">
-                  {stone.imageUrl && (
-                    <a href={stone.imageUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden bg-white border border-app-line aspect-square group">
-                      <img src={stone.imageUrl} alt="Photo" className="w-full h-full object-cover" />
-                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/55 backdrop-blur px-1.5 py-0.5 rounded">Photo</span>
-                    </a>
-                  )}
-                  {stone.videoUrl && (
-                    <a href={stone.videoUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden aspect-square group">
-                      <div className="w-full h-full flex items-center justify-center bg-app-ink">
-                        <svg className="w-8 h-8 text-app-canvas" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                      </div>
-                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/55 backdrop-blur px-1.5 py-0.5 rounded">Video</span>
-                    </a>
-                  )}
-                  {stone.certificateUrl && (
-                    <a href={stone.certificateUrl} target="_blank" rel="noopener noreferrer" className="relative rounded-xl overflow-hidden glass-surface aspect-square group">
-                      <div className="w-full h-full flex items-center justify-center">
-                        <svg className="w-8 h-8 text-app-graphite" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <span className="absolute bottom-1 left-1 text-[10px] font-medium text-white bg-black/55 backdrop-blur px-1.5 py-0.5 rounded">Cert</span>
-                    </a>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Tabs */}
-            <div className="flex gap-1 p-1 bg-app-canvas-2 rounded-full mb-4">
-              <button
-                onClick={() => setActiveTab('details')}
-                className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-full transition-all ${
-                  activeTab === 'details' ? 'bg-app-ink text-app-canvas shadow-sm' : 'text-app-graphite hover:text-app-ink'
-                }`}
-              >
-                Details
-              </button>
-              <button
-                onClick={() => setActiveTab('pricing')}
-                className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-full transition-all ${
-                  activeTab === 'pricing' ? 'bg-app-ink text-app-canvas shadow-sm' : 'text-app-graphite hover:text-app-ink'
-                }`}
-              >
-                Pricing
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === 'details' && isJewelry && (
-              <div className="space-y-4">
-                {/* Center Stone */}
-                <div>
-                  <h4 className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-app-muted mb-2 flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
-                    </svg>
-                    Center Stone
-                  </h4>
-                  <div className="bg-app-canvas-2 rounded-xl p-4 space-y-0">
-                    <DetailRow label="Stone Type" value={stone.stoneType} />
-                    <DetailRow label="Carat" value={stone.centerStoneCarat ? `${stone.centerStoneCarat} ct` : null} />
-                    <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
-                    <DetailRow label="Color" value={stone.color} />
-                    <DetailRow label="Clarity" value={stone.clarity} />
-                  </div>
-                </div>
-                {/* General Details */}
-                <div>
-                  <h4 className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-app-muted mb-2 flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    General Details
-                  </h4>
-                  <div className="bg-app-canvas-2 rounded-xl p-4 space-y-0">
-                    <DetailRow label="Type" value={stone.jewelryType} />
-                    <DetailRow label="Collection" value={stone.collection} />
-                    <DetailRow label="Total Carat" value={stone.weightCt ? `${stone.weightCt} ct` : null} />
-                    <DetailRow label="Jewelry Weight" value={stone.jewelryWeight} />
-                    <DetailRow label="Size" value={stone.jewelrySize} />
-                    <DetailRow label="Metal" value={stone.metalType} />
-                    <DetailRow label="Style" value={stone.style} />
-                    <DetailRow label="Certificate #" value={stone.certificateNumber} />
-                  </div>
-                </div>
-                {/* Description */}
-                {stone.fullDescription && (
-                  <div>
-                    <h4 className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-app-muted mb-2">Description</h4>
-                    <p className="text-sm text-app-graphite leading-relaxed bg-app-canvas-2 rounded-xl p-4 whitespace-pre-line">{sanitizeText(stone.fullDescription)}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'details' && !isJewelry && (
-              <div className="bg-app-canvas-2 rounded-xl p-4 space-y-0">
-                <DetailRow label="Shape" value={getDisplayShape(stone.shape)} />
-                <DetailRow label="Weight" value={`${stone.weightCt} ct`} />
-                <DetailRow label="Color" value={getDisplayColor(stone)} />
-                <DetailRow label="Clarity" value={stone.clarity} />
-                <DetailRow label="Treatment" value={stone.treatment} />
-                <DetailRow label="Origin" value={stone.origin} />
-                <DetailRow label="Lab" value={stone.lab} />
-                <DetailRow label="Measurements" value={stone.measurements} />
-                <DetailRow label="Ratio" value={stone.ratio} />
-                <DetailRow label="Location" value={stone.location} />
-                <DetailRow label="Certificate #" value={stone.certificateNumber} />
-              </div>
-            )}
-
-            {activeTab === 'pricing' && (
-              <div className="space-y-3">
-                <div className="bg-app-canvas-2 rounded-xl p-4">
-                  {!isJewelry && (
-                    <div className="flex justify-between items-center mb-3 pb-3 border-b border-app-line">
-                      <span className="text-app-muted text-sm">Price per Carat</span>
-                      <span className="text-lg font-semibold tracking-tight text-app-ink">
-                        {stone.pricePerCt ? `$${Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString()}` : 'N/A'}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center">
-                    <span className="text-app-muted text-sm">Total Price</span>
-                    <span className="text-2xl font-semibold tracking-tight text-app-ink">
-                      {stone.priceTotal ? `${stone.currency && stone.currency !== 'USD' ? stone.currency : '$'}${Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString()}` : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                {!isJewelry && (
-                  <p className="text-xs text-app-soft text-center">
-                    {stone.weightCt}ct \u00d7 ${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : 'N/A'}/ct
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Catalog visibility — which catalog tiers (and therefore stores)
-                see this SKU. Loud red badge when the SKU is in zero tiers. */}
-            {stone.sku && activeTab === 'details' && (
-              <div className="mt-4">
-                <ItemTierManager type={isJewelry ? 'jewelry' : 'stone'} sku={stone.sku} />
-              </div>
-            )}
-
-            {/* Cross-system usage: workshop pieces + deals + DNA inquiries that touch this SKU.
-                Only shown for stones (jewelry items have their own detail page). */}
-            {!isJewelry && stone.sku && activeTab === 'details' && (
-              <div className="mt-4">
-                <StoneUsagePanel sku={stone.sku} compact />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Fixed Footer Actions */}
-        <div className="sticky bottom-0 bg-app-surface border-t border-app-line p-4 sm:p-6 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={handleShare}
-              className="py-2 px-3 rounded-full bg-app-canvas-2 border border-app-line text-app-graphite font-medium flex items-center justify-center gap-1.5 hover:bg-app-line transition-colors text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              Share
-            </button>
-            {onPrintLabel && (
-              <button
-                onClick={() => onPrintLabel(stone)}
-                className="py-2 px-3 rounded-full bg-app-canvas-2 border border-app-line text-app-graphite font-medium flex items-center justify-center gap-1.5 hover:bg-app-line transition-colors text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print
-              </button>
-            )}
-            <a
-              href={shareUrl}
-              onClick={handleOpenDna}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2 px-3 rounded-full bg-app-ink text-app-canvas font-semibold flex items-center justify-center gap-1.5 hover:bg-app-graphite transition-colors text-sm shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              DNA
-            </a>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-const treatmentOptions = [
-  "All treatments",
-  "No Oil",
-  "Insignificant",
-  "Minor",
-  "Moderate",
-  "Significant",
-];
-
-
-const locationOptions = [
-  "All locations",
-  "New York",
-  "Los Angeles", 
-  "Hong Kong",
-  "Israel",
-];
-
-/* ---------------- Progress Bar ---------------- */
-const LoadingBar = ({ active, progress }) => {
-  if (!active) return null;
-  return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-primary-100">
-      <motion.div
-        className="h-full bg-gradient-to-r from-primary-400 to-primary-600"
-        initial={{ width: 0 }}
-        animate={{ width: `${progress}%` }}
-        transition={{ duration: 0.3 }}
-      />
-    </div>
-  );
-};
-
-/* ---------------- Shape Mapping (BARAK Γזע DNA) ---------------- */
-const SHAPE_TO_DNA = {
-  'ASH': ['Emerald'],
-  'BGT': ['Baguette'],
-  'BGT+RD': ['Baguette', 'Round'],
-  'BRIO': ['Briollete'],
-  'BR': ['Round'],
-  'CAB': ['Cabushon'],
-  'CAD': ['Cadilac'],
-  'Carre': ['Carre'],
-  'CB': ['Cushion'],
-  'CMB': ['Cushion'],
-  'CSX': ['Lucida'],
-  'CU': ['Cushion'],
-  'CU+OV': ['Cushion', 'Oval'],
-  'DROPS': ['Drop'],
-  'EC': ['Emerald'],
-  'EC-CAB': ['Cabushon'],
-  'EC+BGT': ['Emerald', 'Baguette'],
-  'EC+CU': ['Emerald', 'Cushion'],
-  'ECOV': ['Emerald', 'Oval'],
-  'ECPS': ['Emerald', 'Pear'],
-  'EM': ['Emerald'],
-  'FAN': ['Fantasy'],
-  'HD': ['High Dome'],
-  'HEX': ['Hexagon'],
-  'HM': ['Half Moon'],
-  'HS': ['Heart'],
-  'Kite': ['Shield'],
-  'Lozenge': ['Lozenge'],
-  'LUC': ['Lucida'],
-  'MIX': ['Mix'],
-  'MQ': ['Marquise'],
-  'MQ+EC': ['Marquise', 'Emerald'],
-  'MQ+TPR': ['Marquise', 'Taper'],
-  'Moval': ['Oval'],
-  'Novelty': ['Novelty'],
-  'Novelty BR': ['Novelty'],
-  'OCT': ['Octagon'],
-  'OM': ['Old Mine'],
-  'OMB': ['Old Mine'],
-  'OTHER': ['Fantasy'],
-  'OV': ['Oval'],
-  'OV Rose': ['Oval'],
-  'OV-CAB': ['Cabushon'],
-  'OV+PS': ['Oval', 'Pear'],
-  'Portrait': ['Portrait'],
-  'PR': ['Princess'],
-  'PS': ['Pear'],
-  'PS+CU': ['Pear', 'Cushion'],
-  'PS+MQ': ['Pear', 'Marquise'],
-  'PS-CAB': ['Cabushon'],
-  'RAD': ['Radiant'],
-  'RD': ['Round'],
-  'RD+CU': ['Round', 'Cushion'],
-  'RD+EC': ['Round', 'Emerald'],
-  'RD+PS': ['Round', 'Pear'],
-  'RD+TP': ['Round', 'Taper'],
-  'RD-CAB': ['Cabushon'],
-  'REJ': ['Rejection'],
-  'Rose Cut': ['Rose'],
-  'Rough': ['Rough'],
-  'RRC': ['Rose'],
-  'S.Cut': ['Step'],
-  'Shield': ['Shield'],
-  'SHI': ['Shield'],
-  'SQ': ['Carre'],
-  'SQEC': ['Emerald'],
-  'STERN': ['Stern'],
-  'Sugar': ['Sugarloaf'],
-  'TPR': ['Taper'],
-  'TR': ['Triangle'],
-  'TRI-CAB': ['Cabushon'],
-  'TRPZ': ['Trapez'],
-};
-
-const getDnaShapes = (barakShape) => {
-  if (!barakShape) return [];
-  return SHAPE_TO_DNA[barakShape] || SHAPE_TO_DNA[barakShape.trim()] || [barakShape];
-};
-
-const getDisplayShape = (barakShape) => {
-  const dna = getDnaShapes(barakShape);
-  return dna.length > 0 ? dna[0] : barakShape || '';
-};
-
-const LEVEL_1_SHAPES = [
-  'Round', 'Emerald', 'Cushion', 'Pear', 'Oval', 'Marquise',
-  'Baguette', 'Heart', 'Radiant', 'Old Mine', 'Cabushon', 'Carre',
-];
-
-const EXTRA_BARAK_FILTERS = ['ASH', 'TPR'];
-const BARAK_DISPLAY_NAMES = { 'ASH': 'Asscher', 'TPR': 'Taper' };
-
-const DNA_TO_SHORT = {
-  'Emerald': 'EM', 'Round': 'RD', 'Oval': 'OV', 'Pear': 'PS',
-  'Cushion': 'CU', 'Marquise': 'MQ', 'Baguette': 'BGT', 'Cabushon': 'CAB',
-  'Heart': 'HS', 'Carre': 'SQ', 'Old Mine': 'OM', 'Radiant': 'RAD',
-  'Taper': 'TPR', 'Fantasy': 'FAN', 'Sugarloaf': 'SLF',
-  'Briollete': 'BRIO', 'Cadilac': 'CAD', 'Drop': 'DROP', 'Half Moon': 'HM',
-  'Hexagon': 'HEX', 'High Dome': 'HD', 'Lozenge': 'LOZ', 'Lucida': 'LUC',
-  'Mix': 'MIX', 'Novelty': 'NOV', 'Octagon': 'OCT', 'Portrait': 'POR',
-  'Princess': 'PR', 'Rose': 'ROSE', 'Shield': 'SHI', 'Step': 'STEP',
-  'Stern': 'STERN', 'Trapez': 'TRPZ', 'Triangle': 'TR',
-  'Rejection': 'REJ', 'Rough': 'RGH',
-};
-
-const getShortShape = (dnaName) => DNA_TO_SHORT[dnaName] || dnaName;
-
-const getDisplayColor = (stone) => {
-  const mapped = getMappedCategories(stone.category);
-  // Keep in sync with helpers/constants.js getDisplayColor — Fancy titles use
-  // Intensity · Overtone · Color (GIA order). Bare grades like "Intense" get
-  // the leading "Fancy" so they read like a lab report.
-  const normalizeIntensity = (raw) => {
-    const s = String(raw || "").trim();
-    if (!s) return "";
-    if (/^fancy\b/i.test(s) || /^(faint|very\s+light)\b/i.test(s)) return s;
-    if (/^(intense|vivid|deep|dark|light)$/i.test(s)) {
-      return `Fancy ${s.charAt(0).toUpperCase()}${s.slice(1).toLowerCase()}`;
-    }
-    return s;
-  };
-  if (mapped.includes('Fancy')) {
-    return [
-      normalizeIntensity(stone.fancyIntensity),
-      stone.fancyOvertone,
-      stone.fancyColor,
-    ].filter(Boolean).join(' ') || stone.color || '';
-  }
-  if (mapped.includes('Diamond') || mapped.includes('Emerald')) {
-    return stone.color || '';
-  }
-  return [
-    normalizeIntensity(stone.fancyIntensity),
-    stone.fancyOvertone,
-    stone.fancyColor,
-  ].filter(Boolean).join(' ') || stone.color || '';
-};
-
-/* ---------------- Shape Icons (faceted line-art) ---------------- */
-const ShapeIcon = ({ shape, isActive }) => {
-  const c = isActive ? '#059669' : '#a8a29e';
-  const size = 32;
-  const sw = '1.3';
-  const fw = '0.6';
-  
-  const shapeKey = shape?.toUpperCase?.() || '';
-  
-  // Round Brilliant
-  if (shapeKey === 'RD' || shapeKey === 'ROUND' || shapeKey === 'BR' || shapeKey === 'BRILLIANT') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="20" cy="20" r="15" stroke={c} strokeWidth={sw}/>
-        <polygon points="20,5 25.5,15 35,20 25.5,25 20,35 14.5,25 5,20 14.5,15" stroke={c} strokeWidth={fw} fill="none"/>
-        <line x1="20" y1="5" x2="14.5" y2="15" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="5" x2="25.5" y2="15" stroke={c} strokeWidth={fw}/>
-        <line x1="35" y1="20" x2="25.5" y2="15" stroke={c} strokeWidth={fw}/>
-        <line x1="35" y1="20" x2="25.5" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="35" x2="25.5" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="35" x2="14.5" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="5" y1="20" x2="14.5" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="5" y1="20" x2="14.5" y2="15" stroke={c} strokeWidth={fw}/>
-        <polygon points="20,14 24,20 20,26 16,20" stroke={c} strokeWidth={fw} fill="none"/>
-      </svg>
-    );
-  }
-  
-  // Pear
-  if (shapeKey === 'PS' || shapeKey === 'PEAR') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 4 C20 4 9 15 9 25 C9 31.5 14 36 20 36 C26 36 31 31.5 31 25 C31 15 20 4 20 4Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <line x1="20" y1="4" x2="14" y2="18" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="4" x2="26" y2="18" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="18" x2="9.5" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="18" x2="30.5" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="18" x2="20" y2="22" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="18" x2="20" y2="22" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="22" x2="12" y2="31" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="22" x2="28" y2="31" stroke={c} strokeWidth={fw}/>
-        <line x1="9.5" y1="24" x2="12" y2="31" stroke={c} strokeWidth={fw}/>
-        <line x1="30.5" y1="24" x2="28" y2="31" stroke={c} strokeWidth={fw}/>
-        <line x1="12" y1="31" x2="20" y2="36" stroke={c} strokeWidth={fw}/>
-        <line x1="28" y1="31" x2="20" y2="36" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Oval
-  if (shapeKey === 'OV' || shapeKey === 'OVAL') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="20" cy="20" rx="11" ry="16" stroke={c} strokeWidth={sw}/>
-        <line x1="20" y1="4" x2="14" y2="12" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="4" x2="26" y2="12" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="12" x2="9.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="12" x2="30.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="12" x2="20" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="12" x2="20" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="17" x2="9.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="17" x2="30.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="9.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="30.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="14" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="26" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="28" x2="20" y2="36" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="28" x2="20" y2="36" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Cushion
-  if (shapeKey === 'CU' || shapeKey === 'CUSHION') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="7" y="7" width="26" height="26" rx="5" stroke={c} strokeWidth={sw}/>
-        <line x1="9" y1="7" x2="15" y2="15" stroke={c} strokeWidth={fw}/>
-        <line x1="31" y1="7" x2="25" y2="15" stroke={c} strokeWidth={fw}/>
-        <line x1="9" y1="33" x2="15" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="31" y1="33" x2="25" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="15" x2="25" y2="15" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="25" x2="25" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="15" x2="15" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="25" y1="15" x2="25" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="7" x2="20" y2="15" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="33" x2="20" y2="25" stroke={c} strokeWidth={fw}/>
-        <line x1="7" y1="20" x2="15" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="33" y1="20" x2="25" y2="20" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Heart
-  if (shapeKey === 'HS' || shapeKey === 'HEART') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 36 L6 22 C3 18.5 3 12.5 7.5 9.5 C12 6.5 16.5 9 20 14 C23.5 9 28 6.5 32.5 9.5 C37 12.5 37 18.5 34 22 Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <line x1="20" y1="14" x2="20" y2="36" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="14" x2="10" y2="11" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="14" x2="30" y2="11" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="14" x2="8" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="14" x2="32" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="36" x2="8" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="36" x2="32" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="8" y1="20" x2="12" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="32" y1="20" x2="28" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="36" x2="12" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="36" x2="28" y2="28" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Marquise
-  if (shapeKey === 'MQ' || shapeKey === 'MARQUISE') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 3 C27 11 31 17 31 20 C31 23 27 29 20 37 C13 29 9 23 9 20 C9 17 13 11 20 3Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <line x1="20" y1="3" x2="15" y2="13" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="3" x2="25" y2="13" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="13" x2="9.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="25" y1="13" x2="30.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="13" x2="20" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="25" y1="13" x2="20" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="17" x2="9.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="17" x2="30.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="9.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="30.5" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="15" y2="27" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="23" x2="25" y2="27" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="27" x2="20" y2="37" stroke={c} strokeWidth={fw}/>
-        <line x1="25" y1="27" x2="20" y2="37" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Emerald (step cut)
-  if (shapeKey === 'EM' || shapeKey === 'EMERALD') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M11 5 L29 5 L34 10 L34 30 L29 35 L11 35 L6 30 L6 10 Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <path d="M15 10 L25 10 L28 13 L28 27 L25 30 L15 30 L12 27 L12 13 Z" stroke={c} strokeWidth={fw} fill="none"/>
-        <path d="M18 14 L22 14 L23 15 L23 25 L22 26 L18 26 L17 25 L17 15 Z" stroke={c} strokeWidth={fw} fill="none"/>
-        <line x1="11" y1="5" x2="15" y2="10" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="5" x2="25" y2="10" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="10" x2="12" y2="13" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="10" x2="28" y2="13" stroke={c} strokeWidth={fw}/>
-        <line x1="11" y1="35" x2="15" y2="30" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="35" x2="25" y2="30" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="30" x2="12" y2="27" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="30" x2="28" y2="27" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Radiant
-  if (shapeKey === 'RA' || shapeKey === 'RADIANT') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M13 3 L27 3 L34 10 L34 30 L27 37 L13 37 L6 30 L6 10 Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <line x1="13" y1="3" x2="16" y2="12" stroke={c} strokeWidth={fw}/>
-        <line x1="27" y1="3" x2="24" y2="12" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="10" x2="26" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="30" x2="26" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="27" y1="37" x2="24" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="13" y1="37" x2="16" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="30" x2="14" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="10" x2="14" y2="14" stroke={c} strokeWidth={fw}/>
-        <polygon points="16,12 24,12 26,14 26,26 24,28 16,28 14,26 14,14" stroke={c} strokeWidth={fw} fill="none"/>
-        <line x1="20" y1="3" x2="20" y2="12" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="37" x2="20" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="20" x2="14" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="20" x2="26" y2="20" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Princess
-  if (shapeKey === 'PR' || shapeKey === 'PRINCESS') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="6" y="6" width="28" height="28" stroke={c} strokeWidth={sw}/>
-        <line x1="6" y1="6" x2="20" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="6" x2="20" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="34" x2="20" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="34" x2="20" y2="20" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="6" x2="14" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="6" x2="26" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="20" x2="14" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="20" x2="14" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="20" x2="26" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="20" x2="26" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="34" x2="14" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="34" x2="26" y2="26" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-  
-  // Asscher (step-cut square)
-  if (shapeKey === 'AS' || shapeKey === 'ASSCHER') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 6 L30 6 L34 10 L34 30 L30 34 L10 34 L6 30 L6 10 Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <path d="M14 11 L26 11 L29 14 L29 26 L26 29 L14 29 L11 26 L11 14 Z" stroke={c} strokeWidth={fw} fill="none"/>
-        <rect x="16" y="16" width="8" height="8" stroke={c} strokeWidth={fw}/>
-        <line x1="10" y1="6" x2="14" y2="11" stroke={c} strokeWidth={fw}/>
-        <line x1="30" y1="6" x2="26" y2="11" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="10" x2="29" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="30" x2="29" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="30" y1="34" x2="26" y2="29" stroke={c} strokeWidth={fw}/>
-        <line x1="10" y1="34" x2="14" y2="29" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="30" x2="11" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="10" x2="11" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="11" x2="16" y2="16" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="11" x2="24" y2="16" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="14" x2="24" y2="16" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="26" x2="24" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="29" x2="24" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="29" x2="16" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="11" y1="26" x2="16" y2="24" stroke={c} strokeWidth={fw}/>
-        <line x1="11" y1="14" x2="16" y2="16" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-
-  // Trillion / Triangle
-  if (shapeKey === 'TR' || shapeKey === 'TRILLION' || shapeKey === 'TRILLIANT' || shapeKey === 'TRIANGLE') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 4 L36 34 L4 34 Z" stroke={c} strokeWidth={sw} fill="none"/>
-        <line x1="20" y1="4" x2="14" y2="22" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="4" x2="26" y2="22" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="22" x2="26" y2="22" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="22" x2="7" y2="34" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="22" x2="33" y2="34" stroke={c} strokeWidth={fw}/>
-        <line x1="14" y1="22" x2="20" y2="34" stroke={c} strokeWidth={fw}/>
-        <line x1="26" y1="22" x2="20" y2="34" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-
-  // Baguette (step cut rectangle)
-  if (shapeKey === 'BG' || shapeKey === 'BAGUETTE') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="11" y="5" width="18" height="30" stroke={c} strokeWidth={sw}/>
-        <rect x="15" y="10" width="10" height="20" stroke={c} strokeWidth={fw}/>
-        <line x1="11" y1="5" x2="15" y2="10" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="5" x2="25" y2="10" stroke={c} strokeWidth={fw}/>
-        <line x1="11" y1="35" x2="15" y2="30" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="35" x2="25" y2="30" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="17" x2="25" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="15" y1="23" x2="25" y2="23" stroke={c} strokeWidth={fw}/>
-        <line x1="11" y1="14" x2="15" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="14" x2="25" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="11" y1="26" x2="15" y2="23" stroke={c} strokeWidth={fw}/>
-        <line x1="29" y1="26" x2="25" y2="23" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-
-  // Old Mine (rounded square with brilliant facets)
-  if (shapeKey === 'OLD MINE' || shapeKey === 'OM') {
-  return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="6" y="6" width="28" height="28" rx="4" stroke={c} strokeWidth={sw}/>
-        <polygon points="20,8 28,14 32,20 28,26 20,32 12,26 8,20 12,14" stroke={c} strokeWidth={fw} fill="none"/>
-        <line x1="20" y1="8" x2="12" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="8" x2="28" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="8" y1="20" x2="12" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="8" y1="20" x2="12" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="32" y1="20" x2="28" y2="14" stroke={c} strokeWidth={fw}/>
-        <line x1="32" y1="20" x2="28" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="32" x2="12" y2="26" stroke={c} strokeWidth={fw}/>
-        <line x1="20" y1="32" x2="28" y2="26" stroke={c} strokeWidth={fw}/>
-        <polygon points="20,15 24,20 20,25 16,20" stroke={c} strokeWidth={fw} fill="none"/>
-      </svg>
-    );
-  }
-
-  // Cabochon (smooth dome, no facets)
-  if (shapeKey === 'CABUSHON' || shapeKey === 'CABOCHON' || shapeKey === 'CAB') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M5 28 C5 14 12 4 20 4 C28 4 35 14 35 28" stroke={c} strokeWidth={sw} fill="none"/>
-        <line x1="5" y1="28" x2="35" y2="28" stroke={c} strokeWidth={sw}/>
-        <path d="M10 28 C10 17 14 9 20 9 C26 9 30 17 30 28" stroke={c} strokeWidth={fw} opacity="0.6" fill="none"/>
-        <path d="M15 28 C15 20 17 14 20 14 C23 14 25 20 25 28" stroke={c} strokeWidth={fw} opacity="0.4" fill="none"/>
-        <ellipse cx="16" cy="16" rx="3" ry="1.5" stroke={c} strokeWidth={fw} opacity="0.3" transform="rotate(-20 16 16)" fill="none"/>
-      </svg>
-    );
-  }
-
-  // Carre (square step cut)
-  if (shapeKey === 'CARRE' || shapeKey === 'SQ') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="6" y="6" width="28" height="28" stroke={c} strokeWidth={sw}/>
-        <rect x="12" y="12" width="16" height="16" stroke={c} strokeWidth={fw}/>
-        <rect x="17" y="17" width="6" height="6" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="6" x2="12" y2="12" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="6" x2="28" y2="12" stroke={c} strokeWidth={fw}/>
-        <line x1="6" y1="34" x2="12" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="34" y1="34" x2="28" y2="28" stroke={c} strokeWidth={fw}/>
-        <line x1="12" y1="12" x2="17" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="28" y1="12" x2="23" y2="17" stroke={c} strokeWidth={fw}/>
-        <line x1="12" y1="28" x2="17" y2="23" stroke={c} strokeWidth={fw}/>
-        <line x1="28" y1="28" x2="23" y2="23" stroke={c} strokeWidth={fw}/>
-      </svg>
-    );
-  }
-
-  // Default fallback (pentagon)
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M20 4 L35 15 L30 34 L10 34 L5 15 Z" stroke={c} strokeWidth={sw} fill="none"/>
-      <line x1="20" y1="4" x2="15" y2="18" stroke={c} strokeWidth={fw}/>
-      <line x1="20" y1="4" x2="25" y2="18" stroke={c} strokeWidth={fw}/>
-      <line x1="5" y1="15" x2="15" y2="18" stroke={c} strokeWidth={fw}/>
-      <line x1="35" y1="15" x2="25" y2="18" stroke={c} strokeWidth={fw}/>
-      <line x1="15" y1="18" x2="25" y2="18" stroke={c} strokeWidth={fw}/>
-      <line x1="15" y1="18" x2="10" y2="34" stroke={c} strokeWidth={fw}/>
-      <line x1="25" y1="18" x2="30" y2="34" stroke={c} strokeWidth={fw}/>
-    </svg>
-  );
-};
-
-/* ---------------- Shape Filter with Show More ---------------- */
-const ShapeFilter = ({ shapes, activeShapes, onToggle }) => {
-  const [showMore, setShowMore] = useState(false);
-  const [shapeSearch, setShapeSearch] = useState('');
-
-  const mainShapes = ['All shapes', ...LEVEL_1_SHAPES].filter(s => shapes.includes(s));
-  const otherShapes = shapes.filter(s => s !== 'All shapes' && !LEVEL_1_SHAPES.includes(s));
-  const filteredOtherShapes = otherShapes.filter(s => {
-    const q = shapeSearch.toLowerCase();
-    const display = BARAK_DISPLAY_NAMES[s] || s;
-    return s.toLowerCase().includes(q) || display.toLowerCase().includes(q);
-  });
-
-  const isAllActive = activeShapes.length === 0;
-
-  const toggleShape = (shape) => {
-    if (activeShapes.includes(shape)) {
-      onToggle(activeShapes.filter(s => s !== shape));
-    } else {
-      onToggle([...activeShapes, shape]);
-    }
-  };
-
-  const ShapeButton = ({ shape }) => {
-    const isAll = shape === "All shapes";
-    const isActive = isAll ? isAllActive : activeShapes.includes(shape);
-    return (
-      <button
-        key={shape}
-        onClick={() => isAll ? onToggle([]) : toggleShape(shape)}
-        className={`flex flex-col items-center justify-center rounded-xl border-2 transition-all duration-150 w-[72px] h-[72px] sm:w-20 sm:h-20 ${
-          isAll
-            ? `text-sm font-semibold ${isActive ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'}`
-            : `${isActive ? 'bg-emerald-50 border-emerald-500 shadow-md' : 'bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50'}`
-        }`}
-      >
-        {isAll ? (
-          <span>All</span>
-        ) : (
-          <>
-            <ShapeIcon shape={shape} isActive={isActive} />
-            <span className={`text-[10px] mt-1 font-medium ${isActive ? 'text-emerald-700' : 'text-stone-500'}`}>
-              {shape}
-            </span>
-          </>
-        )}
-      </button>
-    );
-  };
-
-  return (
-    <div className="sm:col-span-2 lg:col-span-4">
-      <label className="block text-xs font-medium text-stone-500 mb-2">
-        Shape
-        {activeShapes.length > 0 && (
-          <span className="ml-2 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-            {activeShapes.length} selected
-          </span>
-        )}
-      </label>
-      {/* Main shapes (Level 1) */}
-      <div className="flex flex-wrap gap-2">
-        {mainShapes.map((shape) => (
-          <ShapeButton key={shape} shape={shape} />
-        ))}
-      </div>
-      {/* Show more / less (Level 2) */}
-      {otherShapes.length > 0 && (
-        <>
-          <button
-            onClick={() => { setShowMore(!showMore); setShapeSearch(''); }}
-            className="mt-2 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1"
-          >
-            {showMore ? (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-                Show less
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-                Show more ({otherShapes.length})
-              </>
-            )}
-          </button>
-          <AnimatePresence>
-            {showMore && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-2 p-3 rounded-xl border border-stone-200 bg-stone-50/50 max-w-xs">
-                  <input
-                    type="text"
-                    value={shapeSearch}
-                    onChange={(e) => setShapeSearch(e.target.value)}
-                    placeholder="Search shapes..."
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 mb-2"
-                    autoFocus
-                  />
-                  <div className="max-h-48 overflow-y-auto">
-                    {filteredOtherShapes.map((shape) => {
-                      const isActive = activeShapes.includes(shape);
-                      const displayName = BARAK_DISPLAY_NAMES[shape] || shape;
-                      return (
-                        <button
-                          key={shape}
-                          onClick={() => toggleShape(shape)}
-                          className={`w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                            isActive
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'text-stone-600 hover:bg-stone-100'
-                          }`}
-                        >
-                          <span>{displayName}</span>
-                          {isActive && (
-                            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    })}
-                    {filteredOtherShapes.length === 0 && (
-                      <span className="text-xs text-stone-400 py-2 px-3 block">No shapes found</span>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
-      )}
-    </div>
-  );
-};
-
-/* ---------------- Smart Search Parser ---------------- */
-const SMART_SEARCH_SHAPES = new Set([
-  ...Object.keys(SHAPE_TO_DNA).map(k => k.toUpperCase()),
-  ...new Set(Object.values(SHAPE_TO_DNA).flat().map(v => v.toUpperCase())),
-]);
-
-const SMART_SEARCH_CLARITIES = new Set([
-  'FL', 'IF', 'LOUPE CLEAN', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2', 'I3',
-]);
-
-const SMART_SEARCH_LABS = new Set([
-  'GIA', 'GRS', 'SSEF', 'GUBELIN', 'G├£BELIN', 'CDC', 'AIGS', 'AGL', 'GIT', 'LOTUS', 'CGL',
-]);
-
-const SMART_SEARCH_CATEGORIES = new Set([
-  'DIAMOND', 'EMERALD', 'RUBY', 'SAPPHIRE', 'SPINEL', 'TOURMALINE',
-  'ALEXANDRITE', 'AQUAMARINE', 'GARNET', 'TANZANITE', 'TSAVORITE',
-  'RUBELLITE', 'MORGANITE', 'KUNZITE', 'TOPAZ', 'OPAL', 'ONYX', 'FANCY',
-]);
-
-const SMART_SEARCH_TREATMENTS = {
-  'NO OIL': 'No Oil', 'INSIGNIFICANT': 'Insignificant',
-  'MINOR': 'Minor', 'MODERATE': 'Moderate', 'SIGNIFICANT': 'Significant',
-};
-
-const SMART_SEARCH_LOCATIONS = {
-  'NEW YORK': 'New York', 'LOS ANGELES': 'Los Angeles',
-  'HONG KONG': 'Hong Kong', 'ISRAEL': 'Israel',
-  'NY': 'New York', 'LA': 'Los Angeles', 'HK': 'Hong Kong',
-};
-
-const SMART_SEARCH_FANCY_COLORS = new Set([
-  'YELLOW', 'GREEN', 'BLUE', 'PINK', 'RED', 'ORANGE', 'PURPLE', 'BROWN',
-  'BLACK', 'GREY', 'GRAY', 'WHITE', 'VIOLET', 'TEAL', 'PADPARADSCHA',
-]);
-
-const SMART_SEARCH_ORIGINS = new Set([
-  'COLOMBIA', 'ZAMBIA', 'BRAZIL', 'ETHIOPIA', 'AFGHANISTAN', 'MADAGASCAR',
-  'MOZAMBIQUE', 'BURMA', 'MYANMAR', 'SRI LANKA', 'KASHMIR', 'TANZANIA',
-  'KENYA', 'PAKISTAN', 'RUSSIA', 'TAJIKISTAN', 'VIETNAM', 'THAILAND',
-  'CAMBODIA', 'AUSTRALIA', 'NIGERIA', 'ZIMBABWE', 'INDIA',
-]);
-
-const SMART_SEARCH_GROUPING = new Set([
-  'SINGLE', 'PAIR', 'SET', 'PARCEL', 'SIDE STONES', 'MELEE',
-]);
-
-const parseSmartSearch = (text) => {
-  const result = {
-    shapes: [], weight: null, weightRange: null, clarities: [], colors: [], categories: [],
-    treatments: [], locations: [], labs: [], origins: [], skus: [],
-    fancyColors: [], groupingTypes: [], pricePerCt: null, unmatched: [],
-  };
-  if (!text || !text.trim()) return result;
-
-  let remaining = text.trim();
-
-  // 1. Extract SKUs (T followed by digits, or TC- followed by digits)
-  remaining = remaining.replace(/\b(?:TC-?\d+|T\d+)\b/gi, (match) => {
-    result.skus.push(match.toUpperCase());
-    return ' ';
-  });
-
-  // 2a. Extract price per carat range: 10000-20000pc or 10000pc-20000pc
-  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*(?:pc)?\s*-\s*(\d+(?:\.\d+)?)\s*pc\b/gi, (match, min, max) => {
-    result.pricePerCt = { min: parseFloat(min), max: parseFloat(max) };
-    return ' ';
-  });
-
-  // 2b. Extract single price per carat: 10000pc
-  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*pc\b/gi, (match, num) => {
-    if (!result.pricePerCt) {
-      const val = parseFloat(num);
-      result.pricePerCt = { min: val * 0.85, max: val * 1.15 };
-    }
-    return ' ';
-  });
-
-  // 2c. Extract weight range: 3-5ct
-  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(?:ct|carat|cts|carats)\b/gi, (match, min, max) => {
-    result.weightRange = { min: parseFloat(min), max: parseFloat(max) };
-    return ' ';
-  });
-
-  // 2d. Extract single weight: 3ct or standalone number
-  remaining = remaining.replace(/\b(\d+(?:\.\d+)?)\s*(?:ct|carat|cts|carats)?\b/gi, (match, num) => {
-    if (!result.weight && !result.weightRange) result.weight = parseFloat(num);
-    return ' ';
-  });
-
-  // 3. Extract multi-word phrases first (treatments, locations, origins, grouping, clarities)
-  const multiWordSets = [
-    { dict: SMART_SEARCH_TREATMENTS, target: 'treatments', isMap: true },
-    { dict: SMART_SEARCH_LOCATIONS, target: 'locations', isMap: true },
-  ];
-  for (const { dict, target, isMap } of multiWordSets) {
-    const keys = Object.keys(dict);
-    for (const key of keys) {
-      const regex = new RegExp('\\b' + key.replace(/\s+/g, '\\s+') + '\\b', 'gi');
-      remaining = remaining.replace(regex, () => {
-        result[target].push(isMap ? dict[key] : key);
-        return ' ';
-      });
-    }
-  }
-  // Multi-word origins
-  for (const origin of SMART_SEARCH_ORIGINS) {
-    if (origin.includes(' ')) {
-      const regex = new RegExp('\\b' + origin.replace(/\s+/g, '\\s+') + '\\b', 'gi');
-      remaining = remaining.replace(regex, () => {
-        result.origins.push(origin.charAt(0) + origin.slice(1).toLowerCase());
-        return ' ';
-      });
-    }
-  }
-  // Multi-word grouping
-  for (const gt of SMART_SEARCH_GROUPING) {
-    if (gt.includes(' ')) {
-      const regex = new RegExp('\\b' + gt.replace(/\s+/g, '\\s+') + '\\b', 'gi');
-      remaining = remaining.replace(regex, () => {
-        result.groupingTypes.push(gt.charAt(0) + gt.slice(1).toLowerCase());
-        return ' ';
-      });
-    }
-  }
-
-  // 4. Two-pass token processing:
-  //    Pass 1 -- classify each token; ambiguous words (shape+category) are deferred
-  //    Pass 2 -- resolve deferred words using context from pass 1
-  const tokens = remaining.split(/[\s,]+/).filter(t => t.length > 0);
-  const deferred = []; // { token, upper, shapeName }
-  let pureShapeCount = 0;
-  let pureCategoryCount = 0;
-
-  for (const token of tokens) {
-    const upper = token.toUpperCase();
-    if (['SHAPE', 'COLOR', 'CUT', 'STONE', 'GEM', 'GEMSTONE', 'THE', 'AND', 'WITH', 'CT', 'CARAT'].includes(upper)) continue;
-    if (SMART_SEARCH_CLARITIES.has(upper)) { result.clarities.push(upper); continue; }
-    if (SMART_SEARCH_LABS.has(upper)) { result.labs.push(upper); continue; }
-
-    const isShape = SMART_SEARCH_SHAPES.has(upper);
-    const isCategory = SMART_SEARCH_CATEGORIES.has(upper);
-
-    if (isShape && isCategory) {
-      const dnaNames = SHAPE_TO_DNA[upper] || SHAPE_TO_DNA[token];
-      const shapeName = dnaNames ? dnaNames[0] : (token.charAt(0).toUpperCase() + token.slice(1).toLowerCase());
-      deferred.push({ token, upper, shapeName });
-      continue;
-    }
-    if (isShape) {
-      const dnaNames = SHAPE_TO_DNA[upper] || SHAPE_TO_DNA[token];
-      if (dnaNames) { result.shapes.push(...dnaNames); } else { result.shapes.push(token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()); }
-      pureShapeCount++;
-      continue;
-    }
-    if (isCategory) {
-      result.categories.push(upper.charAt(0) + upper.slice(1).toLowerCase());
-      pureCategoryCount++;
-      continue;
-    }
-
-    if (SMART_SEARCH_TREATMENTS[upper]) { result.treatments.push(SMART_SEARCH_TREATMENTS[upper]); continue; }
-    if (SMART_SEARCH_ORIGINS.has(upper)) { result.origins.push(upper.charAt(0) + upper.slice(1).toLowerCase()); continue; }
-    if (SMART_SEARCH_GROUPING.has(upper)) { result.groupingTypes.push(upper.charAt(0) + upper.slice(1).toLowerCase()); continue; }
-    if (SMART_SEARCH_FANCY_COLORS.has(upper)) { result.fancyColors.push(upper.charAt(0) + upper.slice(1).toLowerCase()); continue; }
-    if (/^[D-Z]$/i.test(token)) { result.colors.push(upper); continue; }
-    result.unmatched.push(token);
-  }
-
-  // Pass 2: resolve ambiguous words
-  // Group deferred by word to detect duplicates (e.g. "emerald emerald")
-  const deferredByWord = {};
-  for (const item of deferred) {
-    if (!deferredByWord[item.upper]) deferredByWord[item.upper] = [];
-    deferredByWord[item.upper].push(item);
-  }
-  for (const [, items] of Object.entries(deferredByWord)) {
-    const catName = items[0].upper.charAt(0) + items[0].upper.slice(1).toLowerCase();
-    if (items.length >= 2) {
-      // Same word twice Γזע first = category, second = shape
-      result.categories.push(catName);
-      result.shapes.push(items[1].shapeName);
-    } else if (pureCategoryCount > 0) {
-      // Another category already exists (e.g. Diamond) Γזע this is a shape
-      result.shapes.push(items[0].shapeName);
-    } else {
-      // No other category Γזע default to category
-      result.categories.push(catName);
-    }
-  }
-
-  // Deduplicate
-  result.shapes = [...new Set(result.shapes)];
-  result.clarities = [...new Set(result.clarities)];
-  result.colors = [...new Set(result.colors)];
-  result.categories = [...new Set(result.categories)];
-  result.fancyColors = [...new Set(result.fancyColors)];
-  return result;
-};
-
-/* ---------------- Multi-Select Dropdown ---------------- */
-const MultiSelect = ({ value, options, onChange, placeholder }) => {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const dropRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (btnRef.current && btnRef.current.contains(e.target)) return;
-      if (dropRef.current && dropRef.current.contains(e.target)) return;
-      setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const updatePos = () => {
-      if (!btnRef.current) return;
-      const rect = btnRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const dropHeight = 240;
-      const showAbove = spaceBelow < dropHeight && rect.top > dropHeight;
-      setPos({
-        top: showAbove ? rect.top - dropHeight - 4 : rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-      });
-    };
-    updatePos();
-    // The menu is `position: fixed`, so it won't move with the page on its
-    // own. Re-anchor it to the button on every scroll/resize so it stays
-    // glued to the field (and scrolls off with it) instead of floating in
-    // place. `capture: true` also catches scrolls on inner scroll containers.
-    window.addEventListener("scroll", updatePos, true);
-    window.addEventListener("resize", updatePos);
-    return () => {
-      window.removeEventListener("scroll", updatePos, true);
-      window.removeEventListener("resize", updatePos);
-    };
-  }, [open]);
-
-  const toggle = (opt) => {
-    if (value.includes(opt)) {
-      onChange(value.filter(v => v !== opt));
-    } else {
-      onChange([...value, opt]);
-    }
-  };
-
-  const display = value.length === 0
-    ? placeholder
-    : value.length <= 2
-      ? value.join(', ')
-      : `${value.length} selected`;
-
-  return (
-    <div className="relative">
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="input-modern w-full text-left flex items-center justify-between gap-1"
-      >
-        <span className={`truncate text-sm ${value.length === 0 ? 'text-stone-400' : 'text-stone-700'}`}>{display}</span>
-        <svg className={`w-4 h-4 text-stone-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && createPortal(
-        <div
-          ref={dropRef}
-          className="bg-white border border-stone-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
-          style={{ position: 'fixed', zIndex: 9999, top: pos.top, left: pos.left, width: pos.width }}
-        >
-          {value.length > 0 && (
-            <button
-              onClick={() => onChange([])}
-              className="w-full px-3 py-1.5 text-left text-xs text-red-500 hover:bg-red-50 border-b border-stone-100 sticky top-0 bg-white"
-            >
-              Clear all
-            </button>
-          )}
-          {options.map((opt) => (
-            <label
-              key={opt}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={value.includes(opt)}
-                onChange={() => toggle(opt)}
-                className="w-3.5 h-3.5 text-primary-600 rounded border-stone-300 focus:ring-primary-500"
-              />
-              <span className="text-sm text-stone-700">{opt}</span>
-            </label>
-          ))}
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-};
-
-/* ---------------- Jewelry Filters ---------------- */
-const JewelryFilters = ({ filters, onChange, jewelryTypeOptions, jewelryStyleOptions, jewelryCollectionOptions, jewelryStoneTypeOptions, jewelryMetalTypeOptions }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const handleChange = (field) => (e) => { onChange({ ...filters, [field]: e.target.value }); };
-  const handleMulti = (field, value) => {
-    const current = filters[field] || [];
-    onChange({ ...filters, [field]: current.includes(value) ? current.filter(v => v !== value) : [...current, value] });
-  };
-  const activeCount = [
-    filters.minPrice, filters.maxPrice, filters.minCarat, filters.maxCarat,
-  ].filter(Boolean).length + (filters.category?.length || 0) + (filters.shape?.length || 0) + (filters.treatment?.length || 0) + (filters.diamondColor?.length || 0) + (filters.fancyColor?.length || 0);
-
-  return (
-    <div className="mb-4">
-      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm font-medium text-stone-600 hover:text-stone-800 transition-colors mb-2">
-        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-        Filters {activeCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-800 text-white">{activeCount}</span>}
-      </button>
-      {isOpen && (
-        <div className="rounded-xl glass-surface p-4 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1">Min Carats</label>
-              <input type="number" step="0.01" value={filters.minCarat} onChange={handleChange('minCarat')} placeholder="Min ct" className="input-modern" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1">Max Carats</label>
-              <input type="number" step="0.01" value={filters.maxCarat} onChange={handleChange('maxCarat')} placeholder="Max ct" className="input-modern" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1">Min Price</label>
-              <input type="number" value={filters.minPrice} onChange={handleChange('minPrice')} placeholder="Min $" className="input-modern" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-stone-500 mb-1">Max Price</label>
-              <input type="number" value={filters.maxPrice} onChange={handleChange('maxPrice')} placeholder="Max $" className="input-modern" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {jewelryTypeOptions.length > 1 && (
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1">Type</label>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                  {jewelryTypeOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('category', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.category || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {jewelryStyleOptions.length > 1 && (
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1">Style</label>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                  {jewelryStyleOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('shape', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.shape || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {jewelryCollectionOptions.length > 1 && (
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1">Collection</label>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                  {jewelryCollectionOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('treatment', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.treatment || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {jewelryStoneTypeOptions.length > 1 && (
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1">Stone Type</label>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                  {jewelryStoneTypeOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('diamondColor', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.diamondColor || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {jewelryMetalTypeOptions.length > 1 && (
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1">Metal</label>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                  {jewelryMetalTypeOptions.slice(1).map(opt => (
-                    <button key={opt} onClick={() => handleMulti('fancyColor', opt)} className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${(filters.fancyColor || []).includes(opt) ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ---------------- Filters ---------------- */
-const StoneFilters = ({ filters, onChange, shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions = [], tags, onManageTags, inventoryMode, priceMode = 'neto', smartSearch = '', onSmartSearchChange, parsedSearch }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Price filters are entered in the currently displayed units (Neto = Bruto/2),
-  // so we annotate the Price/PPC labels with the active mode to make that explicit.
-  const priceUnitLabel = priceMode === 'neto' ? 'Neto' : 'Bruto';
-
-  const handleChange = (field) => (e) => {
-    onChange({ ...filters, [field]: e.target.value });
-  };
-
-  const handleClear = () => {
-    onChange({
-      // SKU search now lives in the prominent top bar with its own clear button,
-      // so "Clear all" here leaves it untouched and only resets the filter fields.
-      sku: filters.sku,
-      minPrice: "",
-      maxPrice: "",
-      minPricePerCt: "",
-      maxPricePerCt: "",
-      minCarat: "",
-      maxCarat: "",
-      minLength: "",
-      maxLength: "",
-      minWidth: "",
-      maxWidth: "",
-      shape: [],
-      treatment: [],
-      category: [],
-      tag: [],
-      location: [],
-      lab: [],
-      groupingType: [],
-      diamondColor: [],
-      fancyColor: [],
-      box: "",
-    });
-    onSmartSearchChange && onSmartSearchChange("");
-  };
-
-  const activeFiltersCount = [
-    smartSearch,
-    filters.minPrice,
-    filters.maxPrice,
-    filters.minPricePerCt,
-    filters.maxPricePerCt,
-    filters.minCarat,
-    filters.maxCarat,
-    filters.minLength,
-    filters.maxLength,
-    filters.minWidth,
-    filters.maxWidth,
-    filters.shape.length > 0,
-    filters.treatment.length > 0,
-    filters.category.length > 0,
-    filters.tag.length > 0,
-    filters.location.length > 0,
-    (filters.lab || []).length > 0,
-    filters.groupingType.length > 0,
-    filters.diamondColor.length > 0,
-    filters.fancyColor.length > 0,
-    filters.box,
-  ].filter(Boolean).length;
-
-  return (
-    <div className="rounded-xl glass-surface p-4 mb-4">
-      {/* Clickable Header */}
-      <div 
-        className="flex items-center justify-between cursor-pointer select-none"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-          </svg>
-          <h2 className="text-sm font-medium text-stone-700">Filters</h2>
-          {activeFiltersCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-800 text-white">{activeFiltersCount}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {isOpen && activeFiltersCount > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleClear(); }}
-              className="text-xs font-medium text-stone-500 hover:text-stone-700 px-2 py-1 rounded hover:bg-stone-50 transition-colors"
-            >
-              Clear all
-            </button>
-          )}
-          <svg className={`w-4 h-4 text-stone-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </div>
-      
-      {/* Collapsible Content */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="pt-4 space-y-4">
-
-              {/* Smart Search (natural language). Moved here from the top bar so
-                  the prominent search is the simple SKU box people expect; this
-                  is the advanced "describe what you want" search. Parses shape,
-                  weight, clarity, color, lab, price/ct, SKU, etc. */}
-              <div>
-                <label className="block text-xs font-medium text-stone-500 mb-1.5">
-                  Smart search
-                  <span className="text-stone-400 font-normal ml-1">(describe the stone in plain words)</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    value={smartSearch}
-                    onChange={(e) => onSmartSearchChange && onSmartSearchChange(e.target.value)}
-                    placeholder="e.g. Emerald 3ct VS2, Diamond J SI1 GIA, Cushion 5-7ct"
-                    className="w-full pl-9 pr-9 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-all"
-                  />
-                  {smartSearch && (
-                    <button
-                      type="button"
-                      onClick={() => onSmartSearchChange && onSmartSearchChange("")}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {smartSearch && parsedSearch && (() => {
-                  const ss = parsedSearch;
-                  const hasTags = ss.shapes.length > 0 || ss.weight || ss.weightRange || ss.clarities.length > 0 ||
-                    ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
-                    ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
-                    ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0 ||
-                    ss.pricePerCt;
-                  if (!hasTags) return null;
-                  const Badge = ({ label, type, color }) => (
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
-                      <span className="opacity-60">{type}:</span> {label}
-                    </span>
-                  );
-                  return (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {ss.skus.map(s => <Badge key={`sku-${s}`} label={s} type="SKU" color="bg-violet-100 text-violet-700" />)}
-                      {ss.categories.map(c => <Badge key={`cat-${c}`} label={c} type="Category" color="bg-blue-100 text-blue-700" />)}
-                      {ss.shapes.map(s => <Badge key={`shp-${s}`} label={s} type="Shape" color="bg-emerald-100 text-emerald-700" />)}
-                      {ss.weightRange && <Badge label={`${ss.weightRange.min}-${ss.weightRange.max}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
-                      {!ss.weightRange && ss.weight && <Badge label={`~${ss.weight}ct`} type="Weight" color="bg-amber-100 text-amber-700" />}
-                      {ss.pricePerCt && <Badge label={`$${Math.round(ss.pricePerCt.min).toLocaleString()}-${Math.round(ss.pricePerCt.max).toLocaleString()}/ct`} type="Price" color="bg-green-100 text-green-700" />}
-                      {ss.clarities.map(c => <Badge key={`cl-${c}`} label={c} type="Clarity" color="bg-sky-100 text-sky-700" />)}
-                      {ss.colors.map(c => <Badge key={`col-${c}`} label={c} type="Color" color="bg-pink-100 text-pink-700" />)}
-                      {ss.fancyColors.map(c => <Badge key={`fc-${c}`} label={c} type="Fancy" color="bg-rose-100 text-rose-700" />)}
-                      {ss.treatments.map(t => <Badge key={`tr-${t}`} label={t} type="Treatment" color="bg-orange-100 text-orange-700" />)}
-                      {ss.labs.map(l => <Badge key={`lab-${l}`} label={l} type="Lab" color="bg-indigo-100 text-indigo-700" />)}
-                      {ss.locations.map(l => <Badge key={`loc-${l}`} label={l} type="Location" color="bg-teal-100 text-teal-700" />)}
-                      {ss.origins.map(o => <Badge key={`org-${o}`} label={o} type="Origin" color="bg-lime-100 text-lime-700" />)}
-                      {ss.groupingTypes.map(g => <Badge key={`gt-${g}`} label={g} type="Type" color="bg-stone-200 text-stone-700" />)}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Row 1: Carat */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Carat</label>
-                  <input type="number" value={filters.minCarat} onChange={handleChange("minCarat")} placeholder="From" step="0.01" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max Carat</label>
-                  <input type="number" value={filters.maxCarat} onChange={handleChange("maxCarat")} placeholder="To" step="0.01" className="input-modern" />
-                </div>
-              </div>
-
-              {/* Row 2: Price */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min Price ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
-                  <input type="number" value={filters.minPrice} onChange={handleChange("minPrice")} placeholder="From" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max Price ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
-                  <input type="number" value={filters.maxPrice} onChange={handleChange("maxPrice")} placeholder="To" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Min PPC ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
-                  <input type="number" value={filters.minPricePerCt} onChange={handleChange("minPricePerCt")} placeholder="From" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Max PPC ($) <span className="text-stone-400 font-normal">({priceUnitLabel})</span></label>
-                  <input type="number" value={filters.maxPricePerCt} onChange={handleChange("maxPricePerCt")} placeholder="To" className="input-modern" />
-                </div>
-              </div>
-
-              {/* Row 3: Shape */}
-              <ShapeFilter shapes={shapesOptions} activeShapes={filters.shape} onToggle={(shapes) => onChange({ ...filters, shape: shapes })} />
-
-              {/* Row 4: Measurements */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Length Min</label>
-                  <input type="number" value={filters.minLength} onChange={handleChange("minLength")} placeholder="mm" step="0.01" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Length Max</label>
-                  <input type="number" value={filters.maxLength} onChange={handleChange("maxLength")} placeholder="mm" step="0.01" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Width Min</label>
-                  <input type="number" value={filters.minWidth} onChange={handleChange("minWidth")} placeholder="mm" step="0.01" className="input-modern" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Width Max</label>
-                  <input type="number" value={filters.maxWidth} onChange={handleChange("maxWidth")} placeholder="mm" step="0.01" className="input-modern" />
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-stone-200/60" />
-
-              {/* Row 5: Dropdowns */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {inventoryMode === 'gemstones' && (
-                  <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Category</label>
-                    <MultiSelect
-                      value={filters.category}
-                      options={categoriesOptions.filter(c => c !== 'All categories')}
-                      onChange={(val) => onChange({ ...filters, category: val })}
-                      placeholder="All categories"
-                    />
-                  </div>
-                )}
-                {inventoryMode === 'gemstones' && (
-                  <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Clarity</label>
-                    <MultiSelect
-                      value={filters.treatment}
-                      options={treatmentOptions.filter(t => t !== 'All treatments')}
-                      onChange={(val) => onChange({ ...filters, treatment: val })}
-                      placeholder="All"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Location</label>
-                  <MultiSelect
-                    value={filters.location}
-                    options={locationOptions.filter(l => l !== 'All locations')}
-                    onChange={(val) => onChange({ ...filters, location: val })}
-                    placeholder="All locations"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Lab</label>
-                  <MultiSelect
-                    value={filters.lab || []}
-                    options={labOptions}
-                    onChange={(val) => onChange({ ...filters, lab: val })}
-                    placeholder="All labs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Grouping Type</label>
-                  <MultiSelect
-                    value={filters.groupingType}
-                    options={["Single", "Pair", "Set", "Parcel", "Side Stones", "Melee", "Empty"]}
-                    onChange={(val) => onChange({ ...filters, groupingType: val })}
-                    placeholder="All types"
-                  />
-                </div>
-                {inventoryMode === 'diamonds' && (
-                  <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Diamond Color</label>
-                    <MultiSelect
-                      value={filters.diamondColor}
-                      options={diamondColorOptions.filter(c => c !== 'All colors')}
-                      onChange={(val) => onChange({ ...filters, diamondColor: val })}
-                      placeholder="All colors"
-                    />
-                  </div>
-                )}
-                {inventoryMode === 'diamonds' && (
-                  <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1.5">Fancy Color</label>
-                    <MultiSelect
-                      value={filters.fancyColor}
-                      options={fancyColorOptions.filter(c => c !== 'All colors')}
-                      onChange={(val) => onChange({ ...filters, fancyColor: val })}
-                      placeholder="All colors"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Box</label>
-                  <input type="text" value={filters.box} onChange={handleChange("box")} placeholder="Search box..." className="input-modern" />
-                </div>
-                <div className="col-span-2 sm:col-span-1 lg:col-span-2">
-                  <label className="block text-xs font-medium text-stone-500 mb-1.5">Client Tag</label>
-                  <div className="flex gap-2">
-                    <MultiSelect
-                      value={filters.tag}
-                      options={tags.map(t => t.name)}
-                      onChange={(val) => onChange({ ...filters, tag: val })}
-                      placeholder="All tags"
-                    />
-                    <button
-                      onClick={onManageTags}
-                      className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl transition-colors"
-                      title="Manage tags"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-/* ---------------- Stone Card (Grid) ---------------- */
-const shortTreatment = (t) => {
-  if (!t) return 'N/A';
-  const lower = t.toLowerCase().trim();
-  if (lower === 'insignificant') return 'Ins';
-  if (lower === 'insignificant to minor') return 'Ins - Min';
-  if (lower === 'moderate') return 'Mod';
-  if (lower === 'minor to moderate') return 'Min - Mod';
-  return t;
-};
-
-/* ---------------- Loose-stone assignment chip (Sprint 3) ---------------- */
-const StoneAssignmentChip = ({ stone, onAssign, busy }) => {
-  const team = useTeam();
-  if (!team?.ready || (team.members || []).length <= 1) return null;
-
-  const assignedMember =
-    stone.assignedTo && team.membersByClerkId
-      ? team.membersByClerkId[stone.assignedTo]
-      : null;
-  const isMine = stone.assignedTo && stone.assignedTo === team.actorUserId;
-
-  if (!stone.assignedTo) {
-    return (
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); if (onAssign) onAssign(stone, "me"); }}
-        disabled={busy}
-        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-medium px-2 py-0.5 ring-1 transition ${
-          busy
-            ? "bg-emerald-50 text-emerald-400 ring-emerald-100 cursor-wait"
-            : "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
-        }`}
-        title="Claim this stone for yourself"
-      >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        Claim
-      </button>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!isMine && !team.isOwner) return;
-        if (onAssign) onAssign(stone, null);
-      }}
-      disabled={busy || (!isMine && !team.isOwner)}
-      className={`inline-flex items-center gap-1.5 rounded-full text-[10px] font-medium pl-0.5 pr-2 py-0.5 ring-1 transition ${
-        isMine
-          ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
-          : "bg-stone-50 text-stone-700 ring-stone-200"
-      } ${(!isMine && !team.isOwner) ? "cursor-default" : "cursor-pointer"}`}
-      title={isMine ? "Click to release this stone" : `Assigned to ${assignedMember?.name || "team member"}`}
-    >
-      <MemberAvatar
-        member={assignedMember}
-        clerkUserId={stone.assignedTo}
-        size="xs"
-        ring={false}
-      />
-      <span className="truncate max-w-[80px]">
-        {isMine ? "Mine" : (assignedMember?.name?.split(" ")[0] || "Assigned")}
-      </span>
-    </button>
-  );
-};
-
-const StoneCard = ({ stone, onToggle, isExpanded, isSelected, onToggleSelection, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, priceMode, onAssign, assigningSku }) => (
-  <motion.div
-    layout
-    className={`rounded-2xl border-2 overflow-hidden shadow-md transition-all duration-200 ${
-      isSelected 
-        ? 'shadow-lg' 
-        : 'border-stone-200 bg-white hover:border-stone-300'
-    }`}
-    style={isSelected ? { borderColor: '#2FAB81', backgroundColor: '#2FAB8120' } : {}}
-  >
-    <div className="p-4">
-      <div className="flex gap-4">
-        {/* Checkbox */}
-        <div className="flex items-start pt-1">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => onToggleSelection(stone.id)}
-            className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
-          />
-        </div>
-        {/* Image */}
-        <div 
-          className={`w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
-          onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
-        >
-          {stone.imageUrl ? (
-            <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-stone-300">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-          )}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-xs font-mono text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{stone.sku}</span>
-                <StoneAssignmentChip stone={stone} onAssign={onAssign} busy={assigningSku === stone.sku} />
-              </div>
-              <h3 className="font-semibold text-stone-800 mt-1">{getDisplayShape(stone.shape)}</h3>
-            </div>
-            <span className="text-lg font-bold text-stone-800">
-              {stone.weightCt} ct
-            </span>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-stone-500">
-            <span><span className="text-stone-400">Total:</span> <span className="font-semibold text-stone-800">${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</span></span>
-            <span><span className="text-stone-400">Price/ct:</span> ${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</span>
-            <span><span className="text-stone-400">Measurements:</span> {stone.measurements || 'N/A'}</span>
-            <span><span className="text-stone-400">Ratio:</span> {stone.ratio || 'N/A'}</span>
-            <span><span className="text-stone-400">Clarity:</span> {shortTreatment(stone.treatment)}</span>
-            <span><span className="text-stone-400">Lab:</span> {stone.lab || ''}</span>
-            <span><span className="text-stone-400">Location:</span> {stone.location || ''}</span>
-            <span><span className="text-stone-400">Type:</span> {stone.pairSku ? 'Pair' : 'Single'}</span>
-          </div>
-          
-          {/* Tags */}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {stoneTags?.map((tag) => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                style={{ backgroundColor: tag.color }}
-              >
-                {tag.name}
-              </span>
-            ))}
-            <TagSelector
-              stoneSku={stone.sku}
-              currentTags={stoneTags || []}
-              allTags={allTags}
-              onAddTag={onAddTag}
-              onRemoveTag={onRemoveTag}
-              onManageTags={onManageTags}
-            />
-          </div>
-        </div>
-      </div>
-
-      <button
-        onClick={() => onToggle(stone)}
-        className="mt-4 w-full py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium text-sm transition-colors"
-      >
-        {isExpanded ? 'Hide details' : 'View details'}
-      </button>
-    </div>
-
-    <AnimatePresence>
-      {isExpanded && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          className="border-t border-stone-200 bg-stone-50"
-        >
-          <StoneDetails stone={stone} onViewDNA={onViewDNA} />
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </motion.div>
-);
-
-/* ---------------- Jewelry Details Panel ---------------- */
-const JewelryDetails = ({ stone }) => {
-  const [activeImgIdx, setActiveImgIdx] = useState(0);
-  const images = stone.allImages || (stone.imageUrl ? [stone.imageUrl] : []);
-
-  return (
-    <div className="p-5">
-      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
-        {/* Image Gallery */}
-        {images.length > 0 && (
-          <div className="space-y-2">
-            <div className="aspect-square rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
-              <img
-                src={images[activeImgIdx] || images[0]}
-                alt={stone.title || stone.sku}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {images.length > 1 && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
-                {images.map((img, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActiveImgIdx(i)}
-                    className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === activeImgIdx ? 'border-slate-600 ring-1 ring-slate-400' : 'border-stone-200 hover:border-stone-400'}`}
-                  >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Details Sections */}
-        <div className="space-y-5">
-          {/* Center Stone Section */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
-              </svg>
-              Center Stone
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <DetailItem label="Stone Type" value={stone.stoneType} />
-              <DetailItem label="Carat" value={stone.centerStoneCarat ? `${stone.centerStoneCarat} ct` : null} />
-              <DetailItem label="Shape" value={getDisplayShape(stone.shape)} />
-              <DetailItem label="Color" value={stone.color} />
-              <DetailItem label="Clarity" value={stone.clarity} />
-            </div>
-          </div>
-
-          {/* General Details Section */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              General Details
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <DetailItem label="SKU" value={stone.sku} />
-              <DetailItem label="Type" value={stone.jewelryType} />
-              <DetailItem label="Collection" value={stone.collection} />
-              <DetailItem label="Total Carat" value={stone.weightCt ? `${stone.weightCt} ct` : null} />
-              <DetailItem label="Jewelry Weight" value={stone.jewelryWeight} />
-              <DetailItem label="Size" value={stone.jewelrySize} />
-            </div>
-          </div>
-
-          {/* Links & Actions */}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <a
-              href={stone.detailHref || (stone.sku ? `/jewelry/${stone.sku}` : '#')}
-              target={stone.source === 'workshop' ? '_self' : '_blank'}
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-medium hover:bg-slate-900 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              {stone.source === 'workshop' ? 'Open in Production' : 'View DNA'}
-            </a>
-            {stone.certificateLink && (
-              <a href={stone.certificateLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 text-xs font-medium hover:bg-stone-200 transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Certificate
-              </a>
-            )}
-            {stone.videoLink && (
-              <a href={stone.videoLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-100 text-accent-700 text-xs font-medium hover:bg-accent-200 transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Video
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ---------------- Stone Details Panel ---------------- */
-const StoneDetails = ({ stone, onViewDNA }) => {
-  const isJewelry = stone.category === 'Jewelry';
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyEmail = async () => {
-    const emailHtml = createEmailHtml(stone);
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        const blob = new Blob([emailHtml], { type: "text/html" });
-        await navigator.clipboard.write([new ClipboardItem({ "text/html": blob })]);
-      } else {
-        await navigator.clipboard.writeText(emailHtml);
-      }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
-
-  if (isJewelry) return <JewelryDetails stone={stone} />;
-
-  return (
-    <div className="p-5">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        <DetailItem label="SKU" value={stone.sku} />
-        <DetailItem label="Shape" value={getDisplayShape(stone.shape)} />
-        <DetailItem label="Weight" value={`${stone.weightCt} ct`} />
-        <DetailItem label="Measurements" value={stone.measurements} />
-        <DetailItem label="Color" value={getDisplayColor(stone)} />
-        <DetailItem label="Clarity" value={stone.clarity} />
-        <DetailItem label="Treatment" value={stone.treatment} />
-        <DetailItem label="Lab" value={stone.lab} />
-        <DetailItem label="Origin" value={stone.origin} />
-        <DetailItem label="Ratio" value={stone.ratio} />
-        <DetailItem label="Luster" value={stone.luster} />
-        <DetailItem label="Fluorescence" value={stone.fluorescence} />
-        <DetailItem label="Box" value={stone.box} />
-        <DetailItem label="Grouping Type" value={stone.groupingType} />
-      </div>
-
-      {/* Links */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        {stone.imageUrl && (
-          <a href={stone.imageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-100 text-primary-700 text-xs font-medium hover:bg-primary-200 transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Photo
-          </a>
-        )}
-        {stone.videoUrl && (
-          <a href={stone.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-100 text-accent-700 text-xs font-medium hover:bg-accent-200 transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            Video
-          </a>
-        )}
-        {stone.certificateUrl && (
-          <a href={stone.certificateUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 text-xs font-medium hover:bg-stone-200 transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Certificate
-          </a>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => onViewDNA && onViewDNA(stone)}
-          className="btn-primary text-xs py-2 px-4 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          View DNA
-        </button>
-        <a
-          href={`mailto:?subject=${encodeURIComponent(`Stone ${stone.sku} details`)}&body=${encodeURIComponent(createEmailText(stone))}`}
-          className="btn-secondary text-xs py-2 px-4"
-        >
-          Open in Outlook
-        </a>
-        <button onClick={handleCopyEmail} className="btn-secondary text-xs py-2 px-4 flex items-center gap-2">
-          {copied ? (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Copied!
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-              </svg>
-              Copy with images
-            </>
-          )}
-        </button>
-        <button 
-          onClick={() => shareToWhatsApp(stone)} 
-          className="text-xs py-2 px-4 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-          </svg>
-          WhatsApp
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const DetailItem = ({ label, value }) => (
-  <div className="p-2 rounded-lg bg-white">
-    <span className="text-[10px] uppercase tracking-wider text-stone-400">{label}</span>
-    <p className="text-sm font-medium text-stone-800 truncate">{value || '-'}</p>
-  </div>
-);
-
-/* ---------------- Pair Card (shows two stones side by side) ---------------- */
-const PairCard = ({ stoneA, stoneB, onViewDNA, stoneTags, isSelected, onToggleSelection, onImageClick, priceMode }) => {
-  const StoneSide = ({ stone, label }) => (
-    <div className="flex-1 min-w-0">
-      {/* Image */}
-      <div 
-        className={`w-full aspect-square rounded-xl overflow-hidden bg-stone-100 mb-3 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
-        onClick={() => { if (stone.imageUrl && onImageClick) onImageClick(stone.imageUrl); }}
-      >
-        {stone.imageUrl ? (
-          <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-stone-300">
-            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-        )}
-      </div>
-      {/* Info */}
-      <div className="space-y-1.5">
-        <span className="inline-block text-xs font-mono font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
-          {stone.sku}
-        </span>
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-stone-800">{getDisplayShape(stone.shape)}</span>
-          <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-stone-500">
-          {stone.measurements && <span>{stone.measurements}</span>}
-        </div>
-        <div className="flex flex-wrap gap-1 mt-1">
-          {stone.origin && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600">{stone.origin}</span>
-          )}
-          {stone.treatment && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">{stone.treatment}</span>
-          )}
-          {stone.lab && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">{stone.lab}</span>
-          )}
-          {stone.location && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{stone.location}</span>
-          )}
-        </div>
-        {/* Price */}
-        <div className="pt-1">
-          <span className="text-base font-bold text-stone-900">${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</span>
-          <span className="text-xs text-stone-400 ml-1">(${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}/ct)</span>
-        </div>
-      </div>
-      {/* View DNA button */}
-      <button
-        onClick={() => onViewDNA && onViewDNA(stone)}
-        className="mt-3 w-full py-2 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        View DNA
-      </button>
-    </div>
-  );
-
-  // Calculate combined weight
-  const combinedWeight = ((stoneA.weightCt || 0) + (stoneB ? stoneB.weightCt || 0 : 0)).toFixed(2);
-  const rawCombinedPrice =
-    (stoneA.priceTotal || 0) * inventoryPriceScale(stoneA, priceMode) +
-    (stoneB ? (stoneB.priceTotal || 0) * inventoryPriceScale(stoneB, priceMode) : 0);
-  const combinedPrice = Math.round(rawCombinedPrice);
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border-2 bg-white overflow-hidden shadow-md hover:shadow-lg transition-all ${
-        isSelected 
-          ? 'border-emerald-500 ring-2 ring-emerald-300' 
-          : 'border-emerald-200 hover:border-emerald-300'
-      }`}
-    >
-      {/* Pair Header */}
-      <div 
-        className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 flex items-center justify-between cursor-pointer"
-        onClick={() => onToggleSelection && onToggleSelection()}
-      >
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={isSelected || false}
-            onChange={(e) => {
-              e.stopPropagation();
-              onToggleSelection && onToggleSelection();
-            }}
-            className="w-4 h-4 rounded border-white/50 text-emerald-300 focus:ring-emerald-300 cursor-pointer"
-          />
-          <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-          </svg>
-          <span className="text-white font-semibold text-sm">Pair</span>
-        </div>
-        <div className="flex items-center gap-3 text-white/90 text-xs">
-          <span>{combinedWeight} ct</span>
-          <span>${combinedPrice.toLocaleString()}</span>
-        </div>
-      </div>
-
-      {/* Two stones side by side */}
-      <div className="p-4">
-        <div className="flex gap-4">
-          <StoneSide stone={stoneA} label="Stone 1" />
-          {/* Divider */}
-          <div className="flex flex-col items-center justify-center">
-            <div className="w-px h-full bg-stone-200 relative">
-              <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 bg-white border border-stone-200 rounded-full w-8 h-8 flex items-center justify-center">
-                <span className="text-xs font-bold text-emerald-500">+</span>
-              </div>
-            </div>
-          </div>
-          {stoneB ? (
-            <StoneSide stone={stoneB} label="Stone 2" />
-          ) : (
-            <div className="flex-1 min-w-0 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 p-6">
-              <svg className="w-8 h-8 text-stone-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-xs text-stone-400 text-center font-medium">Pair stone not in inventory</p>
-              <p className="text-[10px] text-stone-300 mt-1">{stoneA.pairSku}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-/* ---------------- Column Configuration ---------------- */
-const DIAMOND_DEFAULT_COLUMNS = [
-  { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
-  { id: 'img', label: 'Img' },
-  { id: 'video', label: 'Video' },
-  { id: 'type', label: 'Type' },
-  { id: 'shape', label: 'Shape', sortField: 'shape' },
-  { id: 'color', label: 'Color' },
-  { id: 'clarity', label: 'Clarity' },
-  { id: 'qty', label: 'Qty' },
-  { id: 'weight', label: 'Weight', sortField: 'weightCt' },
-  { id: 'measurements', label: 'Measurements', sortField: 'measurements' },
-  { id: 'ratio', label: 'Ratio', sortField: 'ratio' },
-  { id: 'lab', label: 'Lab', sortField: 'lab' },
-  { id: 'fluorescence', label: 'Fluor.' },
-  { id: 'ppc', label: 'PPC', sortField: 'pricePerCt' },
-  { id: 'total', label: 'Total', sortField: 'priceTotal' },
-  { id: 'location', label: 'Location', sortField: 'location' },
-];
-
-const GEMSTONE_DEFAULT_COLUMNS = [
-  { id: 'sku', label: 'SKU', sortField: 'sku', alwaysVisible: true },
-  { id: 'img', label: 'Img' },
-  { id: 'video', label: 'Video' },
-  { id: 'category', label: 'Category', sortField: 'category' },
-  { id: 'type', label: 'Type' },
-  { id: 'shape', label: 'Shape', sortField: 'shape' },
-  { id: 'treatment', label: 'Clarity', sortField: 'treatment' },
-  { id: 'origin', label: 'Origin' },
-  { id: 'qty', label: 'Qty' },
-  { id: 'weight', label: 'Weight', sortField: 'weightCt' },
-  { id: 'measurements', label: 'Measurements', sortField: 'measurements' },
-  { id: 'ratio', label: 'Ratio', sortField: 'ratio' },
-  { id: 'lab', label: 'Lab', sortField: 'lab' },
-  { id: 'ppc', label: 'PPC', sortField: 'pricePerCt' },
-  { id: 'total', label: 'Total', sortField: 'priceTotal' },
-  { id: 'location', label: 'Location', sortField: 'location' },
-];
-
-const JEWELRY_DEFAULT_COLUMNS = [
-  { id: 'sku', label: 'Model', sortField: 'sku', alwaysVisible: true },
-  { id: 'img', label: 'Img' },
-  { id: 'video', label: 'Video' },
-  { id: 'title', label: 'Title', sortField: 'title' },
-  { id: 'jewelryType', label: 'Type', sortField: 'jewelryType' },
-  { id: 'style', label: 'Style', sortField: 'style' },
-  { id: 'collection', label: 'Collection', sortField: 'collection' },
-  { id: 'stoneType', label: 'Stone', sortField: 'stoneType' },
-  { id: 'weight', label: 'Carats', sortField: 'weightCt' },
-  { id: 'metalType', label: 'Metal', sortField: 'metalType' },
-  { id: 'total', label: 'Price', sortField: 'priceTotal' },
-  { id: 'availability', label: 'Avail.', sortField: 'availability' },
-];
-
-const DEFAULT_COLUMNS = DIAMOND_DEFAULT_COLUMNS;
-
-const COLUMNS_STORAGE_KEY = 'gems_dna_column_config';
-
-const getColumnConfig = (userId, mode = 'diamonds') => {
-  const defaults = mode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : mode === 'gemstones' ? GEMSTONE_DEFAULT_COLUMNS : JEWELRY_DEFAULT_COLUMNS;
-  const storageKey = `${COLUMNS_STORAGE_KEY}_${mode}_${userId}`;
-  try {
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      const knownIds = new Set(defaults.map(c => c.id));
-      const seen = new Set();
-      const merged = [];
-      parsed.forEach(c => {
-        if (knownIds.has(c.id) && !seen.has(c.id)) {
-          seen.add(c.id);
-          merged.push(c);
-        }
-      });
-      defaults.forEach(col => {
-        if (!seen.has(col.id)) {
-          seen.add(col.id);
-          merged.push({ id: col.id, visible: true });
-        }
-      });
-      return merged;
-    }
-  } catch {}
-  return defaults.map(c => ({ id: c.id, visible: true }));
-};
-
-const saveColumnConfig = (userId, config, mode = 'diamonds') => {
-  const storageKey = `${COLUMNS_STORAGE_KEY}_${mode}_${userId}`;
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(config));
-  } catch {}
-};
-
-/* ---------------- Column Settings Modal ---------------- */
-const ColumnSettingsModal = ({ isOpen, onClose, columnConfig, onSave, activeDefaultColumns }) => {
-  const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
-  const [localConfig, setLocalConfig] = useState(columnConfig);
-  const [dragIdx, setDragIdx] = useState(null);
-  const [dragOverIdx, setDragOverIdx] = useState(null);
-
-  useEffect(() => {
-    setLocalConfig(columnConfig);
-  }, [columnConfig, isOpen]);
-
-  if (!isOpen) return null;
-
-  const colMeta = Object.fromEntries(defaultCols.map(c => [c.id, c]));
-
-  const handleDragStart = (idx) => (e) => {
-    setDragIdx(idx);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (idx) => (e) => {
-    e.preventDefault();
-    setDragOverIdx(idx);
-  };
-
-  const handleDrop = (idx) => (e) => {
-    e.preventDefault();
-    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOverIdx(null); return; }
-    const updated = [...localConfig];
-    const [moved] = updated.splice(dragIdx, 1);
-    updated.splice(idx, 0, moved);
-    setLocalConfig(updated);
-    setDragIdx(null);
-    setDragOverIdx(null);
-  };
-
-  const toggleVisibility = (id) => {
-    const meta = colMeta[id];
-    if (meta?.alwaysVisible) return;
-    setLocalConfig(prev => prev.map(c => c.id === id ? { ...c, visible: !c.visible } : c));
-  };
-
-  const handleSave = () => {
-    onSave(localConfig);
-    onClose();
-  };
-
-  const handleReset = () => {
-    const reset = defaultCols.map(c => ({ id: c.id, visible: true }));
-    setLocalConfig(reset);
-  };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={onClose}
-        >
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-stone-800">Column Settings</h3>
-                <p className="text-xs text-stone-400 mt-0.5">Drag to reorder, toggle to show/hide</p>
-              </div>
-              <button onClick={onClose} className="p-2 rounded-lg hover:bg-stone-100 transition-colors text-stone-400">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-1">
-              {localConfig.map((col, idx) => {
-                const meta = colMeta[col.id];
-                if (!meta) return null;
-                return (
-                  <div
-                    key={col.id}
-                    draggable
-                    onDragStart={handleDragStart(idx)}
-                    onDragOver={handleDragOver(idx)}
-                    onDrop={handleDrop(idx)}
-                    onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing select-none ${
-                      dragOverIdx === idx ? 'border-primary-400 bg-primary-50' :
-                      dragIdx === idx ? 'opacity-50 border-stone-200 bg-stone-50' :
-                      'border-stone-200 bg-white hover:border-stone-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <svg className="w-4 h-4 text-stone-300 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
-                    </svg>
-                    <span className="flex-1 text-sm font-medium text-stone-700">{meta.label}</span>
-                    {meta.alwaysVisible ? (
-                      <span className="text-[10px] text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">Required</span>
-                    ) : (
-                      <button
-                        onClick={() => toggleVisibility(col.id)}
-                        className={`w-10 h-5 rounded-full transition-colors relative ${col.visible ? 'bg-primary-500' : 'bg-stone-300'}`}
-                      >
-                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${col.visible ? 'left-5' : 'left-0.5'}`} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="px-5 py-4 border-t border-stone-200 flex items-center justify-between gap-3">
-              <button onClick={handleReset} className="px-4 py-2 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors">
-                Reset to Default
-              </button>
-              <div className="flex gap-2">
-                <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors">
-                  Cancel
-                </button>
-                <button onClick={handleSave} className="px-4 py-2 text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-xl transition-colors">
-                  Save
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
-
-/* Spec rows for the mobile stone card.
- *
- * Diamonds and coloured stones are graded on different axes, so the card can't
- * show one fixed list: a diamond has a Clarity grade and Fluorescence, while a
- * coloured stone has an Origin and a treatment — which the trade sheets label
- * "Clarity" (same wording as the table columns, see GEMSTONE_DEFAULT_COLUMNS).
- *
- * Empty values are dropped rather than rendered as "-", so a sparse stone gets
- * a short tidy grid instead of a wall of dashes. `wide` spans two columns for
- * values like measurements that would otherwise truncate on a phone. */
-const getStoneCardSpecs = (stone) => {
-  const mapped = getMappedCategories(stone.category);
-  const isDiamond = mapped.includes('Diamond') || mapped.includes('Fancy');
-
-  const specs = [
-    { label: 'Color', value: getDisplayColor(stone) },
-    isDiamond
-      ? { label: 'Clarity', value: stone.clarity }
-      : { label: 'Clarity', value: stone.treatment ? shortTreatment(stone.treatment) : '' },
-    isDiamond
-      ? { label: 'Fluor.', value: stone.fluorescence }
-      : { label: 'Origin', value: stone.origin },
-    { label: 'Measurements', value: stone.measurements, wide: true },
-    { label: 'Ratio', value: stone.ratio },
-    { label: 'Cert #', value: stone.certificateNumber, wide: true },
-  ];
-
-  return specs.filter((s) => {
-    const v = String(s.value ?? '').trim();
-    return v !== '' && v !== 'N/A';
-  });
-};
-
-/* ---------------- Table (Desktop) ---------------- */
-const StonesTable = ({ stones, onToggle, selectedStone, loading, error, sortConfig, onSort, selectedStones, onToggleSelection, onToggleSelectAll, allSelected, stoneTags, allTags, onAddTag, onRemoveTag, onManageTags, onViewDNA, onImageClick, onVideoClick, columnConfig, onColumnConfigChange, priceMode, activeDefaultColumns, stoneStatusMap = {}, onAssign, assigningSku }) => {
-  const [showColumnSettings, setShowColumnSettings] = useState(false);
-  const defaultCols = activeDefaultColumns || DEFAULT_COLUMNS;
-
-  const colMeta = useMemo(() => Object.fromEntries(defaultCols.map(c => [c.id, c])), [defaultCols]);
-
-  const visibleColumns = useMemo(() => {
-    const knownIds = new Set(defaultCols.map(c => c.id));
-    const raw = columnConfig
-      ? columnConfig.filter(c => c.visible).map(c => c.id)
-      : defaultCols.map(c => c.id);
-    const seen = new Set();
-    return raw.filter(id => {
-      if (!knownIds.has(id) || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-  }, [columnConfig, defaultCols]);
-
-  if (loading) {
-    return (
-      <div className="glass rounded-2xl border border-white/50 p-8 sm:p-12">
-        <div className="flex flex-col items-center justify-center gap-4">
-          <div className="relative">
-            <div className="w-12 h-12 border-4 border-primary-200 rounded-full"></div>
-            <div className="w-12 h-12 border-4 border-primary-500 rounded-full border-t-transparent animate-spin absolute inset-0"></div>
-          </div>
-          <p className="text-stone-500">Loading stones...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="glass rounded-2xl border border-red-200 bg-red-50 p-6 sm:p-8 text-center">
-        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
-          <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <p className="text-red-600 font-medium">{error}</p>
-      </div>
-    );
-  }
-
-  if (!stones.length) {
-    return (
-      <div className="glass rounded-2xl border border-white/50 p-8 sm:p-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-stone-100 flex items-center justify-center">
-          <svg className="w-8 h-8 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-semibold text-stone-800 mb-1">No stones found</h3>
-        <p className="text-stone-500">Try adjusting your filters</p>
-      </div>
-    );
-  }
-
-  const SortButton = ({ field, children }) => (
-    <button
-      onClick={() => onSort(field)}
-      className="flex items-center gap-1 hover:text-primary-600 transition-colors"
-    >
-      {children}
-      {sortConfig?.field === field && (
-        <span className="text-primary-500">
-          {sortConfig.direction === "asc" ? "Γזס" : "Γזף"}
-        </span>
-      )}
-    </button>
-  );
-
-  const renderHeader = (colId) => {
-    const meta = colMeta[colId];
-    if (!meta) return null;
-    const base = "px-4 py-4 text-left text-xs font-semibold text-stone-600 tracking-wider";
-    switch (colId) {
-      case 'sku': return <th key={colId} className={`${base} uppercase`}><SortButton field="sku">SKU</SortButton></th>;
-      case 'img': return <th key={colId} className={base}>Img</th>;
-      case 'video': return <th key={colId} className={base}>Video</th>;
-      case 'category': return <th key={colId} className={base}><SortButton field="category">Category</SortButton></th>;
-      case 'type': return <th key={colId} className={`${base} text-center`}>Type</th>;
-      case 'shape': return <th key={colId} className={`${base} uppercase`}><SortButton field="shape">Shape</SortButton></th>;
-      case 'color': return <th key={colId} className={base}>Color</th>;
-      case 'qty': return <th key={colId} className={`${base} text-center`}>Qty</th>;
-      case 'weight': return <th key={colId} className={`${base} uppercase`}><SortButton field="weightCt">Weight</SortButton></th>;
-      case 'measurements': return <th key={colId} className={`${base} uppercase`}><SortButton field="measurements">Measurements</SortButton></th>;
-      case 'ratio': return <th key={colId} className={`${base} uppercase`}><SortButton field="ratio">Ratio</SortButton></th>;
-      case 'treatment': return <th key={colId} className={`${base} uppercase`}><SortButton field="treatment">Clarity</SortButton></th>;
-      case 'clarity': return <th key={colId} className={`${base} uppercase`}><SortButton field="clarity">Clarity</SortButton></th>;
-      case 'origin': return <th key={colId} className={base}>Origin</th>;
-      case 'fluorescence': return <th key={colId} className={base}>Fluor.</th>;
-      case 'lab': return <th key={colId} className={`${base} uppercase`}><SortButton field="lab">Lab</SortButton></th>;
-      case 'ppc': return <th key={colId} className={`${base} uppercase`}><SortButton field="pricePerCt">PPC</SortButton></th>;
-      case 'total': return <th key={colId} className={`${base} uppercase`}><SortButton field="priceTotal">Total</SortButton></th>;
-      case 'location': return <th key={colId} className={`${base} uppercase`}><SortButton field="location">Location</SortButton></th>;
-      case 'title': return <th key={colId} className={base}><SortButton field="title">Title</SortButton></th>;
-      case 'jewelryType': return <th key={colId} className={base}><SortButton field="jewelryType">Type</SortButton></th>;
-      case 'style': return <th key={colId} className={base}><SortButton field="style">Style</SortButton></th>;
-      case 'collection': return <th key={colId} className={base}><SortButton field="collection">Collection</SortButton></th>;
-      case 'stoneType': return <th key={colId} className={base}><SortButton field="stoneType">Stone</SortButton></th>;
-      case 'metalType': return <th key={colId} className={base}><SortButton field="metalType">Metal</SortButton></th>;
-      case 'availability': return <th key={colId} className={base}><SortButton field="availability">Avail.</SortButton></th>;
-      default: return null;
-    }
-  };
-
-  const renderCell = (colId, stone) => {
-    if (!colMeta[colId]) return null;
-    const cellBase = "px-3 py-2 whitespace-nowrap";
-    switch (colId) {
-      case 'sku': {
-        const wsRow = stone.sku ? stoneStatusMap[stone.sku] : null;
-        const wsStatus = wsRow?.status;
-        return (
-          <td key={colId} className={cellBase}>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs font-medium text-primary-600">{stone.sku}</span>
-              {wsStatus && (
-                <span
-                  title={
-                    wsRow.jewelry_sku
-                      ? `${STONE_STATUS_LABELS[wsStatus] || wsStatus} in ${wsRow.jewelry_sku}${wsRow.jewelry_name ? ' (' + wsRow.jewelry_name + ')' : ''}`
-                      : STONE_STATUS_LABELS[wsStatus] || wsStatus
-                  }
-                  className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STONE_STATUS_PILL[wsStatus] || ''}`}
-                >
-                  {STONE_STATUS_LABELS[wsStatus] || wsStatus}
-                </span>
-              )}
-            </div>
-          </td>
-        );
-      }
-      case 'img': return (
-        <td key={colId} className="px-3 py-2">
-          <div
-            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
-            onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
-          >
-            {stone.imageUrl ? (
-              <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
-            )}
-          </div>
-        </td>
-      );
-      case 'video': {
-        const vid = stone.videoUrl || stone.videoLink;
-        return (
-        <td key={colId} className="px-3 py-2">
-          <div
-            className={`w-10 h-10 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center ${vid ? 'cursor-pointer hover:ring-2 hover:ring-accent-300 transition-all' : ''}`}
-            onClick={(e) => { if (vid && onVideoClick) { e.stopPropagation(); onVideoClick(vid); } }}
-          >
-            {vid ? (
-              <svg className="w-5 h-5 text-accent-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-stone-300 text-[10px]">N/A</div>
-            )}
-          </div>
-        </td>
-        );
-      }
-      case 'category': return (
-        <td key={colId} className={cellBase}>
-          <span className="text-xs text-stone-600">{getMappedCategories(stone.category).filter(c => c !== 'Empty').join(', ') || '-'}</span>
-        </td>
-      );
-      case 'type': return (
-        <td key={colId} className={`${cellBase} text-center`}>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-            stone.groupingType === 'Pair' ? 'bg-indigo-100 text-indigo-700 font-semibold' :
-            stone.groupingType === 'Set' ? 'bg-purple-100 text-purple-700 font-semibold' :
-            stone.groupingType === 'Parcel' ? 'bg-amber-100 text-amber-700 font-semibold' :
-            stone.groupingType === 'Fancy' ? 'bg-pink-100 text-pink-700 font-semibold' :
-            stone.groupingType === 'Side Stones' ? 'bg-teal-100 text-teal-700 font-semibold' :
-            stone.groupingType === 'Melee' ? 'bg-rose-100 text-rose-700 font-semibold' :
-            stone.groupingType === 'Single' ? 'bg-stone-200 text-stone-600' :
-            'bg-stone-100 text-stone-400'
-          }`}>
-            {stone.groupingType || '-'}
-          </span>
-        </td>
-      );
-      case 'shape': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>{stone.shape}</td>;
-      case 'color': return <td key={colId} className="px-3 py-2 text-xs text-stone-700 max-w-[120px]">{getDisplayColor(stone) || '-'}</td>;
-      case 'qty': return (
-        <td key={colId} className={`${cellBase} text-center`}>
-          <span className="inline-flex items-center justify-center min-w-[20px] px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-stone-100 text-stone-600">
-            {stone.stones ?? '-'}
-          </span>
-        </td>
-      );
-      case 'weight': return <td key={colId} className={`${cellBase} text-xs font-medium text-stone-800`}>{stone.weightCt} ct</td>;
-      case 'measurements': return <td key={colId} className={`${cellBase} text-xs text-stone-600`}>{stone.measurements}</td>;
-      case 'ratio': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.ratio || ''}</span></td>;
-      case 'treatment': return <td key={colId} className={cellBase}><span className="badge badge-neutral text-xs">{shortTreatment(stone.treatment)}</span></td>;
-      case 'clarity': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.clarity || ''}</span></td>;
-      case 'origin': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.origin || ''}</span></td>;
-      case 'fluorescence': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.fluorescence || ''}</span></td>;
-      case 'lab': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.lab || ''}</span></td>;
-      case 'ppc': return <td key={colId} className={`${cellBase} text-xs text-stone-700`}>${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</td>;
-      case 'total': return <td key={colId} className={`${cellBase} text-xs font-semibold text-stone-800`}>${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}</td>;
-      case 'location': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.location || ''}</span></td>;
-      case 'title': return <td key={colId} className="px-3 py-2 max-w-[200px]"><span className="text-xs text-stone-700 truncate block">{sanitizeText(stone.title) || '-'}</span></td>;
-      case 'jewelryType': return (
-        <td key={colId} className={cellBase}>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-            stone.jewelryType === 'Rings' ? 'bg-pink-100 text-pink-700' :
-            stone.jewelryType === 'Earrings' ? 'bg-purple-100 text-purple-700' :
-            stone.jewelryType === 'Necklaces' ? 'bg-blue-100 text-blue-700' :
-            stone.jewelryType === 'Pendants' ? 'bg-cyan-100 text-cyan-700' :
-            stone.jewelryType === 'Bracelets' ? 'bg-amber-100 text-amber-700' :
-            'bg-stone-100 text-stone-600'
-          }`}>{stone.jewelryType || '-'}</span>
-        </td>
-      );
-      case 'style': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.style || '-'}</span></td>;
-      case 'collection': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.collection || '-'}</span></td>;
-      case 'stoneType': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.stoneType || '-'}</span></td>;
-      case 'metalType': return <td key={colId} className={cellBase}><span className="text-xs text-stone-600">{stone.metalType || '-'}</span></td>;
-      case 'availability': return (
-        <td key={colId} className={cellBase}>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-            stone.availability === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          }`}>{stone.availability || '-'}</span>
-        </td>
-      );
-      default: return null;
-    }
-  };
-
-  // Mobile Card Component
-  const MobileStoneCard = ({ stone, index }) => {
-    const isSelected = selectedStones?.has(stone.id);
-    const isExpanded = selectedStone?.id === stone.id;
-    const specs = getStoneCardSpecs(stone);
-
-  return (
-      <motion.div
-        layout
-        initial={false}
-        animate={{ opacity: 1 }}
-        className={`rounded-2xl border overflow-hidden shadow-sm transition-colors duration-200 ${
-          isSelected 
-            ? 'ring-2' 
-            : 'border-stone-200 bg-white'
-        }`}
-        style={isSelected ? { borderColor: '#2FAB81', backgroundColor: '#2FAB8115', boxShadow: '0 0 0 2px #2FAB8140' } : {}}
-      >
-        {/* Main Card Content */}
-        <div 
-          className="p-4"
-        >
-          <div className="flex gap-3">
-            {/* Checkbox */}
-            <div className="flex-shrink-0 pt-1">
-              <input
-                type="checkbox"
-                checked={isSelected || false}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  onToggleSelection(stone.id);
-                }}
-                className="w-5 h-5 text-primary-600 rounded border-stone-300 focus:ring-primary-500"
-              />
-            </div>
-
-            {/* Image */}
-            <div className="flex-shrink-0">
-              <div 
-                className={`w-16 h-16 rounded-xl overflow-hidden bg-stone-100 border border-stone-200 ${stone.imageUrl ? 'cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all' : ''}`}
-                onClick={(e) => { if (stone.imageUrl && onImageClick) { e.stopPropagation(); onImageClick(stone.imageUrl); } }}
-              >
-                {stone.imageUrl ? (
-                  <img src={stone.imageUrl} alt={stone.sku} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-stone-300">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-block font-mono text-xs font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">
-                      {stone.sku}
-                    </span>
-                    {stone.sku && stoneStatusMap[stone.sku] && (
-                      <span
-                        className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STONE_STATUS_PILL[stoneStatusMap[stone.sku].status] || ''}`}
-                      >
-                        {STONE_STATUS_LABELS[stoneStatusMap[stone.sku].status] || stoneStatusMap[stone.sku].status}
-                      </span>
-                    )}
-                    <StoneAssignmentChip
-                      stone={stone}
-                      onAssign={onAssign}
-                      busy={assigningSku === stone.sku}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm font-medium text-stone-800">{getDisplayShape(stone.shape)}</span>
-                    <span className="text-stone-300">|</span>
-                    <span className="text-sm font-bold text-stone-900">{stone.weightCt} ct</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-stone-900">
-                    ${stone.priceTotal ? Math.round(stone.priceTotal * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}
-                  </p>
-                  <p className="text-xs text-stone-500">
-                    ${stone.pricePerCt ? Math.round(stone.pricePerCt * inventoryPriceScale(stone, priceMode)).toLocaleString() : '-'}/ct
-                  </p>
-                </div>
-              </div>
-
-              {/* Lab and location stay pills — they answer "who graded it, where
-                  is it", not how the stone is spec'd. The grades live in the grid. */}
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {stone.lab && (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                    {stone.lab}
-                  </span>
-                )}
-                {stone.location && (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                    {stone.location}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Specs — full card width rather than inside the column beside the
-              photo, so measurements and cert numbers get room to breathe. */}
-          {specs.length > 0 && (
-            <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 rounded-xl bg-stone-50 px-3 py-2.5">
-              {specs.map((spec) => (
-                <div key={spec.label} className={`min-w-0 ${spec.wide ? 'col-span-2' : ''}`}>
-                  <div className="text-[9px] font-medium uppercase tracking-wider text-stone-400">
-                    {spec.label}
-                  </div>
-                  <div
-                    className="truncate text-[11px] font-semibold text-stone-800"
-                    title={String(spec.value)}
-                  >
-                    {spec.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Client Tags */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-3">
-            {stoneTags?.[stone.sku]?.map((tag) => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                style={{ backgroundColor: tag.color }}
-              >
-                {tag.name}
-              </span>
-            ))}
-            <TagSelector
-              stoneSku={stone.sku}
-              currentTags={stoneTags?.[stone.sku] || []}
-              allTags={allTags || []}
-              onAddTag={onAddTag}
-              onRemoveTag={onRemoveTag}
-              onManageTags={onManageTags}
-            />
-          </div>
-        </div>
-
-        {/* Action Bar */}
-        <div className="flex border-t border-stone-100">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewDNA && onViewDNA(stone);
-            }}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-primary-600 hover:bg-primary-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            DNA
-          </button>
-          <div className="w-px bg-stone-100"></div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle(stone);
-            }}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
-              isExpanded 
-                ? 'bg-primary-500 text-white' 
-                : 'text-stone-600 hover:bg-stone-50'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {isExpanded ? 'Hide' : 'Details'}
-          </button>
-          {stone.certificateUrl && (
-            <>
-              <div className="w-px bg-stone-100"></div>
-              <a
-                href={stone.certificateUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Cert
-              </a>
-            </>
-          )}
-          <div className="w-px bg-stone-100"></div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              shareToWhatsApp(stone);
-            }}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-green-600 hover:bg-green-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-            Share
-          </button>
-        </div>
-
-        {/* Expanded Details */}
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden border-t border-stone-200"
-            >
-              <StoneDetails stone={stone} onViewDNA={onViewDNA} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  };
-
-  return (
-    <>
-      {/* Mobile Select All Bar */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3 mb-3 rounded-xl bg-stone-100/50">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={allSelected && stones.length > 0}
-            onChange={onToggleSelectAll}
-            className="w-5 h-5 text-primary-600 rounded border-stone-300 focus:ring-primary-500"
-          />
-          <span className="text-sm font-medium text-stone-700">Select All</span>
-        </label>
-        <span className="text-xs text-stone-500">{stones.length} stones</span>
-      </div>
-
-      {/* Mobile Cards View */}
-      <div className="md:hidden space-y-3">
-        {stones.map((stone, index) => (
-          <MobileStoneCard key={stone.id} stone={stone} index={index} />
-        ))}
-      </div>
-
-      {/* Column Settings Modal */}
-      <ColumnSettingsModal
-        isOpen={showColumnSettings}
-        onClose={() => setShowColumnSettings(false)}
-        columnConfig={columnConfig || defaultCols.map(c => ({ id: c.id, visible: true }))}
-        onSave={onColumnConfigChange}
-        activeDefaultColumns={defaultCols}
-      />
-
-      {/* Desktop Table View */}
-      <div className="hidden md:block glass rounded-2xl border border-white/50 overflow-hidden shadow-lg">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-stone-200 bg-stone-50/50">
-                <th className="px-4 py-4 text-center">
-                  <input
-                    type="checkbox"
-                    checked={allSelected && stones.length > 0}
-                    onChange={onToggleSelectAll}
-                    className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
-                  />
-                </th>
-              {visibleColumns.map(colId => renderHeader(colId))}
-              <th className="px-2 py-4 text-right">
-                <button
-                  onClick={() => setShowColumnSettings(true)}
-                  className="p-1.5 rounded-lg hover:bg-stone-200 transition-colors text-stone-400 hover:text-stone-600"
-                  title="Column settings"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </button>
-                </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100">
-            {stones.map((stone, index) => {
-              const isExpanded = selectedStone?.id === stone.id;
-              return (
-                  <React.Fragment key={stone.id}>
-                  <motion.tr
-                      initial={false}
-                    animate={{ opacity: 1, y: 0 }}
-                      className={`transition-colors ${
-                        selectedStones?.has(stone.id) 
-                          ? 'border-l-4' 
-                          : isExpanded 
-                            ? 'bg-primary-50/30 hover:bg-stone-50/50' 
-                            : 'hover:bg-stone-50/50'
-                      }`}
-                      style={selectedStones?.has(stone.id) ? { backgroundColor: '#2FAB8115', borderLeftColor: '#2FAB81' } : {}}
-                    >
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedStones?.has(stone.id) || false}
-                          onChange={() => onToggleSelection(stone.id)}
-                          className="w-4 h-4 text-primary-600 rounded border-stone-300 focus:ring-primary-500 cursor-pointer"
-                        />
-                      </td>
-                    {visibleColumns.map(colId => renderCell(colId, stone))}
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => shareToWhatsApp(stone)}
-                          className="p-2 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
-                          title="Share on WhatsApp"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => onToggle(stone)}
-                          className={`px-4 py-2 rounded-xl text-xs font-medium transition-all ${
-                            isExpanded
-                              ? 'bg-primary-500 text-white'
-                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                          }`}
-                        >
-                          {isExpanded ? 'Hide' : 'Details'}
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.tr
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                      >
-                          <td colSpan={visibleColumns.length + 2} className="bg-stone-50 border-t border-stone-200">
-                          <StoneDetails stone={stone} onViewDNA={onViewDNA} />
-                        </td>
-                      </motion.tr>
-                    )}
-                  </AnimatePresence>
-                  </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    </>
-  );
-};
-
-/* ---------------- Email Helpers ---------------- */
-const createEmailText = (stone) => `Stone Details
-
-SKU: ${stone.sku}
-Shape: ${getDisplayShape(stone.shape)}
-Weight: ${stone.weightCt} ct
-Measurements: ${stone.measurements || 'N/A'}
-Clarity: ${stone.clarity || 'N/A'}
-Treatment: ${stone.treatment || 'N/A'}
-Lab: ${stone.lab || 'N/A'}
-Origin: ${stone.origin || 'N/A'}
-
-Photo: ${stone.imageUrl || 'N/A'}
-Video: ${stone.videoUrl || 'N/A'}
-Certificate: ${stone.certificateUrl || 'N/A'}
-
-Best regards,
-Gemstar`;
-
-const createEmailHtml = (stone) => `<!DOCTYPE html>
-<html>
-<body style="font-family: Arial, sans-serif; background: #f5f5f4; padding: 20px;">
-<div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e7e5e4;">
-<div style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; text-align: center;">
-<h1 style="color: white; margin: 0; font-size: 24px;">Stone Details</h1>
-</div>
-<div style="padding: 24px;">
-${stone.imageUrl ? `<img src="${stone.imageUrl}" style="width: 200px; height: 200px; object-fit: cover; border-radius: 8px; display: block; margin: 0 auto 20px;" />` : ''}
-<table style="width: 100%; border-collapse: collapse;">
-<tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>SKU:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.sku}</td></tr>
-<tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Shape:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${getDisplayShape(stone.shape)}</td></tr>
-<tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Weight:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.weightCt} ct</td></tr>
-<tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Measurements:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.measurements || 'N/A'}</td></tr>
-<tr><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;"><strong>Treatment:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e7e5e4;">${stone.treatment || 'N/A'}</td></tr>
-<tr><td style="padding: 8px 0;"><strong>Origin:</strong></td><td style="padding: 8px 0;">${stone.origin || 'N/A'}</td></tr>
-</table>
-<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e7e5e4; text-align: center;">
-${stone.videoUrl ? `<a href="${stone.videoUrl}" style="color: #10b981; margin-right: 16px;">View Video</a>` : ''}
-${stone.certificateUrl ? `<a href="${stone.certificateUrl}" style="color: #10b981;">View Certificate</a>` : ''}
-</div>
-</div>
-<div style="background: #f5f5f4; padding: 16px; text-align: center; font-size: 12px; color: #78716c;">
-Best regards, Gemstar
-</div>
-</div>
-</body>
-</html>`;
-
-/* ---------------- Compare Modal ---------------- */
-const COMPARE_FIELDS = [
-  { key: 'shape', label: 'Shape', format: (v) => getDisplayShape(v) || '-' },
-  { key: 'category', label: 'Category', format: (v) => v || '-' },
-  { key: 'groupingType', label: 'Type', format: (v) => v || '-' },
-  { key: 'weightCt', label: 'Weight', format: (v) => v ? `${v} ct` : '-' },
-  { key: 'color', label: 'Color', format: (v) => v || '-' },
-  { key: 'clarity', label: 'Clarity', format: (v) => v || '-' },
-  { key: 'treatment', label: 'Treatment', format: (v) => v || '-' },
-  { key: 'measurements', label: 'Measurements', format: (v) => v || '-' },
-  { key: 'ratio', label: 'Ratio', format: (v) => v ? Number(v).toFixed(2) : '-' },
-  { key: 'lab', label: 'Lab', format: (v) => v || '-' },
-  { key: 'origin', label: 'Origin', format: (v) => v || '-' },
-  { key: 'fluorescence', label: 'Fluorescence', format: (v) => v || '-' },
-  { key: 'cut', label: 'Cut', format: (v) => v || '-' },
-  { key: 'polish', label: 'Polish', format: (v) => v || '-' },
-  { key: 'symmetry', label: 'Symmetry', format: (v) => v || '-' },
-  { key: 'pricePerCt', label: 'Price/ct', format: (v) => v ? `$${Number(v).toLocaleString()}` : '-' },
-  { key: 'priceTotal', label: 'Total Price', format: (v) => v ? `$${Number(v).toLocaleString()}` : '-' },
-  { key: 'location', label: 'Location', format: (v) => v || '-' },
-];
-
-const CompareModal = ({ isOpen, onClose, stones }) => {
-  if (!isOpen || !stones.length) return null;
-  const allSame = (key) => {
-    const vals = stones.map(s => s[key]).filter(Boolean);
-    return vals.length > 1 && new Set(vals).size === 1;
-  };
-  const allDiff = (key) => {
-    const vals = stones.map(s => s[key]).filter(Boolean);
-    return vals.length > 1 && new Set(vals).size === vals.length;
-  };
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.92, opacity: 0 }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
-              <div>
-                <h2 className="text-lg font-semibold text-stone-800">Compare Stones</h2>
-                <p className="text-xs text-stone-500">{stones.length} stones selected</p>
-              </div>
-              <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-stone-100 flex items-center justify-center transition-colors">
-                <svg className="w-5 h-5 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="overflow-auto flex-1">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-white z-10">
-                  <tr className="border-b border-stone-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-stone-500 w-[140px] min-w-[140px] bg-stone-50"></th>
-                    {stones.map(s => (
-                      <th key={s.sku} className="px-4 py-3 text-center min-w-[180px]">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="w-20 h-20 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
-                            {s.imageUrl ? (
-                              <img src={s.imageUrl} alt={s.sku} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-stone-300">
-                                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                              </div>
-                            )}
-                          </div>
-                          <span className="font-mono text-sm font-bold text-primary-700">{s.sku}</span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {COMPARE_FIELDS.map(({ key, label, format }) => {
-                    const same = allSame(key);
-                    const diff = allDiff(key);
-                    return (
-                      <tr key={key} className={`border-b border-stone-100 ${diff ? 'bg-amber-50/50' : ''}`}>
-                        <td className="px-4 py-2.5 text-xs font-semibold text-stone-500 bg-stone-50">{label}</td>
-                        {stones.map(s => (
-                          <td key={s.sku} className="px-4 py-2.5 text-center">
-                            <span className={`text-sm ${diff ? 'font-semibold text-amber-700' : same ? 'text-emerald-600' : 'text-stone-700'}`}>
-                              {format(s[key])}
-                            </span>
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
-
-/* ---------------- Main Page ---------------- */
 const StoneSearchPage = () => {
   const { user } = useUser();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const initialSearch = searchParams.get('search') || '';
-
-  // Restore the last inventory view (mode + filters + search) so returning
-  // from a stone's DNA page — especially inside the installed PWA where there
-  // is no browser chrome — lands the rep back on the same filtered list.
-  // A URL ?search=… always wins (deep-link / SKU jump) over the saved view.
-  const savedView = (() => {
-    if (initialSearch) return null;
-    try {
-      const raw = sessionStorage.getItem(INVENTORY_VIEW_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  })();
-
-  const [inventoryMode, setInventoryMode] = useState(savedView?.inventoryMode || 'diamonds');
-
-  const defaultFilters = {
-    sku: initialSearch,
-    minPrice: "",
-    maxPrice: "",
-    minPricePerCt: "",
-    maxPricePerCt: "",
-    minCarat: "",
-    maxCarat: "",
-    minLength: "",
-    maxLength: "",
-    minWidth: "",
-    maxWidth: "",
-    shape: [],
-    treatment: [],
-    category: [],
-    tag: [],
-    location: [],
-    groupingType: [],
-    diamondColor: [],
-    fancyColor: [],
-    // Lab certification (GIA / GRS / SSEF / Gübelin / ...). Multi-select.
-    // The smart-search keyword path already supported labs; this brings
-    // the same filter back as a visible dropdown.
-    lab: [],
-    box: "",
-  };
-
-  const [filters, setFilters] = useState(
-    savedView?.filters ? { ...defaultFilters, ...savedView.filters } : defaultFilters
-  );
-
-  const [stones, setStones] = useState([]);
-  // Phase A: per-SKU map of cross-system status pulled from the workshop.
-  // { [sku]: { status, jewelry_item_id, jewelry_sku, jewelry_name, jewelry_status } }
-  const [stoneStatusMap, setStoneStatusMap] = useState({});
-  // Sales-rep filter: "all" | "me" | "unassigned" | <clerk_user_id>
-  // Persisted in localStorage so a rep doesn't lose their preferred view.
-  const [assigneeFilter, setAssigneeFilter] = useState(() => {
-    try { return localStorage.getItem("inventory.assigneeFilter") || "all"; } catch { return "all"; }
-  });
-  // SKU currently being claimed/released — used to disable the chip while
-  // the request is in flight.
-  const [assigningStoneSku, setAssigningStoneSku] = useState(null);
   const team = useTeam();
-  const [selectedStone, setSelectedStone] = useState(null);
-  const [selectedStones, setSelectedStones] = useState(new Set());
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showFloatingExport, setShowFloatingExport] = useState(false);
-  const [drawerStone, setDrawerStone] = useState(null); // DNA Drawer
-  const [showCategoryExportModal, setShowCategoryExportModal] = useState(false); // Category export choice
-  const [showInternalExcelModal, setShowInternalExcelModal] = useState(false); // Internal Excel column picker
-  const [exportMode, setExportMode] = useState('combined'); // 'combined' or 'separate'
-  const [showPDFModal, setShowPDFModal] = useState(false);
-  const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || 'default', savedView?.inventoryMode || 'diamonds'));
-  const [pdfGenerating, setPdfGenerating] = useState(false);
-  const [catalogLiranStones, setCatalogLiranStones] = useState(null); // snapshot of selection; null = dialog closed
-  const [catalogLiranGenerating, setCatalogLiranGenerating] = useState(false);
-  const [showCompare, setShowCompare] = useState(false);
-  const [savedFilters, setSavedFilters] = useState([]);
-  const [showSaveFilter, setShowSaveFilter] = useState(false);
-  const [saveFilterName, setSaveFilterName] = useState('');
-  const [showPDFPriceModal, setShowPDFPriceModal] = useState(false); // PDF price adjustment modal
-  const [showNiimbotPrint, setShowNiimbotPrint] = useState(false);
-  const [niimbotPrintStones, setNiimbotPrintStones] = useState([]);
-  const [showSendToCrm, setShowSendToCrm] = useState(false);
-  const [pdfStonesWithPrices, setPdfStonesWithPrices] = useState([]); // Stones with modified prices for PDF
-  const [showScanner, setShowScanner] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
-  const [lightboxImage, setLightboxImage] = useState(null);
-  const [lightboxVideo, setLightboxVideo] = useState(null);
-  const exportButtonRef = useRef(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [initialLoading, setInitialLoading] = useState(true);
-  // Keep the route-transition gem visible until the inventory's first
-  // fetch settles. Background refreshes don't gate the page.
-  useRouteLoading(initialLoading);
-  const [progress, setProgress] = useState(0);
-  const [sortConfig, setSortConfig] = useState({ field: "sku", direction: "asc" });
-  const [viewMode, setViewMode] = useState("table");
-  const [pairViewMode, setPairViewMode] = useState("cards");
-  const [smartSearch, setSmartSearch] = useState(savedView?.smartSearch || "");
-  // Persisted so the public DNA page (DiamondCard) can mirror the same
-  // Neto/Bruto choice — the toggle lives here but the code is decoded there.
-  // Neto = the stored price as-is, Bruto = stored × 2 (see utils/pricing.js).
+  const cart = useSelection();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const isPhone = useMediaQuery("(max-width: 767px)");
+  // Below 1024 the content column is too narrow for the table; rows read better.
+  const compactRows = useMediaQuery("(max-width: 1023px)");
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
+  const isWide = useMediaQuery("(min-width: 1440px)");
+
+  /* ---------------- view state ---------------- */
+
   const [priceMode, setPriceMode] = useState(readPriceMode);
-
-  useEffect(() => {
-    writePriceMode(priceMode);
-  }, [priceMode]);
-
-  // Snapshot the current view so navigating to a stone's DNA page and coming
-  // back (via the DNA page's Back button) restores the same filters/mode.
-  useEffect(() => {
+  const [init] = useState(() => initialView(searchParams, priceMode));
+  const [mode, setMode] = useState(init.mode);
+  const [filters, setFiltersRaw] = useState(init.filters);
+  const [smartSearch, setSmartSearchRaw] = useState(init.smartSearch);
+  const [sort, setSortRaw] = useState(init.sort);
+  const [page, setPage] = useState(init.page);
+  const [jewelrySource, setJewelrySourceRaw] = useState(init.jewelrySource);
+  const [assignee, setAssigneeRaw] = useState(() => {
     try {
-      sessionStorage.setItem(
-        INVENTORY_VIEW_KEY,
-        JSON.stringify({ inventoryMode, filters, smartSearch })
-      );
+      return localStorage.getItem(ASSIGNEE_KEY) || "all";
     } catch {
-      /* storage unavailable — view simply won't be restored */
+      return "all";
     }
-  }, [inventoryMode, filters, smartSearch]);
-
-  // Jewelry state - fetched from backend API
-  const [jewelryItems, setJewelryItems] = useState([]);
-  const [jewelryLoading, setJewelryLoading] = useState(false);
-  // 'all' | 'workshop' | 'catalog' — restricts the merged jewelry list
-  // to one of its two sources. Lives outside the main `filters` object
-  // because the jewelry table only has it; the rest of the system uses
-  // the unified filter shape.
-  const [jewelrySourceFilter, setJewelrySourceFilter] = useState('all');
-  const allItems = useMemo(() => [...stones, ...jewelryItems], [stones, jewelryItems]);
-
-  // /inventory?tab=jewelry now reads from TWO sources and merges them
-  // into one unified jewelry list:
-  //
-  //   • /api/jewelry        → jewelry_products (WooCommerce CSV import,
-  //                            global to the workspace)
-  //   • /api/jewelry-items  → jewelry_items (workshop / production
-  //                            pieces, tenant-scoped to the owner)
-  //
-  // Each row carries a `source` field ('catalog' | 'workshop') so the
-  // UI can route clicks correctly (workshop → /jewelry/items/:id ,
-  // catalog → /jewelry/:modelNumber DNA page) and so we can offer a
-  // source filter chip.
-  const fetchJewelry = useCallback(async () => {
-    setJewelryLoading(true);
+  });
+  const [layout, setLayout] = useState(() => {
     try {
-      const [catalogSettled, workshopSettled] = await Promise.allSettled([
-        fetch(`${API_BASE}/api/jewelry`).then((r) => {
-          if (!r.ok) throw new Error(`catalog failed (${r.status})`);
-          return r.json();
-        }),
-        user?.id
-          ? fetch(`${API_BASE}/api/jewelry-items?userId=${encodeURIComponent(user.id)}`).then((r) => {
-              if (!r.ok) throw new Error(`workshop failed (${r.status})`);
-              return r.json();
-            })
-          : Promise.resolve({ items: [] }),
-      ]);
-
-      if (catalogSettled.status === "rejected") {
-        console.warn("Inventory: catalog jewelry fetch failed", catalogSettled.reason);
-      }
-      if (workshopSettled.status === "rejected") {
-        console.warn("Inventory: workshop jewelry fetch failed", workshopSettled.reason);
-      }
-
-      const catalogRaw  = catalogSettled.status  === "fulfilled" ? (catalogSettled.value?.jewelry  || []) : [];
-      const workshopRaw = workshopSettled.status === "fulfilled" ? (workshopSettled.value?.items || []) : [];
-
-      const catalogItems = catalogRaw.map((row, idx) => {
-        const images = (row.all_pictures_link || '').split(';').map(u => u.trim()).filter(Boolean);
-        const sku = row.model_number || '';
-        return {
-          id: `jwl_${idx}_${sku || idx}`,
-          source: 'catalog',
-          detailHref: sku ? `/jewelry/${sku}` : null,
-          sku,
-          stockNumber: row.stock_number || '',
-          title: sanitizeText(row.title) || '',
-          jewelryType: row.jewelry_type || '',
-          style: row.style || '',
-          collection: row.collection || '',
-          priceTotal: row.price || 0,
-          imageUrl: images[0] || null,
-          allImages: images,
-          videoLink: row.video_link || '',
-          certificateLink: row.certificate_link || '',
-          certificateNumber: row.certificate_number || '',
-          description: sanitizeText(row.description) || '',
-          fullDescription: sanitizeText(row.full_description) || '',
-          jewelryWeight: row.jewelry_weight || '',
-          weightCt: row.total_carat || 0,
-          stoneType: (row.stone_type || '').replace(/\s+O$/i, '').trim(),
-          centerStoneCarat: row.center_stone_carat || 0,
-          shape: row.center_stone_shape || '',
-          color: row.center_stone_color || '',
-          clarity: row.center_stone_clarity || '',
-          metalType: row.metal_type || '',
-          currency: row.currency || 'USD',
-          availability: row.availability || '',
-          shippingFrom: row.shipping_from || '',
-          category: 'Jewelry',
-          jewelrySize: row.jewelry_size || '',
-        };
-      });
-
-      // Workshop pieces. Field names diverge (name vs title,
-      // cover_image_url vs all_pictures_link, sale_price vs price,
-      // metal_summary vs metal_type), so we map them into the same
-      // unified shape. Status surfaces as `workshopStatus` so the UI
-      // can show a small "draft / in progress / ready / sold" pill.
-      const workshopItems = workshopRaw.map((row) => ({
-        id: `ws_${row.id}`,
-        source: 'workshop',
-        workshopId: row.id,
-        workshopStatus: row.status || 'draft',
-        workshopType: row.type || '',
-        detailHref: `/jewelry/items/${row.id}`,
-        sku: row.sku || '',
-        stockNumber: '',
-        title: sanitizeText(row.name) || row.sku || '',
-        jewelryType: row.category || row.type || '',
-        style: '',
-        collection: '',
-        priceTotal: Number(row.sale_price ?? row.total_cost ?? 0),
-        imageUrl: row.cover_image_url || null,
-        allImages: row.cover_image_url ? [row.cover_image_url] : [],
-        videoLink: '',
-        certificateLink: '',
-        certificateNumber: '',
-        description: sanitizeText(row.description) || '',
-        fullDescription: sanitizeText(row.internal_notes) || sanitizeText(row.description) || '',
-        jewelryWeight: row.weight_grams ?? '',
-        weightCt: 0,
-        stoneType: '',
-        centerStoneCarat: 0,
-        shape: '',
-        color: '',
-        clarity: '',
-        metalType: row.metal_summary || '',
-        currency: 'USD',
-        availability: row.status === 'sold' ? 'Sold' : (row.status === 'ready' ? 'Ready' : 'In production'),
-        shippingFrom: row.location || '',
-        category: 'Jewelry',
-        jewelrySize: row.size || '',
-      }));
-
-      // eslint-disable-next-line no-console
-      console.log("[Inventory jewelry] loaded:", {
-        catalog: catalogItems.length,
-        workshop: workshopItems.length,
-        total: catalogItems.length + workshopItems.length,
-      });
-
-      // Workshop pieces first so the user sees their own active
-      // production work above the bulk WooCommerce catalog.
-      setJewelryItems([...workshopItems, ...catalogItems]);
-    } catch (e) {
-      console.log('Failed to load jewelry:', e.message);
-    } finally {
-      setJewelryLoading(false);
+      return localStorage.getItem(LAYOUT_KEY) === "gallery" ? "gallery" : "list";
+    } catch {
+      return "list";
     }
+  });
+  const [pairLayout, setPairLayout] = useState("pairs");
+  const [railPref, setRailPref] = useState(() => {
+    try {
+      return localStorage.getItem(RAIL_KEY) !== "closed";
+    } catch {
+      return true;
+    }
+  });
+  const [columnConfig, setColumnConfig] = useState(() => getColumnConfig(user?.id || "default", init.mode));
+
+  const [selected, setSelected] = useState(() => {
+    const saved = readJson(sessionStorage, SELECTION_KEY);
+    return new Set(Array.isArray(saved) ? saved : []);
+  });
+  const [activeId, setActiveId] = useState(null);
+
+  // Every filter edit returns to page 1 — the old list did the same.
+  const setFilters = useCallback((next) => {
+    setFiltersRaw(next);
+    setPage(1);
+  }, []);
+  const setSmartSearch = useCallback((v) => {
+    setSmartSearchRaw(v);
+    setPage(1);
+  }, []);
+  const setSort = useCallback((v) => {
+    setSortRaw(v);
+    setPage(1);
+  }, []);
+  const setJewelrySource = useCallback((v) => {
+    setJewelrySourceRaw(v);
+    setPage(1);
+  }, []);
+  const setAssignee = useCallback((v) => {
+    setAssigneeRaw(v);
+    setPage(1);
+    try {
+      localStorage.setItem(ASSIGNEE_KEY, v);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => writePriceMode(priceMode), [priceMode]);
+  useEffect(() => {
+    writeJson(sessionStorage, VIEW_KEY, { inventoryMode: mode, filters, smartSearch, sort, page, jewelrySource });
+  }, [mode, filters, smartSearch, sort, page, jewelrySource]);
+  useEffect(() => writeJson(sessionStorage, SELECTION_KEY, Array.from(selected)), [selected]);
+
+  /* ---------------- URL sync ---------------- */
+
+  // Every query string this page wrote recently. Fast typing can land an
+  // older write after newer state, which must not read as Back/Forward.
+  const written = useRef([]);
+  const remember = (qs) => {
+    written.current = [...written.current.filter((w) => w !== qs), qs].slice(-12);
+  };
+  useEffect(() => {
+    const next = buildUrlParams({ mode, filters, smartSearch, sort, page, jewelrySource, priceMode }).toString();
+    remember(next);
+    if (next !== searchParams.toString()) setSearchParams(next, { replace: true });
+    // searchParams is read, not tracked: the URL follows state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, filters, smartSearch, sort, page, jewelrySource, priceMode]);
+
+  // Back / Forward or a link to another inventory view while mounted.
+  const urlMounted = useRef(false);
+  useEffect(() => {
+    if (!urlMounted.current) {
+      urlMounted.current = true;
+      return;
+    }
+    const current = searchParams.toString();
+    if (written.current.includes(current)) return;
+    const latest = written.current[written.current.length - 1];
+    if (!hasInventoryParams(searchParams)) {
+      // e.g. the sidebar's plain /inventory link: keep the current view.
+      if (latest) setSearchParams(latest, { replace: true });
+      return;
+    }
+    const url = parseUrlState(searchParams);
+    remember(current);
+    if (url.mode && url.mode !== mode) {
+      setMode(url.mode);
+      setColumnConfig(getColumnConfig(user?.id || "default", url.mode));
+    }
+    setFiltersRaw(convertPriceUnits(url.filters, url.priceUnit, priceMode));
+    setSmartSearchRaw(url.smartSearch);
+    setSortRaw(url.sort);
+    setPage(url.page);
+    setJewelrySourceRaw(url.jewelrySource);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  /* ---------------- data ---------------- */
+
+  const stonesKey = `${user?.id || "anon"}|${assignee}`;
+  const cachedStones = cache.stones.get(stonesKey);
+  const [stones, setStones] = useState(() => cachedStones?.stones || []);
+  const [stonesReady, setStonesReady] = useState(Boolean(cachedStones));
+  const [stonesLoading, setStonesLoading] = useState(!cachedStones);
+  const [stonesError, setStonesError] = useState("");
+  const [statusMap, setStatusMap] = useState(() => cachedStones?.statusMap || {});
+  const [reloadKey, setReloadKey] = useState(0);
+  const fetchSeq = useRef(0);
+
+  useEffect(() => {
+    const hit = cache.stones.get(stonesKey);
+    if (hit) {
+      setStones(hit.stones);
+      setStatusMap(hit.statusMap || {});
+      setStonesReady(true);
+      if (reloadKey === 0 && Date.now() - hit.at < REVALIDATE_MS) return undefined;
+    } else {
+      setStonesReady(false);
+    }
+    const seq = ++fetchSeq.current;
+    setStonesLoading(true);
+    setStonesError("");
+    fetchSoapStones(
+      { id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName },
+      { assignedTo: assignee !== "all" ? assignee : undefined }
+    )
+      .then((data) => {
+        if (seq !== fetchSeq.current) return;
+        const rows = Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : [];
+        const normalized = rows.map(normalizeStone);
+        setStones(normalized);
+        setStonesReady(true);
+        const entry = { at: Date.now(), stones: normalized, statusMap: cache.stones.get(stonesKey)?.statusMap || {} };
+        cache.stones.set(stonesKey, entry);
+        // Workshop status is best-effort enrichment; never blocks the list.
+        fetchStoneInventoryStatus()
+          .then((res) => {
+            if (seq !== fetchSeq.current) return;
+            const map = res?.statuses || {};
+            entry.statusMap = map;
+            setStatusMap(map);
+          })
+          .catch(() => {});
+      })
+      .catch((err) => {
+        if (seq !== fetchSeq.current) return;
+        setStonesError(err?.message || "Unknown error");
+      })
+      .finally(() => {
+        if (seq === fetchSeq.current) setStonesLoading(false);
+      });
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stonesKey, reloadKey]);
+
+  const jewelryKey = user?.id || "anon";
+  const [jewelry, setJewelry] = useState(() => cache.jewelry.get(jewelryKey)?.items || []);
+  const [jewelryReady, setJewelryReady] = useState(Boolean(cache.jewelry.get(jewelryKey)));
+
+  useEffect(() => {
+    const hit = cache.jewelry.get(jewelryKey);
+    if (hit && Date.now() - hit.at < REVALIDATE_MS && reloadKey === 0) return undefined;
+    let cancelled = false;
+    const userId = user?.id;
+    Promise.allSettled([
+      fetch(`${API_BASE}/api/jewelry`).then((r) => {
+        if (!r.ok) throw new Error(`catalog failed (${r.status})`);
+        return r.json();
+      }),
+      userId
+        ? fetch(`${API_BASE}/api/jewelry-items?userId=${encodeURIComponent(userId)}`).then((r) => {
+            if (!r.ok) throw new Error(`workshop failed (${r.status})`);
+            return r.json();
+          })
+        : Promise.resolve({ items: [] }),
+    ]).then(([catalog, workshop]) => {
+      if (cancelled) return;
+      if (catalog.status === "rejected") console.warn("Inventory: catalog jewelry fetch failed", catalog.reason);
+      if (workshop.status === "rejected") console.warn("Inventory: workshop jewelry fetch failed", workshop.reason);
+      const catalogItems = (catalog.status === "fulfilled" ? catalog.value?.jewelry || [] : []).map(normalizeCatalogJewelry);
+      const workshopItems = (workshop.status === "fulfilled" ? workshop.value?.items || [] : []).map(normalizeWorkshopJewelry);
+      // The rep's own production work comes before the bulk catalog.
+      const items = [...workshopItems, ...catalogItems];
+      cache.jewelry.set(jewelryKey, { at: Date.now(), items });
+      setJewelry(items);
+      setJewelryReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jewelryKey, reloadKey]);
+
+  const [tags, setTags] = useState(() => cache.tags?.tags || []);
+  const [stoneTags, setStoneTags] = useState(() => cache.tags?.stoneTags || {});
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([fetch(`${API_BASE}/api/tags`), fetch(`${API_BASE}/api/stone-tags`)])
+      .then(([a, b]) => Promise.all([a.json(), b.json()]))
+      .then(([tagsData, stoneTagsData]) => {
+        if (cancelled) return;
+        setTags(tagsData);
+        setStoneTags(stoneTagsData);
+      })
+      .catch((err) => console.error("Error fetching tags:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    cache.tags = { tags, stoneTags };
+  }, [tags, stoneTags]);
+
+  const [savedFilters, setSavedFilters] = useState([]);
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch(`${API_BASE}/api/saved-filters?userId=${user.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setSavedFilters(data);
+      })
+      .catch(() => {});
   }, [user?.id]);
 
-  useEffect(() => { fetchJewelry(); }, [fetchJewelry]);
+  /* ---------------- derived ---------------- */
 
-  const applyPriceMode = useCallback((stonesArr) => {
-    return stonesArr.map(s => {
-      const scale = inventoryPriceScale(s, priceMode);
-      if (scale === 1) return s;
-      return {
-        ...s,
-        pricePerCt: s.pricePerCt ? s.pricePerCt * scale : s.pricePerCt,
-        priceTotal: s.priceTotal ? s.priceTotal * scale : s.priceTotal,
-      };
+  const allItems = useMemo(() => [...stones, ...jewelry], [stones, jewelry]);
+  const modeItems = useMemo(() => itemsForMode(mode, stones, jewelry, jewelrySource), [mode, stones, jewelry, jewelrySource]);
+  const skuIndex = useMemo(
+    () => buildSkuIndex((mode === "jewelry" ? jewelry : stones).map((s) => s.sku)),
+    [mode, stones, jewelry]
+  );
+  const skuQuery = useMemo(() => parseSkuQuery(filters.sku, skuIndex), [filters.sku, skuIndex]);
+  const parsedSearch = useMemo(() => parseSmartSearch(smartSearch), [smartSearch]);
+
+  const filtered = useMemo(
+    () => filterItems(modeItems, { mode, filters, skuQuery, smartSearch, parsedSearch, priceMode, stoneTags }),
+    [modeItems, mode, filters, skuQuery, smartSearch, parsedSearch, priceMode, stoneTags]
+  );
+  const sorted = useMemo(() => sortItems(filtered, sort, selected), [filtered, sort, selected]);
+
+  const pairOnly = mode !== "jewelry" && isPairOnly(filters);
+  const pairView = pairOnly && pairLayout === "pairs";
+  const pairs = useMemo(() => (pairOnly ? buildPairGroups(sorted, stones) : []), [pairOnly, sorted, stones]);
+
+  const listItems = pairView ? pairs : sorted;
+  const total = listItems.length;
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const pageItems = useMemo(() => listItems.slice(start, start + ITEMS_PER_PAGE), [listItems, start]);
+  const stepList = useMemo(
+    () => (pairView ? pageItems.flatMap((p) => [p.stoneA, ...(p.stoneB ? [p.stoneB] : [])]) : pageItems),
+    [pairView, pageItems]
+  );
+
+  const counts = useMemo(() => {
+    let diamonds = 0;
+    stones.forEach((s) => {
+      if (stoneMode(s) === "diamonds") diamonds += 1;
     });
-  }, [priceMode]);
+    return { diamonds, gemstones: stones.length - diamonds, jewelry: jewelry.length };
+  }, [stones, jewelry]);
+  const jewelryCounts = useMemo(
+    () => ({
+      all: jewelry.length,
+      workshop: jewelry.filter((j) => j.source === "workshop").length,
+      catalog: jewelry.filter((j) => j.source === "catalog").length,
+    }),
+    [jewelry]
+  );
 
-  // Toggle Neto ⇆ Bruto. The price filters (Total + PPC) are entered in the
-  // currently displayed units, so we rescale them on toggle to keep the same
-  // underlying stones in the result set. Neto = Bruto / 2, therefore
-  // Neto → Bruto doubles each threshold and Bruto → Neto halves it. Blank
-  // fields are left untouched.
-  const togglePriceMode = useCallback(() => {
-    const next = priceMode === 'neto' ? 'bruto' : 'neto';
-    const factor = next === 'bruto' ? 2 : 0.5;
-    const rescale = (val) => {
-      if (val === '' || val == null) return val;
-      const num = Number(val);
-      if (!Number.isFinite(num)) return val;
-      return String(Math.round(num * factor));
+  const options = useMemo(() => {
+    if (mode === "jewelry") {
+      return {
+        shapes: { all: [], main: [], more: [] },
+        categories: [],
+        diamondColors: [],
+        fancyColors: [],
+        labs: [],
+        jewelry: buildJewelryOptions(jewelry),
+      };
+    }
+    return {
+      shapes: buildShapeOptions(modeItems),
+      categories: buildCategoryOptions(modeItems),
+      diamondColors: buildDiamondColorOptions(modeItems),
+      fancyColors: buildFancyColorOptions(modeItems),
+      labs: buildLabOptions(modeItems),
+      jewelry: { type: [], style: [], collection: [], stoneType: [], metal: [] },
     };
-    setFilters((f) => ({
-      ...f,
-      minPrice: rescale(f.minPrice),
-      maxPrice: rescale(f.maxPrice),
-      minPricePerCt: rescale(f.minPricePerCt),
-      maxPricePerCt: rescale(f.maxPricePerCt),
-    }));
+  }, [mode, modeItems, jewelry]);
+
+  const showAssignee = mode !== "jewelry" && team?.ready && (team.members || []).length > 1;
+  const assigneeLabel = useMemo(() => {
+    if (assignee === "me") return "Assigned to me";
+    if (assignee === "unassigned") return "Unassigned";
+    const m = team?.membersByClerkId?.[assignee];
+    return `Assigned to ${m?.name || "teammate"}`;
+  }, [assignee, team]);
+
+  const chips = useMemo(
+    () =>
+      activeFilterChips(filters, {
+        mode,
+        smartSearch,
+        jewelrySource,
+        assignee: showAssignee ? assignee : "all",
+        assigneeLabel,
+      }),
+    [filters, mode, smartSearch, jewelrySource, showAssignee, assignee, assigneeLabel]
+  );
+
+  const columnDefs = DEFAULT_COLUMNS_BY_MODE[mode];
+  const colMeta = useMemo(() => Object.fromEntries(columnDefs.map((c) => [c.id, c])), [columnDefs]);
+  const visibleColumns = useMemo(
+    () => columnConfig.filter((c) => c.visible && colMeta[c.id]).map((c) => c.id),
+    [columnConfig, colMeta]
+  );
+  const sortLabels = useMemo(
+    () => Object.fromEntries(columnDefs.filter((c) => c.sortField).map((c) => [c.sortField, c.label])),
+    [columnDefs]
+  );
+
+  const selectedItems = useMemo(() => allItems.filter((s) => selected.has(s.id)), [allItems, selected]);
+  const applyPriceMode = useCallback(
+    (arr) =>
+      arr.map((s) => {
+        const scale = inventoryPriceScale(s, priceMode);
+        if (scale === 1) return s;
+        return {
+          ...s,
+          pricePerCt: s.pricePerCt ? s.pricePerCt * scale : s.pricePerCt,
+          priceTotal: s.priceTotal ? s.priceTotal * scale : s.priceTotal,
+        };
+      }),
+    [priceMode]
+  );
+
+  /* ---------------- handlers ---------------- */
+
+  const handleModeSwitch = useCallback(
+    (next) => {
+      if (next === mode) return;
+      setMode(next);
+      setFiltersRaw(emptyFilters(""));
+      setSelected(new Set());
+      setActiveId(null);
+      setPage(1);
+      setSmartSearchRaw("");
+      setSortRaw({ ...DEFAULT_SORT });
+      // Only gemstones carry a Neto/Bruto split.
+      if (next !== "gemstones") setPriceMode("neto");
+      setColumnConfig(getColumnConfig(user?.id || "default", next));
+    },
+    [mode, user?.id]
+  );
+
+  const togglePriceMode = useCallback(() => {
+    const next = priceMode === "neto" ? "bruto" : "neto";
+    setFiltersRaw((f) => convertPriceUnits(f, priceMode, next));
     setPriceMode(next);
   }, [priceMode]);
 
-  // Tags state
-  const [tags, setTags] = useState([]);
-  const [stoneTags, setStoneTags] = useState({}); // { sku: [tag1, tag2, ...] }
-  const [showTagsModal, setShowTagsModal] = useState(false);
-
-  // Fetch tags on mount
+  // A ?search= link (Home, QA) jumps to whichever tab holds that SKU.
+  const legacyDone = useRef(!init.legacySearch);
   useEffect(() => {
-    const fetchTags = async () => {
-      try {
-        const [tagsRes, stoneTagsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/tags`),
-          fetch(`${API_BASE}/api/stone-tags`)
-        ]);
-        const tagsData = await tagsRes.json();
-        const stoneTagsData = await stoneTagsRes.json();
-        setTags(tagsData);
-        setStoneTags(stoneTagsData);
-      } catch (err) {
-        console.error("Error fetching tags:", err);
+    if (legacyDone.current || !stonesReady || !stones.length) return;
+    legacyDone.current = true;
+    const q = init.legacySearch.toLowerCase();
+    const match = stones.find((s) => s.sku?.toLowerCase() === q);
+    if (!match) {
+      const inJewelry = jewelry.find((j) => j.sku?.toLowerCase() === q);
+      if (inJewelry && mode !== "jewelry") {
+        setMode("jewelry");
+        setPriceMode("neto");
+        setColumnConfig(getColumnConfig(user?.id || "default", "jewelry"));
       }
-    };
-    fetchTags();
+      return;
+    }
+    const target = getMappedCategories(match.category).includes("Diamond") ? "diamonds" : "gemstones";
+    if (target !== mode) {
+      setMode(target);
+      setColumnConfig(getColumnConfig(user?.id || "default", target));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stonesReady, stones, jewelry]);
+
+  const removeChip = useCallback(
+    (chip) => {
+      const r = chip.remove;
+      if (r.type === "smart") setSmartSearch("");
+      else if (r.type === "source") setJewelrySource("all");
+      else if (r.type === "assignee") setAssignee("all");
+      else setFilters((f) => applyChipRemoval(f, r));
+    },
+    [setFilters, setSmartSearch, setJewelrySource, setAssignee]
+  );
+
+  // The SKU search is kept: it has its own clear button.
+  const clearAll = useCallback(() => {
+    setFilters((f) => emptyFilters(f.sku));
+    setSmartSearch("");
+    setJewelrySource("all");
+    if (assignee !== "all") setAssignee("all");
+  }, [setFilters, setSmartSearch, setJewelrySource, setAssignee, assignee]);
+
+  const toggleOne = useCallback((id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }, []);
 
-  // Tag management functions
+  const allVisibleSelected = sorted.length > 0 && sorted.every((s) => selected.has(s.id));
+  const someVisibleSelected = !allVisibleSelected && sorted.some((s) => selected.has(s.id));
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const ids = sorted.map((s) => s.id);
+      const all = ids.length > 0 && ids.every((id) => prev.has(id));
+      ids.forEach((id) => (all ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }, [sorted]);
+
+  const togglePair = useCallback((pair) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const ids = pairIds(pair);
+      const all = ids.every((id) => prev.has(id));
+      ids.forEach((id) => (all ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }, []);
+  const allPairsSelected = pairs.length > 0 && pairs.flatMap(pairIds).every((id) => selected.has(id));
+  const toggleAllPairs = useCallback(() => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const ids = pairs.flatMap(pairIds);
+      const all = ids.length > 0 && ids.every((id) => prev.has(id));
+      ids.forEach((id) => (all ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }, [pairs]);
+
+  const handleSortField = useCallback(
+    (field) => setSort((prev) => ({ field, direction: prev.field === field && prev.direction === "asc" ? "desc" : "asc" })),
+    [setSort]
+  );
+
+  const [assigningSku, setAssigningSku] = useState(null);
+  const handleAssign = useCallback(
+    async (stone, assignedTo) => {
+      if (!stone?.sku) return;
+      setAssigningSku(stone.sku);
+      const previous = stone.assignedTo || null;
+      const target = assignedTo === "me" ? team.actorUserId : assignedTo;
+      setStones((prev) => prev.map((s) => (s.sku === stone.sku ? { ...s, assignedTo: target } : s)));
+      try {
+        await assignStone(
+          { id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName },
+          stone.sku,
+          { assignedTo: target }
+        );
+        toast.success(assignedTo ? `${stone.sku} claimed` : `${stone.sku} released`);
+      } catch (err) {
+        setStones((prev) => prev.map((s) => (s.sku === stone.sku ? { ...s, assignedTo: previous } : s)));
+        toast.error(err.message || "Could not update assignment");
+      } finally {
+        setAssigningSku(null);
+      }
+    },
+    [team.actorUserId, user?.id, user?.primaryEmailAddress?.emailAddress, user?.fullName]
+  );
+  // Keep the cache in step with optimistic assignment edits.
+  useEffect(() => {
+    const hit = cache.stones.get(stonesKey);
+    if (hit && hit.stones !== stones && stones.length) hit.stones = stones;
+  }, [stones, stonesKey]);
+
+  /* tags */
   const createTag = async (name, color) => {
     try {
       const res = await fetch(`${API_BASE}/api/tags`, {
@@ -5985,14 +685,13 @@ const StoneSearchPage = () => {
         body: JSON.stringify({ name, color }),
       });
       if (res.ok) {
-        const newTag = await res.json();
-        setTags((prev) => [...prev, { ...newTag, stone_count: 0 }]);
+        const tag = await res.json();
+        setTags((prev) => [...prev, { ...tag, stone_count: 0 }]);
       }
     } catch (err) {
       console.error("Error creating tag:", err);
     }
   };
-
   const updateTag = async (id, name, color) => {
     try {
       const res = await fetch(`${API_BASE}/api/tags/${id}`, {
@@ -6003,2919 +702,799 @@ const StoneSearchPage = () => {
       if (res.ok) {
         const updated = await res.json();
         setTags((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
-        // Update stoneTags as well
         setStoneTags((prev) => {
-          const newStoneTags = { ...prev };
-          Object.keys(newStoneTags).forEach((sku) => {
-            newStoneTags[sku] = newStoneTags[sku].map((t) =>
-              t.id === id ? { ...t, name: updated.name, color: updated.color } : t
-            );
+          const next = {};
+          Object.keys(prev).forEach((sku) => {
+            next[sku] = prev[sku].map((t) => (t.id === id ? { ...t, name: updated.name, color: updated.color } : t));
           });
-          return newStoneTags;
+          return next;
         });
       }
     } catch (err) {
       console.error("Error updating tag:", err);
     }
   };
-
   const deleteTag = async (id) => {
     if (!window.confirm("Are you sure you want to delete this tag?")) return;
     try {
       const res = await fetch(`${API_BASE}/api/tags/${id}`, { method: "DELETE" });
       if (res.ok) {
         setTags((prev) => prev.filter((t) => t.id !== id));
-        // Remove from stoneTags
         setStoneTags((prev) => {
-          const newStoneTags = { ...prev };
-          Object.keys(newStoneTags).forEach((sku) => {
-            newStoneTags[sku] = newStoneTags[sku].filter((t) => t.id !== id);
+          const next = {};
+          Object.keys(prev).forEach((sku) => {
+            next[sku] = prev[sku].filter((t) => t.id !== id);
           });
-          return newStoneTags;
+          return next;
         });
       }
     } catch (err) {
       console.error("Error deleting tag:", err);
     }
   };
-
-  const addTagToStone = async (sku, tagId) => {
+  const toggleStoneTag = async (sku, tagId, has) => {
     try {
-      const res = await fetch(`${API_BASE}/api/stones/${sku}/tags`, {
+      if (has) {
+        const res = await fetch(`${API_BASE}/api/stones/${sku}/tags/${tagId}`, { method: "DELETE" });
+        if (!res.ok) return;
+        setStoneTags((prev) => ({ ...prev, [sku]: (prev[sku] || []).filter((t) => t.id !== tagId) }));
+        setTags((prev) =>
+          prev.map((t) => (t.id === tagId ? { ...t, stone_count: Math.max(0, (parseInt(t.stone_count, 10) || 0) - 1) } : t))
+        );
+      } else {
+        const res = await fetch(`${API_BASE}/api/stones/${sku}/tags`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagId }),
+        });
+        if (!res.ok) return;
+        const tag = await res.json();
+        setStoneTags((prev) => ({ ...prev, [sku]: [...(prev[sku] || []), tag] }));
+        setTags((prev) => prev.map((t) => (t.id === tagId ? { ...t, stone_count: (parseInt(t.stone_count, 10) || 0) + 1 } : t)));
+      }
+    } catch (err) {
+      console.error("Error updating stone tags:", err);
+      toast.error("Couldn’t update tags");
+    }
+  };
+
+  /* saved filters */
+  const saveCurrent = async (name) => {
+    if (!name.trim() || !user?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/saved-filters`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tagId }),
+        body: JSON.stringify({ userId: user.id, name: name.trim(), inventoryMode: mode, filters }),
       });
-      if (res.ok) {
-        const tag = await res.json();
-        setStoneTags((prev) => ({
-          ...prev,
-          [sku]: [...(prev[sku] || []), tag],
-        }));
-        // Update tag count
-        setTags((prev) =>
-          prev.map((t) => (t.id === tagId ? { ...t, stone_count: (parseInt(t.stone_count) || 0) + 1 } : t))
-        );
-      }
+      const data = await res.json();
+      setSavedFilters((prev) => [data, ...prev]);
+      toast.success(`Saved “${name.trim()}”`);
     } catch (err) {
-      console.error("Error adding tag to stone:", err);
+      console.error("Save filter error:", err);
+      toast.error("Couldn’t save filters");
     }
   };
-
-  const removeTagFromStone = async (sku, tagId) => {
+  const deleteSaved = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/api/stones/${sku}/tags/${tagId}`, { method: "DELETE" });
-      if (res.ok) {
-        setStoneTags((prev) => ({
-          ...prev,
-          [sku]: (prev[sku] || []).filter((t) => t.id !== tagId),
-        }));
-        // Update tag count
-        setTags((prev) =>
-          prev.map((t) => (t.id === tagId ? { ...t, stone_count: Math.max(0, (parseInt(t.stone_count) || 0) - 1) } : t))
-        );
-      }
+      await fetch(`${API_BASE}/api/saved-filters/${id}`, { method: "DELETE" });
+      setSavedFilters((prev) => prev.filter((f) => f.id !== id));
     } catch (err) {
-      console.error("Error removing tag from stone:", err);
+      console.error("Delete filter error:", err);
     }
   };
-
-  // Toggle single stone selection (preserve scroll position)
-  const toggleStoneSelection = (stoneId) => {
-    const scrollY = window.scrollY;
-    setSelectedStones((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(stoneId)) {
-        newSet.delete(stoneId);
-      } else {
-        newSet.add(stoneId);
-      }
-      return newSet;
-    });
-    // Restore scroll position after React re-renders
-    requestAnimationFrame(() => {
-      window.scrollTo(0, scrollY);
-    });
+  const loadSaved = (preset) => {
+    if (preset.inventory_mode && MODES.includes(preset.inventory_mode) && preset.inventory_mode !== mode) {
+      setMode(preset.inventory_mode);
+      if (preset.inventory_mode !== "gemstones") setPriceMode("neto");
+      setColumnConfig(getColumnConfig(user?.id || "default", preset.inventory_mode));
+    }
+    // Presets saved before a filter existed lack its key.
+    setFilters({ ...emptyFilters(), ...(preset.filters || {}) });
   };
 
-  // Select/Deselect all filtered stones across all pages
-  const toggleSelectAll = () => {
-    const scrollY = window.scrollY;
-    const allIds = sortedStones.map((s) => s.id);
-    const allSelected = allIds.length > 0 && allIds.every((id) => selectedStones.has(id));
-    
-    setSelectedStones((prev) => {
-      const newSet = new Set(prev);
-      if (allSelected) {
-        allIds.forEach((id) => newSet.delete(id));
-      } else {
-        allIds.forEach((id) => newSet.add(id));
-      }
-      return newSet;
-    });
-    requestAnimationFrame(() => {
-      window.scrollTo(0, scrollY);
-    });
+  const handleColumnSave = (config) => {
+    setColumnConfig(config);
+    saveColumnConfig(user?.id || "default", config, mode);
   };
 
-  // Clear all selections
-  const clearSelection = () => {
-    setSelectedStones(new Set());
-  };
+  /* ---------------- scanner ---------------- */
 
-  // Handle barcode scan result
-  const handleBarcodeScan = (scannedText) => {
-    setScanResult(scannedText);
-    setShowScanner(false);
-    
-    // Try to find the stone by SKU (exact match or partial)
-    const foundStone = stones.find((s) => {
-      const sku = s.sku?.toUpperCase() || "";
-      const scanned = scannedText.toUpperCase();
-      return sku === scanned || sku.includes(scanned) || scanned.includes(sku);
-    });
-
-    if (foundStone) {
-      // Add to selection
-      setSelectedStones((prev) => {
-        const newSet = new Set(prev);
-        newSet.add(foundStone.id);
-        return newSet;
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const stonesRef = useLatest(stones);
+  const handleScan = useCallback(
+    (scanned) => {
+      setScannerOpen(false);
+      const code = String(scanned || "").toUpperCase();
+      const found = stonesRef.current.find((s) => {
+        const sku = s.sku?.toUpperCase() || "";
+        return sku === code || sku.includes(code) || code.includes(sku);
       });
-      // Show success feedback
-      setTimeout(() => setScanResult(null), 3000);
-    } else {
-      // Show not found message
-      alert(`Stone not found: ${scannedText}\n\nTry scanning another barcode or search manually.`);
-      setScanResult(null);
-    }
-  };
-
-  const handleModeSwitch = (newMode) => {
-    if (newMode === inventoryMode) return;
-    setInventoryMode(newMode);
-    setFilters({ ...defaultFilters, sku: '' });
-    setSelectedStones(new Set());
-    setSelectedStone(null);
-    setCurrentPage(1);
-    setSmartSearch('');
-    setSortConfig({ field: 'sku', direction: 'asc' });
-    // Only gemstones carry a Neto/Bruto split; diamonds and jewelry are always
-    // quoted Neto. Leaving Bruto on here would follow the user back to the
-    // gemstones tab (and the DNA card, which mirrors this preference).
-    if (newMode !== 'gemstones') setPriceMode('neto');
-    setColumnConfig(getColumnConfig(user?.id || 'default', newMode));
-  };
-
-  // USB Barcode Scanner Listener (global keyboard listener)
+      if (found) {
+        setSelected((prev) => new Set(prev).add(found.id));
+        toast.success(`Added: ${scanned}`);
+      } else {
+        toast.error(`Stone not found: ${scanned}`);
+      }
+    },
+    [stonesRef]
+  );
+  // USB scanners type fast and end with Enter.
   useEffect(() => {
     let buffer = "";
-    let lastKeyTime = 0;
-    const SCAN_THRESHOLD = 50; // Max ms between keystrokes for scanner input
-    const MIN_LENGTH = 3; // Minimum barcode length
-
-    const handleKeyDown = (e) => {
-      // Ignore if user is typing in an input field
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) {
-        return;
-      }
-
-      const currentTime = Date.now();
-      const timeDiff = currentTime - lastKeyTime;
-
-      // If Enter key and we have buffer content
-      if (e.key === "Enter" && buffer.length >= MIN_LENGTH) {
+    let last = 0;
+    const onKey = (e) => {
+      const t = e.target;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
+      const now = Date.now();
+      if (e.key === "Enter" && buffer.length >= 3) {
         e.preventDefault();
-        const scannedBarcode = buffer.trim();
+        const code = buffer.trim();
         buffer = "";
-        
-        // Process the scanned barcode
-        if (scannedBarcode) {
-          console.log("USB Scanner detected:", scannedBarcode);
-          handleBarcodeScan(scannedBarcode);
-        }
+        if (code) handleScan(code);
         return;
       }
-
-      // If too much time passed, reset buffer (user is typing manually)
-      if (timeDiff > SCAN_THRESHOLD && buffer.length > 0) {
-        buffer = "";
-      }
-
-      // Add character to buffer (only printable characters)
+      if (now - last > 50 && buffer.length > 0) buffer = "";
       if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         buffer += e.key;
-        lastKeyTime = currentTime;
+        last = now;
       }
     };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [handleScan]);
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [stones]); // Re-create when stones change so handleBarcodeScan has access to latest stones
+  /* ---------------- overlays ---------------- */
 
-  // Determine category of stones
-  const getCategoryBreakdown = (stonesArray) => {
-    return stonesArray.reduce((acc, stone) => {
-      const mapped = getMappedCategories(stone.category);
-      if (mapped.includes('Emerald')) {
-        acc.emeralds = (acc.emeralds || 0) + 1;
-      } else if (mapped.includes('Diamond')) {
-        acc.diamonds = (acc.diamonds || 0) + 1;
-      } else {
-        acc.other = (acc.other || 0) + 1;
-      }
-      return acc;
-    }, {});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [lightbox, setLightbox] = useState({ image: null, video: null });
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportMode, setExportMode] = useState("combined");
+  const [categoryChoiceOpen, setCategoryChoiceOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [pdfPriceOpen, setPdfPriceOpen] = useState(false);
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfStones, setPdfStones] = useState([]);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [liranStones, setLiranStones] = useState(null);
+  const [liranGenerating, setLiranGenerating] = useState(false);
+  const [niimbotOpen, setNiimbotOpen] = useState(false);
+  const [niimbotStones, setNiimbotStones] = useState([]);
+  const [crmOpen, setCrmOpen] = useState(false);
+
+  const legacyModalOpen =
+    tagsOpen || columnsOpen || compareOpen || exportOpen || categoryChoiceOpen || internalOpen || pdfPriceOpen ||
+    pdfOpen || Boolean(liranStones) || niimbotOpen || crmOpen || scannerOpen || Boolean(lightbox.image || lightbox.video);
+
+  const railVisible = isDesktop && railPref;
+  const quickLookVariant = isWide ? "panel" : isPhone ? "bottom" : "side";
+  const activeItem = useMemo(() => (activeId == null ? null : allItems.find((s) => s.id === activeId) || null), [activeId, allItems]);
+  const activeIndex = activeItem ? stepList.findIndex((s) => s.id === activeItem.id) : -1;
+  // The desktop quick look borrows the rail's space while it is open.
+  const panelOpen = Boolean(activeItem) && quickLookVariant === "panel";
+
+  const openItem = useCallback((item) => setActiveId(item.id), []);
+  const closeQuickLook = useCallback(() => {
+    if (legacyModalOpen) return;
+    setActiveId(null);
+  }, [legacyModalOpen]);
+  const stepQuickLook = useCallback(
+    (delta) => {
+      const next = stepList[activeIndex + delta];
+      if (!next) return;
+      setActiveId(next.id);
+      requestAnimationFrame(() => {
+        document.querySelector(`.inv-results [data-id="${CSS.escape(String(next.id))}"]`)?.scrollIntoView({ block: "nearest" });
+      });
+    },
+    [stepList, activeIndex]
+  );
+
+  const openDna = useCallback(
+    (item) => {
+      const path = dnaPathFor(item);
+      if (!path) return;
+      setActiveId(null);
+      navigate(path);
+    },
+    [navigate]
+  );
+
+  const requireSelection = () => {
+    if (selectedItems.length === 0) {
+      toast.error("Please select at least one stone to export.");
+      return false;
+    }
+    return true;
   };
 
-  // Handle export button click - check categories first
   const handleExportClick = () => {
-    const selectedData = allItems.filter((s) => selectedStones.has(s.id));
-    if (selectedData.length === 0) {
-      alert("Please select at least one stone to export.");
-      return;
-    }
-    
-    const breakdown = getCategoryBreakdown(selectedData);
-    const categoryCount = [breakdown.emeralds, breakdown.diamonds, breakdown.other].filter(Boolean).length;
-    
-    // If only one category, go directly to export modal
+    if (!requireSelection()) return;
+    const b = getCategoryBreakdown(selectedItems);
+    const categoryCount = [b.emeralds, b.diamonds, b.other].filter(Boolean).length;
     if (categoryCount === 1) {
-      setExportMode('combined');
-      setShowExportModal(true);
+      setExportMode("combined");
+      setExportOpen(true);
     } else {
-      // Multiple categories - show choice modal
-      setShowCategoryExportModal(true);
+      setCategoryChoiceOpen(true);
     }
   };
 
-  // One-off ESHED-branded worksheet catalog ("Catalog (Liran)").
-  // Opens a pre-flight dialog (drag & drop order + per-item website text);
-  // the snapshot of the selection is stored so edits in the dialog survive
-  // re-renders of the inventory underneath.
-  const handleCatalogLiran = () => {
-    const selectedData = allItems.filter((s) => selectedStones.has(s.id));
-    if (selectedData.length === 0) {
-      alert("Please select at least one stone to export.");
-      return;
-    }
-    setCatalogLiranStones(selectedData);
-  };
+  const internalCounts = useMemo(() => {
+    const c = { diamond: 0, gemstone: 0, jewelry: 0 };
+    applyPriceMode(selectedItems).forEach((it) => {
+      if ((it?.category || "").toLowerCase() === "jewelry" || it?.jewelryType) c.jewelry += 1;
+      else if (getMappedCategories(it?.category).includes("Diamond")) c.diamond += 1;
+      else c.gemstone += 1;
+    });
+    return c;
+  }, [selectedItems, applyPriceMode]);
 
-  const handleCatalogLiranGenerate = async (orderedItems, options = {}) => {
-    setCatalogLiranGenerating(true);
-    const t = toast.loading("Generating Catalog (Liran)\u2026");
+  const handleLiranGenerate = async (ordered, opts = {}) => {
+    setLiranGenerating(true);
+    const t = toast.loading("Generating Catalog (Liran)…");
     try {
-      await exportCatalogLiran(orderedItems, options);
+      await exportCatalogLiran(ordered, opts);
       toast.success("Catalog ready", { id: t });
-      setCatalogLiranStones(null);
+      setLiranStones(null);
     } catch (err) {
       console.error("Catalog (Liran) generation failed:", err);
       toast.error("Failed to generate catalog", { id: t });
     } finally {
-      setCatalogLiranGenerating(false);
+      setLiranGenerating(false);
     }
   };
 
-  // Handle category export choice
-  const handleCategoryExportChoice = (choice) => {
-    setShowCategoryExportModal(false);
-    setExportMode(choice === 'separate' ? 'separate' : 'combined');
-    setShowExportModal(true); // Always show the price adjustment modal
-  };
-
-  // Export to Excel with separate sheets per category
-  const exportToExcelSeparate = async (customStones = null, options = {}) => {
-    const selectedData = customStones || allItems.filter((s) => selectedStones.has(s.id));
-    
-    // Separate by mapped category
-    const emeralds = selectedData.filter(s => getMappedCategories(s.category).includes('Emerald'));
-    const diamonds = selectedData.filter(s => getMappedCategories(s.category).includes('Diamond'));
-    const others = selectedData.filter(s => {
-      const mapped = getMappedCategories(s.category);
-      return !mapped.includes('Emerald') && !mapped.includes('Diamond');
-    });
-
-    console.log('Export Separate Sheets:', {
-      total: selectedData.length,
-      emeralds: emeralds.length,
-      diamonds: diamonds.length,
-      others: others.length,
-      categories: [...new Set(selectedData.map(s => getMappedCategories(s.category).join(', ')))]
-    });
-
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = "GEMS DNA";
-    workbook.created = new Date();
-
-    let logoImageId = null;
-    try {
-      const logoBase64 = await imageToBase64('/gemstar-logo-footer.png');
-      logoImageId = workbook.addImage({ base64: logoBase64, extension: 'png' });
-    } catch (e) {
-      console.log('Could not load logo image:', e.message);
-    }
-
-    const { includeAppendix = true, hidePrices = false } = options;
-
-    // Create sheet for Emeralds
-    if (emeralds.length > 0) {
-      console.log('Creating Emeralds sheet with', emeralds.length, 'stones');
-      createCategorySheet(workbook, "Emeralds", emeralds, EMERALD_COLUMNS, "FF00A86B", logoImageId, includeAppendix, hidePrices);
-    }
-
-    // Create sheet for Diamonds
-    if (diamonds.length > 0) {
-      console.log('Creating Diamonds sheet with', diamonds.length, 'stones');
-      createCategorySheet(workbook, "Diamonds", diamonds, DIAMOND_COLUMNS, "FF3B82F6", logoImageId, includeAppendix, hidePrices);
-    }
-
-    // Create sheet for Others (use Emerald columns as default)
-    if (others.length > 0) {
-      console.log('Creating Other Gems sheet with', others.length, 'stones');
-      createCategorySheet(workbook, "Other Gems", others, EMERALD_COLUMNS, "FF8B5CF6", logoImageId, includeAppendix, hidePrices);
-    }
-
-    console.log('Total sheets in workbook:', workbook.worksheets.length);
-
-    // Generate and download
-    const buffer = await workbook.xlsx.writeBuffer();
-    const exportDate = new Date().toISOString().split("T")[0];
-    const filename = `Gemstar_Export_${exportDate}.xlsx`;
-    saveAs(new Blob([buffer]), filename);
-  };
-
-  // Helper: Create a category-specific sheet (designer template v2)
-  const createCategorySheet = (workbook, sheetName, data, columns, accentColor, logoImageId = null, includeAppendix = true, hidePrices = false) => {
-    let effectiveColumns = includeAppendix ? columns : columns.filter(c => c.key !== 'appendix');
-    if (hidePrices) {
-      effectiveColumns = effectiveColumns.filter(c => !['pricePerCt', 'priceTotal', 'rapPrice'].includes(c.key));
-    }
-    const worksheet = workbook.addWorksheet(sheetName);
-    const colCount = effectiveColumns.length;
-
-    const getColLetter = (num) => {
-      let letter = '';
-      while (num > 0) { const r = (num - 1) % 26; letter = String.fromCharCode(65 + r) + letter; num = Math.floor((num - 1) / 26); }
-      return letter;
-    };
-    const lastCol = getColLetter(colCount);
-
-    worksheet.columns = effectiveColumns.map(col => ({ key: col.key, width: col.width }));
-
-    const totalWeight = data.reduce((sum, s) => sum + (s.weightCt || 0), 0);
-    const totalPrice = hidePrices ? 0 : data.reduce((sum, s) => sum + (s.priceTotal || 0), 0);
-    const now = new Date();
-    const date = now.toLocaleDateString("en-GB");
-    const time = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
-    const greenAccent = "FF00A86B";
-    const darkBorder = { style: "thin", color: { argb: "FF444444" } };
-    const greenBorderBottom = { style: "medium", color: { argb: greenAccent } };
-    const blackBorderMedium = { style: "medium", color: { argb: "FF000000" } };
-    const whiteFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" }, bgColor: { argb: "FFFFFFFF" } };
-    const grayFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
-    const darkFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-
-    // Helper: style a full-width row without merge (uses centerContinuous)
-    const fillRow = (rowNum, value, font, fill, border, height) => {
-      const row = worksheet.getRow(rowNum);
-      row.height = height;
-      for (let c = 1; c <= colCount; c++) {
-        const cell = row.getCell(c);
-        if (c === 1 && value !== undefined) cell.value = value;
-        if (font) cell.font = font;
-        if (fill) cell.fill = fill;
-        cell.alignment = { horizontal: "centerContinuous", vertical: "middle" };
-        if (border) cell.border = border;
-      }
-    };
-
-    // === ROW 1: Title ===
-    fillRow(1,
-      `SELECTED STONES  \u00B7  ${data.length} stones  \u00B7  ${totalWeight.toFixed(2)} cts  \u00B7  ${date}`,
-      { bold: true, size: 16, color: { argb: "FF000000" }, name: "Lato" },
-      whiteFill,
-      { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom },
-      26
-    );
-
-    // === ROW 2: Subtitle ===
-    fillRow(2,
-      "STONE CATALOG",
-      { italic: true, size: 12, color: { argb: "FF000000" }, name: "Lato" },
-      whiteFill,
-      { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom },
-      20
-    );
-
-    // === ROW 3: Spacer ===
-    fillRow(3, undefined, null, whiteFill, null, 6);
-
-    // === ROW 4: Category label ===
-    fillRow(4,
-      sheetName.toUpperCase(),
-      { size: 11, color: { argb: "FF000000" }, name: "Lato", bold: true },
-      whiteFill,
-      null,
-      18
-    );
-
-    // === ROW 5: Column headers ===
-    const headerRow = worksheet.getRow(5);
-    effectiveColumns.forEach((col, i) => { headerRow.getCell(i + 1).value = col.header; });
-    headerRow.height = 22;
-    headerRow.eachCell((cell) => {
-      cell.fill = darkFill;
-      cell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" }, name: "Calibri" };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
-      cell.border = { left: darkBorder, right: darkBorder, top: darkBorder, bottom: greenBorderBottom };
-    });
-
-    // === AUTO FILTER on header + data range ===
-    const lastDataRow = 5 + data.length;
-    worksheet.autoFilter = { from: { row: 5, column: 1 }, to: { row: lastDataRow, column: colCount } };
-
-    // === DATA ROWS (starting from row 6) ===
-    const dataStartRow = 6;
-    const dnaBaseUrl = "https://gems-dna.com";
-
-    const pairColorMap = {};
-    let pairColorToggle = false;
-    data.forEach(stone => {
-      if (stone.pairSku) {
-        const pairKey = [stone.sku, stone.pairSku].sort().join('|');
-        if (!(pairKey in pairColorMap)) {
-          pairColorMap[pairKey] = pairColorToggle ? "FFFFFFFF" : "FFF3FBF7";
-          pairColorToggle = !pairColorToggle;
-        }
-      }
-    });
-
-    data.forEach((stone, index) => {
-      const rowData = {};
-      effectiveColumns.forEach(col => {
-        switch (col.key) {
-          case 'num': rowData.num = index + 1; break;
-          case 'sku': rowData.sku = stone.sku || ''; break;
-          case 'shape': rowData.shape = stone.shape || ''; break;
-          case 'weight': rowData.weight = stone.weightCt || ''; break;
-          case 'measurements': rowData.measurements = stone.measurements || ''; break;
-          case 'ratio': rowData.ratio = stone.ratio != null && stone.ratio !== '' ? Number(Number(stone.ratio).toFixed(2)) : ''; break;
-          case 'treatment': rowData.treatment = stone.treatment || ''; break;
-          case 'origin': rowData.origin = (stone.origin && stone.origin.toUpperCase() !== 'N/A') ? stone.origin : ''; break;
-          case 'location': rowData.location = stone.location || ''; break;
-          case 'lab': rowData.lab = (stone.lab && stone.lab.toUpperCase() !== 'N/A') ? stone.lab : ''; break;
-          case 'pricePerCt': rowData.pricePerCt = stone.pricePerCt || ''; break;
-          case 'priceTotal': rowData.priceTotal = stone.priceTotal || ''; break;
-          case 'color': rowData.color = getDisplayColor(stone) || ''; break;
-          case 'clarity': rowData.clarity = stone.clarity || ''; break;
-          case 'fluorescence': rowData.fluorescence = stone.fluorescence || ''; break;
-          case 'rapPrice': rowData.rapPrice = stone.rapPrice || ''; break;
-          case 'cut': rowData.cut = stone.cut || ''; break;
-          case 'polish': rowData.polish = stone.polish || ''; break;
-          case 'symmetry': rowData.symmetry = stone.symmetry || ''; break;
-          case 'tablePercent': rowData.tablePercent = stone.tablePercent || ''; break;
-          case 'depthPercent': rowData.depthPercent = stone.depthPercent || ''; break;
-          case 'fancyIntensity': rowData.fancyIntensity = stone.fancyIntensity || ''; break;
-          case 'fancyColor': rowData.fancyColor = stone.fancyColor || ''; break;
-          case 'fancyOvertone': rowData.fancyOvertone = stone.fancyOvertone || ''; break;
-          case 'fancyColor2': rowData.fancyColor2 = stone.fancyColor2 || ''; break;
-          case 'fancyOvertone2': rowData.fancyOvertone2 = stone.fancyOvertone2 || ''; break;
-          case 'pairSku': rowData.pairSku = stone.pairSku || ''; break;
-          case 'dna': rowData.dna = stone.sku || ''; break;
-          case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
-          case 'appendix': rowData.appendix = ''; break;
-          case 'image': rowData.image = stone.imageUrl || ''; break;
-          case 'video': rowData.video = stone.videoUrl || stone.videoLink || ''; break;
-          default: rowData[col.key] = '';
-        }
-      });
-
-      const row = worksheet.addRow(rowData);
-      row.height = 20;
-
-      const pairKey = stone.pairSku ? [stone.sku, stone.pairSku].sort().join('|') : null;
-      const pairFillColor = pairKey ? pairColorMap[pairKey] : null;
-      const isEvenRow = index % 2 === 0;
-      const fillArgb = pairFillColor || (isEvenRow ? "FFF3FBF7" : "FFFFFFFF");
-      const rowFill = { type: "pattern", pattern: "solid", fgColor: { argb: fillArgb }, bgColor: { argb: fillArgb } };
-      row.eachCell((cell) => {
-        cell.fill = rowFill;
-        cell.font = { size: 10, color: { argb: "FF000000" }, name: "Lato" };
-        cell.alignment = { vertical: "middle", horizontal: "center" };
-        cell.border = { left: darkBorder, right: darkBorder, top: darkBorder, bottom: darkBorder };
-      });
-
-      const ratioCol = effectiveColumns.findIndex(c => c.key === 'ratio');
-      if (ratioCol >= 0 && rowData.ratio !== '') row.getCell(ratioCol + 1).numFmt = '0.00';
-
-      const pricePerCtCol = effectiveColumns.findIndex(c => c.key === 'pricePerCt');
-      const priceTotalCol = effectiveColumns.findIndex(c => c.key === 'priceTotal');
-      const rapPriceCol = effectiveColumns.findIndex(c => c.key === 'rapPrice');
-      if (pricePerCtCol >= 0 && stone.pricePerCt) row.getCell(pricePerCtCol + 1).numFmt = '"$"#,##0';
-      if (priceTotalCol >= 0 && stone.priceTotal) {
-        row.getCell(priceTotalCol + 1).numFmt = '"$"#,##0';
-        row.getCell(priceTotalCol + 1).font = { size: 10, color: { argb: "FF000000" }, name: "Lato", bold: true };
-      }
-      if (rapPriceCol >= 0 && stone.rapPrice != null) row.getCell(rapPriceCol + 1).numFmt = '0"%"';
-
-      const dnaCol = effectiveColumns.findIndex(c => c.key === 'dna');
-      const certCol = effectiveColumns.findIndex(c => c.key === 'certificate');
-      const appendixCol = effectiveColumns.findIndex(c => c.key === 'appendix');
-      const imgCol = effectiveColumns.findIndex(c => c.key === 'image');
-      const vidCol = effectiveColumns.findIndex(c => c.key === 'video');
-      const pairSkuCol = effectiveColumns.findIndex(c => c.key === 'pairSku');
-
-      if (dnaCol >= 0 && stone.sku) {
-        row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: `${dnaBaseUrl}/${stone.sku}` };
-        row.getCell(dnaCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, bold: true, name: "Lato" };
-      }
-      if (pairSkuCol >= 0 && stone.pairSku) {
-        row.getCell(pairSkuCol + 1).value = { text: stone.pairSku, hyperlink: `${dnaBaseUrl}/${stone.pairSku}` };
-        row.getCell(pairSkuCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, name: "Lato" };
-      }
-      if (certCol >= 0 && stone.certificateUrl) {
-        row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
-        row.getCell(certCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
-      }
-      if (appendixCol >= 0 && stone.lab && stone.lab.toUpperCase() === "GRS" && stone.certificateUrl) {
-        const certMatch = stone.certificateUrl.match(/\/([^/]+)\.pdf$/i);
-        if (certMatch) {
-          const appendixUrl = `https://app.barakdiamonds.com/Gemstones/Output/StoneImages/${certMatch[1]}-ap.pdf`;
-          row.getCell(appendixCol + 1).value = { text: "Appendix", hyperlink: appendixUrl };
-          row.getCell(appendixCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
-        }
-      }
-      if (imgCol >= 0 && stone.imageUrl) {
-        row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
-        row.getCell(imgCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
-      }
-      if (vidCol >= 0 && (stone.videoUrl || stone.videoLink)) {
-        row.getCell(vidCol + 1).value = { text: "Video", hyperlink: stone.videoUrl || stone.videoLink };
-        row.getCell(vidCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
-      }
-    });
-
-    // === FOOTER SECTION ===
-    const footerStartRow = dataStartRow + data.length;
-
-    // Footer message row (no merge)
-    fillRow(footerStartRow,
-      `${sheetName} \u2014 ${data.length} stones exported on ${date}`,
-      { italic: true, size: 10, color: { argb: "FF333333" }, name: "Lato" },
-      whiteFill,
-      { top: { style: "thin", color: { argb: greenAccent } }, bottom: darkBorder },
-      22
-    );
-
-    // Spacer
-    const r1 = footerStartRow + 1;
-    fillRow(r1, undefined, null, whiteFill, null, 8);
-
-    // Summary section (no merged cells to allow Excel Sort & Filter)
-    const sumRow = footerStartRow + 2;
-    const sumBorder = { left: darkBorder, right: darkBorder, top: darkBorder, bottom: darkBorder };
-
-    // "Total Records" label spans A-C visually but without merge
-    ['A','B','C'].forEach(col => {
-      const cell = worksheet.getCell(`${col}${sumRow}`);
-      cell.fill = grayFill;
-      cell.border = sumBorder;
-    });
-    worksheet.getCell(`A${sumRow}`).value = "Total Records";
-    worksheet.getCell(`A${sumRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`A${sumRow}`).alignment = { horizontal: "left", vertical: "middle" };
-
-    worksheet.getCell(`D${sumRow}`).value = "CTS";
-    worksheet.getCell(`D${sumRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`D${sumRow}`).fill = grayFill;
-    worksheet.getCell(`D${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
-    worksheet.getCell(`D${sumRow}`).border = sumBorder;
-
-    worksheet.getCell(`E${sumRow}`).value = "PCS";
-    worksheet.getCell(`E${sumRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`E${sumRow}`).fill = grayFill;
-    worksheet.getCell(`E${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
-    worksheet.getCell(`E${sumRow}`).border = sumBorder;
-
-    if (!hidePrices) {
-      worksheet.getCell(`F${sumRow}`).value = "TOTAL PRICE";
-      worksheet.getCell(`F${sumRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-      worksheet.getCell(`F${sumRow}`).fill = grayFill;
-      worksheet.getCell(`F${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.getCell(`F${sumRow}`).border = sumBorder;
-    }
-
-    // Date/Time info on right side (no merge)
-    if (colCount >= 10) {
-      const dtCol1 = getColLetter(colCount - 2);
-      const dtCol2 = getColLetter(colCount - 1);
-      const dtCol3 = getColLetter(colCount);
-      worksheet.getCell(`${dtCol1}${sumRow}`).value = "Date";
-      worksheet.getCell(`${dtCol1}${sumRow}`).font = { bold: true, size: 9, color: { argb: "FF000000" }, name: "Lato" };
-      worksheet.getCell(`${dtCol1}${sumRow}`).fill = grayFill;
-      worksheet.getCell(`${dtCol1}${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.getCell(`${dtCol2}${sumRow}`).value = date;
-      worksheet.getCell(`${dtCol2}${sumRow}`).font = { size: 9, color: { argb: "FF000000" }, name: "Lato" };
-      worksheet.getCell(`${dtCol2}${sumRow}`).fill = grayFill;
-      worksheet.getCell(`${dtCol2}${sumRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.getCell(`${dtCol3}${sumRow}`).fill = grayFill;
-    }
-    worksheet.getRow(sumRow).height = 21;
-
-    // Summary values row (no merged cells)
-    const valRow = sumRow + 1;
-    ['A','B','C'].forEach(col => {
-      const cell = worksheet.getCell(`${col}${valRow}`);
-      cell.fill = whiteFill;
-      cell.border = sumBorder;
-    });
-    worksheet.getCell(`A${valRow}`).value = "Total";
-    worksheet.getCell(`A${valRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`A${valRow}`).alignment = { horizontal: "left", vertical: "middle" };
-
-    worksheet.getCell(`D${valRow}`).value = totalWeight.toFixed(2);
-    worksheet.getCell(`D${valRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`D${valRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: greenAccent } };
-    worksheet.getCell(`D${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
-    worksheet.getCell(`D${valRow}`).border = sumBorder;
-
-    worksheet.getCell(`E${valRow}`).value = data.length;
-    worksheet.getCell(`E${valRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-    worksheet.getCell(`E${valRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: greenAccent } };
-    worksheet.getCell(`E${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
-    worksheet.getCell(`E${valRow}`).border = sumBorder;
-
-    if (!hidePrices && totalPrice > 0) {
-      worksheet.getCell(`F${valRow}`).value = totalPrice;
-      worksheet.getCell(`F${valRow}`).numFmt = '$#,##0';
-      worksheet.getCell(`F${valRow}`).font = { bold: true, size: 10, color: { argb: "FF000000" }, name: "Lato" };
-      worksheet.getCell(`F${valRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: greenAccent } };
-      worksheet.getCell(`F${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.getCell(`F${valRow}`).border = sumBorder;
-      const colF = worksheet.getColumn('F');
-      if (colF.width < 16) colF.width = 16;
-    }
-
-    if (colCount >= 10) {
-      const dtCol1 = getColLetter(colCount - 2);
-      const dtCol2 = getColLetter(colCount - 1);
-      const dtCol3 = getColLetter(colCount);
-      worksheet.getCell(`${dtCol1}${valRow}`).value = "Time";
-      worksheet.getCell(`${dtCol1}${valRow}`).font = { bold: true, size: 9, color: { argb: "FF000000" }, name: "Lato" };
-      worksheet.getCell(`${dtCol1}${valRow}`).fill = grayFill;
-      worksheet.getCell(`${dtCol1}${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.getCell(`${dtCol2}${valRow}`).value = time;
-      worksheet.getCell(`${dtCol2}${valRow}`).font = { size: 9, color: { argb: "FF000000" }, name: "Lato" };
-      worksheet.getCell(`${dtCol2}${valRow}`).fill = grayFill;
-      worksheet.getCell(`${dtCol2}${valRow}`).alignment = { horizontal: "center", vertical: "middle" };
-      worksheet.getCell(`${dtCol3}${valRow}`).fill = grayFill;
-    }
-    worksheet.getRow(valRow).height = 21;
-
-    // Spacer
-    const r2 = valRow + 1;
-    fillRow(r2, undefined, null, whiteFill, null, 10);
-
-    // Logo row (no merge)
-    const logoRowNum = r2 + 1;
-    fillRow(logoRowNum, undefined, null, whiteFill, null, 60);
-    if (logoImageId !== null) {
-      const centerCol = Math.max(0, Math.floor(colCount / 2) - 2);
-      worksheet.addImage(logoImageId, {
-        tl: { col: centerCol, row: logoRowNum - 1 - 0.45 },
-        ext: { width: 240, height: 90 },
-      });
-    }
-
-    // Contact bar (dark background, no merge)
-    const contactRow = logoRowNum + 1;
-    const userEmailExcel = user?.primaryEmailAddress?.emailAddress || "";
-    const userLocationExcel = user?.publicMetadata?.location;
-    const officeExcel = getOfficeContact({ location: userLocationExcel, email: userEmailExcel });
-    fillRow(contactRow,
-      `${officeExcel.site}     \u2502     ${officeExcel.phone}     \u2502     ${officeExcel.email}`,
-      { size: 14, color: { argb: "FFFFFFFF" }, name: "Lato", bold: true },
-      darkFill,
-      null,
-      36
-    );
-
-    // Disclaimer row (no merge)
-    const disclaimerRow = contactRow + 1;
-    fillRow(disclaimerRow,
-      "All prices are subject to change. Stones are certified and guaranteed authentic.",
-      { italic: true, size: 10, color: { argb: "FF333333" }, name: "Lato" },
-      grayFill,
-      { top: { style: "thin", color: { argb: greenAccent } }, bottom: blackBorderMedium },
-      24
-    );
-  };
-
-  // Export selected stones to Excel with styling (combined - all columns)
-  const exportToExcel = async (customStones = null, options = {}) => {
-    let selectedData = customStones || allItems.filter((s) => selectedStones.has(s.id));
-    
-    if (selectedData.length === 0) {
-      alert("Please select at least one stone to export.");
-      return;
-    }
-
-    // Reorder: place paired stones adjacent to each other
-    const ordered = [];
-    const visited = new Set();
-    const skuMap = {};
-    selectedData.forEach(s => { skuMap[s.sku] = s; });
-    
-    selectedData.forEach(stone => {
-      if (visited.has(stone.sku)) return;
-      visited.add(stone.sku);
-      ordered.push(stone);
-      if (stone.pairSku && skuMap[stone.pairSku] && !visited.has(stone.pairSku)) {
-        visited.add(stone.pairSku);
-        ordered.push(skuMap[stone.pairSku]);
-      }
-    });
-    selectedData = ordered;
-
-    const breakdown = getCategoryBreakdown(selectedData);
-    const isOnlyEmeralds = breakdown.emeralds > 0 && !breakdown.diamonds && !breakdown.other;
-    const isOnlyDiamonds = breakdown.diamonds > 0 && !breakdown.emeralds && !breakdown.other;
-    
-    let columnsToUse;
-    let sheetName;
-    let accentColor = "FF00A86B";
-    
-    if (isOnlyEmeralds) {
-      columnsToUse = EMERALD_COLUMNS;
-      sheetName = "Emeralds";
-      accentColor = "FF00A86B";
-    } else if (isOnlyDiamonds) {
-      columnsToUse = DIAMOND_COLUMNS;
-      sheetName = "Diamonds";
-      accentColor = "FF3B82F6";
-    } else {
-      columnsToUse = [
-        { key: "num", header: "#", width: 5 },
-        { key: "sku", header: "SKU", width: 18 },
-        { key: "pairSku", header: "Pair SKU", width: 18 },
-        { key: "shape", header: "Shape", width: 12 },
-        { key: "weight", header: "Weight (ct)", width: 12 },
-        { key: "color", header: "Color", width: 8 },
-        { key: "clarity", header: "Clarity", width: 10 },
-        { key: "measurements", header: "Measurements", width: 20 },
-        { key: "ratio", header: "Ratio", width: 8 },
-        { key: "treatment", header: "Clarity", width: 18 },
-        { key: "origin", header: "Origin", width: 12 },
-        { key: "lab", header: "Lab", width: 10 },
-        { key: "fluorescence", header: "Fluor.", width: 10 },
-        { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
-        { key: "priceTotal", header: "Total ($)", width: 14 },
-        { key: "dna", header: "DNA", width: 12 },
-        { key: "certificate", header: "Certificate", width: 15 },
-        { key: "appendix", header: "Appendix", width: 14 },
-        { key: "image", header: "Image", width: 12 },
-        { key: "video", header: "Video", width: 12 },
-      ];
-      sheetName = "Selected Stones";
-      accentColor = "FF8B5CF6";
-    }
-
-    const { includeAppendix = true, hidePrices = false } = options;
-
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = "Gemstar";
-    workbook.created = new Date();
-
-    let logoImageId = null;
-    try {
-      const logoBase64 = await imageToBase64('/gemstar-logo-footer.png');
-      logoImageId = workbook.addImage({ base64: logoBase64, extension: 'png' });
-    } catch (e) {
-      console.log('Could not load logo image:', e.message);
-    }
-
-    createCategorySheet(workbook, sheetName, selectedData, columnsToUse, accentColor, logoImageId, includeAppendix, hidePrices);
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const exportDate = new Date().toISOString().split("T")[0];
-    const filename = `Gemstar_Export_${exportDate}.xlsx`;
-    saveAs(new Blob([buffer]), filename);
-  };
-
-  /* Internal Excel — no logo, no branding, just the columns the user picked.
-   * Built for back-office use (inventory audits, broker memos, accounting),
-   * which is why the data layer is intentionally plain: header row, body
-   * rows, autofilter, frozen header. Pricing is shown in raw form (no
-   * "$ N/A" placeholders), URL columns are written as clickable hyperlinks. */
-  /* =========================================================================
-   *  Internal Excel — multi-sheet exporter
-   * =========================================================================
-   *
-   * Splits the user's selection into Diamond / Gemstone / Jewelry buckets and
-   * produces ONE workbook with up to three sheets. Each sheet uses the column
-   * set the user picked for that type in InternalExcelModal — so a mixed
-   * export ("4 diamonds + 3 emeralds + 2 rings") gets each item rendered with
-   * the columns appropriate to it.
-   *
-   * `selections` shape: { diamond?: { sheetName, columns }, gemstone?: {...},
-   * jewelry?: {...} }. Empty types are simply skipped.
-   */
-
-  // Tag each item with the bucket it belongs to. We treat anything coming
-  // from /api/jewelry as a jewelry item (those have category === "Jewelry"
-  // because of fetchJewelry); the rest are split via getMappedCategories.
-  const _bucketFor = (item) => {
-    if ((item?.category || "").toLowerCase() === "jewelry" || item?.jewelryType) {
-      return "jewelry";
-    }
-    const mapped = getMappedCategories(item?.category);
-    if (mapped.includes("Diamond")) return "diamond";
-    return "gemstone";
-  };
-
-  const _renderStoneCell = (key, stone, idx) => {
-    const DNA_BASE = "https://gems-dna.com";
-    switch (key) {
-      case "num": return idx + 1;
-      case "sku": return stone.sku || "";
-      case "pairSku": return stone.pairSku || "";
-      case "shape": return stone.shape || "";
-      case "category": return stone.category || stone.stoneType || "";
-      case "type": return stone.type || "";
-      case "weight":
-        return stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt) : "";
-      case "color": return getDisplayColor(stone) || "";
-      case "clarity": return stone.clarity || "";
-      case "measurements": return stone.measurements || "";
-      case "ratio":
-        return stone.ratio != null && stone.ratio !== "" ? Number(Number(stone.ratio).toFixed(2)) : "";
-      case "fancyIntensity": return stone.fancyIntensity || "";
-      case "fancyColor": return stone.fancyColor || "";
-      case "fancyOvertone": return stone.fancyOvertone || "";
-      case "fancyColor2": return stone.fancyColor2 || "";
-      case "fancyOvertone2": return stone.fancyOvertone2 || "";
-      case "cut": return stone.cut || "";
-      case "polish": return stone.polish || "";
-      case "symmetry": return stone.symmetry || "";
-      case "tablePercent":
-        return stone.tablePercent != null && stone.tablePercent !== "" ? Number(stone.tablePercent) : "";
-      case "depthPercent":
-        return stone.depthPercent != null && stone.depthPercent !== "" ? Number(stone.depthPercent) : "";
-      case "treatment": return stone.treatment || "";
-      case "certComments": return stone.certComments || "";
-      case "origin":
-        return stone.origin && String(stone.origin).toUpperCase() !== "N/A" ? stone.origin : "";
-      case "lab":
-        return stone.lab && String(stone.lab).toUpperCase() !== "N/A" ? stone.lab : "";
-      case "fluorescence": return stone.fluorescence || "";
-      case "pricePerCt":
-        return stone.pricePerCt != null && stone.pricePerCt !== "" ? Number(stone.pricePerCt) : "";
-      case "priceTotal":
-        return stone.priceTotal != null && stone.priceTotal !== "" ? Number(stone.priceTotal) : "";
-      case "rapPrice": return stone.rapPrice != null && stone.rapPrice !== "" ? Number(stone.rapPrice) : "";
-      case "rapListPrice":
-        return stone.rapListPrice != null && stone.rapListPrice !== "" ? Number(stone.rapListPrice) : "";
-      case "branch": return stone.branch || "";
-      case "exactLocation": return stone.exactLocation || "";
-      case "box": return stone.box || "";
-      case "groupingType": return stone.groupingType || "";
-      case "stonesCount":
-        return stone.stones != null && stone.stones !== "" ? Number(stone.stones) : "";
-      case "homePage": return stone.homePage || "";
-      case "tradeShow": return stone.tradeShow || "";
-      case "certificateNumber": return stone.certificateNumber || "";
-      case "certificate": return stone.certificateUrl || "";
-      case "certificateImageJpg": return stone.certificateImageJpg || "";
-      case "image": return stone.imageUrl || "";
-      case "additionalPictures": return stone.additionalPictures || "";
-      case "video": return stone.videoUrl || stone.videoLink || "";
-      case "updatedAt": return stone.updatedAt || "";
-      case "dna":
-        return stone.sku
-          ? { text: `View DNA · ${stone.sku}`, hyperlink: `${DNA_BASE}/${stone.sku}` }
-          : "";
-      // Jewelry-specific
-      case "stockNumber": return stone.stockNumber || "";
-      case "title": return stone.title || "";
-      case "jewelryType": return stone.jewelryType || "";
-      case "style": return stone.style || "";
-      case "collection": return stone.collection || "";
-      case "metalType": return stone.metalType || "";
-      case "jewelryWeight":
-        return stone.jewelryWeight != null && stone.jewelryWeight !== "" ? Number(stone.jewelryWeight) : "";
-      case "jewelrySize": return stone.jewelrySize || "";
-      case "totalCarat":
-        return stone.weightCt != null && stone.weightCt !== "" ? Number(stone.weightCt) : "";
-      case "stoneType": return stone.stoneType || "";
-      case "centerStoneCarat":
-        return stone.centerStoneCarat != null && stone.centerStoneCarat !== "" ? Number(stone.centerStoneCarat) : "";
-      case "currency": return stone.currency || "";
-      case "availability": return stone.availability || "";
-      case "shippingFrom": return stone.shippingFrom || "";
-      default: return "";
-    }
-  };
-
-  const _writeSheet = (workbook, sheetName, columns, items) => {
-    const sheet = workbook.addWorksheet(sheetName, {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-    sheet.columns = columns.map((c) => ({
-      key: c.key,
-      header: c.header,
-      width: c.width || 14,
-    }));
-
-    const header = sheet.getRow(1);
-    header.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    header.alignment = { vertical: "middle", horizontal: "left" };
-    header.height = 22;
-    header.eachCell((cell) => {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-      cell.border = { bottom: { style: "thin", color: { argb: "FF374151" } } };
-    });
-
-    const urlKeys = new Set([
-      "certificate", "certificateImageJpg", "image", "additionalPictures", "video",
-    ]);
-    const moneyKeys = new Set(["pricePerCt", "priceTotal", "rapListPrice"]);
-
-    items.forEach((stone, idx) => {
-      const rowObj = {};
-      columns.forEach((col) => {
-        rowObj[col.key] = _renderStoneCell(col.key, stone, idx);
-      });
-      const r = sheet.addRow(rowObj);
-      r.alignment = { vertical: "middle" };
-      r.eachCell((cell, colNumber) => {
-        const colKey = columns[colNumber - 1]?.key;
-        if (urlKeys.has(colKey) && cell.value) {
-          cell.value = { text: String(cell.value), hyperlink: String(cell.value) };
-          cell.font = { color: { argb: "FF2563EB" }, underline: true };
-        }
-        if (colKey === "dna" && cell.value && typeof cell.value === "object") {
-          cell.font = { color: { argb: "FF2563EB" }, underline: true };
-        }
-        if (moneyKeys.has(colKey)) {
-          cell.numFmt = '"$"#,##0.00';
-        }
-        if (idx % 2 === 1) {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
-        }
-      });
-    });
-
-    if (columns.length && items.length) {
-      // ExcelJS uses 1-based column indices; convert to letter (A..Z, AA, AB…)
-      const colToLetter = (n) => {
-        let s = "";
-        let x = n;
-        while (x > 0) {
-          const r = (x - 1) % 26;
-          s = String.fromCharCode(65 + r) + s;
-          x = Math.floor((x - 1) / 26);
-        }
-        return s;
-      };
-      const lastCol = colToLetter(columns.length);
-      sheet.autoFilter = `A1:${lastCol}${items.length + 1}`;
-    }
-  };
-
-  const exportToInternalExcel = async (selections, customStones = null) => {
-    const data = customStones || allItems.filter((s) => selectedStones.has(s.id));
-    if (!data.length) {
-      alert("Please select at least one stone to export.");
-      return;
-    }
-    if (!selections || typeof selections !== "object" || !Object.keys(selections).length) {
-      alert("Please pick at least one column for at least one category.");
-      return;
-    }
-
-    // Bucket items by type so each goes into its own sheet
-    const buckets = { diamond: [], gemstone: [], jewelry: [] };
-    data.forEach((item) => {
-      const b = _bucketFor(item);
-      if (buckets[b]) buckets[b].push(item);
-    });
-
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = "Gemstar (Internal)";
-    workbook.created = new Date();
-
-    let totalRows = 0;
-    let sheetsWritten = 0;
-    for (const typeId of ["diamond", "gemstone", "jewelry"]) {
-      const sel = selections[typeId];
-      const items = buckets[typeId] || [];
-      if (!sel || !sel.columns?.length || !items.length) continue;
-      _writeSheet(workbook, sel.sheetName || typeId, sel.columns, items);
-      totalRows += items.length;
-      sheetsWritten += 1;
-    }
-
-    if (!sheetsWritten) {
-      alert("No matching items for the selected column sets.");
-      return;
-    }
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const exportDate = new Date().toISOString().split("T")[0];
-    const filename = `Internal_Export_${exportDate}_${totalRows}pcs.xlsx`;
-    saveAs(new Blob([buffer]), filename);
-  };
-
-  const handleSort = (field) => {
-    setSortConfig((prev) => ({
-      field,
-      direction: prev.field === field && prev.direction === "asc" ? "desc" : "asc",
-    }));
-  };
-
-  const handleColumnConfigChange = (newConfig) => {
-    setColumnConfig(newConfig);
-    saveColumnConfig(user?.id || 'default', newConfig, inventoryMode);
-  };
-
-  // Track visibility of export button for floating button
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Show floating button when original is NOT visible and there are selected stones
-        setShowFloatingExport(!entry.isIntersecting && selectedStones.size > 0);
-      },
-      { threshold: 0 }
-    );
-
-    if (exportButtonRef.current) {
-      observer.observe(exportButtonRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [selectedStones.size]);
+  const selectionActions = [
+    {
+      label: "Export",
+      items: [
+        { id: "excel", label: "Excel", sub: "Spreadsheet with all details", icon: FileSpreadsheet, onSelect: handleExportClick },
+        {
+          id: "internal",
+          label: "Excel (Internal)",
+          sub: "Pick columns · no branding",
+          icon: Table2,
+          onSelect: () => requireSelection() && setInternalOpen(true),
+        },
+        { id: "pdf", label: "PDF catalog", sub: "Professional catalog with images", icon: FileText, onSelect: () => setPdfPriceOpen(true) },
+        {
+          id: "liran",
+          label: "Catalog (Liran)",
+          sub: "ESHED cover · 4×3 worksheet grid",
+          icon: BookOpen,
+          onSelect: () => requireSelection() && setLiranStones(selectedItems),
+        },
+      ],
+    },
+    {
+      label: "Labels",
+      items: [
+        {
+          id: "print",
+          label: "Print labels",
+          sub: "Bluetooth (NIIMBOT)",
+          icon: Printer,
+          onSelect: () => {
+            setNiimbotStones([]);
+            setNiimbotOpen(true);
+          },
+        },
+        { id: "niimbot-xlsx", label: "Niimbot Excel", sub: "For the NIIMBOT app", icon: Tag, onSelect: () => exportForLabels(selectedItems, false) },
+      ],
+    },
+    {
+      label: "Share",
+      items: [
+        { id: "crm", label: "Send to CRM", sub: "Add to a deal or contact", icon: Users, onSelect: () => setCrmOpen(true) },
+        { id: "wa", label: "WhatsApp DNA links", sub: "One message with every link", icon: MessageCircle, onSelect: () => shareMultipleToWhatsApp(selectedItems) },
+      ],
+    },
+  ];
+
+  /* ---------------- scroll ---------------- */
+
+  const rootRef = useRef(null);
+  const resultsTopRef = useRef(null);
+  const scrollerRef = useRef(undefined);
+  const restoredRef = useRef(false);
+  const ready = mode === "jewelry" ? jewelryReady : stonesReady;
 
   useEffect(() => {
-    let intervalId;
-    const startProgress = () => {
-      setInitialLoading(true);
-      setProgress(10);
-      intervalId = setInterval(() => {
-        setProgress((prev) => (prev >= 90 ? prev : prev + Math.random() * 10));
-      }, 300);
-    };
-
-    const stopProgress = () => {
-      setProgress(100);
-      setTimeout(() => {
-        setInitialLoading(false);
-        setProgress(0);
-      }, 400);
-      if (intervalId) clearInterval(intervalId);
-    };
-
-    const fetchStones = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        startProgress();
-        const data = await fetchSoapStones(
-          { id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName },
-          { assignedTo: assigneeFilter !== "all" ? assigneeFilter : undefined }
-        );
-        const rows = Array.isArray(data.stones) ? data.stones : Array.isArray(data) ? data : [];
-        const normalized = rows.map((row, index) => ({
-          id: row.id ?? index,
-          sku: row.sku ?? "",
-          shape: row.shape ?? "",
-          weightCt: row.weightCt != null ? Number(row.weightCt) : null,
-          measurements: row.measurements ?? "",
-          priceTotal: row.priceTotal != null ? Number(row.priceTotal) : null,
-          pricePerCt: row.pricePerCt != null ? Number(row.pricePerCt) : null,
-          rapListPrice: row.rapListPrice != null ? Number(row.rapListPrice) : null,
-          imageUrl: row.imageUrl ?? null,
-          additionalPictures: row.additionalPictures ?? "",
-          videoUrl: row.videoUrl ?? null,
-          additionalVideos: row.additionalVideos ?? "",
-          certificateUrl: row.certificateUrl ?? null,
-          certificateImageJpg: row.certificateImageJpg ?? null,
-          lab: (row.lab && row.lab.toUpperCase() !== 'N/A') ? row.lab : null,
-          origin: (row.origin && row.origin.toUpperCase() !== 'N/A') ? row.origin : null,
-          ratio: row.ratio != null && row.ratio !== "" ? Number(row.ratio) : null,
-          color: row.color ?? "",
-          clarity: row.clarity ?? "",
-          luster: row.luster ?? "",
-          fluorescence: row.fluorescence ?? "",
-          certificateNumber: row.certificateNumber ?? "",
-          certComments: row.certComments ?? "",
-          treatment: row.treatment ?? "",
-          category: row.category ?? "",
-          type: row.type ?? "",
-          // 📍 Location — three layers (location kept for back-compat = branch)
-          location: row.location ?? "",
-          branch: row.branch ?? "",
-          exactLocation: row.exactLocation ?? "",
-          // Diamond-specific fields
-          cut: row.cut ?? "",
-          polish: row.polish ?? "",
-          symmetry: row.symmetry ?? "",
-          tablePercent: row.tablePercent != null ? Number(row.tablePercent) : null,
-          depthPercent: row.depthPercent != null ? Number(row.depthPercent) : null,
-          rapPrice: row.rapPrice != null ? Number(row.rapPrice) : null,
-          // Fancy-specific fields
-          fancyIntensity: row.fancyIntensity ?? "",
-          fancyColor: row.fancyColor ?? "",
-          fancyOvertone: row.fancyOvertone ?? "",
-          fancyColor2: row.fancyColor2 ?? "",
-          fancyOvertone2: row.fancyOvertone2 ?? "",
-          // Pair stone
-          pairSku: row.pairSku ?? null,
-          // Grouping & inventory layout
-          groupingType: row.groupingType ?? "",
-          box: row.box ?? "",
-          stones: row.stones != null ? Number(row.stones) : null,
-          // Marketing
-          homePage: row.homePage ?? "",
-          tradeShow: row.tradeShow ?? "",
-          // Sync
-          updatedAt: row.updatedAt ?? null,
-          // Sales-rep assignment (Sprint 3)
-          assignedTo:        row.assignedTo        || null,
-          assignedBy:        row.assignedBy        || null,
-          assignmentNotes:   row.assignmentNotes   || null,
-          assignmentUpdated: row.assignmentUpdated || null,
-        }));
-        setStones(normalized);
-        // Pull workshop status for every SKU in one call so the grid can show
-        // a "Reserved" / "In setting" / "Sold" pill inline. Don't block the
-        // main render if this fails — the bridge is best-effort enrichment.
-        fetchStoneInventoryStatus()
-          .then((res) => setStoneStatusMap(res?.statuses || {}))
-          .catch(() => setStoneStatusMap({}));
-      } catch (err) {
-        setError(err.message || "Unknown error");
-      } finally {
-        setLoading(false);
-        stopProgress();
-      }
-    };
-
-    fetchStones();
-    return () => { if (intervalId) clearInterval(intervalId); };
+    if (!ready || restoredRef.current) return;
+    restoredRef.current = true;
+    const saved = readJson(sessionStorage, SCROLL_KEY);
+    if (!saved || saved.search !== location.search) return;
+    requestAnimationFrame(() => {
+      scrollerRef.current = getScroller(rootRef.current);
+      setScrollTop(scrollerRef.current, saved.top);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, assigneeFilter]);
+  }, [ready]);
 
-  // Persist the assignee filter so reps don't have to re-pick it every time.
+  const searchRef = useLatest(location.search);
   useEffect(() => {
-    try { localStorage.setItem("inventory.assigneeFilter", assigneeFilter); } catch (_) {}
-  }, [assigneeFilter]);
-
-  /* Claim / release a loose stone from the inventory grid. Optimistic update
-   * because the chip lives inside a card and a full refetch would feel laggy. */
-  const handleAssignStone = useCallback(async (stone, assignedTo) => {
-    if (!stone?.sku) return;
-    setAssigningStoneSku(stone.sku);
-    const previousAssignedTo = stone.assignedTo || null;
-    // Optimistic UI flip first.
-    setStones((prev) =>
-      prev.map((s) =>
-        s.sku === stone.sku
-          ? { ...s, assignedTo: assignedTo === "me" ? team.actorUserId : assignedTo }
-          : s
-      )
-    );
-    try {
-      await assignStone(
-        { id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName },
-        stone.sku,
-        { assignedTo: assignedTo === "me" ? team.actorUserId : assignedTo }
-      );
-      toast.success(
-        assignedTo
-          ? `${stone.sku} claimed`
-          : `${stone.sku} released`
-      );
-    } catch (err) {
-      // Roll back on failure.
-      setStones((prev) =>
-        prev.map((s) =>
-          s.sku === stone.sku ? { ...s, assignedTo: previousAssignedTo } : s
-        )
-      );
-      toast.error(err.message || "Could not update assignment");
-    } finally {
-      setAssigningStoneSku(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [team.actorUserId, user?.id, user?.primaryEmailAddress?.emailAddress, user?.fullName]);
-
-  useEffect(() => {
-    if (!initialSearch || loading || stones.length === 0) return;
-    const match = stones.find(s => s.sku?.toLowerCase() === initialSearch.toLowerCase());
-    if (!match) {
-      const inJewelry = jewelryItems.find(j => j.sku?.toLowerCase() === initialSearch.toLowerCase());
-      if (inJewelry && inventoryMode !== 'jewelry') {
-        setInventoryMode('jewelry');
-        setPriceMode('neto');
-      }
-      return;
-    }
-    const mapped = getMappedCategories(match.category);
-    if (mapped.includes('Diamond') && inventoryMode !== 'diamonds') {
-      setInventoryMode('diamonds');
-    } else if (!mapped.includes('Diamond') && inventoryMode !== 'gemstones') {
-      setInventoryMode('gemstones');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stones, jewelryItems, loading]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    fetch(`${API_BASE}/api/saved-filters?userId=${user.id}`)
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setSavedFilters(data); })
-      .catch(() => {});
-  }, [user?.id]);
-
-  const handleSaveFilter = async () => {
-    if (!saveFilterName.trim() || !user?.id) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/saved-filters`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, name: saveFilterName.trim(), inventoryMode, filters }),
+    let frame = 0;
+    const record = () => {
+      // Until the saved position is restored, scrolls are the page settling.
+      if (!restoredRef.current) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (scrollerRef.current === undefined) scrollerRef.current = getScroller(rootRef.current);
+        writeJson(sessionStorage, SCROLL_KEY, { search: searchRef.current, top: getScrollTop(scrollerRef.current) });
       });
-      const data = await res.json();
-      setSavedFilters(prev => [data, ...prev]);
-      setSaveFilterName('');
-      setShowSaveFilter(false);
-    } catch (err) { console.error('Save filter error:', err); }
+    };
+    // Capture: on phones <main> scrolls, which doesn't bubble to window.
+    window.addEventListener("scroll", record, { passive: true, capture: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", record, { capture: true });
+    };
+  }, [searchRef]);
+
+  const goToPage = (p) => {
+    setPage(Math.min(Math.max(1, p), totalPages));
+    requestAnimationFrame(() => resultsTopRef.current?.scrollIntoView({ block: "start" }));
   };
 
-  const handleDeleteFilter = async (id) => {
-    try {
-      await fetch(`${API_BASE}/api/saved-filters/${id}`, { method: 'DELETE' });
-      setSavedFilters(prev => prev.filter(f => f.id !== id));
-    } catch (err) { console.error('Delete filter error:', err); }
-  };
+  /* ---------------- assistant ---------------- */
 
-  const handleLoadFilter = (preset) => {
-    if (preset.inventory_mode && preset.inventory_mode !== inventoryMode) {
-      setInventoryMode(preset.inventory_mode);
-      if (preset.inventory_mode !== 'gemstones') setPriceMode('neto');
-      setColumnConfig(getColumnConfig(user?.id || 'default', preset.inventory_mode));
-    }
-    setFilters(preset.filters || defaultFilters);
-    setCurrentPage(1);
-  };
-
-  useEffect(() => {
-    setCurrentPage(1);
-    setSelectedStone(null);
-  }, [filters, smartSearch]);
-
-  const modeFilteredStones = useMemo(() => {
-    if (inventoryMode === 'jewelry') {
-      if (jewelrySourceFilter === 'workshop') return jewelryItems.filter((j) => j.source === 'workshop');
-      if (jewelrySourceFilter === 'catalog')  return jewelryItems.filter((j) => j.source === 'catalog');
-      return jewelryItems;
-    }
-    return stones.filter(stone => {
-      const mapped = getMappedCategories(stone.category);
-      if (inventoryMode === 'diamonds') {
-        return mapped.includes('Diamond');
-      }
-      return !mapped.includes('Diamond');
-    });
-  }, [stones, jewelryItems, inventoryMode, jewelrySourceFilter]);
-
-  /* The SKU box accepts a list separated however the rep happened to paste it.
-     Whitespace can only be trusted to separate two SKUs by checking them
-     against the ones that exist — 198 stones are named "BAG SET-0001" and the
-     like — so the parser is handed every SKU on the current tab. */
-  const skuIndex = useMemo(
-    () => buildSkuIndex((inventoryMode === 'jewelry' ? jewelryItems : stones).map((s) => s.sku)),
-    [inventoryMode, stones, jewelryItems]
-  );
-
-  const skuQuery = useMemo(
-    () => parseSkuQuery(filters.sku, skuIndex),
-    [filters.sku, skuIndex]
-  );
-
-  const diamondCount = useMemo(() => stones.filter(s => getMappedCategories(s.category).includes('Diamond')).length, [stones]);
-  const gemstoneCount = useMemo(() => stones.filter(s => !getMappedCategories(s.category).includes('Diamond')).length, [stones]);
-  const jewelryCount = jewelryItems.length;
-  // Per-source counts used by the jewelry source chips.
-  const jewelryWorkshopCount = useMemo(() => jewelryItems.filter((j) => j.source === 'workshop').length, [jewelryItems]);
-  const jewelryCatalogCount  = useMemo(() => jewelryItems.filter((j) => j.source === 'catalog').length,  [jewelryItems]);
-
-  const shapesOptions = useMemo(() => {
-    const set = new Set();
-    modeFilteredStones.forEach((s) => {
-      if (s.shape) {
-        getDnaShapes(s.shape).forEach(dna => set.add(dna));
-        if (EXTRA_BARAK_FILTERS.includes(s.shape)) set.add(s.shape);
-      }
-    });
-    Object.values(BARAK_DISPLAY_NAMES).forEach(dn => set.delete(dn));
-    return ["All shapes", ...Array.from(set).sort()];
-  }, [modeFilteredStones]);
-
-  const categoriesOptions = useMemo(() => {
-    const set = new Set();
-    modeFilteredStones.forEach((s) => {
-      getMappedCategories(s.category).forEach((cat) => set.add(cat));
-    });
-    set.delete('Empty');
-    return ["All categories", ...Array.from(set).sort(), "Empty"];
-  }, [modeFilteredStones]);
-
-  const ALL_GRADES = ['D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
-  const DIAMOND_COLOR_OTHER = new Set(['BR','CON','FNTY','TLB']);
-  const DIAMOND_COLOR_ALIAS = { 'COL': ['D','E','F'], 'COM': ['H','I','J'] };
-
-  const DIAMOND_FILTER_GROUPS = ['D','E','F','G','H','I','J','K','L','M','N','O-P','U-V','W-X','Y-Z','Other'];
-  const GRADE_TO_GROUP = {};
-  'DEFGHIJKLMN'.split('').forEach(g => { GRADE_TO_GROUP[g] = g; });
-  ['O','P'].forEach(g => { GRADE_TO_GROUP[g] = 'O-P'; });
-  ['U','V'].forEach(g => { GRADE_TO_GROUP[g] = 'U-V'; });
-  ['W','X'].forEach(g => { GRADE_TO_GROUP[g] = 'W-X'; });
-  ['Y','Z'].forEach(g => { GRADE_TO_GROUP[g] = 'Y-Z'; });
-  ['Q','R','S','T'].forEach(g => { GRADE_TO_GROUP[g] = 'Other'; });
-
-  const getDiamondColorGroups = (color) => {
-    if (!color) return [];
-    const raw = color.trim().toUpperCase();
-    if (DIAMOND_COLOR_OTHER.has(raw)) return ['Other'];
-    const alias = DIAMOND_COLOR_ALIAS[raw];
-    if (alias) return alias;
-    const mainPart = raw.split(/[\s,]+/)[0].replace(/[+-]$/, '');
-    const rangeMatch = mainPart.match(/^([A-Z])-([A-Z])$/);
-    if (rangeMatch) {
-      const start = ALL_GRADES.indexOf(rangeMatch[1]);
-      const end = ALL_GRADES.indexOf(rangeMatch[2]);
-      if (start !== -1 && end !== -1 && start <= end) {
-        const groups = new Set();
-        ALL_GRADES.slice(start, end + 1).forEach(g => groups.add(GRADE_TO_GROUP[g] || 'Other'));
-        return Array.from(groups);
-      }
-    }
-    if (mainPart.length === 1 && GRADE_TO_GROUP[mainPart]) {
-      return [GRADE_TO_GROUP[mainPart]];
-    }
-    return ['Other'];
-  };
-
-  const isDiamondColorStone = (mapped) => (mapped.includes('Diamond') || mapped.includes('Emerald')) && !mapped.includes('Fancy');
-
-  const diamondColorOptions = useMemo(() => {
-    const set = new Set();
-    modeFilteredStones.forEach((s) => {
-      const mapped = getMappedCategories(s.category);
-      if (isDiamondColorStone(mapped) && s.color) {
-        getDiamondColorGroups(s.color).forEach(g => set.add(g));
-      }
-    });
-    return ["All colors", ...DIAMOND_FILTER_GROUPS.filter(g => set.has(g))];
-  }, [modeFilteredStones]);
-
-  const getBaseFancyColor = (fancyColorStr) => {
-    if (!fancyColorStr) return '';
-    const words = fancyColorStr.trim().split(/\s+/);
-    const base = words[words.length - 1];
-    if (base === 'Vivid') return 'Other';
-    return base;
-  };
-
-  const fancyColorOptions = useMemo(() => {
-    const set = new Set();
-    modeFilteredStones.forEach((s) => {
-      const mapped = getMappedCategories(s.category);
-      if (!isDiamondColorStone(mapped)) {
-        const fc = [s.fancyIntensity, s.fancyColor].filter(Boolean).join(' ');
-        const base = getBaseFancyColor(fc);
-        if (base) set.add(base);
-      }
-    });
-    const sorted = Array.from(set).sort((a, b) => {
-      if (a === 'Other') return 1;
-      if (b === 'Other') return -1;
-      return a.localeCompare(b);
-    });
-    return ["All colors", ...sorted];
-  }, [modeFilteredStones]);
-
-  // Lab options — we always include the canonical industry labs so the
-  // filter is useful even before data finishes loading (and so a stone
-  // with a brand-new cert lab still gets that option in the list). Any
-  // additional labs actually present in the user's inventory are merged
-  // in so custom / regional houses also show up. Case-normalised upper,
-  // sorted A→Z.
-  const labOptions = useMemo(() => {
-    const set = new Set([
-      'GIA', 'GRS', 'SSEF', 'GUBELIN', 'CDC', 'AIGS', 'AGL', 'GIT', 'LOTUS', 'CGL', 'IGI',
-    ]);
-    modeFilteredStones.forEach((s) => {
-      const lab = (s.lab || '').trim();
-      if (lab && lab.toUpperCase() !== 'N/A') set.add(lab.toUpperCase());
-    });
-    return Array.from(set).sort();
-  }, [modeFilteredStones]);
-
-  const parsedSearch = useMemo(() => parseSmartSearch(smartSearch), [smartSearch]);
-
-  const jewelryTypeOptions = useMemo(() => {
-    if (inventoryMode !== 'jewelry') return [];
-    const set = new Set();
-    jewelryItems.forEach(j => { if (j.jewelryType) set.add(j.jewelryType); });
-    return ['All types', ...Array.from(set).sort()];
-  }, [jewelryItems, inventoryMode]);
-
-  const jewelryStyleOptions = useMemo(() => {
-    if (inventoryMode !== 'jewelry') return [];
-    const set = new Set();
-    jewelryItems.forEach(j => { if (j.style) set.add(j.style); });
-    return ['All styles', ...Array.from(set).sort()];
-  }, [jewelryItems, inventoryMode]);
-
-  const jewelryCollectionOptions = useMemo(() => {
-    if (inventoryMode !== 'jewelry') return [];
-    const set = new Set();
-    jewelryItems.forEach(j => { if (j.collection) set.add(j.collection); });
-    return ['All collections', ...Array.from(set).sort()];
-  }, [jewelryItems, inventoryMode]);
-
-  const jewelryStoneTypeOptions = useMemo(() => {
-    if (inventoryMode !== 'jewelry') return [];
-    const set = new Set();
-    jewelryItems.forEach(j => { if (j.stoneType) set.add(j.stoneType.trim()); });
-    return ['All stones', ...Array.from(set).sort()];
-  }, [jewelryItems, inventoryMode]);
-
-  const jewelryMetalTypeOptions = useMemo(() => {
-    if (inventoryMode !== 'jewelry') return [];
-    const set = new Set();
-    jewelryItems.forEach(j => { if (j.metalType) set.add(j.metalType); });
-    return ['All metals', ...Array.from(set).sort()];
-  }, [jewelryItems, inventoryMode]);
-
-  /* Vocabulary handed to the AI assistant. It is deliberately built from the
-   * same option lists the dropdowns use, so the model can only pick values
-   * that would actually match something. Location, treatment and grouping are
-   * read straight off the loaded stones rather than a static list — that way
-   * a viewer whose location is masked simply gets no branch to filter by. */
   const assistantVocabulary = useMemo(() => {
-    const distinct = (getValue) => {
-      const set = new Set();
-      modeFilteredStones.forEach((s) => {
-        const v = String(getValue(s) ?? '').trim();
-        if (v) set.add(v);
-      });
-      return Array.from(set).sort();
-    };
-    const withoutPlaceholder = (list) => (list || []).filter((v) => !/^All /.test(v));
-
-    if (inventoryMode === 'jewelry') {
+    if (mode === "jewelry") {
       return {
-        category: withoutPlaceholder(jewelryTypeOptions),
-        shape: withoutPlaceholder(jewelryStyleOptions),
-        treatment: withoutPlaceholder(jewelryCollectionOptions),
-        diamondColor: withoutPlaceholder(jewelryStoneTypeOptions),
-        fancyColor: withoutPlaceholder(jewelryMetalTypeOptions),
+        category: options.jewelry.type,
+        shape: options.jewelry.style,
+        treatment: options.jewelry.collection,
+        diamondColor: options.jewelry.stoneType,
+        fancyColor: options.jewelry.metal,
       };
     }
-
     return {
-      shape: withoutPlaceholder(shapesOptions),
-      category: withoutPlaceholder(categoriesOptions),
-      diamondColor: withoutPlaceholder(diamondColorOptions),
-      fancyColor: withoutPlaceholder(fancyColorOptions),
-      lab: labOptions,
-      treatment: distinct((s) => s.treatment),
-      location: distinct((s) => s.location),
-      groupingType: distinct((s) => s.groupingType),
+      shape: options.shapes.all,
+      category: options.categories,
+      diamondColor: options.diamondColors,
+      fancyColor: options.fancyColors,
+      lab: options.labs,
+      treatment: distinctValues(modeItems, (s) => s.treatment),
+      location: distinctValues(modeItems, (s) => s.location),
+      groupingType: distinctValues(modeItems, (s) => s.groupingType),
       tag: tags.map((t) => t.name),
     };
-  }, [
-    inventoryMode, modeFilteredStones, tags,
-    shapesOptions, categoriesOptions, diamondColorOptions, fancyColorOptions, labOptions,
-    jewelryTypeOptions, jewelryStyleOptions, jewelryCollectionOptions,
-    jewelryStoneTypeOptions, jewelryMetalTypeOptions,
-  ]);
+  }, [mode, options, modeItems, tags]);
 
-  /* Pages the assistant may send this user to. Built from their own section
-   * permissions so it can never route someone into a section the nav itself
-   * would hide from them. */
   const assistantNavTargets = useMemo(() => {
     const targets = [];
-    if (team.can('dashboard')) targets.push({ path: '/dashboard', label: 'Dashboard overview' });
-    if (team.can('sales')) {
+    if (team.can("dashboard")) targets.push({ path: "/dashboard", label: "Dashboard overview" });
+    if (team.can("sales")) {
       targets.push(
-        { path: '/sales/diamonds', label: 'Sales catalog — diamonds' },
-        { path: '/sales/gemstones', label: 'Sales catalog — coloured gemstones' },
-        { path: '/sales/emeralds', label: 'Sales catalog — emeralds' },
-        { path: '/sales/jewelry', label: 'Sales catalog — jewellery' },
+        { path: "/sales/diamonds", label: "Sales catalog — diamonds" },
+        { path: "/sales/gemstones", label: "Sales catalog — coloured gemstones" },
+        { path: "/sales/emeralds", label: "Sales catalog — emeralds" },
+        { path: "/sales/jewelry", label: "Sales catalog — jewellery" }
       );
     }
     return targets;
   }, [team]);
 
-  /* Merge rather than replace: a follow-up like "and only GIA" should narrow
-   * the current view instead of wiping the filters the user set by hand.
-   * Changing tab goes through handleModeSwitch, which also resets the price
-   * mode and column config — the queued filter update below then lands on the
-   * defaults it just set. */
-  const handleAssistantApply = (incoming, suggestedMode, sort) => {
+  const handleAssistantApply = (incoming, suggestedMode, nextSort) => {
     if (suggestedMode) handleModeSwitch(suggestedMode);
     setFilters((prev) => ({ ...prev, ...incoming }));
-    if (sort?.field) setSortConfig({ field: sort.field, direction: sort.direction });
-    setCurrentPage(1);
+    if (nextSort?.field) setSortRaw({ field: nextSort.field, direction: nextSort.direction });
+  };
+  const handleAssistantRemoveFilter = useCallback(
+    (key) => setFilters((prev) => ({ ...prev, [key]: Array.isArray(prev[key]) ? [] : "" })),
+    [setFilters]
+  );
+
+  /* ---------------- render ---------------- */
+
+  const noun = NOUNS[mode];
+  const loadingFirst = !ready;
+  const showError = mode !== "jewelry" && stonesError && !stonesReady;
+  const refreshing = ready && mode !== "jewelry" && stonesLoading;
+  const selectedCarats = selectedItems.reduce((sum, s) => sum + (Number(s.weightCt) || 0), 0);
+
+  const countText = loadingFirst ? (
+    "Loading…"
+  ) : pairView ? (
+    <>
+      <b>{pairs.length.toLocaleString()}</b> pairs · {sorted.length.toLocaleString()} stones
+    </>
+  ) : total === modeItems.length ? (
+    <>
+      <b>{total.toLocaleString()}</b> {noun}
+    </>
+  ) : (
+    <>
+      <b>{total.toLocaleString()}</b> of {modeItems.length.toLocaleString()} {noun}
+    </>
+  );
+
+  const views = pairOnly ? ["pairs", "list"] : ["list", "gallery"];
+  const view = pairOnly ? pairLayout : layout;
+  const onView = (v) => {
+    if (pairOnly) setPairLayout(v);
+    else {
+      setLayout(v);
+      try {
+        localStorage.setItem(LAYOUT_KEY, v);
+      } catch {
+        /* ignore */
+      }
+    }
   };
 
-  const handleAssistantRemoveFilter = useCallback((key) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: Array.isArray(prev[key]) ? [] : '',
-    }));
-    setCurrentPage(1);
-  }, []);
+  const filterPanel = (
+    <FilterPanel
+      key={mode}
+      mode={mode}
+      filters={filters}
+      onFiltersChange={setFilters}
+      smartSearch={smartSearch}
+      onSmartSearchChange={setSmartSearch}
+      parsedSearch={parsedSearch}
+      options={options}
+      tags={tags}
+      onManageTags={() => setTagsOpen(true)}
+      priceMode={priceMode}
+      saved={savedFilters}
+      onLoadSaved={loadSaved}
+      onDeleteSaved={deleteSaved}
+      onSaveCurrent={saveCurrent}
+      canSave={Boolean(user?.id)}
+      team={team}
+      assignee={assignee}
+      onAssigneeChange={setAssignee}
+      jewelrySource={jewelrySource}
+      onJewelrySourceChange={setJewelrySource}
+      jewelryCounts={jewelryCounts}
+    />
+  );
 
-  const filteredStones = useMemo(() => {
-    if (inventoryMode === 'jewelry') {
-      return modeFilteredStones.filter((item) => {
-        if (skuQuery.terms.length > 0) {
-          const itemSku = canonicalSku(item.sku);
-          const itemTitle = canonicalSku(item.title);
-          if (!skuQuery.terms.some(q => itemSku.includes(q) || itemTitle.includes(q))) return false;
-        }
-        if (filters.minPrice && item.priceTotal < Number(filters.minPrice)) return false;
-        if (filters.maxPrice && item.priceTotal > Number(filters.maxPrice)) return false;
-        if (filters.minCarat && item.weightCt < Number(filters.minCarat)) return false;
-        if (filters.maxCarat && item.weightCt > Number(filters.maxCarat)) return false;
-        if (filters.category.length > 0 && !filters.category.includes(item.jewelryType)) return false;
-        if (filters.shape.length > 0 && !filters.shape.includes(item.style)) return false;
-        if (filters.treatment.length > 0 && !filters.treatment.includes(item.collection)) return false;
-        if (filters.diamondColor.length > 0 && !filters.diamondColor.includes((item.stoneType || '').trim())) return false;
-        if (filters.fancyColor.length > 0 && !filters.fancyColor.includes(item.metalType)) return false;
-        if (smartSearch) {
-          const q = smartSearch.toLowerCase();
-          const searchable = [item.sku, item.title, item.jewelryType, item.style, item.collection, item.stoneType, item.metalType, item.description].join(' ').toLowerCase();
-          if (!searchable.includes(q)) return false;
-        }
-        return true;
-      });
-    }
-
-    // Helper to parse measurements string like "11.92-7.85-5.60" into { length, width, depth }
-    const parseMeasurements = (measurements) => {
-      if (!measurements) return { length: null, width: null, depth: null };
-      const parts = measurements.split('-').map(p => parseFloat(p.trim()));
-      return {
-        length: parts[0] && !isNaN(parts[0]) ? parts[0] : null,
-        width: parts[1] && !isNaN(parts[1]) ? parts[1] : null,
-        depth: parts[2] && !isNaN(parts[2]) ? parts[2] : null,
+  const selectAllProps = pairView
+    ? {
+        checked: allPairsSelected,
+        indeterminate: false,
+        onChange: toggleAllPairs,
+        disabled: !pairs.length,
+        label: allPairsSelected ? "Deselect all pairs" : `Select all ${pairs.length} pairs`,
+      }
+    : {
+        checked: allVisibleSelected,
+        indeterminate: someVisibleSelected,
+        onChange: toggleAll,
+        disabled: !sorted.length,
+        label: allVisibleSelected ? "Deselect all" : `Select all ${sorted.length.toLocaleString()} results`,
       };
+
+  const renderResults = () => {
+    if (showError) {
+      return <ErrorState message={stonesError} onRetry={() => setReloadKey((k) => k + 1)} retrying={stonesLoading} />;
+    }
+    if (loadingFirst) {
+      return (
+        <div className="inv-panel">
+          <SkeletonRows rows={isPhone ? 7 : 10} />
+        </div>
+      );
+    }
+    if (total === 0) {
+      const emptyInventory = modeItems.length === 0 && !chips.length && !filters.sku;
+      return (
+        <>
+          <EmptyState
+            noun={noun}
+            chips={chips}
+            onRemoveChip={removeChip}
+            onClearFilters={clearAll}
+            search={filters.sku}
+            onClearSearch={() => setFilters((f) => ({ ...f, sku: "" }))}
+            emptyInventory={emptyInventory}
+          />
+          {emptyInventory && mode === "jewelry" && (
+            <p className="inv-notice">
+              No jewelry items yet. Import a WooCommerce catalog CSV from the{" "}
+              <Link to="/dashboard?tab=jewelry">Jewelry dashboard</Link>.
+            </p>
+          )}
+        </>
+      );
+    }
+    const common = {
+      selectedIds: selected,
+      activeId,
+      priceMode,
+      onToggle: toggleOne,
+      onOpen: openItem,
     };
+    if (pairView) {
+      return <PairResults pairs={pageItems} selectedIds={selected} priceMode={priceMode} onTogglePair={togglePair} onOpen={openItem} />;
+    }
+    if (view === "gallery") return <ResultsGallery items={pageItems} {...common} />;
+    if (compactRows) {
+      return (
+        <div className="inv-panel">
+          <ResultsList items={pageItems} {...common} statusMap={statusMap} stoneTags={stoneTags} onAssign={handleAssign} assigningSku={assigningSku} />
+        </div>
+      );
+    }
+    return (
+      <div className="inv-panel">
+        <ResultsTable
+          items={pageItems}
+          {...common}
+          columns={visibleColumns}
+          colMeta={colMeta}
+          sortConfig={sort}
+          onSortField={handleSortField}
+          statusMap={statusMap}
+          stoneTags={stoneTags}
+          onVideo={(v) => setLightbox({ image: null, video: v })}
+          onWhatsApp={shareToWhatsApp}
+          onAssign={handleAssign}
+          assigningSku={assigningSku}
+          selectAll={<SelectAll {...selectAllProps} />}
+        />
+      </div>
+    );
+  };
 
-    return modeFilteredStones.filter((stone) => {
-      if (skuQuery.terms.length > 0) {
-        // Matching stays exact per SKU — a rep pasting a list wants those
-        // stones, not everything whose SKU contains them.
-        const stoneSku = canonicalSku(stone.sku);
-        if (!skuQuery.terms.some(term => stoneSku === term)) return false;
-      }
-      const priceScale = inventoryPriceScale(stone, priceMode);
-      const effectiveTotal = stone.priceTotal != null ? stone.priceTotal * priceScale : stone.priceTotal;
-      const effectivePPC = stone.pricePerCt != null ? stone.pricePerCt * priceScale : stone.pricePerCt;
-      if (filters.minPrice && effectiveTotal != null && effectiveTotal < Number(filters.minPrice)) return false;
-      if (filters.maxPrice && effectiveTotal != null && effectiveTotal > Number(filters.maxPrice)) return false;
-      if (filters.minPricePerCt && effectivePPC != null && effectivePPC < Number(filters.minPricePerCt)) return false;
-      if (filters.maxPricePerCt && effectivePPC != null && effectivePPC > Number(filters.maxPricePerCt)) return false;
-      if (filters.minCarat && stone.weightCt != null && stone.weightCt < Number(filters.minCarat)) return false;
-      if (filters.maxCarat && stone.weightCt != null && stone.weightCt > Number(filters.maxCarat)) return false;
-      
-      // Measurements filter (length and width)
-      const dims = parseMeasurements(stone.measurements);
-      if (filters.minLength && dims.length != null && dims.length < Number(filters.minLength)) return false;
-      if (filters.maxLength && dims.length != null && dims.length > Number(filters.maxLength)) return false;
-      if (filters.minWidth && dims.width != null && dims.width < Number(filters.minWidth)) return false;
-      if (filters.maxWidth && dims.width != null && dims.width > Number(filters.maxWidth)) return false;
-      
-      if (filters.shape.length > 0 && !filters.shape.includes(stone.shape) && !getDnaShapes(stone.shape).some(dna => filters.shape.includes(dna))) return false;
-      if (filters.treatment.length > 0 && !filters.treatment.some(t => stone.treatment?.toLowerCase() === t.toLowerCase())) return false;
-      if (filters.category.length > 0 && !filters.category.some(c => getMappedCategories(stone.category).includes(c))) return false;
-      if (filters.location.length > 0 && !filters.location.includes(stone.location)) return false;
-      // Lab cert filter — case-insensitive equality. Treats blank/"N/A"
-      // labs as non-matching so picking "GIA" never includes a stone
-      // with no certificate. Default to [] so a stale saved-filter
-      // preset without `lab` doesn't blow up.
-      const labFilterValues = filters.lab || [];
-      if (labFilterValues.length > 0) {
-        const stoneLab = (stone.lab || '').trim().toUpperCase();
-        if (!stoneLab || stoneLab === 'N/A') return false;
-        if (!labFilterValues.some(l => stoneLab === String(l).toUpperCase())) return false;
-      }
-
-      // Grouping type filter
-      if (filters.groupingType.length > 0) {
-        const matchesAny = filters.groupingType.some(gt => {
-          if (gt === "Empty") return !stone.groupingType;
-          return stone.groupingType?.toLowerCase() === gt.toLowerCase();
-        });
-        if (!matchesAny) return false;
-      }
-
-      // Color filters (diamond and fancy work independently)
-      const hasDiamondFilter = filters.diamondColor.length > 0;
-      const hasFancyFilter = filters.fancyColor.length > 0;
-      if (hasDiamondFilter || hasFancyFilter) {
-        const mapped = getMappedCategories(stone.category);
-        const isDiamond = isDiamondColorStone(mapped);
-        if (isDiamond) {
-          if (hasDiamondFilter && !getDiamondColorGroups(stone.color).some(g => filters.diamondColor.includes(g))) return false;
-          if (!hasDiamondFilter && hasFancyFilter) return false;
-        } else {
-          if (hasFancyFilter) {
-            const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
-            if (!filters.fancyColor.includes(getBaseFancyColor(fc))) return false;
-          }
-          if (!hasFancyFilter && hasDiamondFilter) return false;
-        }
-      }
-
-      // Box filter (free text, includes match)
-      if (filters.box && !(stone.box || '').toLowerCase().includes(filters.box.toLowerCase())) return false;
-
-      // Tag filter
-      if (filters.tag.length > 0) {
-        const stoneTagList = stoneTags[stone.sku] || [];
-        if (!filters.tag.some(tagName => stoneTagList.some(t => t.name === tagName))) return false;
-      }
-
-      // Smart search filter
-      const ss = parsedSearch;
-      const hasSmartSearch = ss.shapes.length > 0 || ss.weight || ss.weightRange || ss.clarities.length > 0 ||
-        ss.colors.length > 0 || ss.categories.length > 0 || ss.treatments.length > 0 ||
-        ss.locations.length > 0 || ss.labs.length > 0 || ss.origins.length > 0 ||
-        ss.skus.length > 0 || ss.fancyColors.length > 0 || ss.groupingTypes.length > 0 ||
-        ss.pricePerCt;
-
-      if (hasSmartSearch) {
-        if (ss.skus.length > 0) {
-          const sku = (stone.sku || '').toUpperCase();
-          if (!ss.skus.some(s => sku === s)) return false;
-        }
-        if (ss.shapes.length > 0) {
-          const stoneShapes = getDnaShapes(stone.shape).map(s => s.toUpperCase());
-          if (!ss.shapes.some(s => stoneShapes.includes(s.toUpperCase()))) return false;
-        }
-        if (ss.categories.length > 0) {
-          const mapped = getMappedCategories(stone.category);
-          if (!ss.categories.some(c => mapped.some(m => m.toUpperCase() === c.toUpperCase()))) return false;
-        }
-        if (ss.weightRange) {
-          const w = stone.weightCt;
-          if (w == null || w < ss.weightRange.min || w > ss.weightRange.max) return false;
-        } else if (ss.weight) {
-          const tolerance = ss.weight * 0.15;
-          const w = stone.weightCt;
-          if (w == null || w < ss.weight - tolerance || w > ss.weight + tolerance) return false;
-        }
-        if (ss.pricePerCt) {
-          const ppc = stone.pricePerCt != null ? stone.pricePerCt * inventoryPriceScale(stone, priceMode) : stone.pricePerCt;
-          if (ppc == null || ppc < ss.pricePerCt.min || ppc > ss.pricePerCt.max) return false;
-        }
-        if (ss.clarities.length > 0) {
-          const stoneClarity = (stone.clarity || '').toUpperCase().replace(/\s+/g, '');
-          if (!ss.clarities.some(c => stoneClarity === c || stoneClarity.startsWith(c))) return false;
-        }
-        if (ss.treatments.length > 0) {
-          if (!ss.treatments.some(t => (stone.treatment || '').toLowerCase() === t.toLowerCase())) return false;
-        }
-        if (ss.locations.length > 0) {
-          if (!ss.locations.some(l => (stone.location || '').toLowerCase() === l.toLowerCase())) return false;
-        }
-        if (ss.labs.length > 0) {
-          if (!ss.labs.some(l => (stone.lab || '').toUpperCase() === l.toUpperCase())) return false;
-        }
-        if (ss.origins.length > 0) {
-          if (!ss.origins.some(o => (stone.origin || '').toLowerCase().includes(o.toLowerCase()))) return false;
-        }
-        if (ss.groupingTypes.length > 0) {
-          if (!ss.groupingTypes.some(gt => (stone.groupingType || '').toLowerCase() === gt.toLowerCase())) return false;
-        }
-        if (ss.colors.length > 0) {
-          const groups = getDiamondColorGroups(stone.color);
-          if (!ss.colors.some(c => groups.includes(c))) return false;
-        }
-        if (ss.fancyColors.length > 0) {
-          const fc = [stone.fancyIntensity, stone.fancyColor].filter(Boolean).join(' ');
-          const base = getBaseFancyColor(fc);
-          if (!ss.fancyColors.some(c => c.toUpperCase() === (base || '').toUpperCase())) return false;
-        }
-      }
-      
-      return true;
-    });
-  }, [filters, skuQuery, modeFilteredStones, stoneTags, parsedSearch, priceMode, inventoryMode, smartSearch]);
-
-  const sortedStones = useMemo(() => {
-    const sorted = [...filteredStones];
-    const { field, direction } = sortConfig;
-    const dir = direction === "desc" ? -1 : 1;
-    const isDefaultSort = field === 'sku' && direction === 'asc';
-    sorted.sort((a, b) => {
-      const aIsSelected = selectedStones.has(a.id) ? 1 : 0;
-      const bIsSelected = selectedStones.has(b.id) ? 1 : 0;
-      if (aIsSelected !== bIsSelected) return bIsSelected - aIsSelected;
-
-      if (isDefaultSort) {
-        const aIsEmerald = a.shape?.toUpperCase() === "EM" || a.shape?.toLowerCase().includes("emerald") ? 1 : 0;
-        const bIsEmerald = b.shape?.toUpperCase() === "EM" || b.shape?.toLowerCase().includes("emerald") ? 1 : 0;
-        if (aIsEmerald !== bIsEmerald) return bIsEmerald - aIsEmerald;
-
-        const aHasImage = a.imageUrl ? 1 : 0;
-        const bHasImage = b.imageUrl ? 1 : 0;
-        if (aHasImage !== bHasImage) return bHasImage - aHasImage;
-      }
-
-      const aVal = a[field];
-      const bVal = b[field];
-      if (typeof aVal === "number" && typeof bVal === "number") return (aVal - bVal) * dir;
-      return String(aVal || "").localeCompare(String(bVal || "")) * dir;
-    });
-    return sorted;
-  }, [filteredStones, sortConfig, selectedStones]);
-
-  // Group stones into pairs when pair filter is active
-  const pairedGroups = useMemo(() => {
-    if (!filters.groupingType.includes("Pair") || filters.groupingType.length !== 1) return null;
-    
-    const allStones = sortedStones;
-    const skuMap = {};
-    // Build a lookup of all stones (including non-filtered) to find pair partners
-    stones.forEach(s => { skuMap[s.sku] = s; });
-    
-    const visited = new Set();
-    const groups = [];
-    
-    allStones.forEach(stone => {
-      if (visited.has(stone.sku)) return;
-      visited.add(stone.sku);
-      
-      if (stone.pairSku) {
-        visited.add(stone.pairSku);
-        const partner = skuMap[stone.pairSku] || null;
-        groups.push({ stoneA: stone, stoneB: partner });
-      }
-    });
-    
-    return groups;
-  }, [sortedStones, stones, filters.groupingType]);
-
-  const isPairGrouping = filters.groupingType.length === 1 && filters.groupingType.includes("Pair");
-  const isPairView = isPairGrouping && pairViewMode === "cards" && pairedGroups;
-  const totalItems = isPairView ? pairedGroups.length : sortedStones.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedStones = sortedStones.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  const paginatedPairs = isPairView ? pairedGroups.slice(startIndex, startIndex + ITEMS_PER_PAGE) : [];
+  const rootClass = [
+    "inv",
+    cart?.count > 0 ? "inv--cart-fab" : "",
+    panelOpen ? "inv--ql-open" : "",
+    selected.size > 0 ? "inv--has-sel" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const showRail = railVisible && !panelOpen;
+  const tableHasSelectAll = !pairView && view === "list" && !compactRows && ready && total > 0;
 
   return (
-    <>
-      <LoadingBar active={initialLoading} progress={progress} />
-      <div className="min-h-screen py-8 px-2 sm:px-4 lg:px-6">
-        <div className="max-w-[1600px] mx-auto">
-          {/* Header */}
-          <div className="mb-6">
-            {/* Title Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-stone-800 mb-1">
-                  {inventoryMode === 'diamonds' ? 'Diamond Inventory' : inventoryMode === 'gemstones' ? 'Gemstone Inventory' : 'Jewelry Inventory'}
-                </h1>
-                <p className="text-stone-500 text-sm sm:text-base">
-                  {loading ? 'Loading...' : isPairGrouping ? `${sortedStones.length.toLocaleString()} stones (${pairedGroups?.length || 0} pairs)` : `${totalItems.toLocaleString()} stones available`}
-                </p>
-              </div>
-              
-              {/* View Mode Toggle + Scan - Always visible */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowScanner(true)}
-                  className="flex items-center justify-center gap-2 p-2.5 sm:px-4 sm:py-2.5 bg-stone-800 hover:bg-stone-700 text-white font-medium rounded-xl shadow-lg transition-all"
-                  title="Scan barcode"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                  </svg>
-                  <span className="hidden sm:inline">Scan</span>
-                </button>
-                
-                <div className="flex items-center gap-1 p-1 rounded-xl bg-stone-100">
-                  <button
-                    onClick={() => setViewMode("table")}
-                    className={`p-2 rounded-lg transition-all ${viewMode === "table" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`p-2 rounded-lg transition-all ${viewMode === "grid" ? "bg-white shadow-md text-primary-600" : "text-stone-500 hover:text-stone-700"}`}
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                    </svg>
-                  </button>
-                </div>
+    <div className={rootClass} ref={rootRef}>
+      <div className="inv-page">
+        <InventoryHeader
+          mode={mode}
+          counts={counts}
+          countsReady={{ diamonds: stonesReady, gemstones: stonesReady, jewelry: jewelryReady }}
+          onModeChange={handleModeSwitch}
+          onScan={() => setScannerOpen(true)}
+          priceMode={priceMode}
+          onTogglePriceMode={togglePriceMode}
+        />
 
-                {inventoryMode === 'gemstones' && (
-                <button
-                  onClick={togglePriceMode}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${priceMode === 'neto' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}
-                >
-                  {priceMode === 'neto' ? 'Neto' : 'B'}
-                </button>
+        <SearchField
+          value={filters.sku}
+          onChange={(v) => setFilters((f) => ({ ...f, sku: v }))}
+          skuQuery={skuQuery}
+          placeholder={
+            mode === "jewelry" ? "Search model numbers" : isPhone ? "Search SKUs" : "Search SKUs — paste several to find them all"
+          }
+        >
+          {!railVisible && (
+            <button
+              type="button"
+              className="inv-btn inv-search-filters"
+              onClick={() => setFiltersOpen(true)}
+              aria-label={chips.length ? `Filters, ${chips.length} active` : "Filters"}
+            >
+              <SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
+              {!isPhone && <span>Filters</span>}
+              {chips.length > 0 && <span className="inv-badge">{chips.length}</span>}
+            </button>
+          )}
+        </SearchField>
+
+        <div className={showRail ? "inv-body inv-body--rail" : "inv-body"}>
+          {showRail && (
+            <aside className="inv-rail" aria-label="Filters">
+              <div className="inv-rail-head">
+                <span className="inv-rail-title">Filters</span>
+                {chips.length > 0 && (
+                  <button type="button" className="inv-btn inv-btn--plain inv-btn--sm" onClick={clearAll}>
+                    Clear all
+                  </button>
                 )}
               </div>
-            </div>
+              {filterPanel}
+            </aside>
+          )}
 
-            {/* Inventory Mode Tabs */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              <button
-                onClick={() => handleModeSwitch('diamonds')}
-                className={`px-5 py-2.5 rounded-xl text-base font-semibold transition-all flex items-center gap-2 border ${
-                  inventoryMode === 'diamonds'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
-                }`}
-              >
-                Diamonds
-                {!loading && <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'diamonds' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{diamondCount.toLocaleString()}</span>}
-              </button>
-              <button
-                onClick={() => handleModeSwitch('gemstones')}
-                className={`px-5 py-2.5 rounded-xl text-base font-semibold transition-all flex items-center gap-2 border ${
-                  inventoryMode === 'gemstones'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
-                }`}
-              >
-                Gemstones
-                {!loading && <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'gemstones' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{gemstoneCount.toLocaleString()}</span>}
-              </button>
-              <button
-                onClick={() => handleModeSwitch('jewelry')}
-                className={`px-5 py-2.5 rounded-xl text-base font-semibold transition-all flex items-center gap-2 border ${
-                  inventoryMode === 'jewelry'
-                    ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
-                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
-                }`}
-              >
-                Jewelry
-                <span className={`text-xs tabular-nums px-2 py-0.5 rounded-full font-medium ${inventoryMode === 'jewelry' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'}`}>{jewelryCount.toLocaleString()}</span>
-              </button>
-            </div>
-            
-            {/* Action Buttons - Shows when stones are selected */}
-            <div ref={exportButtonRef}>
-              {selectedStones.size > 0 && (() => {
-                // Calculate category breakdown
-                const selectedStonesArray = allItems.filter(s => selectedStones.has(s.id));
-                const categoryBreakdown = selectedStonesArray.reduce((acc, stone) => {
-                  const cats = getMappedCategories(stone.category);
-                  cats.forEach((cat) => { acc[cat] = (acc[cat] || 0) + 1; });
-                  return acc;
-                }, {});
-                const categories = Object.entries(categoryBreakdown);
-                const totalWeight = selectedStonesArray.reduce((sum, s) => sum + (s.weightCt || 0), 0);
-                
-                return (
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl border" style={{ backgroundColor: '#2FAB8115', borderColor: '#2FAB8140' }}>
-                  {/* Top/Left - Selection info and Actions button on mobile */}
-                  <div className="flex items-center justify-between gap-2 w-full sm:w-auto">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium" style={{ color: '#2FAB81' }}>
-                        {selectedStones.size} selected
-                      </span>
-                      <span className="text-xs" style={{ color: '#2FAB81CC' }}>
-                        ({totalWeight.toFixed(2)} cts)
-                      </span>
-                      {/* Category badges - hidden on very small screens */}
-                      <div className="hidden xs:flex flex-wrap gap-1">
-                        {categories.slice(0, 2).map(([cat, count]) => (
-                          <span 
-                            key={cat}
-                            className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                              cat === 'Emerald'
-                                ? 'bg-green-100 text-green-700' 
-                                : cat === 'Diamond'
-                                ? 'bg-blue-100 text-blue-700'
-                                : cat === 'Ruby'
-                                ? 'bg-red-100 text-red-700'
-                                : cat === 'Sapphire'
-                                ? 'bg-indigo-100 text-indigo-700'
-                                : 'bg-stone-100 text-stone-700'
-                            }`}
-                          >
-                            {cat}: {count}
-                          </span>
-                        ))}
-                        {categories.length > 2 && (
-                          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-stone-100 text-stone-700">
-                            +{categories.length - 2}
-                          </span>
-                        )}
-                      </div>
-                      {selectedStones.size >= 2 && selectedStones.size <= 3 && (
-                        <button
-                          onClick={() => setShowCompare(true)}
-                          className="px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors flex items-center gap-1"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                          Compare
-                        </button>
-                      )}
-                      <button
-                        onClick={clearSelection}
-                        className="px-2 py-1 text-xs text-stone-600 hover:text-stone-800 hover:bg-white rounded-lg transition-colors"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  
-                  {/* Actions Dropdown - visible on mobile in this row */}
-                    <div className="relative group sm:hidden">
-                      <button
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900 text-white text-sm font-medium rounded-lg shadow-md transition-all"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                        </svg>
-                        Actions
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      
-                      {/* Mobile Dropdown Menu — opens downward with internal
-                          scroll so it never overflows the iPhone viewport.
-                          (Earlier `bottom-full` upward layout clipped the
-                          first item once we added the 7th entry.) */}
-                      <div className="absolute right-0 top-full mt-2 w-56 max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200">
-                        <button
-                          onClick={handleExportClick}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          </div>
-                          <span className="font-medium">Excel</span>
-                        </button>
-                        <button
-                          onClick={() => setShowPDFPriceModal(true)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <span className="font-medium">PDF</span>
-                        </button>
-                        <button
-                          onClick={() => { setNiimbotPrintStones([]); setShowNiimbotPrint(true); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                            </svg>
-                          </div>
-                          <span className="font-medium">Print Labels</span>
-                        </button>
-                        {/* Excel for Niimbot — fallback when Bluetooth pairing
-                            isn't available (e.g. iOS, locked-down corp laptop)
-                            or when the user wants to keep a paper trail. The
-                            xlsx is shaped for the official NIIMBOT app. */}
-                        <button
-                          onClick={() => exportForLabels(allItems.filter(s => selectedStones.has(s.id)), false)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          </div>
-                          <span className="font-medium">Niimbot Excel</span>
-                        </button>
-                        <button
-                          onClick={() => setShowSendToCrm(true)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-amber-50 transition-colors border-t border-stone-100"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          </div>
-                          <span className="font-medium">Send to CRM</span>
-                        </button>
-                        <button
-                          onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors border-t border-stone-100"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                              <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.29-.175-2.868.852.852-2.868-.175-.29A8 8 0 1112 20z"/>
-                            </svg>
-                          </div>
-                          <span className="font-medium">WhatsApp DNA</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Desktop Actions Dropdown - hidden on mobile */}
-                  <div className="relative group hidden sm:block">
-                    <button
-                      className="flex items-center justify-center gap-2 px-5 py-2.5 sm:px-6 sm:py-2.5 bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900 text-white text-sm font-medium rounded-lg shadow-md transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                      </svg>
-                      Actions
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    
-                    {/* Actions Dropdown Menu — capped height + scroll so a
-                        short laptop window doesn't clip CRM / labels rows. */}
-                    <div className="absolute right-0 mt-2 w-56 max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 border border-stone-200">
-                      {/* Export Section */}
-                      <div className="px-3 py-2 bg-stone-50 border-b border-stone-200">
-                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Export</span>
-                      </div>
-                      
-                      <button
-                        onClick={handleExportClick}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Export to Excel</span>
-                          <p className="text-xs text-stone-500">Spreadsheet with all details</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (selectedStones.size === 0) {
-                            alert("Please select at least one stone to export.");
-                            return;
-                          }
-                          setShowInternalExcelModal(true);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-slate-50 transition-colors border-t border-stone-100"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h10" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Excel (Internal)</span>
-                          <p className="text-xs text-stone-500">Pick columns · no branding</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => setShowPDFPriceModal(true)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Generate PDF Catalog</span>
-                          <p className="text-xs text-stone-500">Professional catalog with images</p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={handleCatalogLiran}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-teal-50 transition-colors border-t border-stone-100"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Catalog (Liran)</span>
-                          <p className="text-xs text-stone-500">ESHED cover &middot; 4&times;3 worksheet grid</p>
-                        </div>
-                      </button>
-                      
-                      {/* Labels Section */}
-                      <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
-                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Labels</span>
-                      </div>
-                      
-                      <button
-                        onClick={() => { setNiimbotPrintStones([]); setShowNiimbotPrint(true); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Print Labels</span>
-                          <p className="text-xs text-stone-500">Print via Bluetooth (NIIMBOT)</p>
-                        </div>
-                      </button>
-
-                      {/* Excel for Niimbot — fallback when Bluetooth pairing
-                          isn't available (e.g. iOS, locked-down corp laptop)
-                          or when the user wants to keep a paper trail. The
-                          xlsx is shaped for the official NIIMBOT app. */}
-                      <button
-                        onClick={() => exportForLabels(allItems.filter(s => selectedStones.has(s.id)), false)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Niimbot Excel</span>
-                          <p className="text-xs text-stone-500">Excel export for NIIMBOT app</p>
-                        </div>
-                      </button>
-
-                      {/* CRM Section */}
-                      <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
-                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">CRM</span>
-                      </div>
-
-                      <button
-                        onClick={() => setShowSendToCrm(true)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-amber-50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">Send to CRM</span>
-                          <p className="text-xs text-stone-500">Add to a deal or contact</p>
-                        </div>
-                      </button>
-
-                      {/* Share Section */}
-                      <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
-                        <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Share</span>
-                      </div>
-                      
-                      <button
-                        onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                            <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.29-.175-2.868.852.852-2.868-.175-.29A8 8 0 1112 20z"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium">WhatsApp DNA Links</span>
-                          <p className="text-xs text-stone-500">Send DNA links via WhatsApp</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* Primary search — by SKU. This is the box people reach for first, so
-              it owns the prominent top slot. The natural-language "smart search"
-              now lives inside the Filters panel (advanced). Accepts one SKU or
-              a list separated by spaces, commas, tabs or newlines — see
-              utils/skuQuery for why a space alone can't be trusted to split
-              one SKU from the next. Matching is exact per SKU. */}
-          <div className="mb-4">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                value={filters.sku}
-                onChange={(e) => setFilters((f) => ({ ...f, sku: e.target.value }))}
-                placeholder="Search by SKU… e.g. T9548 or M1413  (paste a list — spaces, commas or lines)"
-                className="w-full pl-9 pr-9 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-200 focus:border-stone-300 transition-all"
+          <div className="inv-main">
+            <ActiveFilters chips={chips} onRemove={removeChip} onClearAll={clearAll} />
+            <div ref={resultsTopRef} className="inv-results-anchor" />
+            <Toolbar
+              selectAll={tableHasSelectAll || !ready || total === 0 ? null : selectAllProps}
+              count={countText}
+              refreshing={refreshing}
+              sortOptions={sortOptionsFor(mode)}
+              sortConfig={sort}
+              sortLabel={describeSort(mode, sort, sortLabels)}
+              onSort={(o) => setSort({ field: o.field, direction: o.direction })}
+              views={views}
+              view={view}
+              onView={onView}
+              onColumns={!compactRows && view === "list" && !pairView ? () => setColumnsOpen(true) : null}
+              onFilters={isDesktop && !panelOpen ? () => {
+                const next = !railPref;
+                setRailPref(next);
+                try {
+                  localStorage.setItem(RAIL_KEY, next ? "open" : "closed");
+                } catch {
+                  /* ignore */
+                }
+              } : null}
+              filtersActive={isDesktop ? railPref : undefined}
+              filterCount={isDesktop && !railPref ? chips.length : 0}
+              filtersIcon={railPref ? PanelLeftClose : PanelLeftOpen}
+              compact={isPhone}
+            />
+            <div className={`inv-results${refreshing ? " inv-dim" : ""}`}>{renderResults()}</div>
+            {ready && !showError && (
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                start={total ? start + 1 : 0}
+                end={Math.min(start + ITEMS_PER_PAGE, total)}
+                total={total}
+                noun={pairView ? "pairs" : noun}
+                onPage={goToPage}
               />
-              {filters.sku && (
-                <button
-                  onClick={() => setFilters((f) => ({ ...f, sku: "" }))}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+            )}
+            {stonesError && stonesReady && mode !== "jewelry" && (
+              <p className="inv-notice" role="status">
+                Couldn’t refresh — showing the last loaded list.{" "}
+                <button type="button" className="inv-btn inv-btn--plain inv-btn--sm" onClick={() => setReloadKey((k) => k + 1)}>
+                  Try again
                 </button>
-              )}
-            </div>
-            {skuQuery.terms.length > 1 && (
-              /* Says how the list was read, so a rep who pasted eight SKUs and
-                 got six rows can see whether two were dropped as unknown or
-                 two of the eight were simply the same stone twice. */
-              <p className="text-[11px] text-emerald-600 mt-1.5">
-                Searching {skuQuery.terms.length} SKUs
-                {skuQuery.unknown.length > 0 && (
-                  <span className="text-amber-600">
-                    {" "}· {skuQuery.unknown.length} not in this tab:{" "}
-                    {skuQuery.unknown.slice(0, 3).join(", ").toUpperCase()}
-                    {skuQuery.unknown.length > 3 ? "…" : ""}
-                  </span>
-                )}
               </p>
             )}
           </div>
-
-          {/* Jewelry info bar */}
-          {inventoryMode === 'jewelry' && jewelryLoading && (
-            <div className="mb-4 flex items-center gap-2 text-sm text-stone-500">
-              <svg className="animate-spin h-4 w-4 text-stone-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              Loading jewelry...
-            </div>
-          )}
-          {inventoryMode === 'jewelry' && !jewelryLoading && jewelryItems.length === 0 && (
-            <div className="mb-4 p-4 rounded-lg bg-stone-50 border border-stone-200 text-sm text-stone-600">
-              No jewelry items yet. Import a WooCommerce catalog CSV from the{" "}
-              <Link to="/dashboard?tab=jewelry" className="font-semibold underline">Jewelry dashboard</Link>.
-            </div>
-          )}
-
-          {/* Sales-rep scope filter (only renders if the workspace has more
-              than one team member). Wraps the existing StoneFilters so reps
-              can flip between "All / Mine / Unassigned / specific rep". */}
-          {team?.ready && (team.members || []).length > 1 && (
-            <div className="mb-3 flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] uppercase tracking-wider font-semibold text-stone-500">
-                Show:
-              </span>
-              <AssigneeFilter value={assigneeFilter} onChange={setAssigneeFilter} />
-              {assigneeFilter !== "all" && (
-                <button
-                  type="button"
-                  onClick={() => setAssigneeFilter("all")}
-                  className="text-[11px] text-stone-500 underline hover:text-stone-700"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Filters */}
-          {inventoryMode === 'jewelry' ? (
-            jewelryItems.length > 0 && (
-              <>
-                {/* Source filter chips. Workshop = jewelry_items table
-                    (your own production board pieces), Catalog =
-                    jewelry_products table (WooCommerce CSV import). */}
-                <div className="mb-3 flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] uppercase tracking-wider font-semibold text-stone-500">
-                    Source:
-                  </span>
-                  {[
-                    { id: 'all',      label: 'All',      count: jewelryCount },
-                    { id: 'workshop', label: 'Workshop', count: jewelryWorkshopCount },
-                    { id: 'catalog',  label: 'Catalog',  count: jewelryCatalogCount  },
-                  ].map((opt) => {
-                    const active = jewelrySourceFilter === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setJewelrySourceFilter(opt.id)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-                          active
-                            ? 'bg-slate-900 text-white border-slate-900'
-                            : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
-                        }`}
-                      >
-                        {opt.label}
-                        <span className={`tabular-nums text-[10px] px-1.5 py-0.5 rounded-full ${
-                          active ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-500'
-                        }`}>
-                          {opt.count.toLocaleString()}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <JewelryFilters
-                  filters={filters}
-                  onChange={setFilters}
-                  jewelryTypeOptions={jewelryTypeOptions}
-                  jewelryStyleOptions={jewelryStyleOptions}
-                  jewelryCollectionOptions={jewelryCollectionOptions}
-                  jewelryStoneTypeOptions={jewelryStoneTypeOptions}
-                  jewelryMetalTypeOptions={jewelryMetalTypeOptions}
-                />
-              </>
-            )
-          ) : (
-          <StoneFilters
-            filters={filters}
-            onChange={setFilters}
-            shapesOptions={shapesOptions}
-            categoriesOptions={categoriesOptions}
-            diamondColorOptions={diamondColorOptions}
-            fancyColorOptions={fancyColorOptions}
-            labOptions={labOptions}
-            tags={tags}
-            onManageTags={() => setShowTagsModal(true)}
-            inventoryMode={inventoryMode}
-            priceMode={priceMode}
-            smartSearch={smartSearch}
-            onSmartSearchChange={setSmartSearch}
-            parsedSearch={parsedSearch}
-          />
-          )}
-
-          {/* Saved Filters Bar */}
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            {savedFilters.map(preset => (
-              <div key={preset.id} className="group flex items-center gap-1 px-3 py-1.5 rounded-full glass-surface hover:bg-app-surface/80 transition-all cursor-pointer">
-                <button
-                  onClick={() => handleLoadFilter(preset)}
-                  className="text-xs font-medium text-stone-700 group-hover:text-primary-700 transition-colors"
-                >
-                  {preset.name}
-                </button>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                  preset.inventory_mode === 'diamonds' ? 'bg-blue-100 text-blue-600' :
-                  preset.inventory_mode === 'gemstones' ? 'bg-emerald-100 text-emerald-600' :
-                  'bg-pink-100 text-pink-600'
-                }`}>
-                  {preset.inventory_mode === 'diamonds' ? 'D' : preset.inventory_mode === 'gemstones' ? 'G' : 'J'}
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDeleteFilter(preset.id); }}
-                  className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded-full hover:bg-red-100 text-stone-400 hover:text-red-500 transition-all"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => { setSaveFilterName(''); setShowSaveFilter(true); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-stone-300 text-xs font-medium text-stone-500 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50/50 transition-all"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Save current filters
-            </button>
-          </div>
-
-          {/* Save Filter Dialog */}
-          {showSaveFilter && (
-            <div className="mb-3 flex items-center gap-2 p-3 rounded-xl border border-primary-200 bg-primary-50/30">
-              <input
-                type="text"
-                value={saveFilterName}
-                onChange={(e) => setSaveFilterName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveFilter(); }}
-                placeholder="Filter name (e.g. Emeralds > 5ct)"
-                className="flex-1 h-8 px-3 text-sm rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
-                autoFocus
-              />
-              <button
-                onClick={handleSaveFilter}
-                disabled={!saveFilterName.trim()}
-                className="h-8 px-4 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 rounded-lg transition-colors"
-              >
-                Save
-              </button>
-              <button
-                onClick={() => setShowSaveFilter(false)}
-                className="h-8 px-3 text-xs font-medium text-stone-500 hover:text-stone-700 rounded-lg hover:bg-white transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {/* Pair View Mode Toggle */}
-          {isPairGrouping && (
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex items-center gap-1 p-1 rounded-xl bg-emerald-50 border border-emerald-200">
-                <button
-                  onClick={() => setPairViewMode("cards")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${pairViewMode === "cards" ? "bg-white shadow-md text-emerald-700" : "text-emerald-500 hover:text-emerald-700"}`}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                  Pairs
-                </button>
-                <button
-                  onClick={() => setPairViewMode("table")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${pairViewMode === "table" ? "bg-white shadow-md text-emerald-700" : "text-emerald-500 hover:text-emerald-700"}`}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                  </svg>
-                  Table
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Content */}
-          {isPairView ? (
-            /* Pair View - always show as cards */
-            <>
-            {/* Select All Pairs Bar */}
-            <div className="flex items-center gap-3 mb-3">
-              <button
-                onClick={() => {
-                  const scrollY = window.scrollY;
-                  const allPairIds = (pairedGroups || []).flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]);
-                  const allSelected = allPairIds.length > 0 && allPairIds.every(id => selectedStones.has(id));
-                  setSelectedStones(prev => {
-                    const newSet = new Set(prev);
-                    if (allSelected) {
-                      allPairIds.forEach(id => newSet.delete(id));
-                    } else {
-                      allPairIds.forEach(id => newSet.add(id));
-                    }
-                    return newSet;
-                  });
-                  requestAnimationFrame(() => window.scrollTo(0, scrollY));
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  readOnly
-                  checked={(pairedGroups || []).length > 0 && (pairedGroups || []).flatMap(pair => [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])]).every(id => selectedStones.has(id))}
-                  className="w-3.5 h-3.5 rounded border-emerald-300 text-emerald-500 pointer-events-none"
-                />
-                Select All Pairs
-              </button>
-              {selectedStones.size > 0 && isPairView && (
-                <span className="text-xs text-stone-500">
-                  {Math.ceil(selectedStones.size / 2)} pair{Math.ceil(selectedStones.size / 2) !== 1 ? 's' : ''} selected ({selectedStones.size} stones)
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-              {loading ? (
-                [...Array(4)].map((_, i) => (
-                  <div key={i} className="rounded-2xl border border-emerald-100 p-4 animate-pulse">
-                    <div className="h-8 bg-emerald-100 rounded-xl mb-4"></div>
-                    <div className="flex gap-4">
-                      <div className="flex-1 space-y-3">
-                        <div className="aspect-square rounded-xl bg-stone-200"></div>
-                        <div className="h-4 bg-stone-200 rounded w-1/2"></div>
-                      </div>
-                      <div className="flex-1 space-y-3">
-                        <div className="aspect-square rounded-xl bg-stone-200"></div>
-                        <div className="h-4 bg-stone-200 rounded w-1/2"></div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : error ? (
-                <div className="col-span-full text-center py-12 text-red-500">{error}</div>
-              ) : paginatedPairs.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-stone-500">No pairs found</div>
-              ) : (
-                paginatedPairs.map((pair, idx) => {
-                  const pairIds = [pair.stoneA.id, ...(pair.stoneB ? [pair.stoneB.id] : [])];
-                  const isPairSelected = pairIds.every(id => selectedStones.has(id));
-                  return (
-                    <PairCard
-                      key={pair.stoneA.sku + '-' + (pair.stoneB?.sku || 'missing')}
-                      stoneA={pair.stoneA}
-                      stoneB={pair.stoneB}
-                      onViewDNA={setDrawerStone}
-                      stoneTags={stoneTags}
-                      isSelected={isPairSelected}
-                      onToggleSelection={() => {
-                        const scrollY = window.scrollY;
-                        setSelectedStones(prev => {
-                          const newSet = new Set(prev);
-                          if (isPairSelected) {
-                            pairIds.forEach(id => newSet.delete(id));
-                          } else {
-                            pairIds.forEach(id => newSet.add(id));
-                          }
-                          return newSet;
-                        });
-                        requestAnimationFrame(() => window.scrollTo(0, scrollY));
-                      }}
-                      onImageClick={setLightboxImage}
-                      priceMode={priceMode}
-                    />
-                  );
-                })
-              )}
-            </div>
-            </>
-          ) : viewMode === "table" ? (
-            <StonesTable
-              stones={paginatedStones}
-              onToggle={(stone) => setSelectedStone(selectedStone?.id === stone.id ? null : stone)}
-              selectedStone={selectedStone}
-              loading={loading}
-              error={error}
-              sortConfig={sortConfig}
-              onSort={handleSort}
-              selectedStones={selectedStones}
-              onToggleSelection={toggleStoneSelection}
-              onToggleSelectAll={toggleSelectAll}
-              allSelected={sortedStones.length > 0 && sortedStones.every((s) => selectedStones.has(s.id))}
-              stoneTags={stoneTags}
-              allTags={tags}
-              onAddTag={addTagToStone}
-              onRemoveTag={removeTagFromStone}
-              onManageTags={() => setShowTagsModal(true)}
-              onViewDNA={setDrawerStone}
-              onImageClick={setLightboxImage}
-              onVideoClick={setLightboxVideo}
-              columnConfig={columnConfig}
-              onColumnConfigChange={handleColumnConfigChange}
-              priceMode={priceMode}
-              stoneStatusMap={stoneStatusMap}
-              activeDefaultColumns={inventoryMode === 'diamonds' ? DIAMOND_DEFAULT_COLUMNS : inventoryMode === 'gemstones' ? GEMSTONE_DEFAULT_COLUMNS : JEWELRY_DEFAULT_COLUMNS}
-              onAssign={handleAssignStone}
-              assigningSku={assigningStoneSku}
-            />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-              {loading ? (
-                [...Array(6)].map((_, i) => (
-                  <div key={i} className="glass rounded-2xl border border-white/50 p-4 animate-pulse">
-                    <div className="flex gap-4">
-                      <div className="w-20 h-20 rounded-xl bg-stone-200"></div>
-                      <div className="flex-1 space-y-3">
-                        <div className="h-4 bg-stone-200 rounded w-1/2"></div>
-                        <div className="h-5 bg-stone-200 rounded w-3/4"></div>
-                        <div className="h-3 bg-stone-200 rounded w-1/3"></div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : error ? (
-                <div className="col-span-full text-center py-12 text-red-500">{error}</div>
-              ) : paginatedStones.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-stone-500">No stones found</div>
-              ) : (
-                paginatedStones.map((stone) => (
-                  <StoneCard
-                    key={stone.id}
-                    stone={stone}
-                    onToggle={(s) => setSelectedStone(selectedStone?.id === s.id ? null : s)}
-                    isExpanded={selectedStone?.id === stone.id}
-                    isSelected={selectedStones.has(stone.id)}
-                    onToggleSelection={toggleStoneSelection}
-                    stoneTags={stoneTags[stone.sku] || []}
-                    allTags={tags}
-                    onAddTag={addTagToStone}
-                    onRemoveTag={removeTagFromStone}
-                    onManageTags={() => setShowTagsModal(true)}
-                    onViewDNA={setDrawerStone}
-                    onImageClick={setLightboxImage}
-                    priceMode={priceMode}
-                    onAssign={handleAssignStone}
-                    assigningSku={assigningStoneSku}
-                  />
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {!loading && !error && totalItems > 0 && (
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-sm text-stone-500">
-                Showing {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, totalItems)} of {totalItems.toLocaleString()}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 rounded-xl border border-stone-200 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="px-4 py-2 text-sm text-stone-600">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 rounded-xl border border-stone-200 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Natural-language filtering. Shares the bottom-right corner with the
-          export FAB and steps up out of its way when it appears. */}
+      <SelectionBar
+        count={selected.size}
+        caratText={selectedCarats > 0 ? `${selectedCarats.toFixed(2)} ct` : ""}
+        pairsText={pairView ? `${Math.ceil(selected.size / 2)} pair${Math.ceil(selected.size / 2) === 1 ? "" : "s"}` : ""}
+        canCompare={selected.size >= 2 && selected.size <= 3}
+        onCompare={() => setCompareOpen(true)}
+        onClear={() => setSelected(new Set())}
+        actions={selectionActions}
+        sheet={isPhone}
+      />
+
+      {!railVisible && (
+        <Sheet
+          open={filtersOpen}
+          variant={isPhone ? "bottom" : "side"}
+          tall={isPhone}
+          onClose={() => setFiltersOpen(false)}
+          title="Filters"
+          titleId="inv-filters-title"
+          closeLabel="Close filters"
+          headerExtra={
+            chips.length > 0 ? (
+              <button type="button" className="inv-btn inv-btn--plain inv-btn--sm" onClick={clearAll}>
+                Clear all
+              </button>
+            ) : null
+          }
+          footer={
+            <button type="button" className="inv-btn inv-btn--primary" onClick={() => setFiltersOpen(false)}>
+              {loadingFirst ? "Done" : `Show ${total.toLocaleString()} ${pairView ? "pairs" : noun}`}
+            </button>
+          }
+        >
+          {chips.length > 0 && <ActiveFilters className="inv-active--sheet" chips={chips} onRemove={removeChip} />}
+          {filterPanel}
+        </Sheet>
+      )}
+
+      <QuickLook
+        item={activeItem}
+        variant={quickLookVariant}
+        onClose={closeQuickLook}
+        index={activeIndex}
+        total={stepList.length}
+        onStep={stepQuickLook}
+        priceMode={priceMode}
+        status={activeItem?.sku ? statusMap[activeItem.sku] : null}
+        allTags={tags}
+        itemTags={activeItem?.sku ? stoneTags[activeItem.sku] : null}
+        onToggleTag={toggleStoneTag}
+        onManageTags={() => setTagsOpen(true)}
+        onAssign={handleAssign}
+        assigning={assigningSku === activeItem?.sku}
+        onOpenDna={openDna}
+        onPrintLabel={(item) => {
+          setNiimbotStones([item]);
+          setNiimbotOpen(true);
+        }}
+        onImage={(src) => setLightbox({ image: src, video: null })}
+      />
+
+      <Lightbox image={lightbox.image} video={lightbox.video} onClose={() => setLightbox({ image: null, video: null })} />
+
       <AssistantChat
-        inventoryMode={inventoryMode}
+        inventoryMode={mode}
         vocabulary={assistantVocabulary}
         navTargets={assistantNavTargets}
         filters={filters}
-        results={sortedStones}
+        results={sorted}
         priceMode={priceMode}
         onApply={handleAssistantApply}
         onRemoveFilter={handleAssistantRemoveFilter}
         onNavigate={(path) => navigate(path)}
-        onOpenStone={(item) => setDrawerStone(item)}
-        liftAboveFab={showFloatingExport}
+        onOpenStone={openItem}
+        liftAboveFab={selected.size > 0}
       />
 
-      {/* Floating Actions Button.
-          On mobile, push above the MobileDock (h-14 ≈ 56px + iOS safe-area)
-          so the FAB never hides behind the bottom nav. On md+ the dock
-          isn't rendered, so we keep the original bottom-6 position. */}
-      <AnimatePresence>
-        {showFloatingExport && (
-          <motion.div
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 100 }}
-            className="fixed right-6 z-40 bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6"
-          >
-            <div className="relative group">
-              <button
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-stone-700 to-stone-800 hover:from-stone-800 hover:to-stone-900 text-white font-medium rounded-2xl shadow-2xl shadow-stone-500/30 transition-all hover:scale-105"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                </svg>
-                <span>Actions ({selectedStones.size})</span>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-              </button>
-              
-              {/* Floating Actions Dropdown — appears above the FAB. We keep
-                  the upward direction (no room below — FAB lives at
-                  bottom-right of the viewport) but cap the height + allow
-                  scroll so the menu never punches above the status bar on
-                  small screens. */}
-              <div className="absolute bottom-full right-0 mb-2 w-56 max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all border border-stone-200">
-                {/* Export Section */}
-                <div className="px-3 py-2 bg-stone-50 border-b border-stone-200">
-                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Export</span>
-                </div>
-                
-                <button
-                  onClick={handleExportClick}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-emerald-50 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-medium">Export to Excel</span>
-                    <p className="text-xs text-stone-500">Spreadsheet with all details</p>
-                  </div>
-                </button>
+      <BarcodeScanner isOpen={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
 
-                <button
-                  onClick={() => {
-                    if (selectedStones.size === 0) {
-                      alert("Please select at least one stone to export.");
-                      return;
-                    }
-                    setShowInternalExcelModal(true);
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-slate-50 transition-colors border-t border-stone-100"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h10" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-medium">Excel (Internal)</span>
-                    <p className="text-xs text-stone-500">Pick columns · no branding</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setShowPDFPriceModal(true)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-red-50 transition-colors border-t border-stone-100"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-medium">Generate PDF Catalog</span>
-                    <p className="text-xs text-stone-500">Professional catalog with images</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={handleCatalogLiran}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-teal-50 transition-colors border-t border-stone-100"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-medium">Catalog (Liran)</span>
-                    <p className="text-xs text-stone-500">ESHED cover &middot; 4&times;3 worksheet grid</p>
-                  </div>
-                </button>
-                
-                {/* Labels Section */}
-                <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
-                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Labels</span>
-                </div>
-                
-                <button
-                  onClick={() => { setNiimbotPrintStones([]); setShowNiimbotPrint(true); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-medium">Print Labels</span>
-                    <p className="text-xs text-stone-500">Print via Bluetooth (NIIMBOT)</p>
-                  </div>
-                </button>
-
-                {/* Excel for Niimbot — fallback when Bluetooth pairing
-                    isn't available (e.g. iOS, locked-down corp laptop)
-                    or when the user wants to keep a paper trail. The
-                    xlsx is shaped for the official NIIMBOT app. */}
-                <button
-                  onClick={() => exportForLabels(allItems.filter(s => selectedStones.has(s.id)), false)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-purple-50 transition-colors border-t border-stone-100"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-medium">Niimbot Excel</span>
-                    <p className="text-xs text-stone-500">Excel export for NIIMBOT app</p>
-                  </div>
-                </button>
-
-                {/* Share Section */}
-                <div className="px-3 py-2 bg-stone-50 border-t border-b border-stone-200">
-                  <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Share</span>
-                </div>
-                
-                <button
-                  onClick={() => shareMultipleToWhatsApp(allItems.filter(s => selectedStones.has(s.id)))}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-stone-700 hover:bg-green-50 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                      <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.29-.175-2.868.852.852-2.868-.175-.29A8 8 0 1112 20z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="font-medium">WhatsApp DNA Links</span>
-                    <p className="text-xs text-stone-500">Send DNA links via WhatsApp</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Internal Excel — per-type column picker for back-office exports.
-          Counts feed the modal so empty tabs are disabled and the right
-          starting tab is auto-selected. */}
-      <InternalExcelModal
-        isOpen={showInternalExcelModal}
-        onClose={() => setShowInternalExcelModal(false)}
-        counts={(() => {
-          const sel = applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)));
-          const c = { diamond: 0, gemstone: 0, jewelry: 0 };
-          sel.forEach((it) => {
-            if ((it?.category || "").toLowerCase() === "jewelry" || it?.jewelryType) {
-              c.jewelry += 1;
-            } else if (getMappedCategories(it?.category).includes("Diamond")) {
-              c.diamond += 1;
-            } else {
-              c.gemstone += 1;
-            }
-          });
-          return c;
-        })()}
-        onExport={(selections) =>
-          exportToInternalExcel(
-            selections,
-            applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))
-          )
-        }
+      <ColumnSettingsModal
+        isOpen={columnsOpen}
+        onClose={() => setColumnsOpen(false)}
+        columnConfig={columnConfig}
+        onSave={handleColumnSave}
+        activeDefaultColumns={columnDefs}
       />
 
-      {/* Export Modal */}
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => {
-          setShowExportModal(false);
-          setExportMode('combined'); // Reset to default
-        }}
-        selectedStones={applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))}
-        priceMode={priceMode}
-        onExport={(modifiedStones, options = {}) => {
-          if (exportMode === 'separate') {
-            exportToExcelSeparate(modifiedStones, options);
-          } else {
-            exportToExcel(modifiedStones, options);
-          }
-        }}
-      />
-
-      {/* Category Export Choice Modal */}
-      <CategoryExportModal
-        isOpen={showCategoryExportModal}
-        onClose={() => setShowCategoryExportModal(false)}
-        categories={getCategoryBreakdown(applyPriceMode(allItems.filter((s) => selectedStones.has(s.id))))}
-        onChoose={handleCategoryExportChoice}
-      />
-
-      {/* Barcode Scanner Modal */}
-      <BarcodeScanner
-        isOpen={showScanner}
-        onClose={() => setShowScanner(false)}
-        onScan={handleBarcodeScan}
-      />
-
-      {/* Tags Management Modal */}
       <TagsModal
-        isOpen={showTagsModal}
-        onClose={() => setShowTagsModal(false)}
+        isOpen={tagsOpen}
+        onClose={() => setTagsOpen(false)}
         tags={tags}
         onCreateTag={createTag}
         onDeleteTag={deleteTag}
         onUpdateTag={updateTag}
       />
 
-      {/* PDF Price Adjustment Modal (Step 1) */}
+      <CompareModal isOpen={compareOpen} onClose={() => setCompareOpen(false)} stones={applyPriceMode(selectedItems)} />
+
+      <InternalExcelModal
+        isOpen={internalOpen}
+        onClose={() => setInternalOpen(false)}
+        counts={internalCounts}
+        onExport={(selections) => exportToInternalExcel(selections, applyPriceMode(selectedItems))}
+      />
+
       <ExportModal
-        isOpen={showPDFPriceModal}
-        onClose={() => setShowPDFPriceModal(false)}
-        selectedStones={applyPriceMode(allItems.filter((s) => selectedStones.has(s.id)))}
+        isOpen={exportOpen}
+        onClose={() => {
+          setExportOpen(false);
+          setExportMode("combined");
+        }}
+        selectedStones={applyPriceMode(selectedItems)}
         priceMode={priceMode}
-        onExport={(modifiedStones) => {
-          setPdfStonesWithPrices(modifiedStones);
-          setShowPDFPriceModal(false);
-          setShowPDFModal(true);
+        onExport={(modified, opts = {}) => {
+          if (exportMode === "separate") exportToExcelSeparate(modified, opts, user);
+          else exportToExcel(modified, opts, user);
+        }}
+      />
+
+      <CategoryExportModal
+        isOpen={categoryChoiceOpen}
+        onClose={() => setCategoryChoiceOpen(false)}
+        categories={getCategoryBreakdown(applyPriceMode(selectedItems))}
+        onChoose={(choice) => {
+          setCategoryChoiceOpen(false);
+          setExportMode(choice === "separate" ? "separate" : "combined");
+          setExportOpen(true);
+        }}
+      />
+
+      <ExportModal
+        isOpen={pdfPriceOpen}
+        onClose={() => setPdfPriceOpen(false)}
+        selectedStones={applyPriceMode(selectedItems)}
+        priceMode={priceMode}
+        onExport={(modified) => {
+          setPdfStones(modified);
+          setPdfPriceOpen(false);
+          setPdfOpen(true);
         }}
         title="Adjust Prices for PDF"
         subtitle="Modify prices before generating the catalog"
@@ -8924,170 +1503,53 @@ const StoneSearchPage = () => {
         showHidePricesOption={false}
       />
 
-      {/* PDF Options Modal (Step 2) */}
       <PDFOptionsModal
-        isOpen={showPDFModal}
+        isOpen={pdfOpen}
         onClose={() => {
-          setShowPDFModal(false);
-          setPdfStonesWithPrices([]);
+          setPdfOpen(false);
+          setPdfStones([]);
         }}
-        stoneCount={pdfStonesWithPrices.length || selectedStones.size}
+        stoneCount={pdfStones.length || selected.size}
         isGenerating={pdfGenerating}
-        onGenerate={async (options) => {
+        onGenerate={async (opts) => {
           setPdfGenerating(true);
           try {
-            const stonesToUse = pdfStonesWithPrices.length > 0 
-              ? pdfStonesWithPrices 
-              : applyPriceMode(allItems.filter(s => selectedStones.has(s.id)));
+            const stonesToUse = pdfStones.length > 0 ? pdfStones : applyPriceMode(selectedItems);
             await generatePDFCatalog(stonesToUse, {
-              ...options,
+              ...opts,
               userLocation: user?.publicMetadata?.location,
               userEmail: user?.primaryEmailAddress?.emailAddress,
             });
-            setShowPDFModal(false);
-            setPdfStonesWithPrices([]);
+            setPdfOpen(false);
+            setPdfStones([]);
           } catch (err) {
-            console.error('PDF generation failed:', err);
-            alert('Failed to generate PDF. Please try again.');
+            console.error("PDF generation failed:", err);
+            toast.error("Failed to generate PDF. Please try again.");
           } finally {
             setPdfGenerating(false);
           }
         }}
       />
 
-      {/* Catalog (Liran) — order + website text dialog */}
       <CatalogLiranModal
-        isOpen={!!catalogLiranStones}
-        stones={catalogLiranStones || []}
-        onClose={() => setCatalogLiranStones(null)}
-        isGenerating={catalogLiranGenerating}
-        onGenerate={handleCatalogLiranGenerate}
+        isOpen={Boolean(liranStones)}
+        stones={liranStones || []}
+        onClose={() => setLiranStones(null)}
+        isGenerating={liranGenerating}
+        onGenerate={handleLiranGenerate}
       />
 
-      {/* DNA Drawer */}
-      <DNADrawer
-        isOpen={!!drawerStone}
-        onClose={() => setDrawerStone(null)}
-        stone={drawerStone}
-        priceMode={priceMode}
-        onPrintLabel={(stone) => {
-          setNiimbotPrintStones([stone]);
-          setShowNiimbotPrint(true);
-        }}
-      />
-
-      {/* NIIMBOT Print Dialog */}
       <NiimbotPrintDialog
-        isOpen={showNiimbotPrint}
-        onClose={() => { setShowNiimbotPrint(false); setNiimbotPrintStones([]); }}
-        stones={niimbotPrintStones.length > 0 ? niimbotPrintStones : allItems.filter(s => selectedStones.has(s.id))}
+        isOpen={niimbotOpen}
+        onClose={() => {
+          setNiimbotOpen(false);
+          setNiimbotStones([]);
+        }}
+        stones={niimbotStones.length > 0 ? niimbotStones : selectedItems}
       />
 
-      {/* Send to CRM */}
-      {showSendToCrm && (
-        <SendToCrmModal
-          stones={allItems.filter(s => selectedStones.has(s.id))}
-          onClose={() => setShowSendToCrm(false)}
-        />
-      )}
-
-      {/* Scan Success Toast */}
-      <AnimatePresence>
-        {scanResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            className="fixed left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-emerald-600 text-white rounded-xl shadow-lg flex items-center gap-3 bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] md:bottom-6"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="font-medium">Added: {scanResult}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Image Lightbox */}
-      <AnimatePresence>
-        {lightboxImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setLightboxImage(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative max-w-3xl max-h-[85vh] w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <img
-                src={lightboxImage}
-                alt="Stone"
-                className="w-full h-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
-              />
-              <button
-                onClick={() => setLightboxImage(null)}
-                className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-stone-600 hover:text-stone-900 hover:scale-110 transition-all"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Video Lightbox */}
-      <AnimatePresence>
-        {lightboxVideo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setLightboxVideo(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative max-w-2xl max-h-[80vh] w-full aspect-video"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <iframe
-                src={lightboxVideo}
-                title="Stone Video"
-                className="w-full h-full rounded-lg"
-                allow="autoplay; fullscreen"
-                allowFullScreen
-              />
-              <button
-                onClick={() => setLightboxVideo(null)}
-                className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-stone-600 hover:text-stone-900 hover:scale-110 transition-all"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <CompareModal
-        isOpen={showCompare}
-        onClose={() => setShowCompare(false)}
-        stones={applyPriceMode(allItems.filter(s => selectedStones.has(s.id)))}
-      />
-    </>
+      {crmOpen && <SendToCrmModal stones={selectedItems} onClose={() => setCrmOpen(false)} />}
+    </div>
   );
 };
 
