@@ -1,12 +1,13 @@
 /* ================================================================
-   Gems DNA design tokens — shared by the DNA pages (.dna) and
-   Inventory (.inv). Values follow the apple-liquid-glass tokens;
+   Gems DNA design tokens — shared by the DNA pages (.dna),
+   Inventory (.inv) and the app shell (.gd). Values follow the apple-liquid-glass tokens;
    the accent is the Gems DNA emerald instead of the skill's blue.
    Page-specific layout values stay in each page's stylesheet.
    ================================================================ */
 
 .dna,
-.inv {
+.inv,
+.gd {
   --dna-bg: #f5f5f7;
   --dna-surface: #ffffff;
   --dna-hover: #fbfbfd;
@@ -50,7 +51,8 @@
 }
 
 [data-theme="dark"] .dna,
-[data-theme="dark"] .inv {
+[data-theme="dark"] .inv,
+[data-theme="dark"] .gd {
   --dna-bg: #000000;
   --dna-surface: #1c1c1e;
   --dna-hover: #222224;

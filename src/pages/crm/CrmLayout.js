@@ -156,7 +156,7 @@ export default function CrmLayout() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] pb-20 sm:pb-12">
+    <div className="min-h-[calc(100vh-4rem)] pb-6 sm:pb-12">
       <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         {/* Header */}
         <div className="mb-5 sm:mb-7 flex items-center justify-between gap-3">
@@ -168,10 +168,11 @@ export default function CrmLayout() {
           </div>
         </div>
 
-        {/* Desktop tabs — segmented glass control. Active gets the ink fill;
-            DNA-lead unread badge stays emerald (positive/new arrival). */}
-        <div className="hidden sm:block mb-6">
-          <nav className="inline-flex gap-1 overflow-x-auto scrollbar-hide rounded-full glass-surface px-1.5 py-1 min-w-max">
+        {/* Section tabs — segmented glass control. Active gets the ink fill;
+            DNA-lead unread badge stays emerald (positive/new arrival). Phones
+            scroll it sideways: the app tab bar owns the bottom edge. */}
+        <div className="-mx-3 mb-5 overflow-x-auto scrollbar-hide px-3 sm:mx-0 sm:mb-6 sm:px-0">
+          <nav aria-label="CRM sections" className="inline-flex gap-1 rounded-full glass-surface px-1.5 py-1 min-w-max">
             {navWithBadges.map((item) => (
               <NavLink
                 key={item.to}
@@ -200,44 +201,6 @@ export default function CrmLayout() {
         {/* Page content */}
         <Outlet key={location.pathname} />
       </div>
-
-      {/* Mobile bottom tab bar — glass-bar floating dock. Six+ items stay
-          readable because each cell is an icon + tiny label; the active
-          item gets an ink pill behind the icon. */}
-      <nav
-        className="sm:hidden fixed bottom-0 inset-x-0 z-30 glass-bar grid"
-        style={{
-          paddingBottom: "max(env(safe-area-inset-bottom), 0px)",
-          gridTemplateColumns: `repeat(${navWithBadges.length}, minmax(0, 1fr))`,
-        }}
-      >
-        {navWithBadges.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `relative flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
-                isActive ? "text-app-ink" : "text-app-soft hover:text-app-graphite"
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div className={`relative p-1 rounded-xl ${isActive ? "bg-app-ink text-app-canvas" : ""}`}>
-                  {item.icon}
-                  {item.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-brand-emerald text-white text-[9px] font-semibold">
-                      {item.badge > 9 ? "9+" : item.badge}
-                    </span>
-                  )}
-                </div>
-                <span className="truncate max-w-full">{item.label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
     </div>
   );
 }

@@ -2107,7 +2107,7 @@ const SalesInventory = ({ mode = "gemstone" }) => {
         aria-haspopup="dialog"
         aria-label="Open filters"
         onClick={() => setFiltersOpen(true)}
-        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + var(--shell-dock-h) + 14px)" }}
         className="fixed right-4 z-30 flex items-center gap-2 rounded-full bg-app-ink px-5 py-3 text-[13.5px] font-semibold text-app-canvas shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45)] transition-all duration-200 md:hidden pointer-events-auto translate-y-0 opacity-100"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

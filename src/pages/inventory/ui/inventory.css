@@ -45,10 +45,10 @@
 
 @media (max-width: 767px) {
   .inv {
-    --inv-sel-bottom: calc(env(safe-area-inset-bottom, 0px) + 86px);
+    --inv-sel-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--shell-dock-h) + 12px);
   }
   .inv.inv--cart-fab {
-    --inv-sel-bottom: calc(env(safe-area-inset-bottom, 0px) + 150px);
+    --inv-sel-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--shell-dock-h) + 76px);
   }
 }
 

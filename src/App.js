@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from "react";
+import React, { useState, useEffect, useMemo, createContext, useContext } from "react";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet } from "react-router-dom";
 import { SignedIn, SignedOut, UserButton, useAuth, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
@@ -41,9 +41,7 @@ import { MemoSkusProvider } from "./context/MemoSkusContext";
 import { SelectionProvider } from "./context/SelectionContext";
 import { sectionForPath, firstAllowedLanding } from "./utils/permissions";
 import SelectionFab from "./components/SelectionFab";
-import Sidebar from "./components/Sidebar";
-import TopBar from "./components/TopBar";
-import MobileDock from "./components/MobileDock";
+import AppShell from "./shell/AppShell";
 import ActivityTracker from "./components/ActivityTracker";
 import SessionLimitGuard from "./components/SessionLimitGuard";
 import { trackDenied } from "./utils/activityLog";
@@ -111,188 +109,14 @@ const ThemeToggle = () => {
   );
 };
 
-// ---------- Nav config (used by both Sidebar and TopBar for title) ----------
-//
-// The Sidebar renders sections (each with optional header label + colored dot).
-// The TopBar uses the flattened NAV_ITEMS list to compute the page title.
-const NAV_SECTIONS = [
-  // Top — no section header
-  {
-    items: [
-      {
-        key: "dashboard",
-        to: "/dashboard",
-        label: "Dashboard",
-        matches: (path) => path === "/dashboard",
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  // INVENTORY section — single unified hub. The Sprint 1.B merge folds the
-  // legacy /jewelry/items grid into this surface as the second tab.
-  {
-    label: "INVENTORY",
-    dot: "bg-emerald-500",
-    items: [
-      {
-        key: "inventory",
-        to: "/inventory",
-        label: "Inventory",
-        // Match any /inventory URL (with or without ?tab=) and the legacy
-        // /jewelry/items / /jewelry-items aliases (which redirect into the
-        // unified hub) so the sidebar entry stays highlighted on those URLs
-        // mid-redirect.
-        matches: (path) =>
-          path === "/inventory" ||
-          path === "/jewelry" ||
-          path === "/jewelry/" ||
-          path === "/jewelry/items" ||
-          path === "/jewelry-items",
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  // SALES section
-  {
-    label: "SALES",
-    dot: "bg-sky-500",
-    items: [
-      {
-        // /crm itself now redirects to /dashboard?tab=crm, so we send the
-        // sidebar straight into the CRM workspace (contacts list — most-used
-        // entry point).
-        key: "crm",
-        to: "/crm/contacts",
-        label: "CRM",
-        matches: (path) => path.startsWith("/crm"),
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        ),
-      },
-      {
-        key: "sales",
-        to: "/sales/diamonds",
-        label: "Sales Inventory",
-        // Highlight across the whole sales catalog (incl. the stone/selection
-        // sub-routes) — but not /offers, which is its own entry below.
-        matches: (path) => path.startsWith("/sales"),
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10" />
-          </svg>
-        ),
-        // Desktop category switcher — the mobile dock exposes these as tiles,
-        // the sidebar lists them as sub-items under Sales Inventory.
-        children: [
-          { to: "/sales/diamonds", label: "Diamonds", matches: (p) => p.startsWith("/sales/diamonds") },
-          { to: "/sales/emeralds", label: "Emeralds", matches: (p) => p.startsWith("/sales/emeralds") },
-          {
-            to: "/sales/gemstones",
-            label: "Gemstones",
-            matches: (p) => p.startsWith("/sales/gemstones") || p.startsWith("/sales/inventory"),
-          },
-          { to: "/sales/jewelry", label: "Jewelry", matches: (p) => p.startsWith("/sales/jewelry") },
-        ],
-      },
-      {
-        key: "team",
-        to: "/team",
-        label: "Team",
-        matches: (path) => path.startsWith("/team"),
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zm6 13v-2a4 4 0 00-3-3.87M2 20v-2a4 4 0 014-4h6a4 4 0 014 4v2" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  // TOOLS section — internal QA / data integrity tooling.
-  // Renamed from "QUALITY" so the "QA" namespace is free for a future
-  // production QC workflow built on top of jewelry_items.status='qc'.
-  {
-    label: "TOOLS",
-    dot: "bg-amber-500",
-    items: [
-      {
-        key: "tools",
-        to: "/qa-data",
-        label: "Data Quality",
-        matches: (path) => path === "/qa-data" || path === "/qa",
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        ),
-      },
-      {
-        key: "photos",
-        to: "/photos",
-        label: "Photo Station",
-        matches: (path) => path.startsWith("/photos"),
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        ),
-      },
-      {
-        anyOf: ["sales", "inventory"],
-        to: "/api-access",
-        label: "API Access",
-        matches: (path) => path.startsWith("/api-access"),
-        icon: (cls) => (
-          <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-        ),
-      },
-    ],
-  },
-];
-
-// Flattened list (top-level items only) for the TopBar title resolver
-const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
-
-// Roles & permissions — keep only the nav items the member is allowed to see
-// (admins pass everything via `can`). Sections with no surviving items are
-// dropped so the sidebar + mobile dock render a clean, focused nav.
-const navSectionsFor = (sections, can) =>
-  sections
-    .map((s) => ({
-      ...s,
-      items: s.items.filter((it) => (it.anyOf ? it.anyOf.some(can) : !it.key || can(it.key))),
-    }))
-    .filter((s) => s.items.length > 0);
-
 // ---------- App layout: sidebar + topbar + content (for protected app pages) ----------
 const AppLayout = () => {
-  const { theme } = useTheme();
   const team = useTeam();
   const location = useLocation();
   const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
-  });
-
-  const toggleCollapse = () => {
-    setCollapsed((c) => {
-      const next = !c;
-      try { localStorage.setItem("sidebar-collapsed", String(next)); } catch {}
-      return next;
-    });
-  };
+  const gated = Boolean(team?.ready && !team?.isAdmin && !team?.isStoreUser);
+  const can = team?.can;
+  const access = useMemo(() => ({ gated, can: can || (() => true) }), [gated, can]);
 
   // Render gate. Two problems we're solving here:
   //   1. UX flash. A `store_user` who lands at /dashboard would
@@ -331,7 +155,6 @@ const AppLayout = () => {
   // them. The nav is trimmed to match, and direct deep-links into a forbidden
   // area bounce to their first allowed page. (Data limits are enforced on the
   // BE; this is the UX layer.)
-  const gated = team?.ready && !team?.isAdmin && !team?.isStoreUser;
   if (gated) {
     const allowedLanding = firstAllowedLanding(team.can);
     // No access to anything at all — show a neutral notice instead of looping.
@@ -346,40 +169,17 @@ const AppLayout = () => {
       );
     }
   }
-  const navSections = gated ? navSectionsFor(NAV_SECTIONS, team.can) : NAV_SECTIONS;
-
   return (
     <>
       <SignedIn>
-        {/* Mobile shell is pinned to the viewport (100dvh) and clips its own
-            overflow, so the *document* never scrolls — only <main> does.
-            This is what keeps the fixed MobileDock rock-solid: iOS Safari
-            strands `position: fixed` bars mid-screen during momentum scroll
-            of the document, but never when the scroll lives in an inner
-            container. Desktop (md+) reverts to the normal document flow. */}
-        <div className="flex h-[100dvh] overflow-hidden md:h-auto md:min-h-screen md:overflow-visible">
-          <Sidebar
-            navSections={navSections}
-            collapsed={collapsed}
-            onToggleCollapse={toggleCollapse}
-          />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <TopBar navItems={NAV_ITEMS} />
-            {/* On mobile this is the scroll container; bottom padding clears
-                the fixed MobileDock. Desktop falls through to document flow. */}
-            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-28 md:overflow-visible md:pb-0">
-              <Outlet />
-            </main>
-          </div>
-          {/* Floating "Selected" button — appears bottom-right once stones are
-              picked from any catalog, opens the review page. */}
-          <SelectionFab />
-          {/* v1.0.5 mobile nav — bottom dock replaces the legacy mobile
-              sidebar drawer. Hidden on md+. */}
-          <MobileDock navSections={navSections} />
-          {/* Invisible — records rep activity + presence heartbeat. */}
-          <ActivityTracker />
-        </div>
+        <AppShell access={access}>
+          <Outlet />
+        </AppShell>
+        {/* Floating "Selected" button — appears once stones are picked from
+            any catalog, opens the review page. */}
+        <SelectionFab />
+        {/* Invisible — records rep activity + presence heartbeat. */}
+        <ActivityTracker />
       </SignedIn>
       <SignedOut>
         <div className="min-h-screen flex flex-col">
