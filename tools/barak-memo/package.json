@@ -1,0 +1,14 @@
+{
+  "name": "barak-memo-tool",
+  "private": true,
+  "description": "Barak memo PDF -> Gems DNA memo PDF (local CLI; not part of the app bundle).",
+  "type": "module",
+  "bin": { "barak-memo": "./cli.mjs" },
+  "scripts": {
+    "memo": "node cli.mjs"
+  },
+  "dependencies": {
+    "jpeg-js": "^0.4.4",
+    "pdfjs-dist": "^4.10.38"
+  }
+}
