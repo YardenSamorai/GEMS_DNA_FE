@@ -944,7 +944,6 @@ function RequestsTab({ requests, onChanged }) {
         <div className="bg-white border border-amber-200 rounded-xl overflow-hidden ring-1 ring-amber-100">
           <div className="px-4 py-3 border-b border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 flex items-center gap-2">
             <span className="relative flex w-2 h-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-70 animate-ping" />
               <span className="relative inline-flex w-2 h-2 rounded-full bg-amber-500" />
             </span>
             <h3 className="font-semibold text-amber-900 text-sm">

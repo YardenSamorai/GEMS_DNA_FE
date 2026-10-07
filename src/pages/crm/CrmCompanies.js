@@ -225,7 +225,6 @@ function CompanyCard({ company }) {
       {hasRequests && (
         <div className="-mx-4 -mt-4 mb-3 px-4 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-white text-[11px] font-bold uppercase tracking-[0.16em] flex items-center gap-1.5">
           <span className="relative flex w-1.5 h-1.5">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-70 animate-ping" />
             <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-white" />
           </span>
           {pendingRequests} new memo request{pendingRequests === 1 ? "" : "s"}

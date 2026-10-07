@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import toast from "react-hot-toast";
 import { submitDnaLead } from "../services/crmApi";
+import { FADE, SPRING, SPRING_EXIT } from "../design/motion";
 
 /**
  * "I'm interested" dialog shown on the public DNA pages.
@@ -27,6 +28,7 @@ export default function InterestedModal({ open, onClose, sku, snapshot }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (open) {
@@ -113,15 +115,15 @@ export default function InterestedModal({ open, onClose, sku, snapshot }) {
     }
   };
 
-  if (!open) return null;
-
   return createPortal(
     <AnimatePresence>
+      {open && (
       <motion.div
         className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
       >
         <div
           className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
@@ -129,10 +131,10 @@ export default function InterestedModal({ open, onClose, sku, snapshot }) {
         />
 
         <motion.div
-          initial={{ y: 40, opacity: 0, scale: 0.98 }}
+          initial={reduce ? { opacity: 0 } : { y: 40, opacity: 0, scale: 0.98 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: 40, opacity: 0, scale: 0.98 }}
-          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+          exit={reduce ? { opacity: 0, transition: FADE } : { y: 40, opacity: 0, scale: 0.98, transition: SPRING_EXIT }}
+          transition={reduce ? FADE : SPRING}
           className="relative w-full sm:max-w-md glass-surface-strong rounded-t-2xl sm:rounded-2xl overflow-hidden"
         >
           {success ? (
@@ -202,6 +204,7 @@ export default function InterestedModal({ open, onClose, sku, snapshot }) {
           )}
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>,
     document.body
   );

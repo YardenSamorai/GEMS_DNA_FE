@@ -178,9 +178,9 @@ const HBarChart = ({ data, colorClass = 'bg-emerald-500' }) => {
           <span className="text-xs text-stone-500 w-40 truncate text-right">{d.label}</span>
           <div className="flex-1 bg-stone-100 rounded-full h-5 overflow-hidden">
             <motion.div
-              initial={{ width: 0 }}
+              initial={false}
               animate={{ width: `${(d.value / maxVal) * 100}%` }}
-              transition={{ duration: 0.6, delay: i * 0.05 }}
+              transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
               className={`h-full rounded-full ${d.color || colorClass} flex items-center justify-end pr-2`}
             >
               {d.value > 0 && <span className="text-[10px] font-bold text-white">{d.value}</span>}
@@ -641,8 +641,7 @@ const QAPage = () => {
                 {filteredItems.slice(0, 100).map(({ item, issues }) => (
                   <motion.tr
                     key={item.id || item.sku}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    initial={false}
                     className="hover:bg-stone-50/50 transition-colors"
                   >
                     <td className="px-4 py-3">

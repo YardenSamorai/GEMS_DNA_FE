@@ -1455,13 +1455,16 @@
 
 /* ---------------------------------------------------------------- accessibility */
 
+/* Reduced motion keeps the fades and colour changes that explain a state
+   change, and drops movement: chevrons and transforms snap, skeletons hold. */
 @media (prefers-reduced-motion: reduce) {
   .inv *,
   .inv *::before,
   .inv *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-property: opacity, color, background-color, border-color, box-shadow !important;
+  }
+  .inv-sk {
+    animation: none;
   }
 }
 

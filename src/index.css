@@ -452,8 +452,31 @@ body {
   box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.45);
 }
 
-.btn-primary:hover {
-  background: rgb(var(--app-graphite));
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover {
+    background: rgb(var(--app-graphite));
+  }
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0.1s;
+}
+
+/* Fades in rather than popping over the page it covers. */
+.route-overlay {
+  animation: route-overlay-in 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+@keyframes route-overlay-in {
+  from { opacity: 0; }
+}
+
+/* Theme switch: one short cross-fade instead of every surface changing on
+   its own schedule. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .btn-primary:disabled {

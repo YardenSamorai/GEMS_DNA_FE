@@ -286,7 +286,7 @@ export default function CrmDeals() {
                             onDragStart={(e) => { e.dataTransfer.setData("text/plain", d.id); setDraggingId(d.id); }}
                             onDragEnd={() => setDraggingId(null)}
                             onClick={() => setDrawerId(String(d.id))}
-                            className={`glass-surface rounded-xl p-2.5 cursor-pointer transition-all hover:-translate-y-0.5 ${
+                            className={`glass-surface rounded-xl p-2.5 cursor-pointer transition-shadow ${
                               draggingId === d.id ? "opacity-50" : ""
                             }`}
                           >

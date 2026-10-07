@@ -8,6 +8,7 @@ import DnaPairStones from "./DnaPairStones";
 import DnaPairCertificates from "./DnaPairCertificates";
 import DnaPairComparison from "./DnaPairComparison";
 import { DnaFooter, GemstoneDnaBody } from "./GemstoneDnaPage";
+import { IdentityEntrance } from "./GemstoneIdentity";
 import { dnaTitle } from "./dnaModel";
 import { orderPair, pairTitle } from "./pairModel";
 import { SPRING } from "./motion";
@@ -90,6 +91,7 @@ const DnaPairPage = ({
           <DnaPairSwitch items={items} current={current} onSelect={onSelect} idPrefix="dna-pairnav-top" />
         </nav>
 
+          <IdentityEntrance.Provider value={dir === 0}>
           <motion.div key={current} initial={enterFrom(dir, reduce)} animate={CENTER} transition={ENTER_TRANSITION}>
             {stone ? (
               <GemstoneDnaBody
@@ -129,6 +131,7 @@ const DnaPairPage = ({
               </>
             )}
           </motion.div>
+          </IdentityEntrance.Provider>
 
         <DnaFooter note={stone ? stone.stone_id : `${a.stone_id} + ${b.stone_id}`} />
       </main>

@@ -236,7 +236,7 @@ function CatalogCard({ item, basket, onPreview }) {
           <img
             src={item.imageUrl}
             alt={title}
-            className="w-full h-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.04]"
+            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
             loading="lazy"
           />
         ) : (

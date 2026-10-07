@@ -386,16 +386,23 @@
   align-self: center;
   opacity: 0;
   transform: translateY(14px);
+  /* Leaving is quicker than arriving, so two chapters never read at once. */
   transition:
-    opacity 0.45s var(--dna-ease-out),
-    transform 0.6s var(--dna-ease-out);
+    opacity 0.25s var(--dna-ease-out),
+    transform 0.4s var(--dna-ease-out);
   pointer-events: none;
+}
+
+.home-chapter.is-past {
+  transform: translateY(-14px);
 }
 
 .home-chapter.is-active {
   opacity: 1;
   transform: none;
-  transition-delay: 0.08s;
+  transition:
+    opacity 0.45s var(--dna-ease-out) 0.08s,
+    transform 0.6s var(--dna-ease-out) 0.08s;
   pointer-events: auto;
 }
 
@@ -437,10 +444,24 @@
 }
 
 .home-rail-bar {
+  position: relative;
   display: block;
   height: 2px;
   border-radius: 2px;
+  overflow: hidden;
   background: var(--dna-hairline-strong, rgba(0, 0, 0, 0.12));
+}
+
+/* Each step fills across its own share of the scroll (--from..--to, set per
+   step; --journey is the section's progress), so the rail says how far into
+   the story you are, not just which chapter. */
+.home-rail-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--dna-text-3);
+  transform-origin: left center;
+  transform: scaleX(clamp(0, calc((var(--journey, 0) - var(--from)) / (var(--to) - var(--from))), 1));
   transition: background-color 0.4s var(--dna-ease-out);
 }
 
@@ -452,11 +473,7 @@
   transition: color 0.3s var(--dna-ease-out);
 }
 
-.home-rail-step.is-reached .home-rail-bar {
-  background: var(--dna-text-3);
-}
-
-.home-rail-step[aria-current="step"] .home-rail-bar {
+.home-rail-step[aria-current="step"] .home-rail-bar::after {
   background: var(--dna-accent-dot);
 }
 

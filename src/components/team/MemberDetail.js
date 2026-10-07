@@ -43,9 +43,7 @@ const PresenceDot = ({ online }) => (
   <span
     className={`relative inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${online ? "bg-emerald-500" : "bg-stone-300"}`}
     title={online ? "Online now" : "Offline"}
-  >
-    {online && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-75" />}
-  </span>
+  />
 );
 
 const Kpi = ({ label, value, sub, accent = "stone" }) => {

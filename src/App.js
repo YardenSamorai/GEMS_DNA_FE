@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, createContext, useContext } from "react";
+import { flushSync } from "react-dom";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet } from "react-router-dom";
 import { SignedIn, SignedOut, UserButton, useAuth, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
@@ -72,7 +73,17 @@ const ThemeProvider = ({ children }) => {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const toggleTheme = () => setTheme((p) => (p === "light" ? "dark" : "light"));
+  const toggleTheme = () => {
+    const next = theme === "light" ? "dark" : "light";
+    if (!document.startViewTransition) {
+      setTheme(next);
+      return;
+    }
+    document.startViewTransition(() => {
+      flushSync(() => setTheme(next));
+      document.documentElement.setAttribute("data-theme", next);
+    });
+  };
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
 };

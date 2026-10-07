@@ -51,6 +51,10 @@ const Intro = () => (
   </>
 );
 
+/* Text moves with the scroll: chapters already read leave upwards, the next
+ * one waits below. */
+const chapterState = (index, current) => (index === current ? " is-active" : index < current ? " is-past" : "");
+
 function usePrefersReducedMotion() {
   const query = "(prefers-reduced-motion: reduce)";
   const [reduce, setReduce] = useState(() => typeof window !== "undefined" && Boolean(window.matchMedia?.(query).matches));
@@ -90,6 +94,8 @@ function ScrollJourney() {
       const span = Math.max(rect.height - window.innerHeight, 1);
       const p = Math.min(1, Math.max(0, -rect.top / span));
       motion.current.progress = p;
+      // The rail fills from this, in CSS, without a React render per frame.
+      section.style.setProperty("--journey", p.toFixed(4));
       setChapter(chapterAt(p));
     };
     const onScroll = () => {
@@ -123,11 +129,11 @@ function ScrollJourney() {
         <div className="home-container home-journey-grid">
           <div className="home-journey-copy">
             <div className="home-chapters">
-              <div className={`home-chapter${chapter === 0 ? " is-active" : ""}`} onFocus={onChapterFocus(0)}>
+              <div className={`home-chapter${chapterState(0, chapter)}`} onFocus={onChapterFocus(0)}>
                 <Intro />
               </div>
               {CHAPTERS.slice(1).map(({ id, label }, i) => (
-                <div key={id} className={`home-chapter${chapter === i + 1 ? " is-active" : ""}`} onFocus={onChapterFocus(i + 1)}>
+                <div key={id} className={`home-chapter${chapterState(i + 1, chapter)}`} onFocus={onChapterFocus(i + 1)}>
                   <p className="home-eyebrow">{label}</p>
                   <h2 className="home-chapter-title">{COPY[id].title}</h2>
                   <p className="home-lede">{COPY[id].text}</p>
@@ -141,11 +147,12 @@ function ScrollJourney() {
             </div>
             <nav className="home-rail" aria-label="Story chapters">
               <ol>
-                {CHAPTERS.map(({ id, label }, i) => (
+                {CHAPTERS.map(({ id, label, from }, i) => (
                   <li key={id}>
                     <button
                       type="button"
                       className={`home-rail-step${i <= chapter ? " is-reached" : ""}`}
+                      style={{ "--from": from, "--to": CHAPTERS[i + 1]?.from ?? 1 }}
                       aria-current={i === chapter ? "step" : undefined}
                       onClick={() => goTo(i)}
                     >

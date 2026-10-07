@@ -1,8 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import toast from "react-hot-toast";
 import { CheckIcon, CopyIcon, LockIcon, ShareIcon, VideoIcon } from "./icons";
 import { FADE_FAST, SPRING } from "./motion";
+
+/* Whether the identity block plays its entrance. False when a view it's part
+   of already arrives with its own motion (the pair's Pair / Stone switch). */
+export const IdentityEntrance = createContext(true);
 
 const CopySku = ({ sku }) => {
   const [copied, setCopied] = useState(false);
@@ -81,8 +85,9 @@ export const InlineActions = ({ onInterested, onShare, onShareVideo, interestedL
    use, then the handful of facts a buyer checks before anything else. */
 const GemstoneIdentity = ({ stone, title, subtitle, facts, titleRef, children, eyebrow = "Gemstone DNA", skus }) => {
   const reduce = useReducedMotion();
+  const entrance = useContext(IdentityEntrance);
   const rise = (i) => ({
-    initial: { opacity: 0, y: reduce ? 0 : 10 },
+    initial: entrance ? { opacity: 0, y: reduce ? 0 : 10 } : false,
     animate: { opacity: 1, y: 0 },
     transition: { ...SPRING, delay: reduce ? 0 : 0.04 * i },
   });

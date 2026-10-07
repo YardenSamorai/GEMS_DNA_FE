@@ -11,10 +11,10 @@ function Reveal({ children, className, as = "div" }) {
   return (
     <Tag
       className={className}
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 22 }}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
       whileInView={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "0px 0px -12% 0px" }}
-      transition={reduce ? { duration: 0.2 } : { duration: 0.8, ease: EASE_OUT }}
+      viewport={{ once: true, margin: "0px 0px -8% 0px" }}
+      transition={reduce ? { duration: 0.2 } : { duration: 0.5, ease: EASE_OUT }}
     >
       {children}
     </Tag>

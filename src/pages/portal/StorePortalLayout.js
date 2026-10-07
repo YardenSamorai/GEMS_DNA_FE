@@ -109,7 +109,6 @@ function SecurePill() {
   return (
     <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 backdrop-blur-md border border-white/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
       <span className="relative flex w-1.5 h-1.5">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500/60 opacity-60 animate-ping" />
         <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-500" />
       </span>
       <span className="text-[10.5px] tracking-[0.12em] uppercase text-glass-graphite font-medium">Encrypted</span>

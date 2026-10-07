@@ -283,9 +283,7 @@ const RepIdentity = ({ rep, big }) => (
         rep.online ? "bg-emerald-500" : "bg-stone-300"
       }`}
       title={rep.online ? "Online now" : "Offline"}
-    >
-      {rep.online && <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-75" />}
-    </span>
+    />
     <div className="min-w-0 flex-1">
       <p className={`truncate font-semibold text-app-ink ${big ? "text-[18px]" : "text-[14px]"}`}>
         {rep.name || rep.email || "—"}

@@ -279,6 +279,8 @@
   background: var(--dna-surface);
   box-shadow: var(--dna-sh-overlay);
   animation: gd-pop-in 0.16s var(--dna-ease-out);
+  /* Opens to the right of its rail icon, top-aligned: grow from there. */
+  transform-origin: top left;
 }
 .gd-pop ul { list-style: none; margin: 0; padding: 0; }
 .gd-pop-title { margin: 0; padding: 6px 10px 4px; font-size: 11.5px; font-weight: 600; color: var(--dna-text-3); }
@@ -665,13 +667,20 @@
   .gd-crumb-parent a { padding: 12px 8px; margin: -12px -8px; }
 }
 
+/* Reduced motion: no sliding, resizing or scaling — tooltips and menus still
+   fade, so they don't flash on and off. */
 @media (prefers-reduced-motion: reduce) {
   .gd-sidebar,
   .gd-item-chev,
-  .gd-tip,
   .gd-tabbar,
   .gd-catbar,
   .gd-tab-icon { transition: none; }
+  .gd-tip,
+  .gd-item:focus-visible .gd-tip,
+  .gd-icon-btn:focus-visible .gd-tip { transform: translate(0, -50%); transition: opacity 0.12s; }
   .gd-pop,
-  .gd-menu { animation: none; }
+  .gd-menu { animation: gd-fade-in 0.12s ease-out; }
+}
+@keyframes gd-fade-in {
+  from { opacity: 0; }
 }
