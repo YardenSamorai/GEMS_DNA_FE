@@ -117,7 +117,7 @@ describe("parseBarakMemo", () => {
   });
 
   it("splits ship-to and bill-to columns and keeps attention values", () => {
-    expect(record.shipTo).toEqual({ name: "Test Customer SA", lines: ["2 Example Road"], phone: "+00 1", attention: null });
+    expect(record.shipTo).toEqual({ name: "Test Customer SA", lines: ["2 Example Road"], phone: "+00 1", fax: null, attention: null });
     expect(record.billTo.attention).toBe("Ms Test");
   });
 
@@ -182,6 +182,99 @@ describe("parseBarakMemo", () => {
     const out = parseBarakMemo({ ...doc, pages: [page1, changed] });
     expect(out.conflicts).toEqual([{ page: 2, field: "documentNumber" }]);
     expect(out.documentNumber.value).toBe("7");
+  });
+});
+
+describe("parseBarakMemo · Memo template (MEMO TO, combined item cell)", () => {
+  const memoHeader = [
+    r("Example Gems Ltd.", 177, 14, 12),
+    r("Memo", 235, 132, 18),
+    r("Memo # : 100/1", 356, 150, 14.3),
+    r("MEMO TO", 373, 172, 12),
+    r("SHIP TO", 112, 174, 12),
+    r("Test Customer SpA", 31, 196),
+    r("Test Customer SpA", 291, 196),
+    r("ATT: MR. TEST", 31, 254),
+    r("ATT: MR. TEST", 291, 254),
+    r("Fax: +00 2", 31, 287),
+    r("Fax: +00 2", 291, 287),
+  ];
+  const tableHeader = (y) => [
+    r("Lot", 28, y - 7, 12, 18),
+    r("No", 30, y + 7, 12, 14),
+    r("Item #", 90, y, 12, 33),
+    r("Description", 210, y, 12, 59),
+    r("Qty", 357, y, 12, 20),
+    r("Carat", 395, y, 12, 30),
+    r("Per Carat", 445, y, 12, 51),
+    r("Total Price", 511, y, 12, 57),
+  ];
+  const row = (y, lot, text, carat, ppc, total) => [
+    r(lot, 33, y, 12, 7),
+    r(text, 73, y, 12, 254),
+    r("1", 374, y, 12, 6),
+    r(carat, 412, y, 12, 24),
+    r(ppc, 453, y, 12, 47),
+    r(total, 519, y, 12, 54),
+  ];
+  const p1 = {
+    number: 1,
+    width: 595,
+    height: 842,
+    images: [],
+    runs: [
+      ...memoHeader,
+      r("Goods are delivered for examination only and remain our property until paid in full by the", 17, 306, 8.3, 533),
+      r("Remarks :", 20, 421, 9),
+      r("Country of Origin Testland", 75, 421),
+      r("Memo #", 51, 488),
+      r("Issue Date", 132, 488),
+      r("100/1", 54, 502),
+      r("04-Oct-2026", 129, 502),
+      ...tableHeader(525),
+      ...row(553, "1", "SKU-1 GRS,EC,10.00-8.00x6.00", "2.00", "1,000.00", "2,000.00"),
+      r("Customer Signature", 22, 763, 12),
+    ],
+  };
+  const p2 = {
+    number: 2,
+    width: 595,
+    height: 842,
+    images: [],
+    runs: [
+      ...memoHeader,
+      ...tableHeader(313),
+      ...row(340, "2", "SKU-2 EC,9.00-7.00x5.00", "1.00", "500.00", "500.00"),
+      r("Total Carat on Memo", 207, 363, 12, 112),
+      r("2", 369, 364, 12, 12),
+      r("3.00", 409, 364, 12, 27),
+      r("$ 2,500.00", 509, 364, 12, 63),
+      r("IBAN :", 24, 478, 9),
+      r("GB82 WEST 1234 5698 7654 32", 103, 479, 9),
+      r("Customer Signature", 22, 763, 12),
+    ],
+  };
+  const record = parseBarakMemo({ pages: [p1, p2] });
+
+  it("reads MEMO TO as the recipient with attention and fax", () => {
+    expect(record.billToLabel).toBe("MEMO TO");
+    expect(record.billTo).toEqual({ name: "Test Customer SpA", lines: [], phone: null, fax: "+00 2", attention: "MR. TEST" });
+  });
+
+  it("splits a combined Item # + Description cell on the first word", () => {
+    expect(record.items.map((i) => [i.lot, i.sku, i.description, i.carat])).toEqual([
+      ["1", "SKU-1", "GRS,EC,10.00-8.00x6.00", "2.00"],
+      ["2", "SKU-2", "EC,9.00-7.00x5.00", "1.00"],
+    ]);
+    expect(record.combinedSkuCells).toBe(2);
+  });
+
+  it("stops the table at the totals row and keeps same-line remarks", () => {
+    expect(record.totals).toEqual({ label: "Total Carat on Memo", cells: { qty: "2", carat: "3.00", totalPrice: "$ 2,500.00" } });
+    expect(record.fields).toEqual([{ label: "IBAN", lines: ["GB82 WEST 1234 5698 7654 32"] }]);
+    expect(record.remarks).toEqual(["Country of Origin Testland"]);
+    expect(record.unmapped).toEqual([]);
+    expect(record.conflicts).toEqual([]);
   });
 });
 

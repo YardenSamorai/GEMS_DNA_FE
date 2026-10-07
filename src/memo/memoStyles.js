@@ -139,16 +139,17 @@ dl, dd { margin: 0; }
 .m-qr svg { width: 11mm; height: 11mm; display: block; }
 
 /* Totals */
-.m-totals { display: flex; justify-content: flex-end; break-inside: avoid; break-before: avoid; page-break-before: avoid; }
-.m-totals dl { width: 78mm; }
+.m-table tr.m-totals-row { break-before: avoid; page-break-before: avoid; }
+.m-table tr.m-totals-row > td { border-bottom: 0; padding: 0; }
+.m-totals { break-inside: avoid; page-break-inside: avoid; }
+.m-totals dl { width: 78mm; margin-left: auto; break-inside: avoid; page-break-inside: avoid; }
 .m-totals dl > div { display: flex; justify-content: space-between; gap: 6mm; padding: 1.6mm 0; border-bottom: 0.5pt solid ${t.faint}; }
 .m-totals dt { color: ${t.text2}; }
 .m-totals dd { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .m-totals .m-grand { border-bottom: 0; padding-top: 2.2mm; }
 .m-totals .m-grand dt { color: ${t.text}; font-weight: 600; }
 .m-totals .m-grand dd { font-size: 12pt; font-weight: 650; letter-spacing: -0.01em; }
-.m-summary .m-totals { justify-content: flex-start; }
-.m-summary .m-totals dl { width: 100%; border-top: 0.75pt solid ${t.text}; }
+.m-summary .m-totals dl { width: 100%; margin-left: 0; border-top: 0.75pt solid ${t.text}; }
 .m-summary .m-totals dl > div { padding: 2.2mm 0; }
 
 /* Back matter */

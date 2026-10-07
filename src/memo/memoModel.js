@@ -94,6 +94,7 @@ function normalizeParty(raw) {
     name: clean(raw.name),
     lines: (raw.lines || []).map(clean).filter(Boolean),
     phone: clean(raw.phone),
+    fax: clean(raw.fax),
     attention: clean(raw.attention),
   };
   return party.name || party.lines.length ? party : null;
@@ -238,6 +239,14 @@ export function buildMemoModel(raw, options = {}) {
     warn(warnings, "DRAFT", "Every source page carries a full-page background image (Barak's draft watermark). The document is marked Draft.");
   }
 
+  if (raw.combinedSkuCells) {
+    warn(
+      warnings,
+      "SKU_FROM_COMBINED_CELL",
+      `${raw.combinedSkuCells} row(s) print item number and description as one cell; the first word is read as the item number. Check the item numbers.`,
+    );
+  }
+
   (raw.conflicts || []).forEach((c) => warn(warnings, "PAGE_CONFLICT", `Page ${c.page} repeats "${c.field}" with different content; page 1 is used.`));
   if (raw.unmapped?.length) {
     warn(
@@ -275,6 +284,7 @@ export function buildMemoModel(raw, options = {}) {
     issuer,
     footer: (raw.footer || []).map(clean).filter(Boolean),
     billTo,
+    billToLabel: /^memo\s*to$/i.test(raw.billToLabel || "") ? "Memo to" : /^sold\s*to$/i.test(raw.billToLabel || "") ? "Sold to" : "Bill to",
     shipTo,
     partiesIdentical: Boolean(billTo && shipTo && JSON.stringify(billTo) === JSON.stringify(shipTo)),
     items,

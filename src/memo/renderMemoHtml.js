@@ -28,7 +28,7 @@ function partyHtml(eyebrow, party) {
     <p class="m-eyebrow">${esc(eyebrow)}</p>
     ${party.name ? `<p class="m-party-name">${esc(party.name)}</p>` : ""}
     ${party.lines.length ? `<p class="m-lines">${lines(party.lines)}</p>` : ""}
-    ${kv([["Phone", party.phone], ["Attention", party.attention]])}
+    ${kv([["Attention", party.attention], ["Phone", party.phone], ["Fax", party.fax]])}
   </div>`;
 }
 
@@ -136,10 +136,13 @@ async function itemsHtml(model) {
     .join("");
 
   const count = `${items.length} ${items.length === 1 ? "item" : "items"}`;
+  const columnCount = 3 + Number(cols.lot) + Number(cols.qr) + Number(cols.qty) + Number(cols.perCarat);
+  const totalsBlock = totalsHtml(totals);
+  // Totals ride in the table's last row so they can't split or start a page alone.
+  const totalsRow = totalsBlock ? `<tr class="m-totals-row"><td colspan="${columnCount}">${totalsBlock}</td></tr>` : "";
   return `<section class="m-section">
     <div class="m-items-head"><p class="m-eyebrow">Items</p><span class="m-count">${count}</span></div>
-    <table class="m-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
-    ${totalsHtml(totals)}
+    <table class="m-table"><thead><tr>${head}</tr></thead><tbody>${body}${totalsRow}</tbody></table>
   </section>`;
 }
 
@@ -194,9 +197,10 @@ export async function renderMemoHtml(model, { issuerLogo = null } = {}) {
 
   const parties = [];
   if (model.issuer) parties.push(issuerHtml(model.issuer, issuerLogo));
-  if (model.partiesIdentical) parties.push(partyHtml("Bill to · Ship to", model.billTo));
+  const billLabel = model.billToLabel || "Bill to";
+  if (model.partiesIdentical) parties.push(partyHtml(`${billLabel} · Ship to`, model.billTo));
   else {
-    if (model.billTo) parties.push(partyHtml("Bill to", model.billTo));
+    if (model.billTo) parties.push(partyHtml(billLabel, model.billTo));
     if (model.shipTo) parties.push(partyHtml("Ship to", model.shipTo));
   }
 

@@ -122,11 +122,12 @@ function isFullPageImage(image, page) {
 }
 
 function parseParty(runs) {
-  const party = { name: null, lines: [], phone: null, attention: null };
+  const party = { name: null, lines: [], phone: null, fax: null, attention: null };
   for (const run of [...runs].sort(byPosition)) {
     const field = splitLabel(run.text);
     if (field && /^(phone|tel)$/i.test(field.label)) party.phone = field.value || null;
-    else if (field && /^attention$/i.test(field.label)) party.attention = field.value || null;
+    else if (field && /^fax$/i.test(field.label)) party.fax = field.value || null;
+    else if (field && /^(attention|att|attn)\.?$/i.test(field.label)) party.attention = field.value || null;
     else if (!party.name) party.name = run.text;
     else party.lines.push(run.text);
   }
@@ -176,20 +177,31 @@ function parsePage(page, ctx) {
     }
   }
 
-  /* Parties: SHIP TO / BILL TO headers split the page into two columns. */
+  /* Parties: SHIP TO / BILL TO (or MEMO TO) headers split the page into two columns. */
   const shipHead = find(/^ship\s*to$/i);
-  const billHead = find(/^bill\s*to$/i);
+  const billHead = find(/^(bill|memo|sold)\s*to$/i);
   if (shipHead || billHead) {
     claim(shipHead, billHead);
+    if (billHead) out.billToLabel = billHead.text;
     const heads = [shipHead, billHead].filter(Boolean);
     const top = Math.max(...heads.map((h) => h.y1));
     const attention = runs.filter((r) => r.y0 > top && /^attention\s*:/i.test(r.text));
-    const bottom = attention.length ? Math.max(...attention.map((r) => r.y1)) + 2 : Infinity;
+    // The next structure below the addresses ends the block: a table header,
+    // the memo information row, or a bare "Label :" field.
+    const nextBlock = runs.find(
+      (r) =>
+        r.y0 > top &&
+        (/^(item\s*#?|lot|memo\s*#|remarks?\s*:?)$/i.test(r.text) || (/^[A-Za-z'. ]+\s*:$/.test(r.text) && !/^(attention|att|attn)\.?\s*:$/i.test(r.text))),
+    );
+    const bottom = Math.min(
+      attention.length ? Math.max(...attention.map((r) => r.y1)) + 2 : Infinity,
+      nextBlock ? nextBlock.y0 - 1 : Infinity,
+    );
     const block = [];
     for (const run of runs) {
       if (used.has(run) || run.y0 < top) continue;
       if (run.y0 > bottom || run.x1 - run.x0 > page.width * 0.6) break;
-      if (bottom === Infinity && block.length && run.y0 - Math.max(...block.map((b) => b.y1)) > 18) break;
+      if (!attention.length && !nextBlock && block.length && run.y0 - Math.max(...block.map((b) => b.y1)) > 18) break;
       block.push(run);
     }
     claim(...block);
@@ -236,7 +248,7 @@ function parsePage(page, ctx) {
   }
   if (remarksHead) {
     claim(remarksHead);
-    const remarkLines = prose.filter((r) => r.y0 > remarksHead.y0 && r.y0 < proseEnd);
+    const remarkLines = prose.filter((r) => r.y0 >= remarksHead.y0 - ROW_TOLERANCE && r.y0 < proseEnd);
     out.remarks = toParagraphs(remarkLines);
     claim(...remarkLines);
   }
@@ -269,24 +281,44 @@ function parsePage(page, ctx) {
     const headerBottom = Math.max(...columns.map((c) => c.y1));
     const tableEnd = signature ? signature.y0 : page.height;
     const bodyRows = groupRows(runs.filter((r) => !used.has(r) && r.y0 > headerBottom && r.y0 < tableEnd));
+    const skuIndex = columns.findIndex((c) => c.key === "sku");
+    const descIndex = columns.findIndex((c) => c.key === "description");
+    const skuDescEdge = skuIndex >= 0 && descIndex === skuIndex + 1 ? (center(columns[skuIndex]) + center(columns[descIndex])) / 2 : null;
     out.items = [];
+    out.combinedSkuCells = 0;
     for (const row of bodyRows) {
-      const cells = {};
-      row.runs.forEach((run) => {
+      const placed = row.runs.map((run) => {
         const col = columns[columnAt(run, columns)];
-        const key = col.key || col.label;
+        return { run, key: col.key || col.label };
+      });
+      const hasFigures = placed.some((p) => ["qty", "carat", "pricePerCarat", "totalPrice"].includes(p.key));
+      const hasSku = placed.some((p) => p.key === "sku");
+      const cells = {};
+      let combined = false;
+      placed.forEach(({ run, key }) => {
+        // Barak can print "Item # + Description" as one cell starting in the
+        // Item # column: on an item row, the first word is the item number.
+        if (key === "description" && hasFigures && !hasSku && !combined && skuDescEdge !== null && run.x0 < skuDescEdge) {
+          const m = /^(\S+)(?:\s+(.*))?$/.exec(run.text);
+          cells.sku = m[1];
+          if (m[2]) cells.description = cells.description ? `${cells.description} ${m[2]}` : m[2];
+          combined = true;
+          return;
+        }
         cells[key] = cells[key] ? `${cells[key]} ${run.text}` : run.text;
       });
       claim(...row.runs);
       const labelCell = Object.values(cells).find((v) => /^total\b/i.test(v));
       if (labelCell) {
-        const totals = { label: labelCell, cells: {} };
+        if (combined) delete cells.sku;
+        const totals = { label: row.runs.find((r) => /^total\b/i.test(r.text))?.text || labelCell, cells: {} };
         Object.entries(cells).forEach(([key, value]) => {
-          if (value !== labelCell) totals.cells[key] = value;
+          if (value !== labelCell && !/^total\b/i.test(value)) totals.cells[key] = value;
         });
         out.totals = totals;
-        continue;
+        break;
       }
+      if (combined) out.combinedSkuCells += 1;
       const keys = Object.keys(cells);
       const last = out.items[out.items.length - 1];
       if (last && keys.length === 1 && keys[0] === "description") {
@@ -349,6 +381,8 @@ export function parseBarakMemo(doc) {
     issuer: null,
     shipTo: null,
     billTo: null,
+    billToLabel: null,
+    combinedSkuCells: 0,
     info: [],
     columns: [],
     items: [],
@@ -374,6 +408,8 @@ export function parseBarakMemo(doc) {
     keepFirst("documentNumber", page.documentNumber, page.number);
     keepFirst("shipTo", page.shipTo, page.number);
     keepFirst("billTo", page.billTo, page.number);
+    keepFirst("billToLabel", page.billToLabel, page.number);
+    record.combinedSkuCells += page.combinedSkuCells || 0;
     keepFirst("signature", page.signature, page.number);
     if (page.issuer) {
       if (!record.issuer) record.issuer = page.issuer;
