@@ -4,7 +4,7 @@ import { SignedIn, SignedOut, UserButton, useAuth, AuthenticateWithRedirectCallb
 import DiamondCard from "./pages/DiamondCard";
 import Dashboard from "./pages/Dashboard";
 import JewelryPage from "./pages/JewelryPage";
-import OnboardingPage from "./pages/OnboardingPage";
+import HomePage from "./pages/home/HomePage";
 import { Toaster } from "react-hot-toast";
 import InventoryHub from "./pages/InventoryHub";
 import CustomerSharePage from "./pages/share/CustomerSharePage";
@@ -316,7 +316,7 @@ const AuthPrompt = ({ message }) => (
   </motion.div>
 );
 
-// ---------- Marketing/landing layout (used by `/`, public pages) ----------
+// ---------- Public header for the signed-out gate on protected pages ----------
 const MarketingHeader = () => {
   const location = useLocation();
   return (
@@ -353,15 +353,6 @@ const MarketingHeader = () => {
     </header>
   );
 };
-
-const MarketingLayout = () => (
-  <div className="min-h-screen flex flex-col">
-    <MarketingHeader />
-    <main className="flex-1">
-      <Outlet />
-    </main>
-  </div>
-);
 
 // ---------- App root ----------
 function App() {
@@ -405,10 +396,8 @@ function AppContent() {
         <RouteLoadingProvider>
           <RouteTransitionOverlay />
           <Routes>
-          {/* Marketing / landing */}
-          <Route element={<MarketingLayout />}>
-            <Route path="/" element={<OnboardingPage />} />
-          </Route>
+          {/* Public homepage — its own header, no app shell */}
+          <Route path="/" element={<HomePage />} />
 
           {/* Protected app routes (sidebar + top bar) */}
           <Route element={<AppLayout />}>

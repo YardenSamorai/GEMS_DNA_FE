@@ -131,7 +131,7 @@ const factorNotice = (factor) => {
   return "";
 };
 
-export default function LoginSheet({ children, initialView = "signin", initialEmail = "" }) {
+export default function LoginSheet({ children, initialView = "signin", initialEmail = "", detectInvite = true }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState(initialView); // "signin" | "signup"
   const drag = useDragControls();
@@ -169,8 +169,9 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
   // the query — open the sheet straight into the Create-account view, prefill
   // the invited email, and complete sign-up with the ticket. This gives invited
   // users the same polished surface instead of Clerk's hosted page.
+  // Pages with several sign-in triggers leave this on for exactly one of them.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !detectInvite) return;
     const params = new URLSearchParams(window.location.search);
     const t = params.get("__clerk_ticket");
     const e = params.get("email");
@@ -183,7 +184,7 @@ export default function LoginSheet({ children, initialView = "signin", initialEm
       setView("signup");
       setOpen(true);
     }
-  }, []);
+  }, [detectInvite]);
 
   const resetSecondFactor = () => {
     setSecondFactor(null);

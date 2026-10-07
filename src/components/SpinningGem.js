@@ -43,11 +43,18 @@ export default function SpinningGem({ size = 64 }) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
     /* ────────────── Renderer ────────────── */
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: "low-power",
-    });
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: "low-power",
+      });
+    } catch {
+      // No WebGL (disabled, blocklisted GPU, lost context): the loader is
+      // decoration — throwing here would take the whole app down with it.
+      return;
+    }
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;

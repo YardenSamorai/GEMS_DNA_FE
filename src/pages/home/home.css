@@ -1,0 +1,744 @@
+/* ================================================================
+   Public homepage. Same tokens, type and buttons as the DNA pages
+   (styles/gemsdna-tokens.css, pages/dna/dna.css); the hero is the
+   only place it raises its voice. Light by design.
+   ================================================================ */
+
+@import "../../styles/gemsdna-tokens.css";
+
+.home {
+  --home-nav-h: 52px;
+  --home-max: 1120px;
+  --home-gutter: clamp(20px, 5vw, 40px);
+  --home-section: clamp(72px, 10vw, 136px);
+
+  min-height: 100svh;
+  background: var(--dna-bg);
+  color: var(--dna-text);
+  font-family: var(--dna-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+
+.home *,
+.home *::before,
+.home *::after {
+  box-sizing: border-box;
+}
+
+.home a,
+.home button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.home :focus-visible {
+  outline: 2px solid var(--dna-accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.home-container {
+  width: 100%;
+  max-width: calc(var(--home-max) + var(--home-gutter) * 2);
+  margin: 0 auto;
+  padding-left: max(var(--home-gutter), env(safe-area-inset-left));
+  padding-right: max(var(--home-gutter), env(safe-area-inset-right));
+}
+
+.home-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.home-skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 60;
+  padding: 10px 16px;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-text);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.home-skip:focus {
+  top: calc(env(safe-area-inset-top) + 8px);
+}
+
+/* ---------------- Header ---------------- */
+
+.home-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 1px solid transparent;
+  transition: background-color 0.3s var(--dna-ease-out), border-color 0.3s var(--dna-ease-out),
+    box-shadow 0.3s var(--dna-ease-out);
+}
+
+/* Glass only once content actually scrolls under the bar. */
+.home-nav.is-scrolled {
+  background: var(--dna-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom-color: var(--dna-hairline);
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.04);
+}
+
+.home-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: var(--home-nav-h);
+}
+
+.home-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--dna-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.home-brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dna-accent-dot);
+  flex: none;
+}
+
+.home-nav-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------------- Buttons (DNA button language) ---------------- */
+
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: var(--dna-r-pill);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.1s ease-out, background-color 0.2s var(--dna-ease-out), box-shadow 0.2s var(--dna-ease-out);
+}
+
+.home-btn--primary {
+  background: var(--dna-accent);
+  color: var(--dna-on-accent);
+  box-shadow: 0 1px 2px rgba(4, 120, 87, 0.2), 0 6px 18px rgba(4, 120, 87, 0.18);
+}
+
+.home-btn--quiet {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
+  background: var(--dna-surface);
+  color: var(--dna-text);
+  box-shadow: inset 0 0 0 1px var(--dna-hairline), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.home-btn:active {
+  transform: scale(0.97);
+}
+
+.home-btn--primary:active {
+  background: var(--dna-accent-press);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-btn--primary:hover {
+    background: var(--dna-accent-press);
+  }
+  .home-btn--quiet:hover {
+    background: var(--dna-hover);
+  }
+  .home-link:hover {
+    color: var(--dna-accent-press);
+  }
+  .home-link:hover .home-link-chevron {
+    transform: translateX(2px);
+  }
+}
+
+/* Touch: the quiet header button grows to a full target without looking heavier. */
+@media (pointer: coarse) {
+  .home-btn--quiet {
+    position: relative;
+  }
+  .home-btn--quiet::after {
+    content: "";
+    position: absolute;
+    inset: -4px -2px;
+  }
+}
+
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--dna-accent);
+  text-decoration: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: color 0.2s var(--dna-ease-out);
+}
+
+.home-link-chevron {
+  transition: transform 0.2s var(--dna-ease-out);
+}
+
+/* ---------------- Hero ---------------- */
+
+.home-hero {
+  position: relative;
+  margin-top: calc(-1 * (var(--home-nav-h) + env(safe-area-inset-top)));
+  padding-top: calc(var(--home-nav-h) + env(safe-area-inset-top));
+}
+
+/* A soft studio sweep behind the stone: light, not colour. */
+.home-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(50% 55% at 72% 50%, #ffffff 0%, rgba(255, 255, 255, 0) 72%);
+  pointer-events: none;
+}
+
+.home-hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(16px, 3vw, 40px);
+  min-height: min(calc(100svh - var(--home-nav-h) - env(safe-area-inset-top)), 880px);
+  padding-top: clamp(24px, 4vw, 48px);
+  padding-bottom: clamp(32px, 5vw, 64px);
+}
+
+.home-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dna-text-3);
+}
+
+.home-h1 {
+  margin: 18px 0 0;
+  font-size: clamp(42px, 4.8vw, 68px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.03;
+  color: var(--dna-text);
+  text-wrap: balance;
+}
+
+.home-h1-soft {
+  color: var(--dna-text-3);
+}
+
+.home-lede {
+  margin: 22px 0 0;
+  max-width: 470px;
+  font-size: clamp(17px, 1.55vw, 20px);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--dna-text-2);
+  text-wrap: pretty;
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-top: 34px;
+}
+
+/* ---------------- Gem stage ---------------- */
+
+.home-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 0.92;
+  max-height: 760px;
+  justify-self: center;
+}
+
+.home-stage-poster,
+.home-gem-canvas {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.home-stage-poster {
+  object-fit: contain;
+  transition: opacity 0.7s var(--dna-ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}
+
+.home-gem-canvas {
+  opacity: 0;
+  transition: opacity 0.7s var(--dna-ease-out);
+}
+
+.home-stage.is-live .home-gem-canvas {
+  opacity: 1;
+}
+
+.home-stage.is-live .home-stage-poster {
+  opacity: 0;
+}
+
+.home-stage-caption {
+  position: absolute;
+  right: 0;
+  bottom: 2%;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--dna-text-4);
+}
+
+/* ---------------- Sections ---------------- */
+
+.home-section {
+  padding-top: var(--home-section);
+}
+
+.home-section-title {
+  margin: 12px 0 0;
+  font-size: clamp(32px, 4.6vw, 56px);
+  font-weight: 700;
+  letter-spacing: -0.038em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.home-section-lede {
+  margin: 18px 0 0;
+  max-width: 520px;
+  font-size: clamp(17px, 1.5vw, 19px);
+  line-height: 1.55;
+  color: var(--dna-text-2);
+  text-wrap: pretty;
+}
+
+.home-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: clamp(40px, 7vw, 104px);
+}
+
+.home-split--flip > :first-child {
+  order: 2;
+}
+
+.home-figure {
+  margin: 0;
+}
+
+.home-shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--dna-r-panel);
+  background: var(--dna-surface);
+  box-shadow: var(--dna-sh-panel);
+}
+
+.home-figcaption {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--dna-text-3);
+}
+
+/* -- One stone, one address -- */
+
+.home-address {
+  display: inline-flex;
+  align-items: baseline;
+  margin-top: 26px;
+  padding: 10px 16px;
+  border-radius: var(--dna-r-thumb);
+  background: var(--dna-surface);
+  box-shadow: inset 0 0 0 1px var(--dna-hairline);
+  font-size: clamp(15px, 1.6vw, 18px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--dna-text-2);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.home-address b {
+  font-weight: 650;
+  color: var(--dna-text);
+}
+
+.home-pairing {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(16px, 3vw, 36px);
+}
+
+.home-label {
+  flex: none;
+  width: clamp(132px, 15vw, 176px);
+  margin-bottom: clamp(24px, 5vw, 72px);
+  padding: 16px 16px 14px;
+  border-radius: var(--dna-r-card);
+  background: var(--dna-surface);
+  box-shadow: var(--dna-sh-card);
+  text-align: center;
+}
+
+.home-label img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.home-label-text {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--dna-text-2);
+}
+
+.home-phone {
+  position: relative;
+  width: clamp(220px, 26vw, 300px);
+  flex: none;
+  padding: 9px;
+  border-radius: 46px;
+  background: #1d1d1f;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 30px 70px rgba(0, 0, 0, 0.16);
+}
+
+.home-phone img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 37px;
+  background: var(--dna-bg);
+}
+
+.home-lookup {
+  margin-top: 36px;
+  max-width: 440px;
+}
+
+.home-lookup-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dna-text-2);
+}
+
+.home-lookup-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.home-input {
+  flex: 1;
+  min-width: 0;
+  height: 50px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-surface);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  font: inherit;
+  font-size: 16px;
+  color: var(--dna-text);
+  transition: box-shadow 0.2s var(--dna-ease-out);
+}
+
+.home-input::placeholder {
+  color: var(--dna-text-4);
+}
+
+.home-input:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--dna-accent), 0 0 0 4px rgba(4, 120, 87, 0.14);
+}
+
+.home-btn--dark {
+  background: var(--dna-text);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-btn--dark:hover {
+    background: #000;
+  }
+}
+
+.home-lookup-hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--dna-text-3);
+}
+
+.home-lookup-hint[role="alert"] {
+  color: #b42318;
+}
+
+/* -- Workspace -- */
+
+.home-panel {
+  margin-top: clamp(40px, 6vw, 64px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-radius: var(--dna-r-panel);
+  background: var(--dna-surface);
+  box-shadow: var(--dna-sh-panel);
+  overflow: hidden;
+  list-style: none;
+  padding: 0;
+}
+
+.home-panel-item {
+  padding: clamp(24px, 3vw, 34px);
+  box-shadow: inset -1px 0 0 var(--dna-hairline), inset 0 -1px 0 var(--dna-hairline);
+}
+
+.home-panel-item:nth-child(3n) {
+  box-shadow: inset 0 -1px 0 var(--dna-hairline);
+}
+
+.home-panel-item:nth-last-child(-n + 3) {
+  box-shadow: inset -1px 0 0 var(--dna-hairline);
+}
+
+.home-panel-item:last-child {
+  box-shadow: none;
+}
+
+.home-panel-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.home-panel-copy {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--dna-text-2);
+}
+
+/* -- Closing -- */
+
+.home-closing {
+  padding-top: var(--home-section);
+  padding-bottom: clamp(72px, 10vw, 128px);
+}
+
+.home-closing-inner {
+  max-width: 640px;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.home-closing-inner .home-section-lede {
+  margin-inline: auto;
+}
+
+.home-closing-inner .home-actions {
+  justify-content: center;
+}
+
+/* ---------------- Footer ---------------- */
+
+.home-footer {
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}
+
+.home-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--dna-hairline);
+  font-size: 13px;
+  color: var(--dna-text-3);
+}
+
+.home-footer-inner p {
+  margin: 0;
+}
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 1023.98px) {
+  .home-hero-grid {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    gap: 0;
+    padding-top: clamp(20px, 5vw, 40px);
+  }
+  .home-hero::before {
+    background: radial-gradient(70% 40% at 50% 74%, #ffffff 0%, rgba(255, 255, 255, 0) 72%);
+  }
+  .home-hero-copy {
+    max-width: 640px;
+  }
+  .home-stage {
+    width: min(100%, 620px);
+    margin-top: 8px;
+    aspect-ratio: 1 / 0.86;
+  }
+  .home-split,
+  .home-split--flip {
+    grid-template-columns: 1fr;
+  }
+  .home-split--flip > :first-child {
+    order: 0;
+  }
+  .home-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-panel-item,
+  .home-panel-item:nth-child(3n),
+  .home-panel-item:nth-last-child(-n + 3) {
+    box-shadow: inset -1px 0 0 var(--dna-hairline), inset 0 -1px 0 var(--dna-hairline);
+  }
+  .home-panel-item:nth-child(2n) {
+    box-shadow: inset 0 -1px 0 var(--dna-hairline);
+  }
+  .home-panel-item:nth-last-child(-n + 2) {
+    box-shadow: inset -1px 0 0 var(--dna-hairline);
+  }
+  .home-panel-item:last-child {
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .home-h1 {
+    font-size: clamp(40px, 11.4vw, 52px);
+    letter-spacing: -0.04em;
+  }
+  .home-actions {
+    margin-top: 28px;
+    gap: 4px 20px;
+  }
+  .home-stage {
+    aspect-ratio: 1 / 0.9;
+    margin-top: 4px;
+  }
+  .home-panel {
+    grid-template-columns: 1fr;
+  }
+  .home-panel-item,
+  .home-panel-item:nth-child(2n),
+  .home-panel-item:nth-child(3n),
+  .home-panel-item:nth-last-child(-n + 2),
+  .home-panel-item:nth-last-child(-n + 3) {
+    box-shadow: inset 0 -1px 0 var(--dna-hairline);
+  }
+  .home-panel-item:last-child {
+    box-shadow: none;
+  }
+  .home-pairing {
+    gap: 14px;
+  }
+  .home-label {
+    width: 112px;
+    padding: 12px 12px 10px;
+    margin-bottom: 40px;
+  }
+  .home-label-text {
+    font-size: 11px;
+  }
+  .home-phone {
+    width: min(58vw, 236px);
+    padding: 7px;
+    border-radius: 38px;
+  }
+  .home-phone img {
+    border-radius: 31px;
+  }
+}
+
+/* Landscape phones: keep the CTA and the stone in one view. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .home-hero-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+    min-height: 0;
+  }
+  .home-stage {
+    margin-top: 0;
+    max-height: 78svh;
+  }
+  .home-h1 {
+    font-size: clamp(34px, 5vw, 48px);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .home-nav.is-scrolled {
+    background: var(--dna-bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-btn,
+  .home-link-chevron,
+  .home-stage-poster,
+  .home-gem-canvas {
+    transition-duration: 0.01ms;
+  }
+}
