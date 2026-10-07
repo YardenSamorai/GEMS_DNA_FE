@@ -99,8 +99,9 @@ export function createEmeraldCutGeometry() {
 }
 
 /* The stone as an intersection of half-spaces: one [nx, ny, nz, d] per facet
- * (dot(n, p) = d on the facet, n pointing out). The gem shader traces light
- * inside the stone against these. */
+ * (dot(n, p) = d on the facet, n pointing out). The gem shader renders and
+ * traces light against these, which is what lets the cut be animated: a
+ * facet is a plane sliding in from outside the rough. */
 export function facetPlanes(geometry) {
   const p = geometry.attributes.position.array;
   const planes = [];
@@ -119,4 +120,106 @@ export function facetPlanes(geometry) {
     if (!same) planes.push([n[0], n[1], n[2], d]);
   }
   return planes;
+}
+
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const normalize = (v) => {
+  const l = Math.hypot(...v);
+  return v.map((x) => x / l);
+};
+
+/* Furthest extent of the cut stone along n. */
+function support(geometry, n) {
+  const p = geometry.attributes.position.array;
+  let best = -Infinity;
+  for (let i = 0; i < p.length; i += 3) best = Math.max(best, p[i] * n[0] + p[i + 1] * n[1] + p[i + 2] * n[2]);
+  return best;
+}
+
+/*
+ * The rough it is cut from: beryl grows as a hexagonal prism, so a slightly
+ * irregular six-sided column along the stone's length, with broken ends and a
+ * few chipped edges. Every plane sits outside the finished stone, so the cut
+ * stone always lies inside the rough. Seeded, so every visit (and the still
+ * poster) shows the same crystal.
+ */
+export function roughCrystalPlanes(geometry, seed = 7) {
+  const rand = seeded(seed);
+  const planes = [];
+  const add = (dir, margin) => {
+    const n = normalize(dir);
+    planes.push([...n, support(geometry, n) + margin]);
+  };
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + 0.18 + (rand() - 0.5) * 0.12;
+    add([(rand() - 0.5) * 0.14, Math.cos(a), Math.sin(a)], 0.07 + rand() * 0.08);
+  }
+  add([1, (rand() - 0.5) * 0.7, (rand() - 0.5) * 0.5], 0.12 + rand() * 0.1);
+  add([-1, (rand() - 0.5) * 0.7, (rand() - 0.5) * 0.5], 0.1 + rand() * 0.1);
+  for (let k = 0; k < 5; k++) {
+    const dir = [(rand() - 0.5) * 2, (rand() - 0.5) * 2, (rand() - 0.5) * 2];
+    add(dir, 0.04 + rand() * 0.06);
+  }
+  return planes;
+}
+
+/* Axis-aligned bounds of a convex solid given as planes (sampled; padded by
+ * one cell). Used for the box the stone is ray-cast on. */
+export function convexBounds(planes, extent = 3, cells = 48) {
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  const step = (2 * extent) / cells;
+  for (let i = 0; i <= cells; i++) {
+    const x = -extent + i * step;
+    for (let j = 0; j <= cells; j++) {
+      const y = -extent + j * step;
+      for (let k = 0; k <= cells; k++) {
+        const z = -extent + k * step;
+        if (planes.every(([a, b, c, d]) => a * x + b * y + c * z <= d)) {
+          min[0] = Math.min(min[0], x);
+          min[1] = Math.min(min[1], y);
+          min[2] = Math.min(min[2], z);
+          max[0] = Math.max(max[0], x);
+          max[1] = Math.max(max[1], y);
+          max[2] = Math.max(max[2], z);
+        }
+      }
+    }
+  }
+  return { min: min.map((v) => v - step), max: max.map((v) => v + step) };
+}
+
+/*
+ * When each facet is placed during the cut, 0..1 of the cutting phase:
+ * girdle outline first, then the pavilion steps from the girdle down, the
+ * crown steps, and the table last — the order a cutter works in.
+ */
+export function cutSchedule(planes) {
+  const group = ([, ny]) => (Math.abs(ny) < 0.2 ? 0 : ny < -0.2 ? 1 : ny > 0.999 ? 3 : 2);
+  const windows = [
+    [0, 0.2],
+    [0.14, 0.58],
+    [0.5, 0.82],
+    [0.84, 0.9],
+  ];
+  return planes.map((plane, i) => {
+    const g = group(plane);
+    const [from, to] = windows[g];
+    const members = planes.map((p, j) => [p, j]).filter(([p]) => group(p) === g);
+    // within a group, outer steps (larger d) first
+    members.sort((a, b) => b[0][3] - a[0][3] || a[1] - b[1]);
+    const rank = members.findIndex(([, j]) => j === i);
+    const start = from + ((to - from) * rank) / Math.max(members.length, 1);
+    return { start, duration: 0.1 };
+  });
 }

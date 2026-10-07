@@ -5,6 +5,7 @@ import {
   CubeCamera,
   DoubleSide,
   HalfFloatType,
+  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
@@ -57,7 +58,8 @@ export function createStudioCube(renderer, { size = 256 } = {}) {
     add(new PlaneGeometry(...f.size), new MeshBasicMaterial({ color: new Color(0.01, 0.01, 0.012), side: DoubleSide }), f.at, f.rot);
   }
 
-  const target = new WebGLCubeRenderTarget(size, { type: HalfFloatType, generateMipmaps: false });
+  // Mipmapped: the frosted faces of the rough read blurred light from it.
+  const target = new WebGLCubeRenderTarget(size, { type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter });
   new CubeCamera(0.1, 100, target).update(renderer, scene);
   owned.forEach((o) => o.dispose());
   return target;

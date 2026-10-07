@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useTeam } from "../../context/TeamContext";
 import { firstAllowedLanding } from "../../utils/permissions";
 import PublicHeader from "./PublicHeader";
-import Hero from "./Hero";
+import Journey from "./Journey";
 import Story from "./Story";
 import { AccessAction } from "./AccessAction";
 import "./home.css";
@@ -32,7 +32,6 @@ function useDocumentMeta() {
 
 export default function HomePage() {
   const team = useTeam();
-  const heroRef = useRef(null);
   useDocumentMeta();
 
   // Unchanged from the previous landing: members without admin rights skip
@@ -48,7 +47,7 @@ export default function HomePage() {
       </a>
       <PublicHeader />
       <main id="home-main">
-        <Hero heroRef={heroRef} />
+        <Journey />
         <Story />
         <section className="home-closing" aria-labelledby="home-access-title">
           <div className="home-container">

@@ -1,5 +1,5 @@
 import { Component, Suspense, lazy, useEffect, useRef, useState } from "react";
-import { gemSupport } from "./gemSupport";
+import { CHAPTERS } from "./timeline";
 
 const GemCanvas = lazy(() => import(/* webpackChunkName: "home-gem" */ "./three/GemCanvas"));
 
@@ -31,41 +31,33 @@ const whenSettled = (fn) => {
   };
 };
 
+export const stillSrc = (id, w) => `/home/gem-${id}-${w}.webp`;
+export const STILL_SIZES = "(max-width: 1023px) min(92vw, 620px), 600px";
+
 /**
- * The hero's stone. A still render paints immediately; the live scene loads
- * afterwards where the device can carry it and cross-fades in on its first
- * frame (same pose, so the hand-over is invisible). It only renders while
- * on screen, and follows scroll and a fine pointer — never touch.
+ * The hero's stone. A still of the current chapter paints immediately; where
+ * the device can carry it, the live scene loads afterwards and cross-fades in
+ * on its first frame. It renders only while on screen, and follows scroll
+ * (through `motion`) and a fine pointer — never touch.
  */
-export default function GemStage({ heroRef }) {
+export default function GemStage({ motion, tier, chapter }) {
   const stageRef = useRef(null);
-  const motion = useRef({ progress: 0, pointerX: 0, pointerY: 0, still: false });
-  const [tier, setTier] = useState("none");
   const [mount, setMount] = useState(false);
   const [live, setLive] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const t = gemSupport();
-    if (t === "none") return undefined;
-    setTier(t);
+    if (tier === "none") return undefined;
     return whenSettled(() => setMount(true));
-  }, []);
+  }, [tier]);
 
-  // Reduced motion switched on mid-visit: back to the still render.
+  // Dev builds only: lets the still renderer pose the live scene.
   useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (!mq) return undefined;
-    const onChange = () => {
-      if (mq.matches) {
-        setLive(false);
-        setMount(false);
-        setTier("none");
-      }
-    };
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, []);
+    if (process.env.NODE_ENV === "production") return undefined;
+    window.__gemMotion = motion;
+    return () => delete window.__gemMotion;
+  }, [motion]);
 
   useEffect(() => {
     if (!mount) return undefined;
@@ -73,22 +65,8 @@ export default function GemStage({ heroRef }) {
     const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: "80px 0px" });
     io.observe(el);
 
-    const hero = heroRef.current;
-    let frame = 0;
-    const readScroll = () => {
-      frame = 0;
-      const rect = hero.getBoundingClientRect();
-      const span = Math.max(rect.height * 0.9, 1);
-      motion.current.progress = Math.min(1, Math.max(0, -rect.top / span));
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(readScroll);
-    };
-    readScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-
     const fine = window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
+    if (!fine) return () => io.disconnect();
     const onPointer = (e) => {
       motion.current.pointerX = (e.clientX / window.innerWidth) * 2 - 1;
       motion.current.pointerY = (e.clientY / window.innerHeight) * 2 - 1;
@@ -97,40 +75,44 @@ export default function GemStage({ heroRef }) {
       motion.current.pointerX = 0;
       motion.current.pointerY = 0;
     };
-    if (fine) {
-      window.addEventListener("pointermove", onPointer, { passive: true });
-      document.documentElement.addEventListener("pointerleave", onLeave);
-    }
-
+    window.addEventListener("pointermove", onPointer, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onLeave);
     return () => {
       io.disconnect();
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
       window.removeEventListener("pointermove", onPointer);
       document.documentElement.removeEventListener("pointerleave", onLeave);
     };
-  }, [mount, heroRef]);
+  }, [mount, motion]);
 
   const fail = () => {
     setLive(false);
     setMount(false);
+    setFailed(true);
   };
+
+  // Devices that get the live scene only ever need the first still.
+  const allStills = tier === "none" || failed;
+  const shown = CHAPTERS[chapter].id;
 
   return (
     <div ref={stageRef} className={`home-stage${live ? " is-live" : ""}`}>
-      <img
-        className="home-stage-poster"
-        src="/home/gem-poster-1080.webp"
-        srcSet="/home/gem-poster-640.webp 640w, /home/gem-poster-1080.webp 1080w"
-        sizes="(max-width: 1023px) min(92vw, 620px), 540px"
-        width="1080"
-        height="993"
-        alt=""
-        decoding="async"
-        fetchPriority="high"
-        draggable="false"
-      />
+      {CHAPTERS.map(({ id }) =>
+        id === "rough" || allStills ? (
+          <img
+            key={id}
+            className={`home-stage-poster${id === shown || (!allStills && id === "rough") ? " is-shown" : ""}`}
+            src={stillSrc(id, 1080)}
+            srcSet={`${stillSrc(id, 640)} 640w, ${stillSrc(id, 1080)} 1080w`}
+            sizes={STILL_SIZES}
+            width="1080"
+            height="993"
+            alt=""
+            decoding="async"
+            fetchPriority={id === "rough" ? "high" : "low"}
+            draggable="false"
+          />
+        ) : null
+      )}
       {mount && tier !== "none" && (
         <SceneBoundary onFail={fail}>
           <Suspense fallback={null}>

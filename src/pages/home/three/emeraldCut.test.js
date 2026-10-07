@@ -1,4 +1,12 @@
-import { createEmeraldCutGeometry, emeraldCutTriangles, facetPlanes, octagonRing } from "./emeraldCut";
+import {
+  convexBounds,
+  createEmeraldCutGeometry,
+  cutSchedule,
+  emeraldCutTriangles,
+  facetPlanes,
+  octagonRing,
+  roughCrystalPlanes,
+} from "./emeraldCut";
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
@@ -43,6 +51,32 @@ describe("emerald-cut geometry", () => {
     for (let i = 0; i < p.length; i += 3) {
       for (const [x, y, z, d] of planes) expect(x * p[i] + y * p[i + 1] + z * p[i + 2]).toBeLessThanOrEqual(d + 1e-5);
     }
+  });
+
+  it("cuts the stone from a rough that encloses it", () => {
+    const geometry = createEmeraldCutGeometry();
+    const rough = roughCrystalPlanes(geometry);
+    expect(rough).toHaveLength(13);
+    const p = geometry.attributes.position.array;
+    for (let i = 0; i < p.length; i += 3) {
+      for (const [x, y, z, d] of rough) expect(x * p[i] + y * p[i + 1] + z * p[i + 2]).toBeLessThan(d - 0.03);
+    }
+    // seeded: the same crystal every time
+    expect(roughCrystalPlanes(geometry)).toEqual(rough);
+    const { min, max } = convexBounds(rough, 2.6, 36);
+    expect(max[0] - min[0]).toBeGreaterThan(2.2);
+    expect(max[0]).toBeLessThan(2.6);
+  });
+
+  it("places every facet within the cutting phase, table last", () => {
+    const planes = facetPlanes(createEmeraldCutGeometry());
+    const schedule = cutSchedule(planes);
+    for (const { start, duration } of schedule) {
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(start + duration).toBeLessThanOrEqual(1);
+    }
+    const table = planes.findIndex(([, ny]) => ny > 0.999);
+    expect(Math.max(...schedule.map((s) => s.start))).toBe(schedule[table].start);
   });
 
   it("builds a closed, flat-shaded mesh", () => {

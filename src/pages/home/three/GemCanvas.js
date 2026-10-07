@@ -9,6 +9,24 @@ const QUALITY = {
   low: { dpr: [1, 1.5], env: 128 },
 };
 
+/* The stills are rendered at this aspect and shown with object-fit: contain.
+ * In a narrower box, widen the vertical field of view instead of cropping
+ * the sides — the same framing the still gets. */
+const STILL_ASPECT = 1080 / 993;
+const FOV = 30;
+
+function CameraFit() {
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
+  useEffect(() => {
+    const aspect = size.width / Math.max(size.height, 1);
+    const half = Math.tan((FOV * Math.PI) / 360);
+    camera.fov = aspect < STILL_ASPECT ? (Math.atan((half * STILL_ASPECT) / aspect) * 360) / Math.PI : FOV;
+    camera.updateProjectionMatrix();
+  }, [camera, size]);
+  return null;
+}
+
 function Stone({ motion, tier }) {
   const gl = useThree((s) => s.gl);
   const studio = useMemo(() => createStudioCube(gl, { size: QUALITY[tier].env }), [gl, tier]);
@@ -52,7 +70,7 @@ export default function GemCanvas({ motion, tier = "high", active, onReady, onFa
       className="home-gem-canvas"
       dpr={q.dpr}
       frameloop={active ? "always" : "never"}
-      camera={{ fov: 30, position: [0, 0.32, 6.3], near: 0.1, far: 40 }}
+      camera={{ fov: FOV, position: [0, 0.32, 6.3], near: 0.1, far: 40 }}
       gl={{ antialias: true, alpha: true, powerPreference: tier === "high" ? "high-performance" : "default" }}
       onCreated={({ gl, camera }) => {
         gl.toneMapping = NeutralToneMapping;
@@ -64,6 +82,7 @@ export default function GemCanvas({ motion, tier = "high", active, onReady, onFa
       tabIndex={-1}
       style={{ pointerEvents: "none" }}
     >
+      <CameraFit />
       <Stone motion={motion} tier={tier} />
       <FrameWatch onReady={onReady} onSlow={onFail} />
     </Canvas>
