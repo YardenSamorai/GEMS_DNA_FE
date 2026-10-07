@@ -58,66 +58,70 @@ const sameSku = (a, b) => clean(a) && clean(b) && clean(a).toUpperCase() === cle
  * @param options.loadImage   (url) => src | null; e.g. inline/downscale. Omit
  *                            to use the catalog URL directly.
  */
-export async function enrichMemo(model, { lookupStone = fetchStone, verifyUrl = null, loadImage = null } = {}) {
-  const warnings = [...model.warnings];
-  const items = [];
-  for (const item of model.items) {
-    if (!item.sku) {
-      items.push(item);
-      continue;
-    }
-    let stone = null;
-    try {
-      stone = await lookupStone(item.sku);
-    } catch (error) {
-      warnings.push({ code: "CATALOG_UNAVAILABLE", message: `Item ${item.sku}: catalog lookup failed (${error.message}).`, item: item.index });
-    }
-    if (stone && !sameSku(stone.sku || stone.stone_id, item.sku)) {
-      warnings.push({ code: "CATALOG_MISMATCH", message: `Item ${item.sku}: catalog returned ${stone.sku || stone.stone_id}; not used.`, item: item.index });
-      stone = null;
-    }
-    if (!stone) {
-      warnings.push({ code: "NOT_IN_CATALOG", message: `Item ${item.sku} has no DNA record; shown without image, specs or DNA link.`, item: item.index });
-      items.push(item);
-      continue;
-    }
+export async function enrichMemo(model, options = {}) {
+  const results = await Promise.all(model.items.map((item) => enrichItem(item, options)));
+  return {
+    ...model,
+    items: results.map((r) => r.item),
+    warnings: [...model.warnings, ...results.flatMap((r) => r.warnings)],
+  };
+}
 
-    const facts = catalogFacts(stone);
-    const memoCarat = item.carat?.value;
-    const catalogCarat = Number(stone.carat);
-    if (memoCarat != null && Number.isFinite(catalogCarat) && Math.abs(catalogCarat - memoCarat) > 0.005) {
-      warnings.push({
-        code: "CATALOG_CARAT_DIFFERS",
-        message: `Item ${item.sku}: memo says ${item.carat.text} ct, catalog says ${stone.carat} ct. The memo value is shown.`,
-        item: item.index,
-      });
-    }
+// Barak's stand-in picture when a stone has no photo.
+const PLACEHOLDER_IMAGE = /no_image/i;
 
-    let certificateUrl = null;
-    const candidate = clean(stone.certificate_url);
-    if (candidate && verifyUrl) {
-      try {
-        certificateUrl = (await verifyUrl(candidate)) ? candidate : null;
-      } catch {
-        certificateUrl = null;
-      }
-      if (!certificateUrl) {
-        warnings.push({ code: "CERTIFICATE_UNVERIFIED", message: `Item ${item.sku}: certificate URL did not respond; report number shown without a link.`, item: item.index });
-      }
-    }
-
-    let image = null;
-    const picture = clean(stone.picture);
-    if (picture) {
-      try {
-        image = loadImage ? await loadImage(picture) : picture;
-      } catch {
-        image = null;
-      }
-    }
-    if (!image) warnings.push({ code: "MISSING_IMAGE", message: `Item ${item.sku}: no usable image; the row shows text only.`, item: item.index });
-
-    items.push({ ...item, catalog: { ...facts, image, certificateUrl, dnaUrl: dnaUrl(clean(stone.sku) || item.sku) } });
+async function enrichItem(item, { lookupStone = fetchStone, verifyUrl = null, loadImage = null }) {
+  const warnings = [];
+  if (!item.sku) return { item, warnings };
+  let stone = null;
+  try {
+    stone = await lookupStone(item.sku);
+  } catch (error) {
+    warnings.push({ code: "CATALOG_UNAVAILABLE", message: `Item ${item.sku}: catalog lookup failed (${error.message}).`, item: item.index });
   }
-  return { ...model, items, warnings };
+  if (stone && !sameSku(stone.sku || stone.stone_id, item.sku)) {
+    warnings.push({ code: "CATALOG_MISMATCH", message: `Item ${item.sku}: catalog returned ${stone.sku || stone.stone_id}; not used.`, item: item.index });
+    stone = null;
+  }
+  if (!stone) {
+    warnings.push({ code: "NOT_IN_CATALOG", message: `Item ${item.sku} has no DNA record; shown without image, specs or DNA link.`, item: item.index });
+    return { item, warnings };
+  }
+
+  const facts = catalogFacts(stone);
+  const memoCarat = item.carat?.value;
+  const catalogCarat = Number(stone.carat);
+  if (memoCarat != null && Number.isFinite(catalogCarat) && Math.abs(catalogCarat - memoCarat) > 0.005) {
+    warnings.push({
+      code: "CATALOG_CARAT_DIFFERS",
+      message: `Item ${item.sku}: memo says ${item.carat.text} ct, catalog says ${stone.carat} ct. The memo value is shown.`,
+      item: item.index,
+    });
+  }
+
+  let certificateUrl = null;
+  const candidate = clean(stone.certificate_url);
+  if (candidate && verifyUrl) {
+    try {
+      certificateUrl = (await verifyUrl(candidate)) ? candidate : null;
+    } catch {
+      certificateUrl = null;
+    }
+    if (!certificateUrl) {
+      warnings.push({ code: "CERTIFICATE_UNVERIFIED", message: `Item ${item.sku}: certificate URL did not respond; report number shown without a link.`, item: item.index });
+    }
+  }
+
+  let image = null;
+  const picture = clean(stone.picture);
+  if (picture && !PLACEHOLDER_IMAGE.test(picture)) {
+    try {
+      image = loadImage ? await loadImage(picture) : picture;
+    } catch {
+      image = null;
+    }
+  }
+  if (!image) warnings.push({ code: "MISSING_IMAGE", message: `Item ${item.sku}: no usable image; the row shows text only.`, item: item.index });
+
+  return { item: { ...item, catalog: { ...facts, image, certificateUrl, dnaUrl: dnaUrl(clean(stone.sku) || item.sku) } }, warnings };
 }

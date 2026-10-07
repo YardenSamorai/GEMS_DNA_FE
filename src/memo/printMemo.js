@@ -8,8 +8,8 @@ import { renderMemoHtml } from "./renderMemoHtml";
  * Image and certificate URLs are used as the catalog returns them; pass
  * `verifyUrl` to link certificates (the strict default shows lab + number).
  */
-export async function memoHtmlFromRecord(record, { catalog = true, verifyUrl = null, lookupStone } = {}) {
-  let model = buildMemoModel(record);
+export async function memoHtmlFromRecord(record, { catalog = true, verifyUrl = null, lookupStone, draft } = {}) {
+  let model = buildMemoModel(record, draft === undefined ? {} : { draft });
   if (catalog && model.items.length) model = await enrichMemo(model, { verifyUrl, ...(lookupStone ? { lookupStone } : {}) });
   const logo = issuerLogo(model.issuer?.name);
   const html = await renderMemoHtml(model, { issuerLogo: logo && { ...logo, src: `${window.location.origin}${logo.src}` } });
@@ -33,10 +33,14 @@ export function printMemoHtml(html) {
       await Promise.all([...doc.images].filter((img) => !img.complete).map(settled));
       if (doc.fonts?.ready) await doc.fonts.ready;
       const win = frame.contentWindow;
+      // Browsers name the saved PDF after the top-level document's title.
+      const pageTitle = document.title;
+      if (doc.title) document.title = doc.title;
       let done = false;
       const cleanup = () => {
         if (done) return;
         done = true;
+        document.title = pageTitle;
         frame.remove();
         resolve();
       };

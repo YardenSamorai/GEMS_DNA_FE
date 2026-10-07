@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import {
   BookOpen,
   FileSpreadsheet,
+  FileSignature,
   FileText,
   MessageCircle,
   PanelLeftClose,
@@ -42,6 +43,7 @@ import { exportToExcel, exportToExcelSeparate, exportToInternalExcel, getCategor
 import { exportCatalogLiran } from "./helpers/catalogLiran";
 import BarcodeScanner from "./components/BarcodeScanner";
 import CatalogLiranModal from "./components/CatalogLiranModal";
+import MemoSheet from "./components/MemoSheet";
 import CategoryExportModal from "./components/CategoryExportModal";
 import ColumnSettingsModal from "./components/ColumnSettingsModal";
 import CompareModal from "./components/CompareModal";
@@ -100,6 +102,7 @@ const LAYOUT_KEY = "inventory.layout";
 const RAIL_KEY = "inventory.rail";
 const ASSIGNEE_KEY = "inventory.assigneeFilter";
 const REVALIDATE_MS = 60_000;
+const EMPTY_LIST = [];
 
 const DEFAULT_COLUMNS_BY_MODE = {
   diamonds: DIAMOND_DEFAULT_COLUMNS,
@@ -864,10 +867,12 @@ const StoneSearchPage = () => {
   const [niimbotOpen, setNiimbotOpen] = useState(false);
   const [niimbotStones, setNiimbotStones] = useState([]);
   const [crmOpen, setCrmOpen] = useState(false);
+  const [memoStones, setMemoStones] = useState(null);
 
   const legacyModalOpen =
     tagsOpen || columnsOpen || compareOpen || exportOpen || categoryChoiceOpen || internalOpen || pdfPriceOpen ||
-    pdfOpen || Boolean(liranStones) || niimbotOpen || crmOpen || scannerOpen || Boolean(lightbox.image || lightbox.video);
+    pdfOpen || Boolean(liranStones) || niimbotOpen || crmOpen || Boolean(memoStones) || scannerOpen ||
+    Boolean(lightbox.image || lightbox.video);
 
   const railVisible = isDesktop && railPref;
   const quickLookVariant = isWide ? "panel" : isPhone ? "bottom" : "side";
@@ -948,10 +953,22 @@ const StoneSearchPage = () => {
     }
   };
 
+  const openMemo = () => {
+    if (!requireSelection()) return;
+    const stones = selectedItems.filter((it) => (it?.category || "").toLowerCase() !== "jewelry" && !it?.jewelryType);
+    if (stones.length === 0) {
+      toast.error("Memos list stones — select at least one stone.");
+      return;
+    }
+    if (stones.length < selectedItems.length) toast("Jewelry isn't listed on a memo; only the stones are included.");
+    setMemoStones(applyPriceMode(stones));
+  };
+
   const selectionActions = [
     {
       label: "Export",
       items: [
+        { id: "memo", label: "Memo", sub: "Gemstar consignment memo · PDF", icon: FileSignature, onSelect: openMemo },
         { id: "excel", label: "Excel", sub: "Spreadsheet with all details", icon: FileSpreadsheet, onSelect: handleExportClick },
         {
           id: "internal",
@@ -1549,6 +1566,15 @@ const StoneSearchPage = () => {
       />
 
       {crmOpen && <SendToCrmModal stones={selectedItems} onClose={() => setCrmOpen(false)} />}
+
+      <MemoSheet
+        open={Boolean(memoStones)}
+        stones={memoStones || EMPTY_LIST}
+        onClose={() => setMemoStones(null)}
+        priceMode={priceMode}
+        salesman={user?.fullName || ""}
+        variant={isPhone ? "bottom" : "side"}
+      />
     </div>
   );
 };
