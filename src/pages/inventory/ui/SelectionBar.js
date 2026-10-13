@@ -12,13 +12,13 @@ const EXIT = { duration: 0.14, ease: EASE_OUT };
 
 /* Floats over the results while anything is selected. `actions` is a list of
  * sections: [{ label, items: [{ id, label, sub, icon, onSelect }] }]. */
-const SelectionBar = ({ count, caratText, pairsText, canCompare, onCompare, onClear, actions, sheet }) => {
+const SelectionBar = ({ count, caratText, breakdownText, pairsText, canCompare, onCompare, onClear, actions, sheet }) => {
   const btnRef = useRef(null);
   const [open, setOpen] = useState(false);
   const reduce = useReducedMotion();
   // While the bar leaves, it keeps showing the selection it had.
   const last = useRef(null);
-  if (count) last.current = { count, caratText, pairsText, canCompare };
+  if (count) last.current = { count, caratText, breakdownText, pairsText, canCompare };
   const shown = last.current;
   const off = reduce ? { opacity: 0 } : { opacity: 0, y: 16 };
 
@@ -44,8 +44,13 @@ const SelectionBar = ({ count, caratText, pairsText, canCompare, onCompare, onCl
           >
             <span className="inv-selbar-count" aria-live="polite">
               <b>{shown.count.toLocaleString()}</b> selected
-              {shown.pairsText && <span className="inv-selbar-ct"> · {shown.pairsText}</span>}
-              {!shown.pairsText && shown.caratText && <span className="inv-selbar-ct"> · {shown.caratText}</span>}
+              {shown.breakdownText ? (
+                <span className="inv-selbar-ct"> · {shown.breakdownText}</span>
+              ) : shown.pairsText ? (
+                <span className="inv-selbar-ct"> · {shown.pairsText}</span>
+              ) : (
+                shown.caratText && <span className="inv-selbar-ct"> · {shown.caratText}</span>
+              )}
             </span>
             <button type="button" className="inv-icon-btn" onClick={onClear} aria-label="Clear selection" title="Clear selection">
               <X size={17} strokeWidth={1.75} />
@@ -75,7 +80,7 @@ const SelectionBar = ({ count, caratText, pairsText, canCompare, onCompare, onCl
       </AnimatePresence>
 
       {!count ? null : sheet ? (
-        <Sheet open={open} variant="bottom" onClose={() => setOpen(false)} title={`${count} selected`} titleId="inv-actions-title">
+        <Sheet open={open} variant="bottom" onClose={() => setOpen(false)} title={breakdownText ? `${count} selected · ${breakdownText}` : `${count} selected`} titleId="inv-actions-title">
           <div className="inv-action-list">
             {actions.map((section) => (
               <div key={section.label} role="group" aria-label={section.label}>

@@ -76,6 +76,7 @@ import {
   normalizeCatalogJewelry,
   normalizeStone,
   normalizeWorkshopJewelry,
+  isJewelryItem,
   sortItems,
   sortOptionsFor,
   stoneMode,
@@ -551,7 +552,8 @@ const StoneSearchPage = () => {
       if (next === mode) return;
       setMode(next);
       setFiltersRaw(emptyFilters(""));
-      setSelected(new Set());
+      // The selection is kept across tabs so one export can mix diamonds,
+      // gemstones and jewelry.
       setActiveId(null);
       setPage(1);
       setSmartSearchRaw("");
@@ -929,7 +931,9 @@ const StoneSearchPage = () => {
     if (!requireSelection()) return;
     const b = getCategoryBreakdown(selectedItems);
     const categoryCount = [b.emeralds, b.diamonds, b.other].filter(Boolean).length;
-    if (categoryCount === 1) {
+    // Per-category sheets have no jewelry layout, so any selection with
+    // jewelry goes to the single combined sheet.
+    if (categoryCount === 1 || selectedItems.some(isJewelryItem)) {
       setExportMode("combined");
       setExportOpen(true);
     } else {
@@ -1122,6 +1126,13 @@ const StoneSearchPage = () => {
   const showError = mode !== "jewelry" && stonesError && !stonesReady;
   const refreshing = ready && mode !== "jewelry" && stonesLoading;
   const selectedCarats = selectedItems.reduce((sum, s) => sum + (Number(s.weightCt) || 0), 0);
+  const selectedKinds = [
+    [internalCounts.diamond, "diamond", "diamonds"],
+    [internalCounts.gemstone, "gemstone", "gemstones"],
+    [internalCounts.jewelry, "jewelry", "jewelry"],
+  ].filter(([n]) => n > 0);
+  const breakdownText =
+    selectedKinds.length > 1 ? selectedKinds.map(([n, one, many]) => `${n} ${n === 1 ? one : many}`).join(" · ") : "";
 
   const countText = loadingFirst ? (
     "Loading…"
@@ -1386,6 +1397,7 @@ const StoneSearchPage = () => {
       <SelectionBar
         count={selected.size}
         caratText={selectedCarats > 0 ? `${selectedCarats.toFixed(2)} ct` : ""}
+        breakdownText={breakdownText}
         pairsText={pairView ? `${Math.ceil(selected.size / 2)} pair${Math.ceil(selected.size / 2) === 1 ? "" : "s"}` : ""}
         canCompare={selected.size >= 2 && selected.size <= 3}
         onCompare={() => setCompareOpen(true)}

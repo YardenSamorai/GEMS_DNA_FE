@@ -127,9 +127,12 @@ export const createCategorySheet = (workbook, sheetName, data, columns, accentCo
     }
   };
 
+  const withJewelry = data.some((s) => _bucketFor(s) === "jewelry");
+  const noun = withJewelry ? "items" : "stones";
+
   // === ROW 1: Title ===
   fillRow(1,
-    `SELECTED STONES  \u00B7  ${data.length} stones  \u00B7  ${totalWeight.toFixed(2)} cts  \u00B7  ${date}`,
+    `SELECTED ${noun.toUpperCase()}  \u00B7  ${data.length} ${noun}  \u00B7  ${totalWeight.toFixed(2)} cts  \u00B7  ${date}`,
     { bold: true, size: 16, color: { argb: "FF000000" }, name: "Lato" },
     whiteFill,
     { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom },
@@ -138,7 +141,7 @@ export const createCategorySheet = (workbook, sheetName, data, columns, accentCo
 
   // === ROW 2: Subtitle ===
   fillRow(2,
-    "STONE CATALOG",
+    withJewelry ? "GEMS & JEWELRY CATALOG" : "STONE CATALOG",
     { italic: true, size: 12, color: { argb: "FF000000" }, name: "Lato" },
     whiteFill,
     { left: blackBorderMedium, right: blackBorderMedium, top: blackBorderMedium, bottom: greenBorderBottom },
@@ -220,10 +223,18 @@ export const createCategorySheet = (workbook, sheetName, data, columns, accentCo
         case 'fancyOvertone2': rowData.fancyOvertone2 = stone.fancyOvertone2 || ''; break;
         case 'pairSku': rowData.pairSku = stone.pairSku || ''; break;
         case 'dna': rowData.dna = stone.sku || ''; break;
-        case 'certificate': rowData.certificate = stone.certificateUrl || ''; break;
+        case 'certificate': rowData.certificate = stone.certificateUrl || stone.certificateLink || ''; break;
         case 'appendix': rowData.appendix = ''; break;
         case 'image': rowData.image = stone.imageUrl || ''; break;
         case 'video': rowData.video = stone.videoUrl || stone.videoLink || ''; break;
+        case 'itemType': {
+          const bucket = _bucketFor(stone);
+          rowData.itemType = bucket === 'jewelry' ? (stone.jewelryType || 'Jewelry') : bucket === 'diamond' ? 'Diamond' : 'Gemstone';
+          break;
+        }
+        case 'title': rowData.title = stone.title || ''; break;
+        case 'metalType': rowData.metalType = stone.metalType || ''; break;
+        case 'jewelryWeight': rowData.jewelryWeight = stone.jewelryWeight != null && stone.jewelryWeight !== '' ? Number(stone.jewelryWeight) || stone.jewelryWeight : ''; break;
         default: rowData[col.key] = '';
       }
     });
@@ -263,16 +274,27 @@ export const createCategorySheet = (workbook, sheetName, data, columns, accentCo
     const vidCol = effectiveColumns.findIndex(c => c.key === 'video');
     const pairSkuCol = effectiveColumns.findIndex(c => c.key === 'pairSku');
 
-    if (dnaCol >= 0 && stone.sku) {
-      row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: `${dnaBaseUrl}/${stone.sku}` };
-      row.getCell(dnaCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, bold: true, name: "Lato" };
+    const isJewelry = _bucketFor(stone) === "jewelry";
+    // Workshop pieces have no public DNA page.
+    const dnaUrl = !stone.sku ? null
+      : !isJewelry ? `${dnaBaseUrl}/${stone.sku}`
+      : stone.source === "workshop" ? null
+      : `${dnaBaseUrl}/jewelry/${encodeURIComponent(stone.sku)}`;
+    if (dnaCol >= 0) {
+      if (dnaUrl) {
+        row.getCell(dnaCol + 1).value = { text: "DNA", hyperlink: dnaUrl };
+        row.getCell(dnaCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, bold: true, name: "Lato" };
+      } else {
+        row.getCell(dnaCol + 1).value = "";
+      }
     }
     if (pairSkuCol >= 0 && stone.pairSku) {
       row.getCell(pairSkuCol + 1).value = { text: stone.pairSku, hyperlink: `${dnaBaseUrl}/${stone.pairSku}` };
       row.getCell(pairSkuCol + 1).font = { color: { argb: "FF8B5CF6" }, underline: true, size: 10, name: "Lato" };
     }
-    if (certCol >= 0 && stone.certificateUrl) {
-      row.getCell(certCol + 1).value = { text: "Cert", hyperlink: stone.certificateUrl };
+    const certUrl = stone.certificateUrl || stone.certificateLink;
+    if (certCol >= 0 && certUrl) {
+      row.getCell(certCol + 1).value = { text: "Cert", hyperlink: certUrl };
       row.getCell(certCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
     }
     if (appendixCol >= 0 && stone.lab && stone.lab.toUpperCase() === "GRS" && stone.certificateUrl) {
@@ -298,7 +320,7 @@ export const createCategorySheet = (workbook, sheetName, data, columns, accentCo
 
   // Footer message row (no merge)
   fillRow(footerStartRow,
-    `${sheetName} \u2014 ${data.length} stones exported on ${date}`,
+    `${sheetName} \u2014 ${data.length} ${noun} exported on ${date}`,
     { italic: true, size: 10, color: { argb: "FF333333" }, name: "Lato" },
     whiteFill,
     { top: { style: "thin", color: { argb: greenAccent } }, bottom: darkBorder },
@@ -478,12 +500,40 @@ export const exportToExcel = async (customStones, options = {}, user = null) => 
   const breakdown = getCategoryBreakdown(selectedData);
   const isOnlyEmeralds = breakdown.emeralds > 0 && !breakdown.diamonds && !breakdown.other;
   const isOnlyDiamonds = breakdown.diamonds > 0 && !breakdown.emeralds && !breakdown.other;
+  const hasJewelry = selectedData.some((s) => _bucketFor(s) === "jewelry");
   
   let columnsToUse;
   let sheetName;
   let accentColor = "FF00A86B";
   
-  if (isOnlyEmeralds) {
+  if (hasJewelry) {
+    columnsToUse = [
+      { key: "num", header: "#", width: 5 },
+      { key: "itemType", header: "Type", width: 12 },
+      { key: "sku", header: "SKU", width: 18 },
+      { key: "title", header: "Description", width: 30 },
+      { key: "pairSku", header: "Pair SKU", width: 18 },
+      { key: "shape", header: "Shape", width: 12 },
+      { key: "weight", header: "Weight (ct)", width: 12 },
+      { key: "color", header: "Color", width: 8 },
+      { key: "clarity", header: "Clarity", width: 10 },
+      { key: "measurements", header: "Measurements", width: 20 },
+      { key: "treatment", header: "Treatment", width: 18 },
+      { key: "origin", header: "Origin", width: 12 },
+      { key: "lab", header: "Lab", width: 10 },
+      { key: "metalType", header: "Metal", width: 14 },
+      { key: "jewelryWeight", header: "Weight (g)", width: 11 },
+      { key: "pricePerCt", header: "Price/ct ($)", width: 14 },
+      { key: "priceTotal", header: "Total ($)", width: 14 },
+      { key: "dna", header: "DNA", width: 12 },
+      { key: "certificate", header: "Certificate", width: 15 },
+      { key: "appendix", header: "Appendix", width: 14 },
+      { key: "image", header: "Image", width: 12 },
+      { key: "video", header: "Video", width: 12 },
+    ];
+    sheetName = "Selected Items";
+    accentColor = "FF8B5CF6";
+  } else if (isOnlyEmeralds) {
     columnsToUse = EMERALD_COLUMNS;
     sheetName = "Emeralds";
     accentColor = "FF00A86B";
@@ -502,7 +552,7 @@ export const exportToExcel = async (customStones, options = {}, user = null) => 
       { key: "clarity", header: "Clarity", width: 10 },
       { key: "measurements", header: "Measurements", width: 20 },
       { key: "ratio", header: "Ratio", width: 8 },
-      { key: "treatment", header: "Clarity", width: 18 },
+      { key: "treatment", header: "Treatment", width: 18 },
       { key: "origin", header: "Origin", width: 12 },
       { key: "lab", header: "Lab", width: 10 },
       { key: "fluorescence", header: "Fluor.", width: 10 },

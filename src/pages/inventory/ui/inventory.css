@@ -1183,6 +1183,9 @@
   .inv-selbar { left: calc(50% + 120px); }
 }
 .inv-selbar-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 10px 0 6px;
   font-size: 14px;
   white-space: nowrap;
