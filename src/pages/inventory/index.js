@@ -61,6 +61,7 @@ import {
   buildFancyColorOptions,
   buildJewelryOptions,
   buildLabOptions,
+  buildClientOptions,
   buildPairGroups,
   buildShapeOptions,
   DEFAULT_SORT,
@@ -180,7 +181,14 @@ const StoneSearchPage = () => {
   const [priceMode, setPriceMode] = useState(readPriceMode);
   const [init] = useState(() => initialView(searchParams, priceMode));
   const [mode, setMode] = useState(init.mode);
-  const [filters, setFiltersRaw] = useState(init.filters);
+  const [storedFilters, setFiltersRaw] = useState(init.filters);
+  // Who holds which stones on memo is admin-only — a shared link or saved view
+  // carrying a client filter does nothing for anyone else.
+  const canSearchClients = Boolean(team?.ready && !team.loadError && team.isAdmin);
+  const filters = useMemo(
+    () => (canSearchClients || !storedFilters.client?.length ? storedFilters : { ...storedFilters, client: [] }),
+    [canSearchClients, storedFilters]
+  );
   const [smartSearch, setSmartSearchRaw] = useState(init.smartSearch);
   const [sort, setSortRaw] = useState(init.sort);
   const [page, setPage] = useState(init.page);
@@ -485,9 +493,10 @@ const StoneSearchPage = () => {
       diamondColors: buildDiamondColorOptions(modeItems),
       fancyColors: buildFancyColorOptions(modeItems),
       labs: buildLabOptions(modeItems),
+      clients: canSearchClients ? buildClientOptions(modeItems) : [],
       jewelry: { type: [], style: [], collection: [], stoneType: [], metal: [] },
     };
-  }, [mode, modeItems, jewelry]);
+  }, [mode, modeItems, jewelry, canSearchClients]);
 
   const showAssignee = mode !== "jewelry" && team?.ready && (team.members || []).length > 1;
   const assigneeLabel = useMemo(() => {
@@ -1162,6 +1171,7 @@ const StoneSearchPage = () => {
       onDeleteSaved={deleteSaved}
       onSaveCurrent={saveCurrent}
       canSave={Boolean(user?.id)}
+      canSearchClients={canSearchClients}
       team={team}
       assignee={assignee}
       onAssigneeChange={setAssignee}

@@ -536,6 +536,38 @@
 .inv-field--prefix .inv-field-unit { left: 10px; right: auto; }
 @media (pointer: coarse) { .inv-input { height: 44px; font-size: 16px; } }
 
+/* Client on memo */
+.inv-clients { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+.inv-client {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dna-text-body);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.inv-client-name { font-size: 13px; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.inv-client-meta { flex: none; font-size: 12px; color: var(--dna-text-3); font-variant-numeric: tabular-nums; }
+.inv-client[aria-pressed="true"] {
+  background: var(--inv-accent-tint);
+  color: var(--dna-accent);
+  box-shadow: inset 0 0 0 1px var(--inv-accent-tint-2);
+}
+.inv-client[aria-pressed="true"] .inv-client-meta { color: inherit; opacity: 0.75; }
+@media (hover: hover) and (pointer: fine) {
+  .inv-client:hover { background: var(--dna-track); color: var(--dna-text); }
+  .inv-client[aria-pressed="true"]:hover { background: var(--inv-accent-tint); color: var(--dna-accent); }
+}
+@media (pointer: coarse) { .inv-client { min-height: 44px; } }
+
 .inv-fnote { margin: 8px 0 0; font-size: 12px; color: var(--dna-text-3); }
 .inv-fnote b { color: var(--dna-text-2); font-weight: 500; }
 

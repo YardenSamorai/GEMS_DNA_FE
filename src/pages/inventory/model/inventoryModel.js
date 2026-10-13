@@ -36,6 +36,7 @@ export const DEFAULT_FILTERS = Object.freeze({
   category: [],
   tag: [],
   location: [],
+  client: [],
   groupingType: [],
   diamondColor: [],
   fancyColor: [],
@@ -50,6 +51,7 @@ export const emptyFilters = (sku = "") => ({
   category: [],
   tag: [],
   location: [],
+  client: [],
   groupingType: [],
   diamondColor: [],
   fancyColor: [],
@@ -97,6 +99,7 @@ export const normalizeStone = (row, index) => ({
   location: row.location ?? "",
   branch: row.branch ?? "",
   exactLocation: row.exactLocation ?? "",
+  onMemo: Boolean(row.onMemo),
   cut: row.cut ?? "",
   polish: row.polish ?? "",
   symmetry: row.symmetry ?? "",
@@ -302,6 +305,7 @@ const filterStones = (items, { filters, skuQuery, parsedSearch, priceMode, stone
     if (filters.treatment.length > 0 && !filters.treatment.some((t) => stone.treatment?.toLowerCase() === t.toLowerCase())) return false;
     if (filters.category.length > 0 && !filters.category.some((c) => getMappedCategories(stone.category).includes(c))) return false;
     if (filters.location.length > 0 && !filters.location.includes(stone.location)) return false;
+    if (filters.client?.length > 0 && !filters.client.includes(memoClientOf(stone))) return false;
     // Lab — case-insensitive equality; blank/"N/A" never matches a picked lab.
     const labFilterValues = filters.lab || [];
     if (labFilterValues.length > 0) {
@@ -563,6 +567,25 @@ export const buildLabOptions = (items) => {
   return Array.from(set).sort();
 };
 
+/* The client holding a stone on memo — the server's exact location, which it
+ * only sends to viewers with full location access. In-house stones have none. */
+export const memoClientOf = (stone) =>
+  stone.onMemo ? String(stone.exactLocation || "").trim().replace(/\s+/g, " ") : "";
+
+/* Every client with stones on memo in this tab, busiest first. */
+export const buildClientOptions = (items) => {
+  const byName = new Map();
+  items.forEach((s) => {
+    const name = memoClientOf(s);
+    if (!name) return;
+    const row = byName.get(name) || { name, count: 0, carats: 0 };
+    row.count += 1;
+    row.carats += Number(s.weightCt) || 0;
+    byName.set(name, row);
+  });
+  return Array.from(byName.values()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+};
+
 export const distinctValues = (items, getValue) => {
   const set = new Set();
   items.forEach((item) => {
@@ -626,7 +649,7 @@ const RANGE_FILTERS = [
   { id: "width", min: "minWidth", max: "maxWidth", format: (a, b) => `Width ${formatRange(a, b, { suffix: " mm" })}` },
 ];
 
-const LIST_KEYS = ["shape", "category", "diamondColor", "fancyColor", "treatment", "lab", "groupingType", "location", "tag"];
+const LIST_KEYS = ["shape", "category", "diamondColor", "fancyColor", "treatment", "lab", "groupingType", "location", "client", "tag"];
 
 const listValueLabel = (key, value, isJewelry) => {
   if (isJewelry) return value;
@@ -643,6 +666,8 @@ const listValueLabel = (key, value, isJewelry) => {
       return value === "Empty" ? "No category" : value;
     case "tag":
       return `Tag: ${value}`;
+    case "client":
+      return `At ${value}`;
     case "treatment":
       return `Clarity: ${value}`;
     default:

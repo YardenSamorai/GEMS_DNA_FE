@@ -9,6 +9,7 @@ const LIST_PARAMS = {
   category: "cat",
   treatment: "clarity",
   location: "loc",
+  client: "client",
   lab: "lab",
   groupingType: "group",
   diamondColor: "color",

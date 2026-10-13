@@ -175,6 +175,60 @@ const AssigneeChips = ({ team, value, onChange }) => {
   );
 };
 
+/* ---------------- client on memo (admin) ---------------- */
+
+const CLIENT_LIMIT = 8;
+
+const ClientPicker = ({ clients, selected, onChange }) => {
+  const [query, setQuery] = useState("");
+  const [all, setAll] = useState(false);
+  const q = query.trim().toLowerCase();
+  const matches = q ? clients.filter((c) => c.name.toLowerCase().includes(q)) : clients;
+  const shown = all || q ? matches : matches.filter((c, i) => i < CLIENT_LIMIT || selected.includes(c.name));
+  return (
+    <>
+      <label className="inv-field" style={{ display: "block" }}>
+        <span className="inv-sr">Search clients</span>
+        <input
+          className="inv-input"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`Search ${clients.length} clients`}
+          autoComplete="off"
+          spellCheck="false"
+        />
+      </label>
+      {shown.length > 0 ? (
+        <ul className="inv-clients">
+          {shown.map((c) => (
+            <li key={c.name}>
+              <button
+                type="button"
+                className="inv-client"
+                aria-pressed={selected.includes(c.name)}
+                onClick={() => onChange(toggleIn(selected, c.name))}
+              >
+                <span className="inv-client-name">{c.name}</span>
+                <span className="inv-client-meta">
+                  {c.count} {c.count === 1 ? "stone" : "stones"} · {c.carats.toLocaleString("en-US", { maximumFractionDigits: 2 })} ct
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="inv-fnote">{q ? "No client matches." : "No stones on memo in this tab."}</p>
+      )}
+      {!q && !all && matches.length > shown.length && (
+        <button type="button" className="inv-more" onClick={() => setAll(true)}>
+          Show all {matches.length}
+        </button>
+      )}
+    </>
+  );
+};
+
 /* ---------------- saved views ---------------- */
 
 const MODE_SHORT = { diamonds: "Diamonds", gemstones: "Gemstones", jewelry: "Jewelry" };
@@ -237,9 +291,10 @@ const SavedViews = ({ saved, onLoad, onDelete, onSave, canSave }) => {
 
 /* ---------------- panel ---------------- */
 
-const STONE_GROUPS = (mode) => [
+const STONE_GROUPS = (mode, canSearchClients) => [
   { id: "saved", keys: [] },
   { id: "smart", keys: [] },
+  ...(canSearchClients ? [{ id: "client", keys: ["client"] }] : []),
   { id: "shape", keys: ["shape"] },
   { id: "weight", keys: ["minCarat", "maxCarat"] },
   mode === "diamonds" ? { id: "color", keys: ["diamondColor", "fancyColor"] } : { id: "category", keys: ["category"] },
@@ -278,6 +333,7 @@ const FilterPanel = ({
   onDeleteSaved,
   onSaveCurrent,
   canSave,
+  canSearchClients = false,
   team,
   assignee,
   onAssigneeChange,
@@ -286,7 +342,7 @@ const FilterPanel = ({
   jewelryCounts,
 }) => {
   const isJewelry = mode === "jewelry";
-  const groups = isJewelry ? JEWELRY_GROUPS : STONE_GROUPS(mode);
+  const groups = isJewelry ? JEWELRY_GROUPS : STONE_GROUPS(mode, canSearchClients);
   const showAssignee = !isJewelry && team?.ready && (team.members || []).length > 1;
 
   const activeOf = (g) => {
@@ -348,6 +404,12 @@ const FilterPanel = ({
             ) : (
               <p className="inv-fnote">Shape, weight, colour, clarity, lab, origin, price per carat or SKU.</p>
             )}
+          </FilterGroup>
+        );
+      case "client":
+        return (
+          <FilterGroup key={g.id} id={g.id} label="Client on memo" open={open[g.id]} onToggle={toggle} count={activeOf(g)} summary={summaryOf(g)}>
+            <ClientPicker clients={options.clients || []} selected={filters.client || []} onChange={setList("client")} />
           </FilterGroup>
         );
       case "shape":

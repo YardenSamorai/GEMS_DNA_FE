@@ -1,6 +1,7 @@
 import {
   activeFilterChips,
   applyChipRemoval,
+  buildClientOptions,
   buildPairGroups,
   buildShapeOptions,
   emptyFilters,
@@ -113,6 +114,34 @@ describe("filterItems", () => {
     const parsed = parseSmartSearch("3ct");
     expect(filterItems(items, ctx({ smartSearch: "3ct", parsedSearch: parsed })).map((s) => s.sku)).toEqual(["B"]);
   });
+
+  it("filters by the client holding the stone on memo", () => {
+    const m1 = stone({ sku: "M1", exactLocation: "Acme  Jewels", onMemo: true });
+    const m2 = stone({ sku: "M2", exactLocation: "Other Store", onMemo: true });
+    const house = stone({ sku: "H1", exactLocation: "Acme Jewels", onMemo: false });
+    const f = { ...emptyFilters(), client: ["Acme Jewels"] };
+    expect(filterItems([m1, m2, house], ctx({ filters: f })).map((s) => s.sku)).toEqual(["M1"]);
+  });
+});
+
+describe("buildClientOptions", () => {
+  it("counts stones and carats per memo client, busiest first, ignoring in-house stones", () => {
+    const rows = buildClientOptions([
+      stone({ sku: "1", weightCt: 1.5, exactLocation: "Beta", onMemo: true }),
+      stone({ sku: "2", weightCt: 2, exactLocation: "Alpha", onMemo: true }),
+      stone({ sku: "3", weightCt: 0.25, exactLocation: " Alpha ", onMemo: true }),
+      stone({ sku: "4", weightCt: 9, exactLocation: "Eshed Diam Inc - NY", onMemo: false }),
+      stone({ sku: "5", weightCt: 1, exactLocation: "", onMemo: false }),
+    ]);
+    expect(rows).toEqual([
+      { name: "Alpha", count: 2, carats: 2.25 },
+      { name: "Beta", count: 1, carats: 1.5 },
+    ]);
+  });
+
+  it("is empty when the server withheld exact locations", () => {
+    expect(buildClientOptions([stone({ sku: "1", exactLocation: null, onMemo: true })])).toEqual([]);
+  });
 });
 
 describe("sortItems", () => {
@@ -175,6 +204,7 @@ describe("URL state", () => {
       ...emptyFilters("T9616"),
       shape: ["Cushion", "Oval"],
       lab: ["GRS"],
+      client: ["Acme & Sons"],
       minCarat: "2.5",
       maxPrice: "50000",
       box: "12",
