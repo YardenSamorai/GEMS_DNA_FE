@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, createContext, useContext } from "react";
 import { flushSync } from "react-dom";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet } from "react-router-dom";
-import { SignedIn, SignedOut, UserButton, useAuth, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, UserButton, useAuth, useClerk, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
 import Dashboard from "./pages/Dashboard";
 import JewelryPage from "./pages/JewelryPage";
@@ -155,6 +155,10 @@ const AppLayout = () => {
     return <WorkspaceLoadErrorScreen onRetry={team.refresh} />;
   }
 
+  if (clerkLoaded && isSignedIn && team?.ready && team?.notMember) {
+    return <NotInvitedScreen email={team.actor?.email} />;
+  }
+
   // Hard redirect: store-portal users have no business inside the
   // sidebar app at all. Send them to /store-portal the moment we
   // resolve their role.
@@ -270,6 +274,36 @@ const WorkspaceLoadErrorScreen = ({ onRetry }) => {
           className="mt-6 rounded-xl bg-app-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
         >
           {retrying ? "Retrying…" : "Try again"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Shown to a signed-in account that no workspace has invited. Sign-up is open,
+// so this is where a stranger (or an employee who signed up with a different
+// email than the one they were invited with) lands.
+const NotInvitedScreen = ({ email }) => {
+  const { signOut } = useClerk();
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="glass-surface-strong rounded-3xl px-8 py-10 max-w-md w-full text-center">
+        <div className="relative w-16 h-16 mx-auto rounded-2xl bg-app-ink flex items-center justify-center">
+          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h2 className="text-[22px] font-semibold tracking-tight text-app-ink mt-6">Invitation required</h2>
+        <p className="text-[14px] text-app-muted mt-2 leading-relaxed">
+          {email ? <><span className="text-app-ink font-medium">{email}</span> isn't</> : "This account isn't"} part
+          of a workspace. Ask your administrator to invite this email, or sign in with the email you were invited with.
+        </p>
+        <button
+          type="button"
+          onClick={() => signOut({ redirectUrl: "/" })}
+          className="mt-6 rounded-xl bg-app-ink px-6 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+        >
+          Sign out
         </button>
       </div>
     </div>

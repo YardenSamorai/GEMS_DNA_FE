@@ -14,11 +14,16 @@ const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.
 const json = async (res) => {
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
+    let code = null;
     try {
       const body = await res.json();
       if (body?.error) message = body.error;
+      code = body?.code || null;
     } catch (_) {}
-    throw new Error(message);
+    const err = new Error(message);
+    err.status = res.status;
+    err.code = code;
+    throw err;
   }
   return res.json();
 };

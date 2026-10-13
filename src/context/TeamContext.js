@@ -52,6 +52,7 @@ const TeamContext = createContext({
   loading: true,
   ready: false,
   loadError: false,
+  notMember: false,
   me: null,
   members: [],
   membersById: {},
@@ -128,6 +129,24 @@ export const TeamProvider = ({ children }) => {
         });
         return;
       } catch (e) {
+        if (e.code === "not_a_member") {
+          setState({
+            loading: false,
+            ready: true,
+            loadError: false,
+            notMember: true,
+            me: null,
+            members: [],
+            tenantUserId: null,
+            actorUserId: actor.id,
+            role: null,
+            permissions: null,
+            isOwner: false,
+            isStoreUser: false,
+            companyId: null,
+          });
+          return;
+        }
         console.warn(`TeamProvider /me failed (attempt ${attempt}/3):`, e.message);
         if (attempt < 3) await sleep(1500 * attempt);
       }
