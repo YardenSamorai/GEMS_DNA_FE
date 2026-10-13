@@ -4,10 +4,10 @@
  *   sendHeartbeat(user)        → POST /api/heartbeat        (presence ping)
  *   fetchTeamActivity(user)    → GET  /api/team/activity     (manager view)
  *
- * Writes prefer navigator.sendBeacon so they survive page unloads and never
- * block the UI. Beacons can't set headers, so the actor identity is carried in
- * the JSON body (resolveTeamContext on the BE reads userId/userEmail/actorName
- * from the body as a fallback to the x-actor-* headers).
+ * Writes are fire-and-forget keepalive fetches, so they survive page unloads
+ * and never block the UI. The BE identifies the rep only from the verified
+ * session token, which the global fetch wrapper attaches — sendBeacon can't
+ * carry it, so it isn't used.
  */
 
 const API_BASE =
@@ -26,25 +26,14 @@ const actorBody = (user) => ({
   actorName: user?.name || null,
 });
 
-/* Fire-and-forget POST with a JSON body. Uses sendBeacon when available so the
- * request still goes out during pagehide/visibilitychange. */
+/* Fire-and-forget POST with a JSON body. keepalive lets it finish during
+ * pagehide/visibilitychange. */
 const beaconPost = (url, payload, user) => {
-  const body = JSON.stringify(payload);
-  try {
-    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-      // text/plain is CORS-safelisted → no preflight (beacons can't preflight).
-      // The BE parses the JSON string back into an object.
-      const blob = new Blob([body], { type: "text/plain;charset=UTF-8" });
-      if (navigator.sendBeacon(url, blob)) return;
-    }
-  } catch (_) {
-    /* fall through to fetch */
-  }
   try {
     fetch(url, {
       method: "POST",
       headers: teamHeaders(user),
-      body,
+      body: JSON.stringify(payload),
       keepalive: true,
     }).catch(() => {});
   } catch (_) {
