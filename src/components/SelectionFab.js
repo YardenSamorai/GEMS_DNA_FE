@@ -21,6 +21,12 @@ const SelectionFab = () => {
   const [open, setOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Off by default: the Rap % goes out only when asked for, with prices.
+  const [withRap, setWithRap] = useState(false);
+  const hasRap = useMemo(
+    () => items.some((s) => s.kind !== "jewelry" && s.rapPrice != null && s.rapPrice !== ""),
+    [items]
+  );
   // The order the sheet shows is the order the PDF prints and WhatsApp sends.
   const [sort, setSort] = useState({ key: "picked", dir: "desc" });
   const ordered = useMemo(() => sortCatalogItems(items, sort), [items, sort]);
@@ -53,7 +59,7 @@ const SelectionFab = () => {
     setActionsOpen(false);
     setExporting(true);
     try {
-      await downloadCatalogPdf(ordered, { showLogo, showCost });
+      await downloadCatalogPdf(ordered, { showLogo, showCost, showRap: withRap && hasRap });
     } catch (err) {
       console.error("[catalog pdf] export failed", err);
       alert("Could not generate the PDF. Please try again.");
@@ -67,7 +73,7 @@ const SelectionFab = () => {
   const handleShareWhatsApp = (withPrice) => {
     if (count === 0) return;
     setActionsOpen(false);
-    shareStonesOnWhatsApp(ordered, { actor, withPrice });
+    shareStonesOnWhatsApp(ordered, { actor, withPrice, withRap: withPrice && withRap && hasRap });
   };
 
   return (
@@ -167,6 +173,39 @@ const SelectionFab = () => {
                             role="menu"
                             className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-app-line bg-app-surface py-1 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.35)]"
                           >
+                            {/* Applies to everything below that carries prices:
+                                WhatsApp "With prices" and the PDF catalogs. */}
+                            {hasRap && (
+                              <>
+                                <button
+                                  type="button"
+                                  role="menuitemcheckbox"
+                                  aria-checked={withRap}
+                                  onClick={() => setWithRap((v) => !v)}
+                                  className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-app-canvas2"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block text-[13.5px] font-medium text-app-ink">Include Rap %</span>
+                                    <span className="block text-[11px] text-app-soft">
+                                      {withRap ? "Shown with the prices" : "Hidden"}
+                                    </span>
+                                  </span>
+                                  <span
+                                    aria-hidden
+                                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                                      withRap ? "bg-emerald-500" : "bg-app-line"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                                        withRap ? "translate-x-[22px]" : "translate-x-0.5"
+                                      }`}
+                                    />
+                                  </span>
+                                </button>
+                                <div className="mx-3 my-1 h-px bg-app-line" aria-hidden />
+                              </>
+                            )}
                             <div className="px-4 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-soft">
                               Share on WhatsApp
                             </div>

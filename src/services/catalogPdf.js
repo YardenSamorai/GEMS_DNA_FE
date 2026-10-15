@@ -275,12 +275,13 @@ const SHARE_FIELDS = [
   "imageUrl", "image", "additionalPictures",
 ];
 
-const sharePayload = (it, showPrices) => {
+const sharePayload = (it, showPrices, showRap) => {
   const slim = {};
   for (const k of SHARE_FIELDS) {
     const v = it[k];
     if (v != null && v !== "") slim[k] = v;
   }
+  if (!showRap) delete slim.rapPrice;
   if (!showPrices) {
     delete slim.rapPrice;
     delete slim.pricePerCt;
@@ -395,13 +396,15 @@ async function loadLogoAsset() {
  *   - showLogo   (bool, default true) — include the ESHED wordmark/branding in
  *     the header & footer. When false the document is unbranded (neutral
  *     "Catalog" header, no ESHED mark) — useful for white-label sends.
+ *   - showRap    (bool, default false) — add the Rap % to white diamonds'
+ *     specs. Only with prices; fancies, gemstones and jewelry have none.
  *   - showCost   (bool, default false) — add the internal cost basis to each
  *     card. This turns the document into an internal one: it is stamped
  *     INTERNAL on every page and saved under a different name, because the
  *     same export is routinely sent straight to a customer over WhatsApp.
  */
 export async function buildCatalogPdf(rawItems, options = {}) {
-  const { showPrices = true, showLogo = true, showCost = false } = options;
+  const { showPrices = true, showLogo = true, showCost = false, showRap = false } = options;
   // Swap Vimeo embed links for the direct 1080p MP4s (BE-resolved) so the
   // VIDEO buttons and the WhatsApp share text always open at full quality.
   const items = await withDirectVideoLinks((rawItems || []).filter(Boolean));
@@ -801,7 +804,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     // Rap % sits inside the spec table, right below the Branch row.
     // Price-per-carat lives in the price block under the table, just above
     // the total.
-    if (showPrices && price.rap) {
+    if (showPrices && showRap && price.rap) {
       const branchIdx = specs.findIndex(([label]) => label === "Branch");
       if (branchIdx >= 0) specs.splice(branchIdx + 1, 0, ["Rap %", price.rap]);
       else specs.push(["Rap %", price.rap]);
@@ -848,7 +851,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
       buttons.push({
         label: "SHARE",
         color: [22, 163, 74],
-        url: `${window.location.origin}/share-item?p=${showPrices ? 1 : 0}&d=${encodePayload(sharePayload(it, showPrices))}`,
+        url: `${window.location.origin}/share-item?p=${showPrices ? 1 : 0}&d=${encodePayload(sharePayload(it, showPrices, showRap))}`,
       });
     }
 

@@ -73,7 +73,11 @@ const ShareItemPage = () => {
     };
   })();
 
-  const text = buildStoneShareText(shareItem, { withPrice });
+  // The catalog only carries a Rap % when it was exported with one; a price
+  // edited here no longer matches it, so the message drops it.
+  const priceEdited = !isJewelry && editValid && editNum !== Math.round(basePpc * 100) / 100;
+  const withRap = withPrice && item.rapPrice != null && !priceEdited;
+  const text = buildStoneShareText(shareItem, { withPrice, withRap });
   const canEdit =
     withPrice && (isJewelry ? Number.isFinite(basePrice) && basePrice > 0 : Number.isFinite(basePpc) && basePpc > 0);
   const sendTotal = isJewelry ? money(shareItem.price) : money(shareItem.priceTotal);
