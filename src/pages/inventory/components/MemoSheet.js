@@ -5,6 +5,7 @@ import { Segmented } from "../ui/InventoryHeader";
 import { supportsBrutoMode } from "../../../utils/pricing";
 import { memoRecordFromInventory, sharedOrigin, stoneFromInventory } from "../../../memo/inventoryMemo";
 import { memoHtmlFromRecord, printMemoHtml } from "../../../memo/printMemo";
+import { CUSTOMER_PROFILES, profileForCustomer } from "../../../memo/customerProfiles";
 
 const today = () => {
   const d = new Date();
@@ -84,6 +85,8 @@ const PartyFields = ({ value, onChange, nameRef }) => {
  */
 export default function MemoSheet({ open, onClose, stones, priceMode, salesman, variant }) {
   const [kind, setKind] = useState("memo");
+  // null follows the customer's name; a pick in the menu overrides it.
+  const [profileChoice, setProfileChoice] = useState(null);
   const [dueDate, setDueDate] = useState("");
   const [customerNo, setCustomerNo] = useState("");
   const [memoRef, setMemoRef] = useState("");
@@ -133,6 +136,7 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
 
   const invoice = kind === "invoice";
   const noun = invoice ? "invoice" : "memo";
+  const profileId = profileChoice ?? profileForCustomer(memoTo.name).id;
   const missingPrices = stones.length - totals.priced;
   const sapAmount = sapTotal.trim() === "" ? null : Number(sapTotal.replace(/,/g, ""));
   const sapDiff = Number.isFinite(sapAmount) ? Math.round((totals.price - sapAmount) * 100) / 100 : null;
@@ -149,6 +153,7 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
         Object.fromEntries(Object.entries(prices).map(([id, v]) => [id, v === "" ? NaN : Number(v)])),
         {
           kind,
+          profile: profileId,
           memoTo,
           shipTo: separateShipTo ? shipTo : null,
           number,
@@ -213,9 +218,20 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
         <section className="inv-memo-section">
           <Segmented label="Document" options={KINDS} value={kind} onChange={setKind} className="inv-memo-kind" />
           {invoice && (
-            <p className="inv-fnote inv-memo-kind-note">
-              A copy of the tax invoice issued in SAP. Use SAP&apos;s invoice number, and match its total below.
-            </p>
+            <>
+              <p className="inv-fnote inv-memo-kind-note">
+                A copy of the tax invoice issued in SAP. Use SAP&apos;s invoice number, and match its total below.
+              </p>
+              <Field label="Customer format" hint="The customer's own declarations and terms. Picked from the customer's name; change it here if needed.">
+                <select className="inv-input" value={profileId} onChange={(e) => setProfileChoice(e.target.value)}>
+                  {CUSTOMER_PROFILES.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </>
           )}
         </section>
 

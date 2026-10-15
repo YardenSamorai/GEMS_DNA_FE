@@ -6,6 +6,7 @@
 import { clean } from "../pages/dna/dnaModel";
 import { GEMSTAR_MEMO_TEMPLATE } from "./gemstarTemplate";
 import { DECLARATION } from "./memoModel";
+import { profileById } from "./customerProfiles";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -91,12 +92,14 @@ export function sharedOrigin(stones) {
  * @param prices   { [stone.id]: pricePerCarat } as quoted on this memo
  * @param form     { kind? ("memo" | "invoice"), memoTo, shipTo?, number, issueDate (yyyy-mm-dd),
  *                   salesman, poNumber?, shipVia?, origin?, shipmentRef?, remarks, includeBank,
+ *                   profile? (customerProfiles.js id),
  *                   invoice only: dueDate? (yyyy-mm-dd), customerNo?, memoRef? }
  *                 An invoice is a copy of the tax invoice issued in SAP: `number` is SAP's.
  */
 export function memoRecordFromInventory(stones, prices, form) {
   const t = GEMSTAR_MEMO_TEMPLATE;
   const invoice = form.kind === "invoice";
+  const custom = invoice ? profileById(form.profile).invoice || {} : {};
   const title = invoice ? "Invoice" : "Memo";
   const items = stones.map((stone, i) => {
     const carat = round2(Number(stone.weightCt) || 0);
@@ -134,6 +137,7 @@ export function memoRecordFromInventory(stones, prices, form) {
             { label: "Due Date", value: memoDate(form.dueDate) },
             { label: "Customer No.", value: clean(form.customerNo) },
             { label: "Memo Ref.", value: clean(form.memoRef) },
+            { label: "Terms", value: clean(custom.paymentTerms) },
           ]
         : []),
       { label: "Salesman", value: clean(form.salesman) },
@@ -151,7 +155,8 @@ export function memoRecordFromInventory(stones, prices, form) {
         }
       : null,
     // An invoice drops the consignment terms; the declaration still applies to a sale.
-    terms: invoice ? [...t.terms.filter((p) => DECLARATION.test(p)), ...t.invoiceNotes] : [...t.terms],
+    terms: invoice ? [...(custom.declarations ? [] : t.terms.filter((p) => DECLARATION.test(p))), ...(custom.notes ?? t.invoiceNotes)] : [...t.terms],
+    declarations: custom.declarations ? [...custom.declarations] : [],
     remarks: splitLines(form.remarks),
     fields: form.includeBank === false ? [] : t.bank.map((f) => ({ ...f, lines: [...f.lines] })),
     signature: invoice ? null : t.signature,

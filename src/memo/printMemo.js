@@ -1,6 +1,6 @@
 import { buildMemoModel } from "./memoModel";
 import { enrichMemo } from "./enrichMemo";
-import { issuerLogo } from "./issuerBrands";
+import { issuerLogo, issuerMarks } from "./issuerBrands";
 import { renderMemoHtml } from "./renderMemoHtml";
 
 /**
@@ -12,7 +12,11 @@ export async function memoHtmlFromRecord(record, { catalog = true, verifyUrl = n
   let model = buildMemoModel(record, draft === undefined ? {} : { draft });
   if (catalog && model.items.length) model = await enrichMemo(model, { verifyUrl, ...(lookupStone ? { lookupStone } : {}) });
   const logo = issuerLogo(model.issuer?.name);
-  const html = await renderMemoHtml(model, { issuerLogo: logo && { ...logo, src: `${window.location.origin}${logo.src}` } });
+  const absolute = (asset) => ({ ...asset, src: `${window.location.origin}${asset.src}` });
+  const html = await renderMemoHtml(model, {
+    issuerLogo: logo && absolute(logo),
+    marks: issuerMarks(model.issuer?.name).map(absolute),
+  });
   return { html, model };
 }
 

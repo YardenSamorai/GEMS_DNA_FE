@@ -86,6 +86,35 @@ describe("renderMemoHtml", () => {
     expect(html).toContain('"Invoice 5935 · Copy · "');
   });
 
+  it("prints a customer's declarations, terms of payment and an issuer signature on an invoice", async () => {
+    const invoice = {
+      ...record,
+      kind: "invoice",
+      info: [
+        { label: "Invoice #", value: "5904" },
+        { label: "Terms", value: "30 days net" },
+      ],
+      terms: [],
+      declarations: ["Customer declaration one.", "Customer declaration two."],
+    };
+    const html = await toHtml(buildMemoModel(invoice));
+    expect(html).toContain('<div class="label">Gemstone declaration</div><p>Customer declaration one.</p><p>Customer declaration two.</p>');
+    expect(html).not.toContain('<div class="label">Notes</div>');
+    expect(html).toContain('<p class="terms"><span>Terms of payment</span>30 days net</p>');
+    expect(html).not.toMatch(/<div class="label">Terms<\/div>/);
+    expect(html).toContain("<div>For Example Gems Ltd.</div>");
+  });
+
+  it("prints accreditation marks on memos and invoices", async () => {
+    const marks = [{ src: "https://example.test/rjc.png", alt: "RJC Certified Member" }];
+    const memo = await toHtml(buildMemoModel(record), { marks });
+    const invoice = await toHtml(buildMemoModel({ ...record, kind: "invoice" }), { marks });
+    for (const html of [memo, invoice]) {
+      expect(html).toContain('<div class="m-marks"><img src="https://example.test/rjc.png" alt="RJC Certified Member"></div>');
+    }
+    expect(await toHtml(buildMemoModel(record))).not.toContain('<div class="m-marks">');
+  });
+
   it("renders a summary when the source has totals but no items", async () => {
     const html = await toHtml(buildMemoModel(record));
     expect(html).toContain("Summary");

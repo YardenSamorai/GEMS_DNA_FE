@@ -167,14 +167,20 @@ h1 { font: 700 22pt/1 ${SERIF}; letter-spacing: 0.01em; margin: 0; }
 
 /* Bank + signature */
 .bottom { margin-top: 5mm; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 4mm; break-inside: avoid; }
+.bottom-start { display: grid; gap: 4mm; align-content: start; min-width: 0; }
 .bank { border: 1px solid ${t.faint}; border-radius: 2mm; padding: 3mm 4mm; min-width: 0; }
+.m-marks { display: flex; gap: 5mm; align-items: center; }
+.m-marks img { height: 17mm; width: auto; display: block; }
 .bank dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.4mm 4mm; }
 .bank dt { color: ${t.text2}; }
 .bank dd { font-weight: 500; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .sign { display: grid; grid-template-rows: auto 1fr auto; min-height: 30mm; padding-top: 3mm; }
 .sign-lines { grid-row: 3; display: grid; grid-template-columns: 2fr 1fr; gap: 5mm; }
 .sign-lines div { border-top: 1px solid ${t.faint}; padding-top: 1.5mm; font-size: 7.5pt; color: ${t.text2}; }
-.pay { padding-top: 3mm; min-width: 0; }
+.sign-lines--one { grid-template-columns: 1fr; }
+.pay { display: grid; grid-template-rows: auto auto 1fr auto; min-height: 30mm; padding-top: 3mm; min-width: 0; }
 .pay p { color: ${t.body}; margin-top: 1.2mm; overflow-wrap: anywhere; }
-.pay .due { color: ${t.text}; font-size: 11pt; font-weight: 700; letter-spacing: -0.005em; }`;
+.pay .due { color: ${t.text}; font-size: 11pt; font-weight: 700; letter-spacing: -0.005em; }
+.pay .terms span { display: block; ${label} margin: 0; }
+.pay .sign-lines { grid-row: 4; margin-top: 10mm; }`;
 }

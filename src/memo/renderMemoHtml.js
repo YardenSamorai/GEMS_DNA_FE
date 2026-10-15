@@ -114,7 +114,7 @@ function detailsHtml(d, invoice) {
     ["Terms", d.paymentTerms],
     ["Courier", d.courier],
     ...d.extra.map((e) => [e.label, e.value]),
-  ].filter(([label, value]) => value && !shown.has(label) && !(invoice && label === "Due Date"));
+  ].filter(([label, value]) => value && !shown.has(label) && !(invoice && (label === "Due Date" || label === "Terms")));
   const cells = [...fixed, ...more];
   return `<div class="details">${cells
     .map(([label, value, numeric]) => `<div><div class="label">${esc(label)}</div><div class="v${numeric ? " num" : ""}">${field(value)}</div></div>`)
@@ -215,7 +215,7 @@ async function itemsHtml(model, currency) {
 
 function legalHtml(model) {
   const terms = model.terms.filter((p) => !DECLARATION.test(p));
-  const declaration = model.terms.filter((p) => DECLARATION.test(p));
+  const declaration = [...model.terms.filter((p) => DECLARATION.test(p)), ...(model.declarations || [])];
   const remarks = [...model.remarks, ...(model.remark ? [model.remark] : [])];
   const blocks = [
     [model.kind === "invoice" ? "Notes" : "Terms of delivery", terms, ""],
@@ -233,28 +233,38 @@ function legalHtml(model) {
 
 const BANK_ORDER = ["bankName", "branch", "bankAddress", "accountName", "accountNumber", "iban", "swift"];
 
-function bottomHtml(model) {
+/** Accreditation marks (e.g. RJC), sized by height so each keeps its proportions. */
+function marksHtml(marks) {
+  if (!marks?.length) return "";
+  return `<div class="m-marks">${marks.map((m) => `<img src="${esc(m.src)}" alt="${esc(m.alt || "")}">`).join("")}</div>`;
+}
+
+function bottomHtml(model, marks) {
   const bank = [...model.bank].sort((a, b) => BANK_ORDER.indexOf(a.key) - BANK_ORDER.indexOf(b.key));
   const rows = [...bank, ...model.otherFields];
   const bankBox = rows.length
     ? `<section class="bank"><div class="label">Bank details</div><dl>${rows
         .map((f) => `<dt>${esc(f.label)}</dt><dd>${f.lines.map(esc).join("<br>")}</dd>`)
         .join("")}</dl></section>`
-    : "<div></div>";
+    : "";
   const d = model.document;
   const side =
     model.kind === "invoice"
       ? `<section class="pay">
     <div class="label">Payment</div>
-    ${d.dueDate ? `<p class="due">Due ${esc(longDate(d.dueDate))}</p>` : ""}
-    ${d.number ? `<p>Please quote invoice No. ${esc(d.number)} with your payment.</p>` : ""}
+    <div>
+      ${d.dueDate ? `<p class="due">Due ${esc(longDate(d.dueDate))}</p>` : ""}
+      ${d.paymentTerms ? `<p class="terms"><span>Terms of payment</span>${esc(d.paymentTerms)}</p>` : ""}
+      ${d.number ? `<p>Please quote invoice No. ${esc(d.number)} with your payment.</p>` : ""}
+    </div>
+    ${model.issuer?.name ? `<div class="sign-lines sign-lines--one"><div>For ${esc(model.issuer.name)}</div></div>` : ""}
   </section>`
       : `<section class="sign">
     <div class="label">Received by</div>
     <div class="sign-lines"><div>Customer signature / name</div><div>Date</div></div>
   </section>`;
   return `<div class="bottom">
-  ${bankBox}
+  <div class="bottom-start">${bankBox}${marksHtml(marks)}</div>
   ${side}
 </div>`;
 }
@@ -262,8 +272,9 @@ function bottomHtml(model) {
 /**
  * Memo model -> self-contained, print-ready HTML (A4).
  * @param options.issuerLogo { src, width, height, crop, alt } (issuerBrands.js)
+ * @param options.marks      [{ src, alt }] accreditation marks printed by the bank details
  */
-export async function renderMemoHtml(model, { issuerLogo = null } = {}) {
+export async function renderMemoHtml(model, { issuerLogo = null, marks = [] } = {}) {
   const d = model.document;
   const invoice = model.kind === "invoice";
   const noun = invoice ? "Invoice" : "Memo";
@@ -309,7 +320,7 @@ ${letterheadHtml(model.issuer, issuerLogo)}
 ${detailsHtml(d, invoice)}
 ${await itemsHtml(model, currency)}
 ${legalHtml(model)}
-${bottomHtml(model)}
+${bottomHtml(model, marks)}
 </body>
 </html>`;
 }

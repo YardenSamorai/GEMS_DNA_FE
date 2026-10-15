@@ -3,6 +3,7 @@ import { memoDate, memoRecordFromInventory, sharedOrigin, stoneCount, stoneFromI
 import { buildMemoModel } from "./memoModel";
 import { enrichMemo } from "./enrichMemo";
 import { GEMSTAR_MEMO_TEMPLATE } from "./gemstarTemplate";
+import { CUSTOMER_PROFILES, profileById, profileForCustomer } from "./customerProfiles";
 
 const STONES = [
   {
@@ -100,11 +101,45 @@ describe("inventory memo", () => {
   test("uses Gemstar's corrected template text, bank order and footer", () => {
     const text = GEMSTAR_MEMO_TEMPLATE.terms.join(" ");
     expect(text).not.toMatch(/Gemsotnes|\s\.|[“”]/);
-    expect(GEMSTAR_MEMO_TEMPLATE.bank.map((b) => b.label)).toEqual(["Bank Name", "Branch", "Account No.", "IBAN", "SWIFT"]);
+    expect(GEMSTAR_MEMO_TEMPLATE.bank.map((b) => b.label)).toEqual(["Bank Name", "Branch", "Account Name", "Account No.", "IBAN", "SWIFT"]);
     expect(GEMSTAR_MEMO_TEMPLATE.footer).toEqual(["Gemstar Ltd.", "Company No. 510997646"]);
     const model = buildMemoModel(memoRecordFromInventory(STONES, { 1: 1, 2: 1 }, FORM));
-    expect(model.bank.map((b) => b.label)).toEqual(["Bank Name", "Branch", "Account No.", "IBAN", "SWIFT"]);
+    expect(model.bank.map((b) => b.label)).toEqual(["Bank Name", "Branch", "Account name", "Account No.", "IBAN", "SWIFT"]);
+    expect(model.bank.find((b) => b.key === "accountNumber").lines).toEqual(["90801-910025"]);
     expect(model.otherFields).toEqual([]);
+    expect(model.warnings.map((w) => w.code)).not.toContain("IBAN_CHECKSUM");
+  });
+
+  test("a customer profile replaces the invoice declaration and notes, and adds its terms", () => {
+    const form = { ...FORM, kind: "invoice", number: "5904", profile: "cartier" };
+    const model = buildMemoModel(memoRecordFromInventory(STONES, { 1: 3000, 2: 15500 }, form));
+    expect(model.declarations).toEqual(profileById("cartier").invoice.declarations);
+    expect(model.terms).toEqual([]);
+    expect(model.document.paymentTerms).toBeNull();
+
+    const withTerms = { ...profileById("cartier"), invoice: { ...profileById("cartier").invoice, paymentTerms: "30 days net" } };
+    CUSTOMER_PROFILES.push({ ...withTerms, id: "test-terms" });
+    try {
+      const termed = buildMemoModel(memoRecordFromInventory(STONES, { 1: 1, 2: 1 }, { ...form, profile: "test-terms" }));
+      expect(termed.document.paymentTerms).toBe("30 days net");
+    } finally {
+      CUSTOMER_PROFILES.pop();
+    }
+  });
+
+  test("the standard profile and memos keep Gemstar's own wording", () => {
+    const invoice = buildMemoModel(memoRecordFromInventory(STONES, { 1: 1, 2: 1 }, { ...FORM, kind: "invoice", number: "1", profile: "standard" }));
+    expect(invoice.declarations).toEqual([]);
+    expect(invoice.terms).toEqual([GEMSTAR_MEMO_TEMPLATE.terms[1], ...GEMSTAR_MEMO_TEMPLATE.invoiceNotes]);
+    const memo = buildMemoModel(memoRecordFromInventory(STONES, { 1: 1, 2: 1 }, { ...FORM, profile: "cartier" }));
+    expect(memo.declarations).toEqual([]);
+    expect(memo.terms).toEqual(GEMSTAR_MEMO_TEMPLATE.terms);
+  });
+
+  test("picks the profile from the customer's name", () => {
+    expect(profileForCustomer("Cartier Joaillerie International").id).toBe("cartier");
+    expect(profileForCustomer("Example Jewels SA").id).toBe("standard");
+    expect(profileForCustomer("").id).toBe("standard");
   });
 
   test("builds an invoice: SAP's number, payment fields, no consignment terms or signature", () => {

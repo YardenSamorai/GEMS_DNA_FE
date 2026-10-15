@@ -317,6 +317,7 @@ export function buildMemoModel(raw, options = {}) {
     items,
     totals,
     terms: (raw.terms || []).map(clean).filter(Boolean),
+    declarations: (raw.declarations || []).map(clean).filter(Boolean),
     remarks,
     remark,
     bank,

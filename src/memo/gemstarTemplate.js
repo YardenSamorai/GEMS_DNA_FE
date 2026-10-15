@@ -22,6 +22,7 @@ export const GEMSTAR_MEMO_TEMPLATE = Object.freeze({
   bank: [
     { label: "Bank Name", lines: ["Israel Discount Bank Ltd"] },
     { label: "Branch", lines: ["Diamond Exchange Branch, Ramat Gan, Israel"] },
+    { label: "Account Name", lines: ["Gemstar Ltd"] },
     { label: "Account No.", lines: ["90801-910025"] },
     { label: "IBAN", lines: ["IL 270 110 80000000 1910029"] },
     { label: "SWIFT", lines: ["IDBLILITXXX"] },
