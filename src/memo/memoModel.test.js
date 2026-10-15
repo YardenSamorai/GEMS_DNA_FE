@@ -114,6 +114,32 @@ describe("buildMemoModel", () => {
     expect(codes(model)).toContain("IBAN_CHECKSUM");
   });
 
+  it("reads P.O., ship via, origin and shipment ref from the source", () => {
+    const model = buildMemoModel({
+      ...base,
+      info: [...base.info, { label: "Ship Via", value: "Malca-Amit" }, { label: "Country of Origin", value: "Zambia" }, { label: "Shipment Ref.", value: "40393" }],
+    });
+    expect(model.document).toMatchObject({ shipVia: "Malca-Amit", origin: "Zambia", shipmentRef: "40393" });
+  });
+
+  it("moves a 'Country of Origin' remark into the origin field instead of printing it twice", () => {
+    const model = buildMemoModel({ ...base, remarks: ["Country of Origin: Zambia", "Keep cool"] });
+    expect(model.document.origin).toBe("Zambia");
+    expect(model.remarks).toEqual(["Keep cool"]);
+    const barak = buildMemoModel({ ...base, remarks: ["Country of Origin Testland"] });
+    expect(barak.document.origin).toBe("Testland");
+    expect(barak.remarks).toEqual([]);
+    const field = buildMemoModel({ ...base, fields: [{ label: "Remarks", lines: ["Country of Origin: Zambia", "Handle with care"] }] });
+    expect(field.document.origin).toBe("Zambia");
+    expect(field.remark).toBe("Handle with care");
+  });
+
+  it("keeps a remark whose origin disagrees with the document's own", () => {
+    const model = buildMemoModel({ ...base, info: [...base.info, { label: "Origin", value: "Colombia" }], remarks: ["Country of Origin: Zambia"] });
+    expect(model.document.origin).toBe("Colombia");
+    expect(model.remarks).toEqual(["Country of Origin: Zambia"]);
+  });
+
   it("surfaces unmapped text and page conflicts", () => {
     const model = buildMemoModel({ ...base, unmapped: [{ page: 2, text: "Stray", x: 1, y: 1 }], conflicts: [{ page: 2, field: "totals" }] });
     expect(codes(model)).toEqual(expect.arrayContaining(["UNMAPPED_TEXT", "PAGE_CONFLICT"]));

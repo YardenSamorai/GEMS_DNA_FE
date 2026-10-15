@@ -58,20 +58,25 @@ const INFO_FIELDS = [
   [/^p\.?\s*o\.?\s*(#|no\.?|number)?$/i, "poNumber"],
   [/^(salesman|sales\s*person|salesperson)$/i, "salesman"],
   [/^ship\s*via$/i, "shipVia"],
+  [/^(country\s*of\s*)?origin$/i, "origin"],
+  [/^shipment\s*(ref\.?|reference|#|no\.?)$/i, "shipmentRef"],
   [/^due\s*date$/i, "dueDate"],
   [/^terms$/i, "paymentTerms"],
 ];
 
 const BANK_FIELDS = [
-  [/^account\s*name$/i, "accountName", "Account name"],
-  [/^account\s*(number|no\.?|#)$/i, "accountNumber", "Account number"],
-  [/^bank\s*name$/i, "bankName", "Bank"],
+  [/^bank\s*name$/i, "bankName", "Bank Name"],
+  [/^branch$/i, "branch", "Branch"],
   [/^bank(er'?s)?\s*address$/i, "bankAddress", "Bank address"],
+  [/^account\s*name$/i, "accountName", "Account name"],
+  [/^account\s*(number|no\.?|#)$/i, "accountNumber", "Account No."],
   [/^iban$/i, "iban", "IBAN"],
   [/^(swift|bic)(\s*code)?$/i, "swift", "SWIFT"],
 ];
 
 const REMARK_FIELD = /^re+a?marks?$/i;
+// Barak prints the origin as a remark line ("Country of Origin: Zambia").
+const ORIGIN_REMARK = /^country\s+of\s+origin\s*:?\s*(.+)$/i;
 
 const warn = (warnings, code, message, extra) => warnings.push({ code, message, ...extra });
 
@@ -256,6 +261,18 @@ export function buildMemoModel(raw, options = {}) {
     );
   }
 
+  // The origin has its own field on the document; a remark that only states
+  // it moves there instead of printing twice.
+  let remarks = (raw.remarks || []).map(clean).filter(Boolean);
+  const takeOrigin = (text) => {
+    const hit = ORIGIN_REMARK.exec(text);
+    if (!hit) return false;
+    if (info.origin == null) info.origin = clean(hit[1]);
+    return clean(hit[1]) === info.origin;
+  };
+  remarks = remarks.filter((text) => !takeOrigin(text));
+  if (remark) remark = remark.split("\n").filter((line) => !takeOrigin(line)).join("\n") || null;
+
   const billTo = normalizeParty(raw.billTo);
   const shipTo = normalizeParty(raw.shipTo);
   const omitted = [
@@ -276,6 +293,8 @@ export function buildMemoModel(raw, options = {}) {
       poNumber: info.poNumber ?? null,
       salesman: info.salesman ?? null,
       shipVia: info.shipVia ?? null,
+      origin: info.origin ?? null,
+      shipmentRef: info.shipmentRef ?? null,
       paymentTerms: info.paymentTerms ?? null,
       courier: clean(raw.issuer?.courier),
       extra: infoExtra,
@@ -290,7 +309,7 @@ export function buildMemoModel(raw, options = {}) {
     items,
     totals,
     terms: (raw.terms || []).map(clean).filter(Boolean),
-    remarks: (raw.remarks || []).map(clean).filter(Boolean),
+    remarks,
     remark,
     bank,
     otherFields,

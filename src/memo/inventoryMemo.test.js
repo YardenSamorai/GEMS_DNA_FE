@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { memoDate, memoRecordFromInventory, stoneFromInventory } from "./inventoryMemo";
+import { memoDate, memoRecordFromInventory, sharedOrigin, stoneCount, stoneFromInventory } from "./inventoryMemo";
 import { buildMemoModel } from "./memoModel";
 import { enrichMemo } from "./enrichMemo";
 import { GEMSTAR_MEMO_TEMPLATE } from "./gemstarTemplate";
@@ -75,6 +75,42 @@ describe("inventory memo", () => {
     for (const code of ["LINE_TOTAL_MISMATCH", "TOTAL_CARAT_MISMATCH", "TOTAL_PRICE_MISMATCH", "NOT_NUMERIC", "UNNUMBERED"]) {
       expect(codes).not.toContain(code);
     }
+  });
+
+  test("counts the stones of a set as the line quantity and sums them", () => {
+    const sets = [
+      { ...STONES[0], id: 1, stones: 14 },
+      { ...STONES[1], id: 2, stones: 45 },
+      { ...STONES[1], id: 3, sku: "TEST-003", stones: null },
+    ];
+    const model = buildMemoModel(memoRecordFromInventory(sets, { 1: 1, 2: 1, 3: 1 }, FORM));
+    expect(model.items.map((i) => i.qty.text)).toEqual(["14", "45", "1"]);
+    expect(model.totals.qty.text).toBe("60");
+    expect(stoneCount({ stones: 0 })).toBe(1);
+    expect(stoneCount({})).toBe(1);
+  });
+
+  test("carries P.O., ship via, origin and shipment ref into the model", () => {
+    const model = buildMemoModel(
+      memoRecordFromInventory(STONES, { 1: 1, 2: 1 }, { ...FORM, poNumber: "PO-1", shipVia: "Malca-Amit", origin: "Zambia", shipmentRef: "40393" }),
+    );
+    expect(model.document).toMatchObject({ poNumber: "PO-1", shipVia: "Malca-Amit", origin: "Zambia", shipmentRef: "40393" });
+  });
+
+  test("uses Gemstar's corrected template text, bank order and footer", () => {
+    const text = GEMSTAR_MEMO_TEMPLATE.terms.join(" ");
+    expect(text).not.toMatch(/Gemsotnes|\s\.|[“”]/);
+    expect(GEMSTAR_MEMO_TEMPLATE.bank.map((b) => b.label)).toEqual(["Bank Name", "Branch", "Account No.", "IBAN", "SWIFT"]);
+    expect(GEMSTAR_MEMO_TEMPLATE.footer).toEqual(["Gemstar Ltd.", "Company No. 510997646"]);
+    const model = buildMemoModel(memoRecordFromInventory(STONES, { 1: 1, 2: 1 }, FORM));
+    expect(model.bank.map((b) => b.label)).toEqual(["Bank Name", "Branch", "Account No.", "IBAN", "SWIFT"]);
+    expect(model.otherFields).toEqual([]);
+  });
+
+  test("prefills the origin only when every stone shares one", () => {
+    expect(sharedOrigin([{ origin: "Zambia" }, { origin: "Zambia" }])).toBe("Zambia");
+    expect(sharedOrigin([{ origin: "Zambia" }, { origin: "Colombia" }])).toBe("");
+    expect(sharedOrigin([{ origin: "N/A" }, { origin: "" }])).toBe("");
   });
 
   test("leaves out bank details and keeps a separate ship-to on request", () => {

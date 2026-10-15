@@ -72,10 +72,24 @@ function party(p) {
   };
 }
 
+/** Stones in one line: a set counts its stones, a single stone is 1. */
+export const stoneCount = (stone) => {
+  const n = Number(stone?.stones);
+  return Number.isInteger(n) && n > 0 ? n : 1;
+};
+
+/** The catalog origin every selected stone shares, or "" when they differ or none is known. */
+export function sharedOrigin(stones) {
+  const origins = new Set(stones.map((s) => clean(s.origin)));
+  if (origins.size !== 1) return "";
+  return [...origins][0] || "";
+}
+
 /**
  * @param stones   inventory rows, in memo order
  * @param prices   { [stone.id]: pricePerCarat } as quoted on this memo
- * @param form     { memoTo, shipTo?, number, issueDate (yyyy-mm-dd), salesman, remarks, includeBank }
+ * @param form     { memoTo, shipTo?, number, issueDate (yyyy-mm-dd), salesman, poNumber?, shipVia?,
+ *                   origin?, shipmentRef?, remarks, includeBank }
  */
 export function memoRecordFromInventory(stones, prices, form) {
   const t = GEMSTAR_MEMO_TEMPLATE;
@@ -86,7 +100,7 @@ export function memoRecordFromInventory(stones, prices, form) {
     return {
       lot: String(i + 1),
       sku: stone.sku,
-      qty: "1",
+      qty: String(stoneCount(stone)),
       carat: carat ? fixed(carat) : null,
       pricePerCarat: Number.isFinite(ppc) ? fixed(ppc) : null,
       totalPrice: total !== null ? fixed(total) : null,
@@ -110,13 +124,17 @@ export function memoRecordFromInventory(stones, prices, form) {
       { label: "Memo #", value: clean(form.number) },
       { label: "Issue Date", value: memoDate(form.issueDate) },
       { label: "Salesman", value: clean(form.salesman) },
+      { label: "P.O. #", value: clean(form.poNumber) },
+      { label: "Ship Via", value: clean(form.shipVia) },
+      { label: "Country of Origin", value: clean(form.origin) },
+      { label: "Shipment Ref.", value: clean(form.shipmentRef) },
     ],
     columns: [],
     items,
     totals: items.length
       ? {
           label: "Total Carat on Memo",
-          cells: { qty: String(items.length), carat: fixed(round2(caratSum)), totalPrice: `$ ${fixed(round2(priceSum))}` },
+          cells: { qty: String(stones.reduce((sum, s) => sum + stoneCount(s), 0)), carat: fixed(round2(caratSum)), totalPrice: `$ ${fixed(round2(priceSum))}` },
         }
       : null,
     terms: [...t.terms],

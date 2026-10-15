@@ -59,14 +59,32 @@ describe("renderMemoHtml", () => {
     expect(html).toContain("Summary");
     expect(html).not.toContain("<table");
     expect(html).toContain("9.36 ct");
-    expect(html).toContain("$88,000.00");
+    expect(html).toContain("<small>USD</small>88,000.00");
+    expect(html).not.toContain("$");
   });
 
-  it("never prints labels for empty values", async () => {
+  it("prints a dash for empty details and no labels for absent party fields", async () => {
     const html = await toHtml(buildMemoModel(record));
-    expect(html).not.toMatch(/Attention|P\.O\. no\.|Courier|Remark<|Fax|undefined|null|N\/A/);
-    expect(html).toContain("Bill to");
+    expect(html).not.toMatch(/<span>Attn|<span>Fax|Courier|Remarks<|undefined|null|N\/A/);
+    expect(html).toContain('<div class="label">P.O. #</div><div class="v"><span class="empty">—</span></div>');
+    expect(html).toContain("Memo to");
     expect(html).toContain("Ship to");
+  });
+
+  it("always prints both party boxes, with attention and phone when present", async () => {
+    const html = await toHtml(buildMemoModel({ ...record, shipTo: null, billTo: { ...record.billTo, attention: "A. Buyer", phone: "+1 555" } }));
+    expect(html.match(/class="party"/g)).toHaveLength(2);
+    expect(html.match(/<span>Attn<\/span>A\. Buyer/g)).toHaveLength(2);
+    expect(html.match(/<span>Phone<\/span>\+1 555/g)).toHaveLength(2);
+  });
+
+  it("prints the long issue date and the currency code", async () => {
+    const html = await toHtml(buildMemoModel(record));
+    expect(html).toContain('<div class="meta">30 September 2026 · USD</div>');
+    const odd = await toHtml(buildMemoModel({ ...record, info: [{ label: "Issue Date", value: "Q3 2026" }] }));
+    expect(odd).toContain('<div class="meta">Q3 2026 · USD</div>');
+    const eur = await toHtml(buildMemoModel({ ...record, totals: { cells: { totalPrice: "€ 10.00" } } }));
+    expect(eur).toContain("<small>EUR</small>10.00");
   });
 
   it("marks drafts and puts the memo number in the running footer", async () => {
@@ -74,6 +92,7 @@ describe("renderMemoHtml", () => {
     expect(html).toContain('class="m-draft"');
     expect(html).toContain('"Draft · Memo 12 · " "Page " counter(page) " of " counter(pages)');
     expect(html).toContain('"Example Gems Ltd. · 123"');
+    expect(html).not.toContain("Gems DNA");
   });
 
   it("renders catalog identity, a verified certificate link and a DNA QR", async () => {
@@ -87,12 +106,48 @@ describe("renderMemoHtml", () => {
     });
     const html = await toHtml(enriched);
     expect(html).toContain('href="https://example.test/r-1.pdf"');
-    expect(html).toContain('href="https://gems-dna.com/SKU-A"');
+    expect(html).toContain('<a class="m-qr" href="https://gems-dna.com/SKU-A"');
     expect(html.match(/<svg/g)).toHaveLength(1);
+    expect(html.match(/<td class="qr"><\/td>/g)).toHaveLength(1);
     expect(html).toContain("Cushion");
     expect(html).toContain("7.00 x 6.00 x 4.00 mm");
-    expect(html).not.toContain("Per carat");
-    expect(html).not.toContain("<th>Lot");
+    expect(html).toContain("<th class=\"r\">Per Carat (USD)</th>");
+  });
+
+  it("shows the photo over a 'No photo' fallback, and the fallback alone without one", async () => {
+    const model = buildMemoModel({ ...record, items: [{ sku: "SKU-A", carat: "1.50" }, { sku: "SKU-B", carat: "2.00" }] });
+    const html = await toHtml(await enrichMemo(model, { lookupStone: async (sku) => (sku === "SKU-A" ? stone : null) }));
+    expect(html).toContain('<div class="thumb"><span class="none">No<br>photo</span><img src="https://example.test/a.jpg" alt="" onerror="this.remove()"></div>');
+    expect(html).toContain('<div class="thumb"><span class="none">No<br>photo</span></div>');
+  });
+
+  it("builds the description from the catalog and keeps hyphenated codes together", async () => {
+    const model = buildMemoModel({ ...record, items: [{ sku: "SKU-A", carat: "1.50" }] });
+    const html = await toHtml(await enrichMemo(model, { lookupStone: async () => ({ ...stone, shape: "RD-CAB", measurements1: "0.00-0.00-0.00" }) }));
+    expect(html).toContain('<div class="desc">Polished Emerald RD\u2011CAB</div>');
+    expect(html).not.toContain("0.00 x 0.00");
+    expect(html).not.toMatch(/desc-sub">[^<]*Cabushon/);
+  });
+
+  it("prints totals from the model and never re-adds the lines", async () => {
+    const model = buildMemoModel({
+      ...record,
+      items: [
+        { sku: "A", qty: "1", carat: "1.00", pricePerCarat: "$ 100.00", totalPrice: "$ 100.00" },
+        { sku: "B", qty: "1", carat: "2.00", pricePerCarat: "$ 100.00", totalPrice: "$ 200.00" },
+      ],
+      totals: { cells: { qty: "1", carat: "9.99", totalPrice: "$ 12,345.67" } },
+    });
+    const html = await toHtml(model);
+    expect(html).toContain("1 stone · 9.99 ct");
+    expect(html).not.toContain("1 stones");
+    expect(html).toContain("<small>USD</small>12,345.67");
+    expect(html).not.toContain("300.00");
+  });
+
+  it("pluralises the stone count", async () => {
+    const html = await toHtml(buildMemoModel({ ...record, items: [{ sku: "A", carat: "1.00" }], totals: { cells: { qty: "59", carat: "71.13" } } }));
+    expect(html).toContain("59 stones · 71.13 ct");
   });
 });
 

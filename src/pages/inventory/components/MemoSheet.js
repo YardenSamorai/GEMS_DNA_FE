@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import Sheet from "../ui/Sheet";
 import { supportsBrutoMode } from "../../../utils/pricing";
-import { memoRecordFromInventory, stoneFromInventory } from "../../../memo/inventoryMemo";
+import { memoRecordFromInventory, sharedOrigin, stoneFromInventory } from "../../../memo/inventoryMemo";
 import { memoHtmlFromRecord, printMemoHtml } from "../../../memo/printMemo";
 
 const today = () => {
@@ -80,6 +80,10 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
   const [number, setNumber] = useState("");
   const [issueDate, setIssueDate] = useState(today);
   const [salesmanName, setSalesmanName] = useState("");
+  const [poNumber, setPoNumber] = useState("");
+  const [shipVia, setShipVia] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [shipmentRef, setShipmentRef] = useState("");
   const [remarks, setRemarks] = useState("");
   const [includeBank, setIncludeBank] = useState(true);
   const [draft, setDraft] = useState(false);
@@ -92,6 +96,7 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
     setPrices(Object.fromEntries(stones.map((s) => [s.id, toPriceInput(basePricePerCt(s))])));
     setIssueDate(today());
     setSalesmanName((name) => name || salesman || "");
+    setOrigin(sharedOrigin(stones));
   }, [open, stones, salesman]);
 
   const showsBruto = priceMode === "bruto" && stones.some(supportsBrutoMode);
@@ -129,6 +134,10 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
           number,
           issueDate,
           salesman: salesmanName,
+          poNumber,
+          shipVia,
+          origin,
+          shipmentRef,
           remarks,
           includeBank,
         }
@@ -203,8 +212,24 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
               <input className="inv-input" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </Field>
           </div>
-          <Field label="Salesman">
-            <input className="inv-input" value={salesmanName} onChange={(e) => setSalesmanName(e.target.value)} />
+          <div className="inv-memo-row">
+            <Field label="Salesman">
+              <input className="inv-input" value={salesmanName} onChange={(e) => setSalesmanName(e.target.value)} />
+            </Field>
+            <Field label="P.O. #">
+              <input className="inv-input" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="Optional" />
+            </Field>
+          </div>
+          <div className="inv-memo-row">
+            <Field label="Ship via">
+              <input className="inv-input" value={shipVia} onChange={(e) => setShipVia(e.target.value)} placeholder="Optional" />
+            </Field>
+            <Field label="Shipment ref.">
+              <input className="inv-input" value={shipmentRef} onChange={(e) => setShipmentRef(e.target.value)} placeholder="Optional" />
+            </Field>
+          </div>
+          <Field label="Country of origin">
+            <input className="inv-input" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="Optional" />
           </Field>
         </section>
 

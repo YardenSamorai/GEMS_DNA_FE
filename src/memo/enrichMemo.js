@@ -23,9 +23,15 @@ const graded = (label, value) => (clean(value) ? `${label} ${clean(value)}` : nu
 export function catalogFacts(stone) {
   const kind = stoneKind(stone);
   const isDiamondLike = kind === "diamond" || kind === "fancy";
-  const measurements = clean(changeMeasurementsFormat(clean(stone.measurements1)));
+  // Sets carry "0.00-0.00-0.00" in the feed: no measurement at all.
+  const rawMeasurements = clean(stone.measurements1);
+  const measurements = rawMeasurements && /[1-9]/.test(rawMeasurements) ? clean(changeMeasurementsFormat(rawMeasurements)) : null;
+  const shape = shapeName(stone);
+  const type = kind === "fancy" ? `${fancyColorText(stone) || "Fancy Color"} Diamond` : dnaSubtitle({ ...stone, origin: null });
+  // The trade line for coloured stones, with the shape code as the feed has it ("Polished Emerald RD-CAB").
+  const description = isDiamondLike ? type : ["Polished", type, clean(stone.shape)].filter(Boolean).join(" ");
   const facts = [
-    shapeName(stone),
+    shape,
     kind === "diamond" ? clean(stone.color) : null,
     isDiamondLike ? clean(stone.clarity) : null,
     isDiamondLike ? null : clean(stone.origin),
@@ -37,7 +43,10 @@ export function catalogFacts(stone) {
     : [];
   return {
     kind,
-    type: kind === "fancy" ? `${fancyColorText(stone) || "Fancy Color"} Diamond` : dnaSubtitle({ ...stone, origin: null }),
+    type,
+    description,
+    shape,
+    shapeCode: clean(stone.shape),
     facts,
     grading,
     lab: clean(stone.lab),
