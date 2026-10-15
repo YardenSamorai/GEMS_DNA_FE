@@ -80,38 +80,18 @@ export default function AlphabetIndex({ letters, present, onJump, className = ""
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className={`shrink-0 flex flex-col items-center justify-start gap-px py-1 px-1 rounded-2xl bg-white/70 backdrop-blur-sm border border-stone-200/80 shadow-sm select-none touch-none ${className}`}
+      // Positioning and the capped height (a mixed A-Z + א-ת strip is 52
+      // cells) live in .crm-index, crm.css.
+      className={`crm-index ${className}`}
       role="navigation"
       aria-label="Jump to letter"
-      style={{
-        writingMode: "horizontal-tb",
-        // Cap the strip so a long mixed alphabet (A-Z + א-ת = 52 cells)
-        // can't extend past the bottom of the viewport / under the
-        // mobile bottom dock. We pad ~160px for TopBar + dock + margin.
-        maxHeight: "calc(100dvh - 160px)",
-        ...style,
-      }}
+      style={style}
     >
-      {letters.map((l) => {
-        const isPresent = present.has(l);
-        return (
-          <div
-            key={l}
-            data-letter={l}
-            aria-label={`Jump to ${l}`}
-            // Bigger touch slot on mobile so thumbs can actually hit it
-            // (Apple HIG ≥ 44pt). Desktop stays compact so the strip
-            // doesn't dominate the layout.
-            className={`flex items-center justify-center w-7 h-5 sm:w-5 sm:h-4 text-[11px] sm:text-[10px] font-semibold leading-none rounded select-none ${
-              isPresent
-                ? "text-stone-700"
-                : "text-stone-300"
-            }`}
-          >
-            {l}
-          </div>
-        );
-      })}
+      {letters.map((l) => (
+        <div key={l} data-letter={l} data-empty={!present.has(l)} aria-label={`Jump to ${l}`} className="crm-index-letter">
+          {l}
+        </div>
+      ))}
     </div>
   );
 }

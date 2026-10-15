@@ -141,7 +141,8 @@ export function scrollToLetter(letter) {
     topbarHeight = topbar.getBoundingClientRect().height;
   }
   const breathingRoom = 6;
-  const rect = el.getBoundingClientRect();
-  const targetY = window.scrollY + rect.top - topbarHeight - breathingRoom;
-  window.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
+  // scrollIntoView moves whichever container scrolls: the window on
+  // desktop, the shell's inner scroller on phones.
+  el.style.scrollMarginTop = `${topbarHeight + breathingRoom}px`;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
 }

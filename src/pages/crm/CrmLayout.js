@@ -2,90 +2,25 @@ import React, { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useUser } from "@clerk/clerk-react";
+import { CheckCircle2, FileText, Files, LayoutList, Settings, Store, TrendingUp, Users } from "lucide-react";
 import { fetchDnaLeadsUnreadCount, pingApi } from "../../services/crmApi";
+import "./crm.css";
 
 const POLL_MS = 30_000;
 const SEEN_KEY = (uid) => `crm.dnaLeadsSeenAt.${uid || "anon"}`;
 const TOAST_KEY = (uid) => `crm.dnaLeadsLastToastedLatest.${uid || "anon"}`;
 
+// The CRM "Home" view lives in the global Dashboard (Dashboard → CRM tab),
+// so there is deliberately no Dashboard entry here.
 const NAV = [
-  // After Sprint 1.A the CRM "Home" view lives in the global Dashboard
-  // (Dashboard → CRM tab). We intentionally do NOT add a "Dashboard" entry
-  // here because clicking it just bounces the user out of the CRM section,
-  // which is confusing. Users reach the CRM dashboard via the sidebar.
-  {
-    to: "/crm/contacts",
-    label: "Contacts",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-  {
-    to: "/crm/deals",
-    label: "Deals",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-      </svg>
-    ),
-  },
-  {
-    to: "/crm/tasks",
-    label: "Tasks",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
-    to: "/crm/stores",
-    label: "Stores",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 21h18M3 7v14m18-14v14M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
-      </svg>
-    ),
-  },
-  {
-    to: "/crm/memos",
-    label: "Memos",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  {
-    to: "/crm/documents",
-    label: "Documents",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17v-2a4 4 0 014-4h0a4 4 0 014 4v2m-8 0h8m-8 0H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2" />
-      </svg>
-    ),
-  },
-  {
-    to: "/crm/catalog",
-    label: "Catalog",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 10h16M4 14h10M4 18h7" />
-      </svg>
-    ),
-  },
-  {
-    to: "/crm/settings",
-    label: "Settings",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
+  { to: "/crm/contacts", label: "Contacts", Icon: Users },
+  { to: "/crm/deals", label: "Deals", Icon: TrendingUp },
+  { to: "/crm/tasks", label: "Tasks", Icon: CheckCircle2 },
+  { to: "/crm/stores", label: "Stores", Icon: Store },
+  { to: "/crm/memos", label: "Memos", Icon: FileText },
+  { to: "/crm/documents", label: "Documents", Icon: Files },
+  { to: "/crm/catalog", label: "Catalog", Icon: LayoutList },
+  { to: "/crm/settings", label: "Settings", Icon: Settings },
 ];
 
 export default function CrmLayout() {
@@ -150,55 +85,35 @@ export default function CrmLayout() {
     }
   }, [location.pathname, user?.id]);
 
-  // Inject badge counts into the nav definition
-  const navWithBadges = NAV.map((item) =>
-    item.to === "/crm/contacts" ? { ...item, badge: unread } : item
-  );
-
   return (
-    <div className="min-h-[calc(100vh-4rem)] pb-6 sm:pb-12">
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-        {/* Header */}
-        <div className="mb-5 sm:mb-7 flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-[24px] sm:text-[32px] font-semibold tracking-tight text-app-ink">CRM</h1>
-            <p className="hidden sm:block text-[13.5px] text-app-muted mt-0.5">
-              Manage contacts, deals and follow-ups
-            </p>
-          </div>
-        </div>
+    <div className="crm">
+      <div className="crm-page">
+        <header className="crm-head">
+          <h1 className="crm-title">CRM</h1>
+          <p className="crm-subtitle">Contacts, deals and follow-ups</p>
+        </header>
 
-        {/* Section tabs — segmented glass control. Active gets the ink fill;
-            DNA-lead unread badge stays emerald (positive/new arrival). Phones
-            scroll it sideways: the app tab bar owns the bottom edge. */}
-        <div className="-mx-3 mb-5 overflow-x-auto scrollbar-hide px-3 sm:mx-0 sm:mb-6 sm:px-0">
-          <nav aria-label="CRM sections" className="inline-flex gap-1 rounded-full glass-surface px-1.5 py-1 min-w-max">
-            {navWithBadges.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  `relative inline-flex items-center gap-2 px-3.5 py-1.5 [@media(pointer:coarse)]:min-h-[44px] text-[12.5px] font-medium whitespace-nowrap rounded-full select-none transition-colors ${
-                    isActive
-                      ? "bg-app-ink text-app-canvas shadow-[0_4px_14px_-6px_rgba(0,0,0,0.45)]"
-                      : "text-app-graphite active:text-app-ink [@media(hover:hover)_and_(pointer:fine)]:hover:text-app-ink"
-                  }`
-                }
-              >
-                <span className="w-4 h-4">{item.icon}</span>
-                {item.label}
-                {item.badge > 0 && (
-                  <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-brand-emerald text-white text-[10px] font-semibold">
-                    {item.badge > 99 ? "99+" : item.badge}
-                  </span>
-                )}
-              </NavLink>
-            ))}
+        {/* Section tabs — the Inventory segmented control. Phones scroll it
+            sideways: the app tab bar owns the bottom edge. */}
+        <div className="crm-tabs-scroll">
+          <nav aria-label="CRM sections" className="crm-tabs">
+            {NAV.map(({ to, label, Icon }) => {
+              const badge = to === "/crm/contacts" ? unread : 0;
+              return (
+                <NavLink key={to} to={to} className="crm-tab">
+                  <Icon size={15} strokeWidth={1.9} aria-hidden="true" />
+                  {label}
+                  {badge > 0 && (
+                    <span className="crm-badge" aria-label={`${badge} new DNA leads`}>
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
 
-        {/* Page content */}
         <Outlet key={location.pathname} />
       </div>
     </div>

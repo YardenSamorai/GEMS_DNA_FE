@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import toast from "react-hot-toast";
+import { ChevronRight, EyeOff, Folder, FolderOpen, FolderPlus, Inbox, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { createFolder, updateFolder, deleteFolder } from "../../../services/crmApi";
 
 // Per-user UI prefs for the virtual "Unfiled" pseudo-folder.
@@ -98,46 +99,46 @@ export default function FolderTree({ folders, contacts = [], selectedFolderId, o
   };
 
   return (
-    <div className="space-y-0.5">
-      {/* All */}
+    <nav aria-label="Contact lists">
+      <div className="crm-side-section">Contacts</div>
       <FolderRow
         active={!selectedFolderId}
         onClick={() => onSelect(null)}
         label="All contacts"
         count={totalContacts}
-        icon={(
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-7.13a4 4 0 11-8 0 4 4 0 018 0zm6 4a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-        )}
+        Icon={Users}
       />
       {!unfiledPrefs.hidden && (
-        <UnfiledRow
+        <FolderRow
           active={selectedFolderId === "unfiled"}
           onClick={() => onSelect("unfiled")}
           label={unfiledPrefs.label || "Unfiled"}
           count={unfiledCount}
-          onRename={handleUnfiledRename}
-          onHide={handleUnfiledHide}
+          Icon={Inbox}
+          actions={
+            <>
+              <RowAction label="Rename" Icon={Pencil} onClick={handleUnfiledRename} />
+              <RowAction label="Hide from sidebar" Icon={EyeOff} onClick={handleUnfiledHide} />
+            </>
+          }
         />
       )}
 
-      <div className="pt-1.5 mt-1.5 border-t border-stone-200">
-        <div className="flex items-center justify-between px-2 py-1">
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-stone-500">Folders</span>
-          <div className="flex items-center gap-0.5">
-            {unfiledPrefs.hidden && (
-              <button onClick={handleUnfiledShow} className="text-[10px] text-stone-500 hover:text-stone-900 px-1.5 py-0.5 rounded hover:bg-stone-100" title="Show Unfiled row">
-                Show Unfiled
-              </button>
-            )}
-            <button onClick={() => handleCreate(null)} className="text-stone-500 hover:text-stone-900 p-1 rounded hover:bg-stone-100" title="New folder">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+      <div className="crm-side-section">
+        <span>Folders</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {unfiledPrefs.hidden && (
+            <button type="button" onClick={handleUnfiledShow} className="crm-side-link">
+              Show {unfiledPrefs.label || "Unfiled"}
             </button>
-          </div>
-        </div>
-        {tree.length === 0 && (
-          <div className="px-3 py-3 text-xs text-stone-400 italic">No folders yet</div>
-        )}
-        {tree.map((node) => (
+          )}
+          <button type="button" onClick={() => handleCreate(null)} className="crm-icon-btn crm-icon-btn--sm" aria-label="New folder" title="New folder">
+            <FolderPlus size={15} strokeWidth={1.9} />
+          </button>
+        </span>
+      </div>
+      {tree.length === 0 && <div className="crm-side-empty">No folders yet</div>}
+      {tree.map((node) => (
           <FolderNode
             key={node.id}
             node={node}
@@ -146,65 +147,49 @@ export default function FolderTree({ folders, contacts = [], selectedFolderId, o
             onSelect={onSelect}
             onCreate={handleCreate}
             onRename={handleRename}
-            onDelete={handleDelete}
-          />
-        ))}
-      </div>
-    </div>
+          onDelete={handleDelete}
+        />
+      ))}
+    </nav>
   );
 }
 
 function FolderNode({ node, depth, selectedId, onSelect, onCreate, onRename, onDelete }) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
-  const active = selectedId === node.id;
 
   return (
     <div>
-      <div
-        className={`group flex items-center gap-1 pr-2 rounded-md cursor-pointer ${active ? "bg-stone-900 text-white" : "hover:bg-stone-100 text-stone-700"}`}
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
+      <FolderRow
+        active={selectedId === node.id}
         onClick={() => onSelect(node.id)}
-      >
-        {hasChildren ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-            className={`p-0.5 rounded ${active ? "hover:bg-white/20" : "hover:bg-stone-200"}`}
-          >
-            <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`} fill="currentColor" viewBox="0 0 20 20"><path d="M6 4l8 6-8 6V4z" /></svg>
-          </button>
-        ) : (
-          <div className="w-4" />
-        )}
-        <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
-        <div className="flex-1 py-1 text-sm truncate">{node.name}</div>
-        {node.direct_count > 0 && (
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-stone-200 text-stone-600"}`}>{node.direct_count}</span>
-        )}
-        <div className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${active ? "" : ""}`}>
-          <button
-            onClick={(e) => { e.stopPropagation(); onCreate(node.id); }}
-            title="Add sub-folder"
-            className={`p-0.5 rounded ${active ? "hover:bg-white/20" : "hover:bg-stone-200"}`}
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onRename(node); }}
-            title="Rename"
-            className={`p-0.5 rounded ${active ? "hover:bg-white/20" : "hover:bg-stone-200"}`}
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(node); }}
-            title="Delete"
-            className={`p-0.5 rounded ${active ? "hover:bg-white/20 text-rose-200" : "hover:bg-rose-100 text-rose-600"}`}
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
-          </button>
-        </div>
-      </div>
+        label={node.name}
+        count={node.direct_count > 0 ? node.direct_count : null}
+        Icon={expanded && hasChildren ? FolderOpen : Folder}
+        indent={depth * 14}
+        twisty={
+          hasChildren ? (
+            <button
+              type="button"
+              className="crm-side-twisty"
+              aria-expanded={expanded}
+              aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
+              onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            >
+              <ChevronRight size={12} strokeWidth={2.4} />
+            </button>
+          ) : (
+            <span style={{ width: 12, flex: "none" }} />
+          )
+        }
+        actions={
+          <>
+            <RowAction label="Add sub-folder" Icon={Plus} onClick={() => onCreate(node.id)} />
+            <RowAction label="Rename" Icon={Pencil} onClick={() => onRename(node)} />
+            <RowAction label="Delete" Icon={Trash2} onClick={() => onDelete(node)} danger />
+          </>
+        }
+      />
       {hasChildren && expanded && node.children.map((child) => (
         <FolderNode
           key={child.id}
@@ -221,51 +206,37 @@ function FolderNode({ node, depth, selectedId, onSelect, onCreate, onRename, onD
   );
 }
 
-const UnfiledRow = ({ active, onClick, label, count, onRename, onHide }) => (
+/* One source-list row. A div with role="button" so the hover actions can be real buttons inside it. */
+const FolderRow = ({ active, onClick, label, count, Icon, actions, twisty, indent = 0 }) => (
   <div
-    className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors cursor-pointer ${
-      active ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-100"
-    }`}
+    role="button"
+    tabIndex={0}
+    aria-current={active ? "true" : undefined}
+    className="crm-side-row"
+    style={indent ? { paddingLeft: 10 + indent } : undefined}
     onClick={onClick}
+    onKeyDown={(e) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); }
+    }}
   >
-    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z" />
-    </svg>
-    <span className="flex-1 text-left truncate">{label}</span>
-    {count != null && (
-      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-stone-200 text-stone-600"}`}>{count}</span>
-    )}
-    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-      <button
-        onClick={(e) => { e.stopPropagation(); onRename(); }}
-        title="Rename"
-        className={`p-0.5 rounded ${active ? "hover:bg-white/20" : "hover:bg-stone-200"}`}
-      >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onHide(); }}
-        title="Hide from sidebar"
-        className={`p-0.5 rounded ${active ? "hover:bg-white/20" : "hover:bg-stone-200"}`}
-      >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-      </button>
-    </div>
+    {twisty}
+    <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
+    <span className="crm-side-label">{label}</span>
+    {count != null && <span className="crm-side-count">{count}</span>}
+    {actions && <span className="crm-side-actions">{actions}</span>}
   </div>
 );
 
-const FolderRow = ({ active, onClick, label, count, icon, muted }) => (
+const RowAction = ({ label, Icon, onClick, danger }) => (
   <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
-      active ? "bg-stone-900 text-white" : muted ? "text-stone-500 hover:bg-stone-100" : "text-stone-700 hover:bg-stone-100"
-    }`}
+    type="button"
+    className={`crm-icon-btn crm-icon-btn--sm${danger ? " crm-icon-btn--danger" : ""}`}
+    aria-label={label}
+    title={label}
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
   >
-    {icon}
-    <span className="flex-1 text-left truncate">{label}</span>
-    {count != null && (
-      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-stone-200 text-stone-600"}`}>{count}</span>
-    )}
+    <Icon size={13} strokeWidth={2} />
   </button>
 );
 
