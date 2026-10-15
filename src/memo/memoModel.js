@@ -51,8 +51,13 @@ export function formatAmount(amount, { withCurrency = true } = {}) {
   return withCurrency && amount.currency ? `${amount.currency}${/^[A-Z]/i.test(amount.currency) ? " " : ""}${digits}` : digits;
 }
 
+/** The conflict-free statement among the terms; it applies to memos and invoices alike. */
+export const DECLARATION = /conflict[\s-]*free|funding\s+conflict/i;
+
 const INFO_FIELDS = [
-  [/^memo\s*(#|no\.?|number)$/i, "number"],
+  [/^(memo|invoice)\s*(#|no\.?|number)$/i, "number"],
+  [/^customer\s*(#|no\.?|number)$/i, "customerNo"],
+  [/^memo\s*ref(\.|erence)?$/i, "memoRef"],
   [/^(issue\s*)?date$/i, "issueDate"],
   [/^issue\s*date$/i, "issueDate"],
   [/^p\.?\s*o\.?\s*(#|no\.?|number)?$/i, "poNumber"],
@@ -60,7 +65,7 @@ const INFO_FIELDS = [
   [/^ship\s*via$/i, "shipVia"],
   [/^(country\s*of\s*)?origin$/i, "origin"],
   [/^shipment\s*(ref\.?|reference|#|no\.?)$/i, "shipmentRef"],
-  [/^due\s*date$/i, "dueDate"],
+  [/^(due\s*date|payment\s*due)$/i, "dueDate"],
   [/^terms$/i, "paymentTerms"],
 ];
 
@@ -234,9 +239,10 @@ export function buildMemoModel(raw, options = {}) {
   );
   if (currencies.size > 1) warn(warnings, "MIXED_CURRENCY", `More than one currency appears: ${[...currencies].join(", ")}.`);
 
+  const kind = raw.kind === "invoice" ? "invoice" : "memo";
   const number = info.number ?? null;
   if (!number || /^0+$/.test(number)) {
-    warn(warnings, "UNNUMBERED", `Memo number is "${number ?? ""}" in the source; the document shows it as printed.`);
+    warn(warnings, "UNNUMBERED", `${kind === "invoice" ? "Invoice" : "Memo"} number is "${number ?? ""}" in the source; the document shows it as printed.`);
   }
 
   const draft = options.draft ?? Boolean(raw.fullPageImageOnEveryPage);
@@ -284,12 +290,14 @@ export function buildMemoModel(raw, options = {}) {
   ];
 
   return {
-    kind: "memo",
+    kind,
     source: { ...raw.source, title: clean(raw.title), documentNumber: raw.documentNumber || null },
     document: {
       number,
       issueDate: info.issueDate ?? null,
       dueDate: info.dueDate ?? null,
+      customerNo: info.customerNo ?? null,
+      memoRef: info.memoRef ?? null,
       poNumber: info.poNumber ?? null,
       salesman: info.salesman ?? null,
       shipVia: info.shipVia ?? null,

@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { formatAmount } from "./memoModel";
+import { DECLARATION, formatAmount } from "./memoModel";
 import { memoCss, PRINT_TOKENS } from "./memoStyles";
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -84,22 +84,38 @@ function partyHtml(label, party) {
   </section>`;
 }
 
-function detailsHtml(d) {
-  const cells = [
-    ["Issue Date", d.issueDate, true],
-    ["P.O. #", d.poNumber],
+function detailsHtml(d, invoice) {
+  const fixed = invoice
+    ? [
+        ["Issue Date", d.issueDate, true],
+        ["Payment Due", d.dueDate, true],
+        ["Customer No.", d.customerNo, true],
+        ["Memo Ref.", d.memoRef, true],
+        ["P.O. #", d.poNumber],
+        ["Origin", d.origin],
+      ]
+    : [
+        ["Issue Date", d.issueDate, true],
+        ["P.O. #", d.poNumber],
+        ["Salesman", d.salesman],
+        ["Ship Via", d.shipVia],
+        ["Origin", d.origin],
+        ["Shipment Ref.", d.shipmentRef],
+      ];
+  const shown = new Set(fixed.map(([label]) => label));
+  // Anything else the source printed follows the fixed six instead of being dropped.
+  const more = [
     ["Salesman", d.salesman],
     ["Ship Via", d.shipVia],
-    ["Origin", d.origin],
     ["Shipment Ref.", d.shipmentRef],
-    // Anything else the source printed follows the fixed six instead of being dropped.
-    ...[
-      ["Due Date", d.dueDate, true],
-      ["Terms", d.paymentTerms],
-      ["Courier", d.courier],
-      ...d.extra.map((e) => [e.label, e.value]),
-    ].filter(([, value]) => value),
-  ];
+    ["Due Date", d.dueDate, true],
+    ["Customer No.", d.customerNo, true],
+    ["Memo Ref.", d.memoRef, true],
+    ["Terms", d.paymentTerms],
+    ["Courier", d.courier],
+    ...d.extra.map((e) => [e.label, e.value]),
+  ].filter(([label, value]) => value && !shown.has(label) && !(invoice && label === "Due Date"));
+  const cells = [...fixed, ...more];
   return `<div class="details">${cells
     .map(([label, value, numeric]) => `<div><div class="label">${esc(label)}</div><div class="v${numeric ? " num" : ""}">${field(value)}</div></div>`)
     .join("")}</div>`;
@@ -144,11 +160,11 @@ const stonesLabel = (qty) => {
 };
 
 /** Totals exactly as the model carries them (the source's own figures), never re-added here. */
-function totalsHtml(totals, currency) {
+function totalsHtml(totals, currency, invoice) {
   if (!totals) return "";
   const count = [stonesLabel(totals.qty), totals.carat ? `${plain(totals.carat)} ct` : null].filter(Boolean).join(" · ");
   return `<div class="totals">
-    <div><span class="what">Total on memo</span>${count ? `&nbsp;&nbsp;<span class="count num">${count}</span>` : ""}</div>
+    <div><span class="what">${invoice ? "Total due" : "Total on memo"}</span>${count ? `&nbsp;&nbsp;<span class="count num">${count}</span>` : ""}</div>
     ${totals.totalPrice ? `<div class="amount num"><small>${esc(currency)}</small>${plain(totals.totalPrice)}</div>` : ""}
   </div>`;
 }
@@ -167,8 +183,9 @@ const COLUMNS = [
 
 async function itemsHtml(model, currency) {
   const { items, totals } = model;
+  const invoice = model.kind === "invoice";
   if (!items.length) {
-    const block = totalsHtml(totals, currency);
+    const block = totalsHtml(totals, currency, invoice);
     return block ? `<section class="m-summary"><div class="label">Summary</div>${block}</section>` : "";
   }
   const qrs = await Promise.all(items.map((i) => (i.catalog?.dnaUrl ? qrSvg(i.catalog.dnaUrl) : null)));
@@ -190,20 +207,18 @@ async function itemsHtml(model, currency) {
       </tr>`;
     })
     .join("");
-  const block = totalsHtml(totals, currency);
+  const block = totalsHtml(totals, currency, invoice);
   // Totals ride in the table's last row so they can't split or start a page alone.
   const totalsRow = block ? `<tr class="m-totals-row"><td colspan="${COLUMNS.length}">${block}</td></tr>` : "";
   return `<table class="m-table"><colgroup>${cols}</colgroup><thead><tr>${head}</tr></thead><tbody>${body}${totalsRow}</tbody></table>`;
 }
-
-const DECLARATION = /conflict[\s-]*free|funding\s+conflict/i;
 
 function legalHtml(model) {
   const terms = model.terms.filter((p) => !DECLARATION.test(p));
   const declaration = model.terms.filter((p) => DECLARATION.test(p));
   const remarks = [...model.remarks, ...(model.remark ? [model.remark] : [])];
   const blocks = [
-    ["Terms of delivery", terms, ""],
+    [model.kind === "invoice" ? "Notes" : "Terms of delivery", terms, ""],
     ["Gemstone declaration", declaration, ""],
     ["Remarks", remarks, "remarks"],
   ].filter(([, paragraphs]) => paragraphs.length);
@@ -226,12 +241,21 @@ function bottomHtml(model) {
         .map((f) => `<dt>${esc(f.label)}</dt><dd>${f.lines.map(esc).join("<br>")}</dd>`)
         .join("")}</dl></section>`
     : "<div></div>";
-  return `<div class="bottom">
-  ${bankBox}
-  <section class="sign">
+  const d = model.document;
+  const side =
+    model.kind === "invoice"
+      ? `<section class="pay">
+    <div class="label">Payment</div>
+    ${d.dueDate ? `<p class="due">Due ${esc(longDate(d.dueDate))}</p>` : ""}
+    ${d.number ? `<p>Please quote invoice No. ${esc(d.number)} with your payment.</p>` : ""}
+  </section>`
+      : `<section class="sign">
     <div class="label">Received by</div>
     <div class="sign-lines"><div>Customer signature / name</div><div>Date</div></div>
-  </section>
+  </section>`;
+  return `<div class="bottom">
+  ${bankBox}
+  ${side}
 </div>`;
 }
 
@@ -241,16 +265,24 @@ function bottomHtml(model) {
  */
 export async function renderMemoHtml(model, { issuerLogo = null } = {}) {
   const d = model.document;
+  const invoice = model.kind === "invoice";
+  const noun = invoice ? "Invoice" : "Memo";
   const customer = model.billTo?.name || model.shipTo?.name || null;
-  const memoLabel = d.number ? `Memo ${d.number}` : "Memo";
+  const memoLabel = d.number ? `${noun} ${d.number}` : noun;
   const currency = currencyCode(model);
   const memoTo = model.billTo || model.shipTo;
   const shipTo = model.shipTo || model.billTo;
   const meta = [longDate(d.issueDate), currency].filter(Boolean).map(esc).join(" · ");
+  // The legal original is the tax invoice issued in SAP; this document says it is a copy of it.
+  const title = invoice
+    ? `<div class="title"><h1>TAX INVOICE</h1><span class="m-draft">Copy</span>${d.draft ? `<span class="m-draft">Draft</span>` : ""}</div>
+    <div class="subtitle">Copy of the original${model.issuer?.name ? ` issued by ${esc(model.issuer.name)}` : ""}</div>`
+    : `<div class="title"><h1>MEMORANDUM</h1>${d.draft ? `<span class="m-draft">Draft</span>` : ""}</div>
+    <div class="subtitle">For examination and inspection only</div>`;
 
   const css = memoCss({
     footerStart: model.footer.length ? model.footer.join(" · ") : null,
-    footerEnd: [d.draft ? "Draft" : null, memoLabel].filter(Boolean).join(" · "),
+    footerEnd: [d.draft ? "Draft" : null, memoLabel, invoice ? "Copy" : null].filter(Boolean).join(" · "),
     headerEnd: [memoLabel, customer].filter(Boolean).join(" · "),
   });
 
@@ -265,17 +297,16 @@ export async function renderMemoHtml(model, { issuerLogo = null } = {}) {
 ${letterheadHtml(model.issuer, issuerLogo)}
 <div class="title-row">
   <div>
-    <div class="title"><h1>MEMORANDUM</h1>${d.draft ? `<span class="m-draft">Draft</span>` : ""}</div>
-    <div class="subtitle">For examination and inspection only</div>
+    ${title}
   </div>
   <div class="memo-no">
-    <div class="label">Memo No.</div>
+    <div class="label">${noun} No.</div>
     <div class="value num">${field(d.number)}</div>
     <div class="meta">${meta}</div>
   </div>
 </div>
-<div class="parties">${partyHtml("Memo to", memoTo)}${partyHtml("Ship to", shipTo)}</div>
-${detailsHtml(d)}
+<div class="parties">${partyHtml(invoice ? "Bill to" : "Memo to", memoTo)}${partyHtml("Ship to", shipTo)}</div>
+${detailsHtml(d, invoice)}
 ${await itemsHtml(model, currency)}
 ${legalHtml(model)}
 ${bottomHtml(model)}

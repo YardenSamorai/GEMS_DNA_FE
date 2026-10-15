@@ -1,6 +1,7 @@
 /**
  * Gemstar's fixed memo content: issuer block, consignment terms, conflict
  * statement, bank details and footer, as on Gemstar's current memo design.
+ * Invoices share the issuer, declaration, bank and footer.
  * Memos created in Gems DNA print exactly this text; edit here when Gemstar
  * changes its template.
  */
@@ -25,6 +26,8 @@ export const GEMSTAR_MEMO_TEMPLATE = Object.freeze({
     { label: "IBAN", lines: ["IL 270 110 80000000 1910029"] },
     { label: "SWIFT", lines: ["IDBLILITXXX"] },
   ],
+  // Printed on the invoice under the declaration, as on the SAP tax invoice.
+  invoiceNotes: ["Exempt from tax withholding at source, per the approval of the Assessing Officer, Gush Dan."],
   signature: "Customer Signature",
   footer: ["Gemstar Ltd.", "Company No. 510997646"],
 });

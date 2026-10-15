@@ -30,6 +30,23 @@ test("needs a recipient and a price for every stone", () => {
   expect(screen.getByText("1 stone needs a price per carat.")).toBeInTheDocument();
 });
 
+test("an invoice needs SAP's number and a total that matches SAP to the cent", () => {
+  renderSheet();
+  fireEvent.click(screen.getByRole("radio", { name: "Invoice" }));
+  const create = screen.getByRole("button", { name: "Create invoice" });
+  fireEvent.change(screen.getByLabelText("Company / name"), { target: { value: "Example Jewels" } });
+  expect(create).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("SAP invoice no."), { target: { value: "5935" } });
+  expect(create).toBeDisabled();
+  const sap = screen.getByLabelText("Total on the SAP invoice");
+  fireEvent.change(sap, { target: { value: "35,575.01" } });
+  expect(screen.getByText("Off by $0.01 (below SAP). Adjust the prices until it matches.")).toBeInTheDocument();
+  expect(create).toBeDisabled();
+  fireEvent.change(sap, { target: { value: "35,575.00" } });
+  expect(screen.getByText("Matches the SAP invoice.")).toBeInTheDocument();
+  expect(create).toBeEnabled();
+});
+
 test("labels Bruto only when a gemstone is actually scaled", () => {
   renderSheet({ priceMode: "bruto" });
   expect(screen.getByText("Bruto prices")).toBeInTheDocument();

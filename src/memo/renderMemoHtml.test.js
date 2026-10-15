@@ -54,6 +54,38 @@ describe("renderMemoHtml", () => {
     expect(html).not.toContain("<b>& Co");
   });
 
+  it("prints an invoice as a marked copy with payment details instead of a signature", async () => {
+    const invoice = {
+      ...record,
+      kind: "invoice",
+      fullPageImageOnEveryPage: false,
+      info: [
+        { label: "Invoice #", value: "5935" },
+        { label: "Issue Date", value: "12-Oct-2026" },
+        { label: "Due Date", value: "12-Oct-2026" },
+        { label: "Customer No.", value: "1870011" },
+        { label: "Memo Ref.", value: "8327" },
+      ],
+      terms: ["Exempt from tax withholding at source."],
+    };
+    const html = await toHtml(buildMemoModel(invoice));
+    expect(html).toContain("<h1>TAX INVOICE</h1><span class=\"m-draft\">Copy</span>");
+    expect(html).toContain("Copy of the original issued by Example Gems Ltd.");
+    expect(html).toContain('<div class="label">Invoice No.</div>');
+    expect(html).toContain('<div class="label">Bill to</div>');
+    expect(html).toMatch(/Payment Due<\/div><div class="v num">12-Oct-2026/);
+    expect(html).toMatch(/Customer No\.<\/div><div class="v num">1870011/);
+    expect(html).toMatch(/Memo Ref\.<\/div><div class="v num">8327/);
+    expect(html.match(/12-Oct-2026/g)).toHaveLength(2);
+    expect(html).toContain("Total due");
+    expect(html).toContain('<div class="label">Notes</div>');
+    expect(html).toContain("Due 12 October 2026");
+    expect(html).toContain("Please quote invoice No. 5935 with your payment.");
+    expect(html).not.toContain("Received by");
+    expect(html).not.toContain("MEMORANDUM");
+    expect(html).toContain('"Invoice 5935 · Copy · "');
+  });
+
   it("renders a summary when the source has totals but no items", async () => {
     const html = await toHtml(buildMemoModel(record));
     expect(html).toContain("Summary");

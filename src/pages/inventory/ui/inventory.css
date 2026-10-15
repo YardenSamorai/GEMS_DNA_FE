@@ -1324,6 +1324,12 @@
 .inv-memo-total dt { font-size: 11px; color: var(--dna-text-3); }
 .inv-memo-total dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; color: var(--dna-text); }
 .inv-memo-warn { color: var(--inv-warn); }
+.inv-memo-kind { display: flex; width: 100%; }
+.inv-memo-kind .inv-seg-btn { flex: 1; }
+.inv-memo-kind-note { margin: 8px 0 0; }
+.inv-memo-sap { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--dna-hairline); }
+.inv-memo-sap .inv-memo-field { margin-bottom: 6px; }
+.inv-memo-sap .inv-input { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 380px) { .inv-memo-row { grid-template-columns: 1fr; } }
 
 /* ---------------------------------------------------------------- quick look */

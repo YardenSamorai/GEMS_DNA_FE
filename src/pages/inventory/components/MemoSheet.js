@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import Sheet from "../ui/Sheet";
+import { Segmented } from "../ui/InventoryHeader";
 import { supportsBrutoMode } from "../../../utils/pricing";
 import { memoRecordFromInventory, sharedOrigin, stoneFromInventory } from "../../../memo/inventoryMemo";
 import { memoHtmlFromRecord, printMemoHtml } from "../../../memo/printMemo";
@@ -21,6 +22,11 @@ const basePricePerCt = (stone) => {
 const toPriceInput = (n) => (n == null ? "" : String(Math.round(n * 100) / 100));
 
 const money = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const KINDS = [
+  { id: "memo", label: "Memo" },
+  { id: "invoice", label: "Invoice" },
+];
 
 async function certificateResponds(url) {
   const controller = new AbortController();
@@ -72,8 +78,16 @@ const PartyFields = ({ value, onChange, nameRef }) => {
  * design, and opens the print dialog (Save as PDF). Stones arrive priced in
  * the inventory's current Neto/Bruto view; every $/ct is editable because a
  * memo quotes the price agreed with this customer.
+ *
+ * Invoice mode prints a copy of the tax invoice already issued in SAP: it
+ * carries SAP's number and can't be created until its total equals SAP's.
  */
 export default function MemoSheet({ open, onClose, stones, priceMode, salesman, variant }) {
+  const [kind, setKind] = useState("memo");
+  const [dueDate, setDueDate] = useState("");
+  const [customerNo, setCustomerNo] = useState("");
+  const [memoRef, setMemoRef] = useState("");
+  const [sapTotal, setSapTotal] = useState("");
   const [memoTo, setMemoTo] = useState(emptyParty);
   const [separateShipTo, setSeparateShipTo] = useState(false);
   const [shipTo, setShipTo] = useState(emptyParty);
@@ -117,22 +131,31 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
     return { carat, price, priced };
   }, [stones, prices]);
 
+  const invoice = kind === "invoice";
+  const noun = invoice ? "invoice" : "memo";
   const missingPrices = stones.length - totals.priced;
-  const canCreate = memoTo.name.trim() && stones.length > 0 && missingPrices === 0 && !busy;
+  const sapAmount = sapTotal.trim() === "" ? null : Number(sapTotal.replace(/,/g, ""));
+  const sapDiff = Number.isFinite(sapAmount) ? Math.round((totals.price - sapAmount) * 100) / 100 : null;
+  const invoiceReady = number.trim() && sapDiff === 0;
+  const canCreate = memoTo.name.trim() && stones.length > 0 && missingPrices === 0 && (!invoice || invoiceReady) && !busy;
 
   const create = async () => {
     if (!canCreate) return;
     setBusy(true);
-    const t = toast.loading("Preparing memo…");
+    const t = toast.loading(`Preparing ${noun}…`);
     try {
       const record = memoRecordFromInventory(
         stones,
         Object.fromEntries(Object.entries(prices).map(([id, v]) => [id, v === "" ? NaN : Number(v)])),
         {
+          kind,
           memoTo,
           shipTo: separateShipTo ? shipTo : null,
           number,
           issueDate,
+          dueDate: invoice ? dueDate : "",
+          customerNo: invoice ? customerNo : "",
+          memoRef: invoice ? memoRef : "",
           salesman: salesmanName,
           poNumber,
           shipVia,
@@ -152,11 +175,12 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
         },
       });
       const noImage = model.warnings.filter((w) => w.code === "MISSING_IMAGE").length;
-      toast.success(noImage ? `Memo ready · ${noImage} without a photo` : "Memo ready", { id: t });
+      const ready = invoice ? "Invoice ready" : "Memo ready";
+      toast.success(noImage ? `${ready} · ${noImage} without a photo` : ready, { id: t });
       await printMemoHtml(html);
     } catch (err) {
-      console.error("Memo generation failed:", err);
-      toast.error("Couldn't create the memo", { id: t });
+      console.error(`${noun} generation failed:`, err);
+      toast.error(`Couldn't create the ${noun}`, { id: t });
     } finally {
       setBusy(false);
     }
@@ -168,7 +192,7 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
         Cancel
       </button>
       <button type="button" className="inv-btn inv-btn--primary" onClick={create} disabled={!canCreate} aria-busy={busy}>
-        {busy ? "Preparing…" : "Create memo"}
+        {busy ? "Preparing…" : `Create ${noun}`}
       </button>
     </>
   );
@@ -179,15 +203,24 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
       variant={variant}
       tall={variant === "bottom"}
       onClose={busy ? () => {} : onClose}
-      title="Memo"
+      title={invoice ? "Invoice" : "Memo"}
       titleId="inv-memo-title"
-      closeLabel="Close memo"
+      closeLabel={`Close ${noun}`}
       footer={footer}
       initialFocus={variant === "bottom" ? undefined : nameRef}
     >
       <div className="inv-memo">
+        <section className="inv-memo-section">
+          <Segmented label="Document" options={KINDS} value={kind} onChange={setKind} className="inv-memo-kind" />
+          {invoice && (
+            <p className="inv-fnote inv-memo-kind-note">
+              A copy of the tax invoice issued in SAP. Use SAP&apos;s invoice number, and match its total below.
+            </p>
+          )}
+        </section>
+
         <section className="inv-memo-section" aria-labelledby="inv-memo-to">
-          <h3 id="inv-memo-to" className="inv-memo-h">Memo to</h3>
+          <h3 id="inv-memo-to" className="inv-memo-h">{invoice ? "Bill to" : "Memo to"}</h3>
           <PartyFields value={memoTo} onChange={setMemoTo} nameRef={nameRef} />
           <label className="inv-memo-toggle">
             <input type="checkbox" checked={separateShipTo} onChange={(e) => setSeparateShipTo(e.target.checked)} />
@@ -205,13 +238,34 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
         <section className="inv-memo-section" aria-labelledby="inv-memo-details">
           <h3 id="inv-memo-details" className="inv-memo-h">Details</h3>
           <div className="inv-memo-row">
-            <Field label="Memo no.">
-              <input className="inv-input" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Optional" />
+            <Field label={invoice ? "SAP invoice no." : "Memo no."}>
+              <input
+                className="inv-input"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                placeholder={invoice ? "Required" : "Optional"}
+                required={invoice}
+              />
             </Field>
             <Field label="Issue date">
               <input className="inv-input" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </Field>
           </div>
+          {invoice && (
+            <>
+              <div className="inv-memo-row">
+                <Field label="Payment due">
+                  <input className="inv-input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </Field>
+                <Field label="Customer no.">
+                  <input className="inv-input" value={customerNo} onChange={(e) => setCustomerNo(e.target.value)} placeholder="Optional" />
+                </Field>
+              </div>
+              <Field label="Memo ref." hint="The memo this sale came from.">
+                <input className="inv-input" value={memoRef} onChange={(e) => setMemoRef(e.target.value)} placeholder="Optional" />
+              </Field>
+            </>
+          )}
           <div className="inv-memo-row">
             <Field label="Salesman">
               <input className="inv-input" value={salesmanName} onChange={(e) => setSalesmanName(e.target.value)} />
@@ -241,7 +295,8 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
             <span className="inv-memo-badge">{showsBruto ? "Bruto prices" : "Neto prices"}</span>
           </div>
           <p className="inv-fnote inv-memo-note">
-            Prices start from the inventory{showsBruto ? " (Bruto for gemstones; diamonds stay Neto)" : ""}. Edit any $/ct to the price quoted on this memo.
+            Prices start from the inventory{showsBruto ? " (Bruto for gemstones; diamonds stay Neto)" : ""}. Edit any $/ct to the price{" "}
+            {invoice ? "on the SAP invoice" : "quoted on this memo"}.
           </p>
           <ul className="inv-memo-stones">
             {stones.map((s) => {
@@ -288,6 +343,32 @@ export default function MemoSheet({ open, onClose, stones, priceMode, salesman, 
             <p className="inv-fnote inv-memo-warn" role="status">
               {missingPrices} {missingPrices === 1 ? "stone needs" : "stones need"} a price per carat.
             </p>
+          )}
+          {invoice && (
+            <div className="inv-memo-sap">
+              <Field label="Total on the SAP invoice">
+                <div className="inv-field inv-field--prefix">
+                  <input
+                    className="inv-input"
+                    aria-label="Total on the SAP invoice"
+                    type="text"
+                    inputMode="decimal"
+                    value={sapTotal}
+                    onChange={(e) => setSapTotal(e.target.value)}
+                    placeholder="Required"
+                    aria-describedby="inv-memo-sap-status"
+                  />
+                  <span className="inv-field-unit" aria-hidden="true">$</span>
+                </div>
+              </Field>
+              <p id="inv-memo-sap-status" className={`inv-fnote${sapDiff === 0 ? "" : " inv-memo-warn"}`} role="status">
+                {sapDiff === null
+                  ? "Enter SAP's total; the copy must match it to the cent."
+                  : sapDiff === 0
+                    ? "Matches the SAP invoice."
+                    : `Off by $${money(Math.abs(sapDiff))} (${sapDiff > 0 ? "above" : "below"} SAP). Adjust the prices until it matches.`}
+              </p>
+            </div>
           )}
         </section>
 

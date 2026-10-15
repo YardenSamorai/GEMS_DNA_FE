@@ -173,5 +173,8 @@ h1 { font: 700 22pt/1 ${SERIF}; letter-spacing: 0.01em; margin: 0; }
 .bank dd { font-weight: 500; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .sign { display: grid; grid-template-rows: auto 1fr auto; min-height: 30mm; padding-top: 3mm; }
 .sign-lines { grid-row: 3; display: grid; grid-template-columns: 2fr 1fr; gap: 5mm; }
-.sign-lines div { border-top: 1px solid ${t.faint}; padding-top: 1.5mm; font-size: 7.5pt; color: ${t.text2}; }`;
+.sign-lines div { border-top: 1px solid ${t.faint}; padding-top: 1.5mm; font-size: 7.5pt; color: ${t.text2}; }
+.pay { padding-top: 3mm; min-width: 0; }
+.pay p { color: ${t.body}; margin-top: 1.2mm; overflow-wrap: anywhere; }
+.pay .due { color: ${t.text}; font-size: 11pt; font-weight: 700; letter-spacing: -0.005em; }`;
 }

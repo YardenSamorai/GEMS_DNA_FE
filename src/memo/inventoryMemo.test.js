@@ -107,6 +107,25 @@ describe("inventory memo", () => {
     expect(model.otherFields).toEqual([]);
   });
 
+  test("builds an invoice: SAP's number, payment fields, no consignment terms or signature", () => {
+    const form = { ...FORM, kind: "invoice", number: "5935", dueDate: "2026-10-12", customerNo: "1870011", memoRef: "8327" };
+    const model = buildMemoModel(memoRecordFromInventory(STONES, { 1: 3000, 2: 15500 }, form));
+    expect(model.kind).toBe("invoice");
+    expect(model.billToLabel).toBe("Bill to");
+    expect(model.document).toMatchObject({ number: "5935", dueDate: "12-Oct-2026", customerNo: "1870011", memoRef: "8327" });
+    expect(model.document.extra).toEqual([]);
+    expect(model.terms).toEqual([GEMSTAR_MEMO_TEMPLATE.terms[1], ...GEMSTAR_MEMO_TEMPLATE.invoiceNotes]);
+    expect(model.signature).toBeNull();
+    expect(model.warnings.filter((w) => w.code !== "MISSING_SKU")).toEqual([]);
+  });
+
+  test("a memo carries no invoice fields", () => {
+    const model = buildMemoModel(memoRecordFromInventory(STONES, { 1: 3000, 2: 15500 }, { ...FORM, dueDate: "2026-10-12", customerNo: "1" }));
+    expect(model.kind).toBe("memo");
+    expect(model.document).toMatchObject({ dueDate: null, customerNo: null, memoRef: null });
+    expect(model.terms).toEqual(GEMSTAR_MEMO_TEMPLATE.terms);
+  });
+
   test("prefills the origin only when every stone shares one", () => {
     expect(sharedOrigin([{ origin: "Zambia" }, { origin: "Zambia" }])).toBe("Zambia");
     expect(sharedOrigin([{ origin: "Zambia" }, { origin: "Colombia" }])).toBe("");
