@@ -175,37 +175,36 @@ const SelectionFab = () => {
                           >
                             {/* Applies to everything below that carries prices:
                                 WhatsApp "With prices" and the PDF catalogs. */}
-                            {hasRap && (
-                              <>
-                                <button
-                                  type="button"
-                                  role="menuitemcheckbox"
-                                  aria-checked={withRap}
-                                  onClick={() => setWithRap((v) => !v)}
-                                  className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-app-canvas2"
-                                >
-                                  <span className="min-w-0">
-                                    <span className="block text-[13.5px] font-medium text-app-ink">Include Rap %</span>
-                                    <span className="block text-[11px] text-app-soft">
-                                      {withRap ? "Shown with the prices" : "Hidden"}
-                                    </span>
-                                  </span>
-                                  <span
-                                    aria-hidden
-                                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                                      withRap ? "bg-emerald-500" : "bg-app-line"
-                                    }`}
-                                  >
-                                    <span
-                                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                                        withRap ? "translate-x-[22px]" : "translate-x-0.5"
-                                      }`}
-                                    />
-                                  </span>
-                                </button>
-                                <div className="mx-3 my-1 h-px bg-app-line" aria-hidden />
-                              </>
-                            )}
+                            <button
+                              type="button"
+                              role="menuitemcheckbox"
+                              aria-checked={withRap && hasRap}
+                              disabled={!hasRap}
+                              onClick={() => setWithRap((v) => !v)}
+                              className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-app-canvas2 disabled:cursor-default disabled:hover:bg-transparent"
+                            >
+                              <span className="min-w-0">
+                                <span className={`block text-[13.5px] font-medium ${hasRap ? "text-app-ink" : "text-app-soft"}`}>
+                                  Include Rap %
+                                </span>
+                                <span className="block text-[11px] text-app-soft">
+                                  {!hasRap ? "No diamonds with Rap % selected" : withRap ? "Shown with the prices" : "Hidden"}
+                                </span>
+                              </span>
+                              <span
+                                aria-hidden
+                                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                                  withRap && hasRap ? "bg-emerald-500" : "bg-app-line"
+                                } ${hasRap ? "" : "opacity-50"}`}
+                              >
+                                <span
+                                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                                    withRap && hasRap ? "translate-x-[22px]" : "translate-x-0.5"
+                                  }`}
+                                />
+                              </span>
+                            </button>
+                            <div className="mx-3 my-1 h-px bg-app-line" aria-hidden />
                             <div className="px-4 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-app-soft">
                               Share on WhatsApp
                             </div>
