@@ -1201,7 +1201,8 @@ function countDepth(id, folders) {
   let cur = folders.find((f) => f.id === id);
   while (cur && cur.parent_id) {
     d++;
-    cur = folders.find((f) => f.id === cur.parent_id);
+    const parentId = cur.parent_id;
+    cur = folders.find((f) => f.id === parentId);
     if (d > 10) break;
   }
   return d;
