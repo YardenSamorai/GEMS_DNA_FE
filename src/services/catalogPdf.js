@@ -447,6 +447,12 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     ...items.map((it) => loadImage(itemImageUrl(it))),
   ]);
 
+  const grandTotal = items.reduce((sum, it) => {
+    const v = Number(isJewelry(it) ? it.price : it.priceTotal);
+    return Number.isFinite(v) && v > 0 ? sum + v : sum;
+  }, 0);
+  const totalLabel = showPrices && grandTotal ? money(grandTotal) : null;
+
   const drawHeader = () => {
     pdf.setFillColor(...wash);
     pdf.rect(0, 0, pageW, headerBottom - 4, "F");
@@ -507,7 +513,7 @@ export async function buildCatalogPdf(rawItems, options = {}) {
     pdf.setTextColor(...soft);
     pdf.text(dateStr, pageW - margin, 16, { align: "right" });
     pdf.text(
-      `${items.length} ${items.length === 1 ? "item" : "items"}`,
+      `${items.length} ${items.length === 1 ? "item" : "items"}${totalLabel ? ` - ${totalLabel} Total` : ""}`,
       pageW - margin,
       24.5,
       { align: "right" }
