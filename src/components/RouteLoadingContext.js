@@ -49,3 +49,9 @@ export const useRouteLoading = (isLoading) => {
 };
 
 export const useIsRouteLoading = () => useContext(RouteLoadingContext).isLoading;
+
+/** Suspense fallback for lazy pages: holds the route overlay, renders nothing. */
+export const PageLoading = () => {
+  useRouteLoading(true);
+  return null;
+};

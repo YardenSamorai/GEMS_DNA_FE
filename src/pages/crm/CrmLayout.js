@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useUser } from "@clerk/clerk-react";
 import { CheckCircle2, FileText, Files, LayoutList, Settings, Store, TrendingUp, Users } from "lucide-react";
 import { fetchDnaLeadsUnreadCount, pingApi } from "../../services/crmApi";
+import { PageLoading } from "../../components/RouteLoadingContext";
 import "./crm.css";
 
 const POLL_MS = 30_000;
@@ -114,7 +115,9 @@ export default function CrmLayout() {
           </nav>
         </div>
 
-        <Outlet key={location.pathname} />
+        <Suspense fallback={<PageLoading />}>
+          <Outlet key={location.pathname} />
+        </Suspense>
       </div>
     </div>
   );

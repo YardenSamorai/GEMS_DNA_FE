@@ -1,62 +1,83 @@
-import React, { useState, useEffect, useMemo, createContext, useContext } from "react";
+import React, { useState, useEffect, useMemo, createContext, useContext, lazy, Suspense } from "react";
 import { flushSync } from "react-dom";
 import { BrowserRouter as Router, Route, Routes, useLocation, Link, Navigate, Outlet } from "react-router-dom";
 import { SignedIn, SignedOut, UserButton, useAuth, useClerk, AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import DiamondCard from "./pages/DiamondCard";
-import Dashboard from "./pages/Dashboard";
 import JewelryPage from "./pages/JewelryPage";
 import HomePage from "./pages/home/HomePage";
 import { Toaster } from "react-hot-toast";
-import InventoryHub from "./pages/InventoryHub";
-import CustomerSharePage from "./pages/share/CustomerSharePage";
-import SignaturePage from "./pages/sign/SignaturePage";
-import MediaViewer from "./pages/MediaViewer";
-import ShareItemPage from "./pages/ShareItemPage";
 import { SignInPage, SignUpPage } from "./pages/auth/AuthPage";
 import LoginSheet from "./components/LoginSheet";
 import { motion } from "framer-motion";
-import SalesInventory from "./pages/sales/SalesInventory";
-import SalesJewelry from "./pages/sales/SalesJewelry";
-import StoneDetail from "./pages/sales/StoneDetail";
-import JewelryDetail from "./pages/sales/JewelryDetail";
-import SalesDashboard from "./pages/sales/SalesDashboard";
-import QAPage from "./pages/QAPage";
-import PhotoStation from "./pages/photos/PhotoStation";
-import ApiAccess from "./pages/api/ApiAccess";
-import PhotoReview from "./pages/photos/PhotoReview";
-import CrmLayout from "./pages/crm/CrmLayout";
-import CrmContacts from "./pages/crm/CrmContacts";
-import CrmCompanies from "./pages/crm/CrmCompanies";
-import StoreProfile from "./pages/crm/StoreProfile";
-import CrmMemos from "./pages/crm/CrmMemos";
-import MemoDetail from "./pages/crm/MemoDetail";
-import CrmDocuments from "./pages/crm/CrmDocuments";
-import CustomerProfile from "./pages/crm/CustomerProfile";
-import CrmDeals from "./pages/crm/CrmDeals";
-import CrmTasks from "./pages/crm/CrmTasks";
-import CrmSettings from "./pages/crm/CrmSettings";
-import CatalogTiers from "./pages/crm/CatalogTiers";
-import TeamSettings from "./pages/team/TeamSettings";
 import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
 import { SelectionProvider } from "./context/SelectionContext";
 import { sectionForPath, firstAllowedLanding } from "./utils/permissions";
-import SelectionFab from "./components/SelectionFab";
 import AppShell from "./shell/AppShell";
 import ActivityTracker from "./components/ActivityTracker";
 import SessionLimitGuard from "./components/SessionLimitGuard";
 import { trackDenied } from "./utils/activityLog";
-import SpinningGem from "./components/SpinningGem";
+import SpinningGem from "./components/LoadingGem";
 import BrandMark from "./components/BrandMark";
-import { RouteLoadingProvider } from "./components/RouteLoadingContext";
+import { RouteLoadingProvider, PageLoading } from "./components/RouteLoadingContext";
 import RouteTransitionOverlay from "./components/RouteTransitionOverlay";
-import StorePortalLayout from "./pages/portal/StorePortalLayout";
-import StorePortalMemos from "./pages/portal/StorePortalMemos";
-import StorePortalMemoDetail from "./pages/portal/StorePortalMemoDetail";
-import StorePortalAccount from "./pages/portal/StorePortalAccount";
-import StorePortalCatalog from "./pages/portal/StorePortalCatalog";
-import StorePortalRequests from "./pages/portal/StorePortalRequests";
-import StorePortalDocuments from "./pages/portal/StorePortalDocuments";
+
+// Public entry pages (home, DNA card, sign-in) stay in the main bundle; every
+// signed-in page is its own chunk so opening one doesn't download them all.
+// A chunk 404s after a deploy replaces the hashed files under an open tab;
+// reloading once picks up the new build.
+const CHUNK_RELOAD_KEY = "gd.chunkReload";
+const page = (load) =>
+  lazy(() =>
+    load().then((mod) => {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      return mod;
+    }, (err) => {
+      const key = CHUNK_RELOAD_KEY;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      throw err;
+    })
+  );
+const SelectionFab = page(() => import("./components/SelectionFab"));
+const Dashboard = page(() => import("./pages/Dashboard"));
+const InventoryHub = page(() => import("./pages/InventoryHub"));
+const CustomerSharePage = page(() => import("./pages/share/CustomerSharePage"));
+const SignaturePage = page(() => import("./pages/sign/SignaturePage"));
+const MediaViewer = page(() => import("./pages/MediaViewer"));
+const ShareItemPage = page(() => import("./pages/ShareItemPage"));
+const SalesInventory = page(() => import("./pages/sales/SalesInventory"));
+const SalesJewelry = page(() => import("./pages/sales/SalesJewelry"));
+const StoneDetail = page(() => import("./pages/sales/StoneDetail"));
+const JewelryDetail = page(() => import("./pages/sales/JewelryDetail"));
+const SalesDashboard = page(() => import("./pages/sales/SalesDashboard"));
+const QAPage = page(() => import("./pages/QAPage"));
+const PhotoStation = page(() => import("./pages/photos/PhotoStation"));
+const ApiAccess = page(() => import("./pages/api/ApiAccess"));
+const PhotoReview = page(() => import("./pages/photos/PhotoReview"));
+const CrmLayout = page(() => import("./pages/crm/CrmLayout"));
+const CrmContacts = page(() => import("./pages/crm/CrmContacts"));
+const CrmCompanies = page(() => import("./pages/crm/CrmCompanies"));
+const StoreProfile = page(() => import("./pages/crm/StoreProfile"));
+const CrmMemos = page(() => import("./pages/crm/CrmMemos"));
+const MemoDetail = page(() => import("./pages/crm/MemoDetail"));
+const CrmDocuments = page(() => import("./pages/crm/CrmDocuments"));
+const CustomerProfile = page(() => import("./pages/crm/CustomerProfile"));
+const CrmDeals = page(() => import("./pages/crm/CrmDeals"));
+const CrmTasks = page(() => import("./pages/crm/CrmTasks"));
+const CrmSettings = page(() => import("./pages/crm/CrmSettings"));
+const CatalogTiers = page(() => import("./pages/crm/CatalogTiers"));
+const TeamSettings = page(() => import("./pages/team/TeamSettings"));
+const StorePortalLayout = page(() => import("./pages/portal/StorePortalLayout"));
+const StorePortalMemos = page(() => import("./pages/portal/StorePortalMemos"));
+const StorePortalMemoDetail = page(() => import("./pages/portal/StorePortalMemoDetail"));
+const StorePortalAccount = page(() => import("./pages/portal/StorePortalAccount"));
+const StorePortalCatalog = page(() => import("./pages/portal/StorePortalCatalog"));
+const StorePortalRequests = page(() => import("./pages/portal/StorePortalRequests"));
+const StorePortalDocuments = page(() => import("./pages/portal/StorePortalDocuments"));
 
 // ---------- Theme Context ----------
 const ThemeContext = createContext();
@@ -188,11 +209,15 @@ const AppLayout = () => {
     <>
       <SignedIn>
         <AppShell access={access}>
-          <Outlet />
+          <Suspense fallback={<PageLoading />}>
+            <Outlet />
+          </Suspense>
         </AppShell>
         {/* Floating "Selected" button — appears once stones are picked from
             any catalog, opens the review page. */}
-        <SelectionFab />
+        <Suspense fallback={null}>
+          <SelectionFab />
+        </Suspense>
         {/* Invisible — records rep activity + presence heartbeat. */}
         <ActivityTracker />
       </SignedIn>
@@ -440,6 +465,7 @@ function AppContent() {
         <SessionLimitGuard />
         <RouteLoadingProvider>
           <RouteTransitionOverlay />
+          <Suspense fallback={<PageLoading />}>
           <Routes>
           {/* Public homepage — its own header, no app shell */}
           <Route path="/" element={<HomePage />} />
@@ -585,6 +611,7 @@ function AppContent() {
           <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
           <Route path="/:stone_id" element={<DiamondCard />} />
           </Routes>
+          </Suspense>
         </RouteLoadingProvider>
       </Router>
     </>

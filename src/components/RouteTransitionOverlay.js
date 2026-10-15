@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import SpinningGem from "./SpinningGem";
+import SpinningGem from "./LoadingGem";
 import { useIsRouteLoading } from "./RouteLoadingContext";
 
 /**

@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
@@ -18,15 +18,8 @@ import { makeThumbnail } from "./utils/cardImage";
 import { buildAlphabet, groupByLetter, scrollToLetter } from "./utils/alphabetIndex";
 import { useRouteLoading } from "../../components/RouteLoadingContext";
 import AlphabetIndex from "./components/AlphabetIndex";
-import ContactDrawer from "./components/ContactDrawer";
-import ContactFormModal from "./components/ContactFormModal";
-import ScanCardModal from "./components/ScanCardModal";
-import AttachCardModal from "./components/AttachCardModal";
 import FolderTree from "./components/FolderTree";
 import AdvancedFiltersDrawer, { EMPTY_FILTERS, countActiveFilters } from "./components/AdvancedFiltersDrawer";
-import ImportContactsModal from "./components/ImportContactsModal";
-import BroadcastEmailModal from "./components/BroadcastEmailModal";
-import CardImageLightbox from "./components/CardImageLightbox";
 import AssigneeFilter from "../../components/team/AssigneeFilter";
 import MemberAvatar from "../../components/team/MemberAvatar";
 import { useTeam } from "../../context/TeamContext";
@@ -34,6 +27,16 @@ import {
   Camera, Check, Folder, FolderInput, Loader2, Mail, MoreHorizontal, Plus, ScanLine,
   Search, SlidersHorizontal, Tag, Trash2, Upload, Users, X,
 } from "lucide-react";
+
+// Opened on demand; between them they pull in the card scanner, the
+// spreadsheet importer, PDF and 3D code the list itself never needs.
+const ContactDrawer = lazy(() => import("./components/ContactDrawer"));
+const ContactFormModal = lazy(() => import("./components/ContactFormModal"));
+const ScanCardModal = lazy(() => import("./components/ScanCardModal"));
+const AttachCardModal = lazy(() => import("./components/AttachCardModal"));
+const ImportContactsModal = lazy(() => import("./components/ImportContactsModal"));
+const BroadcastEmailModal = lazy(() => import("./components/BroadcastEmailModal"));
+const CardImageLightbox = lazy(() => import("./components/CardImageLightbox"));
 
 const SORTS = [
   { value: "name", label: "Name" },
@@ -191,6 +194,10 @@ export default function CrmContacts() {
   const [thumbCache, setThumbCache] = useState(() =>
     user?.id ? (loadCache(thumbsCacheKey(user.id)) || {}) : {}
   );
+  // Read through a ref so new thumbnails don't recreate `reload`, which
+  // would refetch the whole list every time a batch of images lands.
+  const thumbCacheRef = useRef(thumbCache);
+  thumbCacheRef.current = thumbCache;
 
   const reload = useCallback(() => {
     if (!user?.id) return;
@@ -216,6 +223,7 @@ export default function CrmContacts() {
       setContacts(cached);
       setLoading(false);
       setRefreshing(true);
+      setInitialLoading(false);
     } else {
       setLoading(true);
     }
@@ -235,7 +243,7 @@ export default function CrmContacts() {
         // locally and POST a real thumbnail back so the next visit is
         // small.
         const missingIds = fresh
-          .filter((c) => !thumbCache[c.id])
+          .filter((c) => !thumbCacheRef.current[c.id])
           .map((c) => c.id);
         if (missingIds.length > 0) {
           fetchContactThumbs(missingIds)
@@ -290,7 +298,7 @@ export default function CrmContacts() {
         // subsequent refreshes don't churn.
         setInitialLoading(false);
       });
-  }, [user?.id, search, selectedFolderId, advancedFilters, assigneeFilter, thumbCache]);
+  }, [user?.id, search, selectedFolderId, advancedFilters, assigneeFilter]);
 
   // Load tags + folders ONCE per page (not on every keystroke / filter change)
   const reloadSidebars = useCallback(() => {
@@ -301,11 +309,25 @@ export default function CrmContacts() {
 
   useEffect(() => { reloadSidebars(); }, [reloadSidebars]);
 
+  // Opening a contact is the next thing almost everyone does.
   useEffect(() => {
-    if (!user?.id) return;
+    if (loading) return undefined;
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+    const cancel = window.cancelIdleCallback || clearTimeout;
+    const id = idle(() => { import("./components/ContactDrawer"); });
+    return () => cancel(id);
+  }, [loading]);
+
+  // Debounce only while typing; first load and filter clicks fetch at once.
+  const lastSearchRef = useRef(null);
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const typing = lastSearchRef.current !== null && lastSearchRef.current !== search;
+    lastSearchRef.current = search;
+    if (!typing) { reload(); return undefined; }
     const t = setTimeout(reload, 250);
     return () => clearTimeout(t);
-  }, [user?.id, search, selectedFolderId, advancedFilters, assigneeFilter, reload]);
+  }, [user?.id, search, reload]);
 
   // Apply the Lead/Buyer/Dealer pill *here* (client-side) so the contacts
   // state always contains the full set the server matched on search /
@@ -873,7 +895,7 @@ export default function CrmContacts() {
         </div>
       )}
 
-      {/* Modals */}
+      <Suspense fallback={null}>
       {showForm && (
         <ContactFormModal onClose={() => setShowForm(false)} onSubmit={handleCreate} />
       )}
@@ -978,6 +1000,7 @@ export default function CrmContacts() {
           onClose={() => setShowFoldersMobile(false)}
         />
       )}
+      </Suspense>
     </div>
   );
 }
