@@ -17,7 +17,7 @@ const nobreak = (value) =>
 const names = (text, term) =>
   Boolean(term) && new RegExp(`(^|[^\\w-])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w-])`, "i").test(text);
 
-const LOGO_HEIGHT_MM = 17;
+const LOGO_HEIGHT_MM = 22;
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** "05-Oct-2026" / "2026-10-05" -> "05 October 2026"; anything else as printed. */
