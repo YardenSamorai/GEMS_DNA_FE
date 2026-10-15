@@ -111,7 +111,7 @@ function normalizeParty(raw) {
 }
 
 function normalizeItem(raw, index, warnings) {
-  const known = new Set(["lot", "sku", "description", "qty", "carat", "pricePerCarat", "totalPrice"]);
+  const known = new Set(["lot", "sku", "description", "qty", "carat", "pricePerCarat", "totalPrice", "pairSingle"]);
   const item = {
     index: index + 1,
     lot: clean(raw.lot),
@@ -121,6 +121,7 @@ function normalizeItem(raw, index, warnings) {
     carat: parseAmount(raw.carat),
     pricePerCarat: parseAmount(raw.pricePerCarat),
     totalPrice: parseAmount(raw.totalPrice),
+    pairSingle: clean(raw.pairSingle),
     extra: Object.entries(raw)
       .filter(([key, value]) => !known.has(key) && present(value))
       .map(([label, value]) => ({ label, value: clean(value) })),
@@ -315,6 +316,7 @@ export function buildMemoModel(raw, options = {}) {
     shipTo,
     partiesIdentical: Boolean(billTo && shipTo && JSON.stringify(billTo) === JSON.stringify(shipTo)),
     items,
+    extraColumns: (raw.extraColumns || []).filter((key) => key === "pairSingle"),
     totals,
     terms: (raw.terms || []).map(clean).filter(Boolean),
     declarations: (raw.declarations || []).map(clean).filter(Boolean),

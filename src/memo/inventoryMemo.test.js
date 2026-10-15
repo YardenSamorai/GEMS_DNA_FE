@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { memoDate, memoRecordFromInventory, sharedOrigin, stoneCount, stoneFromInventory } from "./inventoryMemo";
+import { memoDate, memoRecordFromInventory, pairSingle, sharedOrigin, stoneCount, stoneFromInventory } from "./inventoryMemo";
 import { buildMemoModel } from "./memoModel";
 import { enrichMemo } from "./enrichMemo";
 import { GEMSTAR_MEMO_TEMPLATE } from "./gemstarTemplate";
@@ -134,6 +134,23 @@ describe("inventory memo", () => {
     const memo = buildMemoModel(memoRecordFromInventory(STONES, { 1: 1, 2: 1 }, { ...FORM, profile: "cartier" }));
     expect(memo.declarations).toEqual([]);
     expect(memo.terms).toEqual(GEMSTAR_MEMO_TEMPLATE.terms);
+  });
+
+  test("Cartier's invoice carries P/S from the stone's grouping", () => {
+    const grouped = [
+      { ...STONES[0], groupingType: "Pair" },
+      { ...STONES[1], groupingType: "Single" },
+      { ...STONES[1], id: 3, sku: "TEST-003", groupingType: "Parcel" },
+      { ...STONES[1], id: 4, sku: "TEST-004", groupingType: "" },
+    ];
+    const prices = { 1: 1, 2: 1, 3: 1, 4: 1 };
+    const cartier = buildMemoModel(memoRecordFromInventory(grouped, prices, { ...FORM, kind: "invoice", number: "1", profile: "cartier" }));
+    expect(cartier.extraColumns).toEqual(["pairSingle"]);
+    expect(cartier.items.map((i) => i.pairSingle)).toEqual(["P", "S", "Parcel", null]);
+    expect(cartier.items.every((i) => i.extra.length === 0)).toBe(true);
+    const standard = buildMemoModel(memoRecordFromInventory(grouped, prices, { ...FORM, kind: "invoice", number: "1" }));
+    expect(standard.extraColumns).toEqual([]);
+    expect(pairSingle({ groupingType: "pair" })).toBe("P");
   });
 
   test("picks the profile from the customer's name", () => {

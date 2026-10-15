@@ -17,7 +17,7 @@ const nobreak = (value) =>
 const names = (text, term) =>
   Boolean(term) && new RegExp(`(^|[^\\w-])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w-])`, "i").test(text);
 
-const LOGO_HEIGHT_MM = 22;
+const LOGO_HEIGHT_MM = 28;
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** "05-Oct-2026" / "2026-10-05" -> "05 October 2026"; anything else as printed. */
@@ -169,16 +169,18 @@ function totalsHtml(totals, currency, invoice) {
   </div>`;
 }
 
+/** [title, width, class, cell(item, qr)]; `optional` columns print only when the model asks for them. */
 const COLUMNS = [
-  ["Photo", "17mm", "photo"],
-  ["Lot", "9mm", "c"],
-  ["Item #", "23mm", ""],
-  ["Description", null, ""],
-  ["DNA", "17mm", "c"],
-  ["Qty", "11mm", "r"],
-  ["Carat", "16mm", "r"],
-  ["Per Carat ({cur})", "21mm", "r"],
-  ["Total ({cur})", "27mm", "r"],
+  ["Photo", "17mm", "photo", (item) => `<td class="photo">${thumbHtml(item.catalog?.image)}</td>`],
+  ["Lot", "9mm", "c", (item) => `<td class="lot c num">${esc(item.lot || item.index)}</td>`],
+  ["Item #", "23mm", "", (item) => `<td class="sku">${esc(item.sku || "")}</td>`],
+  ["Description", null, "", (item) => `<td>${descriptionHtml(item)}</td>`],
+  ["DNA", "17mm", "c", (item, qr) => `<td class="qr">${qr}</td>`],
+  ["Qty", "11mm", "r", (item) => `<td class="r num">${plain(item.qty)}</td>`],
+  ["P/S", "10mm", "c", (item) => `<td class="c">${esc(item.pairSingle || "")}</td>`, "pairSingle"],
+  ["Carat", "16mm", "r", (item) => `<td class="r num">${plain(item.carat)}</td>`],
+  ["Per Carat ({cur})", "21mm", "r", (item) => `<td class="r num">${plain(item.pricePerCarat)}</td>`],
+  ["Total ({cur})", "27mm", "r", (item) => `<td class="r num">${plain(item.totalPrice)}</td>`],
 ];
 
 async function itemsHtml(model, currency) {
@@ -188,28 +190,19 @@ async function itemsHtml(model, currency) {
     const block = totalsHtml(totals, currency, invoice);
     return block ? `<section class="m-summary"><div class="label">Summary</div>${block}</section>` : "";
   }
+  const columns = COLUMNS.filter(([, , , , optional]) => !optional || (model.extraColumns || []).includes(optional));
   const qrs = await Promise.all(items.map((i) => (i.catalog?.dnaUrl ? qrSvg(i.catalog.dnaUrl) : null)));
-  const cols = COLUMNS.map(([, width]) => `<col${width ? ` style="width:${width}"` : ""}>`).join("");
-  const head = COLUMNS.map(([title, , cls]) => `<th${cls ? ` class="${cls}"` : ""}>${esc(title.replace("{cur}", currency))}</th>`).join("");
+  const cols = columns.map(([, width]) => `<col${width ? ` style="width:${width}"` : ""}>`).join("");
+  const head = columns.map(([title, , cls]) => `<th${cls ? ` class="${cls}"` : ""}>${esc(title.replace("{cur}", currency))}</th>`).join("");
   const body = items
     .map((item, i) => {
       const qr = qrs[i] ? `<a class="m-qr" href="${esc(item.catalog.dnaUrl)}" title="${esc(item.catalog.dnaUrl)}">${qrs[i]}</a>` : "";
-      return `<tr class="m-row">
-        <td class="photo">${thumbHtml(item.catalog?.image)}</td>
-        <td class="lot c num">${esc(item.lot || item.index)}</td>
-        <td class="sku">${esc(item.sku || "")}</td>
-        <td>${descriptionHtml(item)}</td>
-        <td class="qr">${qr}</td>
-        <td class="r num">${plain(item.qty)}</td>
-        <td class="r num">${plain(item.carat)}</td>
-        <td class="r num">${plain(item.pricePerCarat)}</td>
-        <td class="r num">${plain(item.totalPrice)}</td>
-      </tr>`;
+      return `<tr class="m-row">${columns.map(([, , , cell]) => cell(item, qr)).join("")}</tr>`;
     })
     .join("");
   const block = totalsHtml(totals, currency, invoice);
   // Totals ride in the table's last row so they can't split or start a page alone.
-  const totalsRow = block ? `<tr class="m-totals-row"><td colspan="${COLUMNS.length}">${block}</td></tr>` : "";
+  const totalsRow = block ? `<tr class="m-totals-row"><td colspan="${columns.length}">${block}</td></tr>` : "";
   return `<table class="m-table"><colgroup>${cols}</colgroup><thead><tr>${head}</tr></thead><tbody>${body}${totalsRow}</tbody></table>`;
 }
 
@@ -284,16 +277,14 @@ export async function renderMemoHtml(model, { issuerLogo = null, marks = [] } = 
   const memoTo = model.billTo || model.shipTo;
   const shipTo = model.shipTo || model.billTo;
   const meta = [longDate(d.issueDate), currency].filter(Boolean).map(esc).join(" · ");
-  // The legal original is the tax invoice issued in SAP; this document says it is a copy of it.
   const title = invoice
-    ? `<div class="title"><h1>TAX INVOICE</h1><span class="m-draft">Copy</span>${d.draft ? `<span class="m-draft">Draft</span>` : ""}</div>
-    <div class="subtitle">Copy of the original${model.issuer?.name ? ` issued by ${esc(model.issuer.name)}` : ""}</div>`
+    ? `<div class="title"><h1>INVOICE</h1>${d.draft ? `<span class="m-draft">Draft</span>` : ""}</div>`
     : `<div class="title"><h1>MEMORANDUM</h1>${d.draft ? `<span class="m-draft">Draft</span>` : ""}</div>
     <div class="subtitle">For examination and inspection only</div>`;
 
   const css = memoCss({
     footerStart: model.footer.length ? model.footer.join(" · ") : null,
-    footerEnd: [d.draft ? "Draft" : null, memoLabel, invoice ? "Copy" : null].filter(Boolean).join(" · "),
+    footerEnd: [d.draft ? "Draft" : null, memoLabel].filter(Boolean).join(" · "),
     headerEnd: [memoLabel, customer].filter(Boolean).join(" · "),
   });
 

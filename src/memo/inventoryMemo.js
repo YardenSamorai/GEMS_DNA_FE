@@ -87,6 +87,15 @@ export function sharedOrigin(stones) {
   return [...origins][0] || "";
 }
 
+/** The P/S cell: "P" for a pair, "S" for a single, other groupings (Set, Parcel…) as named. */
+export function pairSingle(stone) {
+  const grouping = clean(stone?.groupingType);
+  if (!grouping) return null;
+  if (/^pair$/i.test(grouping)) return "P";
+  if (/^single$/i.test(grouping)) return "S";
+  return grouping;
+}
+
 /**
  * @param stones   inventory rows, in memo order
  * @param prices   { [stone.id]: pricePerCarat } as quoted on this memo
@@ -112,6 +121,7 @@ export function memoRecordFromInventory(stones, prices, form) {
       carat: carat ? fixed(carat) : null,
       pricePerCarat: Number.isFinite(ppc) ? fixed(ppc) : null,
       totalPrice: total !== null ? fixed(total) : null,
+      ...(custom.pairSingle ? { pairSingle: pairSingle(stone) } : {}),
     };
   });
   const caratSum = stones.reduce((sum, s) => sum + round2(Number(s.weightCt) || 0), 0);
@@ -147,6 +157,7 @@ export function memoRecordFromInventory(stones, prices, form) {
       { label: "Shipment Ref.", value: clean(form.shipmentRef) },
     ],
     columns: [],
+    extraColumns: custom.pairSingle ? ["pairSingle"] : [],
     items,
     totals: items.length
       ? {

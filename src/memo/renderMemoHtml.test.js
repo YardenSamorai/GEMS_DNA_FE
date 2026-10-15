@@ -54,7 +54,7 @@ describe("renderMemoHtml", () => {
     expect(html).not.toContain("<b>& Co");
   });
 
-  it("prints an invoice as a marked copy with payment details instead of a signature", async () => {
+  it("prints an invoice with payment details instead of a signature", async () => {
     const invoice = {
       ...record,
       kind: "invoice",
@@ -69,8 +69,8 @@ describe("renderMemoHtml", () => {
       terms: ["Exempt from tax withholding at source."],
     };
     const html = await toHtml(buildMemoModel(invoice));
-    expect(html).toContain("<h1>TAX INVOICE</h1><span class=\"m-draft\">Copy</span>");
-    expect(html).toContain("Copy of the original issued by Example Gems Ltd.");
+    expect(html).toContain('<div class="title"><h1>INVOICE</h1></div>');
+    expect(html).not.toMatch(/TAX INVOICE|Copy/);
     expect(html).toContain('<div class="label">Invoice No.</div>');
     expect(html).toContain('<div class="label">Bill to</div>');
     expect(html).toMatch(/Payment Due<\/div><div class="v num">12-Oct-2026/);
@@ -83,7 +83,22 @@ describe("renderMemoHtml", () => {
     expect(html).toContain("Please quote invoice No. 5935 with your payment.");
     expect(html).not.toContain("Received by");
     expect(html).not.toContain("MEMORANDUM");
-    expect(html).toContain('"Invoice 5935 · Copy · "');
+    expect(html).toContain('"Invoice 5935 · "');
+  });
+
+  it("adds the P/S column only when the model asks for it", async () => {
+    const items = [
+      { sku: "A", carat: "1.00", pairSingle: "P" },
+      { sku: "B", carat: "2.00" },
+    ];
+    const withPs = await toHtml(buildMemoModel({ ...record, kind: "invoice", items, extraColumns: ["pairSingle"] }));
+    expect(withPs).toContain('<th class="c">P/S</th>');
+    expect(withPs).toContain('<td class="c">P</td>');
+    expect(withPs.match(/<td class="c"><\/td>/g)).toHaveLength(1);
+    expect(withPs).toContain('<td colspan="10">');
+    const without = await toHtml(buildMemoModel({ ...record, kind: "invoice", items }));
+    expect(without).not.toContain("P/S");
+    expect(without).toContain('<td colspan="9">');
   });
 
   it("prints a customer's declarations, terms of payment and an issuer signature on an invoice", async () => {

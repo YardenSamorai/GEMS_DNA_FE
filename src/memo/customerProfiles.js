@@ -7,6 +7,7 @@
  * invoice.declarations  replace the standard gemstone declaration
  * invoice.notes         replace the standard invoice notes ([] prints none)
  * invoice.paymentTerms  the customer's fixed terms of payment (null: not printed)
+ * invoice.pairSingle    adds a P/S column (pair or single, from the stone's grouping)
  */
 export const CUSTOMER_PROFILES = [
   {
@@ -26,6 +27,7 @@ export const CUSTOMER_PROFILES = [
       ],
       notes: [],
       paymentTerms: null,
+      pairSingle: true,
     },
   },
 ];
