@@ -22,7 +22,6 @@ import {
   API_BASE,
   getDisplayShape,
   getDisplayColor,
-  shortTreatment,
 } from "../pages/inventory/helpers/constants";
 import {
   stoneImage,
@@ -63,7 +62,7 @@ const itemTitle = (it) => {
     it.weightCt != null && it.weightCt !== "" ? Number(it.weightCt).toFixed(2) : "";
   const shape = getDisplayShape(it.shape);
   const lab = it.lab && String(it.lab).toUpperCase() !== "N/A" ? it.lab : "";
-  const treatment = it.treatment ? shortTreatment(it.treatment) : "";
+  const treatment = it.treatment ? String(it.treatment).trim() : "";
   const gemTypeName =
     mapped.filter((c) => !["Empty", "Diamond", "Fancy", "Emerald"].includes(c))[0] || "";
 
