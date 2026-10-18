@@ -77,13 +77,11 @@ dl, dd { margin: 0; }
   display: flex; justify-content: space-between; align-items: center; gap: 8mm;
   padding-bottom: 4mm; border-bottom: 1px solid ${t.faint};
 }
-.brand { display: flex; gap: 4mm; align-items: center; min-width: 0; }
-.m-logo { display: block; flex: none; overflow: hidden; }
-.m-logo img { display: block; max-width: none; }
-.wordmark { font: 700 18pt/1 ${SERIF}; letter-spacing: 0.04em; margin: 0 0 1.2mm; }
-.brand-sub { color: ${t.body}; font-size: 8pt; line-height: 1.4; overflow-wrap: anywhere; }
-.brand-sub strong { color: ${t.text}; font-weight: 600; }
-.contact { flex: none; text-align: right; color: ${t.body}; font-size: 8pt; line-height: 1.45; }
+.brand { display: flex; gap: 4.5mm; align-items: center; min-width: 0; }
+.m-logo { display: block; flex: none; }
+.wordmark { font: 700 19pt/1 ${SERIF}; letter-spacing: 0.06em; white-space: nowrap; }
+.tagline { margin-top: 2mm; font-size: 6.5pt; font-weight: 600; line-height: 1.5; letter-spacing: 0.1em; text-transform: uppercase; color: ${t.text2}; }
+.contact { flex: none; text-align: right; color: ${t.body}; font-size: 8pt; line-height: 1.5; font-variant-numeric: tabular-nums; }
 
 /* Title */
 .title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; margin: 5mm 0 4.5mm; }

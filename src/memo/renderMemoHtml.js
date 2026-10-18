@@ -17,7 +17,7 @@ const nobreak = (value) =>
 const names = (text, term) =>
   Boolean(term) && new RegExp(`(^|[^\\w-])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w-])`, "i").test(text);
 
-const LOGO_HEIGHT_MM = 28;
+const LOGO_HEIGHT_MM = 21;
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** "05-Oct-2026" / "2026-10-05" -> "05 October 2026"; anything else as printed. */
@@ -47,24 +47,24 @@ const field = (value) => (value ? esc(value) : '<span class="empty">—</span>')
 
 function logoHtml(logo) {
   if (!logo?.src) return "";
-  const [x, y, w, h] = logo.crop || [0, 0, logo.width, logo.height];
-  const scale = LOGO_HEIGHT_MM / h;
-  const mm = (n) => `${(n * scale).toFixed(2)}mm`;
-  return `<div class="m-logo" style="width:${mm(w)};height:${mm(h)}"><img src="${esc(logo.src)}" alt="${esc(logo.alt || "")}" style="width:${mm(logo.width)};height:${mm(logo.height)};margin:-${mm(y)} 0 0 -${mm(x)}"></div>`;
+  const width = (LOGO_HEIGHT_MM * logo.width) / logo.height;
+  return `<img class="m-logo" src="${esc(logo.src)}" alt="${esc(logo.alt || "")}" style="width:${width.toFixed(2)}mm;height:${LOGO_HEIGHT_MM}mm">`;
 }
 
-function letterheadHtml(issuer, logo) {
+/** Emblem, name and tagline on the left; address and contacts on the right, both centred on the emblem. */
+function letterheadHtml(issuer, logo, tagline) {
   if (!issuer && !logo) return "";
-  // The logo artwork already carries the wordmark; without one, set the name in its place.
-  const wordmark = !logo && issuer?.name ? `<div class="wordmark">${esc(issuer.name.replace(/[\s,]+(ltd|inc|llc|s\.?a)\.?$/i, "").toUpperCase())}</div>` : "";
-  const sub = issuer
-    ? `<div class="brand-sub">${[issuer.name ? `<strong>${esc(issuer.name)}</strong>` : "", ...issuer.addressLines.map(esc)].filter(Boolean).join("<br>")}</div>`
-    : "";
+  const name = issuer?.name ? `<div class="wordmark">${esc(issuer.name.replace(/\.$/, "").toUpperCase())}</div>` : "";
+  const lines = (tagline || []).length ? `<div class="tagline">${tagline.map(esc).join("<br>")}</div>` : "";
   const contact = issuer
-    ? [issuer.phone && `Tel ${esc(issuer.phone)}`, issuer.fax && `Fax ${esc(issuer.fax)}`, issuer.email && esc(issuer.email), issuer.website && esc(issuer.website)].filter(Boolean)
+    ? [
+        ...issuer.addressLines.map(esc),
+        [issuer.phone && `Tel ${esc(issuer.phone)}`, issuer.fax && `Fax ${esc(issuer.fax)}`].filter(Boolean).join("&ensp;·&ensp;"),
+        [issuer.email, issuer.website].filter(Boolean).map(esc).join("&ensp;·&ensp;"),
+      ].filter(Boolean)
     : [];
   return `<header class="letterhead">
-  <div class="brand">${logoHtml(logo)}<div>${wordmark}${sub}</div></div>
+  <div class="brand">${logoHtml(logo)}<div>${name}${lines}</div></div>
   ${contact.length ? `<div class="contact">${contact.join("<br>")}</div>` : ""}
 </header>`;
 }
@@ -264,10 +264,11 @@ function bottomHtml(model, marks) {
 
 /**
  * Memo model -> self-contained, print-ready HTML (A4).
- * @param options.issuerLogo { src, width, height, crop, alt } (issuerBrands.js)
- * @param options.marks      [{ src, alt }] accreditation marks printed by the bank details
+ * @param options.issuerLogo    { src, width, height, alt } (issuerBrands.js)
+ * @param options.issuerTagline lines printed under the issuer's name
+ * @param options.marks         [{ src, alt }] accreditation marks printed by the bank details
  */
-export async function renderMemoHtml(model, { issuerLogo = null, marks = [] } = {}) {
+export async function renderMemoHtml(model, { issuerLogo = null, issuerTagline = [], marks = [] } = {}) {
   const d = model.document;
   const invoice = model.kind === "invoice";
   const noun = invoice ? "Invoice" : "Memo";
@@ -296,7 +297,7 @@ export async function renderMemoHtml(model, { issuerLogo = null, marks = [] } = 
 <style>${css}</style>
 </head>
 <body>
-${letterheadHtml(model.issuer, issuerLogo)}
+${letterheadHtml(model.issuer, issuerLogo, issuerTagline)}
 <div class="title-row">
   <div>
     ${title}

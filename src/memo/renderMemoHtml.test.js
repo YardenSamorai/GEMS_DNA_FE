@@ -120,6 +120,16 @@ describe("renderMemoHtml", () => {
     expect(html).toContain("<div>For Example Gems Ltd.</div>");
   });
 
+  it("sets the letterhead: emblem, name and tagline left, address and contacts right", async () => {
+    const html = await toHtml(buildMemoModel(record), {
+      issuerLogo: { src: "https://example.test/emblem.jpg", width: 281, height: 333, alt: "Example" },
+      issuerTagline: ["Cutters of stones", "Specializing in emeralds"],
+    });
+    expect(html).toContain('<img class="m-logo" src="https://example.test/emblem.jpg" alt="Example" style="width:17.72mm;height:21mm">');
+    expect(html).toContain('<div class="wordmark">EXAMPLE GEMS LTD</div><div class="tagline">Cutters of stones<br>Specializing in emeralds</div>');
+    expect(html).toContain('<div class="contact">1 Sample Street<br>Tel +000</div>');
+  });
+
   it("prints accreditation marks on memos and invoices", async () => {
     const marks = [{ src: "https://example.test/rjc.png", alt: "RJC Certified Member" }];
     const memo = await toHtml(buildMemoModel(record), { marks });

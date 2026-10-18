@@ -1,6 +1,6 @@
 import { buildMemoModel } from "./memoModel";
 import { enrichMemo } from "./enrichMemo";
-import { issuerLogo, issuerMarks } from "./issuerBrands";
+import { issuerLogo, issuerMarks, issuerTagline } from "./issuerBrands";
 import { renderMemoHtml } from "./renderMemoHtml";
 
 /**
@@ -15,6 +15,7 @@ export async function memoHtmlFromRecord(record, { catalog = true, verifyUrl = n
   const absolute = (asset) => ({ ...asset, src: `${window.location.origin}${asset.src}` });
   const html = await renderMemoHtml(model, {
     issuerLogo: logo && absolute(logo),
+    issuerTagline: issuerTagline(model.issuer?.name),
     marks: issuerMarks(model.issuer?.name).map(absolute),
   });
   return { html, model };
