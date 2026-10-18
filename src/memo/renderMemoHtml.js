@@ -183,27 +183,40 @@ const COLUMNS = [
   ["Total ({cur})", "27mm", "r", (item) => `<td class="r num">${plain(item.totalPrice)}</td>`],
 ];
 
-async function itemsHtml(model, currency) {
+/** Item rows that travel with the totals, so a continuation page never starts with the closing alone. */
+const TAIL_ROWS = 1;
+
+/**
+ * The items table, closed by the totals, the legal text and the closing block.
+ * Those follow the items as rows of the same table, chained to the last item
+ * rows: a page can break between items, never inside that tail, and a page the
+ * tail moves to repeats the column headings.
+ */
+async function itemsHtml(model, currency, tail) {
   const { items, totals } = model;
   const invoice = model.kind === "invoice";
   if (!items.length) {
     const block = totalsHtml(totals, currency, invoice);
-    return block ? `<section class="m-summary"><div class="label">Summary</div>${block}</section>` : "";
+    const summary = block ? `<section class="m-summary"><div class="label">Summary</div>${block}</section>` : "";
+    return `${summary}${tail.join("")}`;
   }
   const columns = COLUMNS.filter(([, , , , optional]) => !optional || (model.extraColumns || []).includes(optional));
   const qrs = await Promise.all(items.map((i) => (i.catalog?.dnaUrl ? qrSvg(i.catalog.dnaUrl) : null)));
   const cols = columns.map(([, width]) => `<col${width ? ` style="width:${width}"` : ""}>`).join("");
   const head = columns.map(([title, , cls]) => `<th${cls ? ` class="${cls}"` : ""}>${esc(title.replace("{cur}", currency))}</th>`).join("");
+  const firstKept = Math.max(1, items.length - TAIL_ROWS + 1);
   const body = items
     .map((item, i) => {
       const qr = qrs[i] ? `<a class="m-qr" href="${esc(item.catalog.dnaUrl)}" title="${esc(item.catalog.dnaUrl)}">${qrs[i]}</a>` : "";
-      return `<tr class="m-row">${columns.map(([, , , cell]) => cell(item, qr)).join("")}</tr>`;
+      return `<tr class="m-row${i >= firstKept ? " m-keep" : ""}">${columns.map(([, , , cell]) => cell(item, qr)).join("")}</tr>`;
     })
     .join("");
+  const span = columns.length;
   const block = totalsHtml(totals, currency, invoice);
-  // Totals ride in the table's last row so they can't split or start a page alone.
-  const totalsRow = block ? `<tr class="m-totals-row"><td colspan="${columns.length}">${block}</td></tr>` : "";
-  return `<table class="m-table"><colgroup>${cols}</colgroup><thead><tr>${head}</tr></thead><tbody>${body}${totalsRow}</tbody></table>`;
+  const closing = [block && `<tr class="m-totals-row m-keep"><td colspan="${span}">${block}</td></tr>`, ...tail.map((html) => html && `<tr class="m-tail-row m-keep"><td colspan="${span}">${html}</td></tr>`)]
+    .filter(Boolean)
+    .join("");
+  return `<table class="m-table"><colgroup>${cols}</colgroup><thead><tr>${head}</tr></thead><tbody>${body}${closing}</tbody></table>`;
 }
 
 function legalHtml(model) {
@@ -232,33 +245,34 @@ function marksHtml(marks) {
   return `<div class="m-marks">${marks.map((m) => `<img src="${esc(m.src)}" alt="${esc(m.alt || "")}">`).join("")}</div>`;
 }
 
-function bottomHtml(model, marks) {
+const dl = (rows) => `<dl>${rows.map((f) => `<dt>${esc(f.label)}</dt><dd>${f.lines.map(esc).join("<br>")}</dd>`).join("")}</dl>`;
+
+/** Bank details in two columns (bank | account), then one row: marks, payment or receipt, signature. */
+function closingHtml(model, marks) {
   const bank = [...model.bank].sort((a, b) => BANK_ORDER.indexOf(a.key) - BANK_ORDER.indexOf(b.key));
   const rows = [...bank, ...model.otherFields];
+  const half = Math.ceil(rows.length / 2);
   const bankBox = rows.length
-    ? `<section class="bank"><div class="label">Bank details</div><dl>${rows
-        .map((f) => `<dt>${esc(f.label)}</dt><dd>${f.lines.map(esc).join("<br>")}</dd>`)
-        .join("")}</dl></section>`
+    ? `<section class="bank"><div class="label">Bank details</div><div class="bank-cols">${dl(rows.slice(0, half))}${dl(rows.slice(half))}</div></section>`
     : "";
   const d = model.document;
-  const side =
-    model.kind === "invoice"
-      ? `<section class="pay">
+  const invoice = model.kind === "invoice";
+  const middle = invoice
+    ? `<section class="pay">
     <div class="label">Payment</div>
-    <div>
-      ${d.dueDate ? `<p class="due">Due ${esc(longDate(d.dueDate))}</p>` : ""}
-      ${d.paymentTerms ? `<p class="terms"><span>Terms of payment</span>${esc(d.paymentTerms)}</p>` : ""}
-      ${d.number ? `<p>Please quote invoice No. ${esc(d.number)} with your payment.</p>` : ""}
-    </div>
-    ${model.issuer?.name ? `<div class="sign-lines sign-lines--one"><div>For ${esc(model.issuer.name)}</div></div>` : ""}
+    ${d.dueDate ? `<p class="due">Due ${esc(longDate(d.dueDate))}</p>` : ""}
+    ${d.paymentTerms ? `<p class="terms"><span>Terms of payment</span>${esc(d.paymentTerms)}</p>` : ""}
+    ${d.number ? `<p>Please quote invoice No. ${esc(d.number)} with your payment.</p>` : ""}
   </section>`
-      : `<section class="sign">
-    <div class="label">Received by</div>
-    <div class="sign-lines"><div>Customer signature / name</div><div>Date</div></div>
-  </section>`;
-  return `<div class="bottom">
-  <div class="bottom-start">${bankBox}${marksHtml(marks)}</div>
-  ${side}
+    : "";
+  const sign = invoice
+    ? model.issuer?.name
+      ? `<div class="sign-lines sign-lines--one"><div>For ${esc(model.issuer.name)}</div></div>`
+      : ""
+    : `<section class="sign"><div class="label">Received by</div><div class="sign-lines"><div>Customer signature / name</div><div>Date</div></div></section>`;
+  return `<div class="closing">
+  ${bankBox}
+  <div class="sign-row${invoice ? "" : " sign-row--memo"}">${marksHtml(marks) || "<div></div>"}${middle}${sign}</div>
 </div>`;
 }
 
@@ -266,7 +280,7 @@ function bottomHtml(model, marks) {
  * Memo model -> self-contained, print-ready HTML (A4).
  * @param options.issuerLogo    { src, width, height, alt } (issuerBrands.js)
  * @param options.issuerTagline lines printed under the issuer's name
- * @param options.marks         [{ src, alt }] accreditation marks printed by the bank details
+ * @param options.marks         [{ src, alt }] accreditation marks printed beside the signature
  */
 export async function renderMemoHtml(model, { issuerLogo = null, issuerTagline = [], marks = [] } = {}) {
   const d = model.document;
@@ -310,9 +324,7 @@ ${letterheadHtml(model.issuer, issuerLogo, issuerTagline)}
 </div>
 <div class="parties">${partyHtml(invoice ? "Bill to" : "Memo to", memoTo)}${partyHtml("Ship to", shipTo)}</div>
 ${detailsHtml(d, invoice)}
-${await itemsHtml(model, currency)}
-${legalHtml(model)}
-${bottomHtml(model, marks)}
+${await itemsHtml(model, currency, [legalHtml(model), closingHtml(model, marks)])}
 </body>
 </html>`;
 }

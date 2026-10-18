@@ -130,6 +130,16 @@ describe("renderMemoHtml", () => {
     expect(html).toContain('<div class="contact">1 Sample Street<br>Tel +000</div>');
   });
 
+  it("chains the last item row, totals, legal text and closing so they move to a new page together", async () => {
+    const items = [{ sku: "A", carat: "1.00" }, { sku: "B", carat: "1.00" }, { sku: "C", carat: "1.00" }];
+    const html = await toHtml(buildMemoModel({ ...record, items, fields: [{ label: "IBAN", lines: ["IL 270 110 80000000 1910029"] }] }));
+    const body = html.slice(html.indexOf("<tbody>"), html.indexOf("</tbody>"));
+    expect(body.match(/<tr class="m-row">/g)).toHaveLength(3);
+    expect(body).not.toContain("m-row m-keep");
+    expect(body).toMatch(/m-totals-row m-keep[\s\S]*m-tail-row m-keep[\s\S]*class="legal"[\s\S]*m-tail-row m-keep[\s\S]*class="closing"/);
+    expect(html.indexOf('class="closing"')).toBeLessThan(html.indexOf("</table>"));
+  });
+
   it("prints accreditation marks on memos and invoices", async () => {
     const marks = [{ src: "https://example.test/rjc.png", alt: "RJC Certified Member" }];
     const memo = await toHtml(buildMemoModel(record), { marks });

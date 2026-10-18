@@ -75,7 +75,7 @@ dl, dd { margin: 0; }
 /* Letterhead */
 .letterhead {
   display: flex; justify-content: space-between; align-items: center; gap: 8mm;
-  padding-bottom: 4mm; border-bottom: 1px solid ${t.faint};
+  padding-bottom: 3mm; border-bottom: 1px solid ${t.faint};
 }
 .brand { display: flex; gap: 4.5mm; align-items: center; min-width: 0; }
 .m-logo { display: block; flex: none; }
@@ -84,7 +84,7 @@ dl, dd { margin: 0; }
 .contact { flex: none; text-align: right; color: ${t.body}; font-size: 8pt; line-height: 1.5; font-variant-numeric: tabular-nums; }
 
 /* Title */
-.title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; margin: 5mm 0 4.5mm; }
+.title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; margin: 4mm 0 3.5mm; }
 .title { display: flex; align-items: center; gap: 3mm; margin: 0 0 1.8mm; }
 h1 { font: 700 22pt/1 ${SERIF}; letter-spacing: 0.01em; margin: 0; }
 .m-draft {
@@ -97,8 +97,8 @@ h1 { font: 700 22pt/1 ${SERIF}; letter-spacing: 0.01em; margin: 0; }
 .memo-no .meta { color: ${t.body}; margin-top: 1mm; }
 
 /* Parties */
-.parties { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4mm; margin-bottom: 3.5mm; break-inside: avoid; }
-.party { border: 1px solid ${t.faint}; border-radius: 2mm; padding: 3mm 4mm; min-width: 0; }
+.parties { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4mm; margin-bottom: 3mm; break-inside: avoid; }
+.party { border: 1px solid ${t.faint}; border-radius: 2mm; padding: 2.5mm 4mm; min-width: 0; }
 .party .name { font-size: 11pt; font-weight: 700; letter-spacing: -0.005em; margin: 0 0 1mm; overflow-wrap: anywhere; }
 .party p { color: ${t.body}; overflow-wrap: anywhere; }
 .party .name { color: ${t.text}; }
@@ -108,7 +108,7 @@ h1 { font: 700 22pt/1 ${SERIF}; letter-spacing: 0.01em; margin: 0; }
 /* Details strip */
 .details {
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2mm 3mm;
-  background: ${t.bg}; border-radius: 2mm; padding: 2.5mm 4mm; margin-bottom: 4mm; break-inside: avoid;
+  background: ${t.bg}; border-radius: 2mm; padding: 2.2mm 4mm; margin-bottom: 3.5mm; break-inside: avoid;
 }
 .details > div { min-width: 0; }
 .details .v { font-weight: 600; overflow-wrap: anywhere; }
@@ -143,12 +143,12 @@ h1 { font: 700 22pt/1 ${SERIF}; letter-spacing: 0.01em; margin: 0; }
 .desc-sub { margin-top: 0.4mm; font-size: 7pt; line-height: 1.35; color: ${t.text2}; }
 .desc-sub a { color: ${t.accent}; }
 
-/* Totals */
-.m-table tr.m-totals-row { break-before: avoid; page-break-before: avoid; }
-.m-table tr.m-totals-row > td { border-bottom: 0; padding: 0; background: none; }
+/* Totals, legal and closing ride in the table's last rows, chained to the last items. */
+.m-table tr.m-keep { break-before: avoid; page-break-before: avoid; }
+.m-table tr.m-totals-row > td, .m-table tr.m-tail-row > td { border-bottom: 0; padding: 0; background: none; }
 .totals {
   display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 1mm 6mm;
-  padding: 3mm 2.5mm 2.5mm; border-bottom: 2px solid ${t.text}; break-inside: avoid; page-break-inside: avoid;
+  padding: 2.5mm 2.5mm 2mm; border-bottom: 2px solid ${t.text}; break-inside: avoid; page-break-inside: avoid;
 }
 .totals .what { font-size: 7pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .totals .count { color: ${t.body}; }
@@ -157,28 +157,29 @@ h1 { font: 700 22pt/1 ${SERIF}; letter-spacing: 0.01em; margin: 0; }
 .m-summary { margin-top: 2mm; }
 
 /* Legal */
-.legal { margin-top: 5mm; display: grid; gap: 3mm; }
+.legal { margin-top: 3mm; display: grid; gap: 2.5mm; }
 .legal section { break-inside: avoid; }
 .legal p { color: ${t.body}; font-size: 7.5pt; line-height: 1.45; text-align: justify; hyphens: auto; }
 .legal p + p { margin-top: 1.2mm; }
 .legal .remarks p { text-align: left; white-space: pre-line; overflow-wrap: anywhere; }
 
-/* Bank + signature */
-.bottom { margin-top: 5mm; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 4mm; break-inside: avoid; }
-.bottom-start { display: grid; gap: 4mm; align-content: start; min-width: 0; }
-.bank { border: 1px solid ${t.faint}; border-radius: 2mm; padding: 3mm 4mm; min-width: 0; }
-.m-marks { display: flex; gap: 5mm; align-items: center; }
-.m-marks img { height: 17mm; width: auto; display: block; }
-.bank dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.4mm 4mm; }
+/* Closing: bank details, then marks · payment · signature on one row */
+.closing { margin-top: 3.5mm; display: grid; gap: 2.5mm; break-inside: avoid; page-break-inside: avoid; }
+.bank { border: 1px solid ${t.faint}; border-radius: 2mm; padding: 2.5mm 4mm; min-width: 0; }
+.bank-cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 0 8mm; }
+.bank dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.4mm 4mm; align-content: start; }
 .bank dt { color: ${t.text2}; }
 .bank dd { font-weight: 500; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.sign { display: grid; grid-template-rows: auto 1fr auto; min-height: 30mm; padding-top: 3mm; }
-.sign-lines { grid-row: 3; display: grid; grid-template-columns: 2fr 1fr; gap: 5mm; }
+.sign-row { display: grid; grid-template-columns: auto minmax(0, 1.5fr) minmax(0, 1fr); gap: 8mm; align-items: end; }
+.sign-row--memo { grid-template-columns: auto minmax(0, 1fr); }
+.m-marks { display: flex; gap: 5mm; align-items: center; }
+.m-marks img { height: 12mm; width: auto; display: block; }
+.sign { min-width: 0; }
+.sign-lines { display: grid; grid-template-columns: 2fr 1fr; gap: 5mm; margin-top: 9mm; }
 .sign-lines div { border-top: 1px solid ${t.faint}; padding-top: 1.5mm; font-size: 7.5pt; color: ${t.text2}; }
-.sign-lines--one { grid-template-columns: 1fr; }
-.pay { display: grid; grid-template-rows: auto auto 1fr auto; min-height: 30mm; padding-top: 3mm; min-width: 0; }
-.pay p { color: ${t.body}; margin-top: 1.2mm; overflow-wrap: anywhere; }
+.sign-lines--one { grid-template-columns: 1fr; margin-top: 0; }
+.pay { min-width: 0; }
+.pay p { color: ${t.body}; margin-top: 0.8mm; overflow-wrap: anywhere; }
 .pay .due { color: ${t.text}; font-size: 11pt; font-weight: 700; letter-spacing: -0.005em; }
-.pay .terms span { display: block; ${label} margin: 0; }
-.pay .sign-lines { grid-row: 4; margin-top: 10mm; }`;
+.pay .terms span { display: block; ${label} margin: 0; }`;
 }
