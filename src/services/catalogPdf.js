@@ -76,7 +76,7 @@ const itemTitle = (it) => {
       shape,
       // Fancy colour = intensity + overtone + color (white `color` is empty on Fancy).
       isFancy ? getDisplayColor(it) : it.color,
-      isFancy ? "" : it.clarity,
+      it.clarity,
       lab,
       fluorDisplay(it.fluorescence),
     ]
@@ -133,6 +133,7 @@ const itemSpecs = (it) => {
   if (isDiamond) {
     return cleanRows([
       ["SKU", it.sku],
+      ["Clarity", it.clarity],
       ["Polish", it.polish],
       ["Sym.", it.symmetry],
       ["L/W/D (mm)", lwd],

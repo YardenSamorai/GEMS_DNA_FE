@@ -294,17 +294,17 @@ const StoneDetail = () => {
   const gemTypeName =
     mapped.filter((c) => !["Empty", "Diamond", "Fancy", "Emerald"].includes(c))[0] || "";
 
-  // "5.05 Cushion Fancy Intense Grayish Yellowish Green GIA" (fancy)
+  // "5.05 Cushion Fancy Intense Grayish Yellowish Green VS1 GIA None" (fancy)
   // "0.51 Round H SI1 None IGI" (white) / "1.16 Pear ICA Minor" (emerald)
   // "1.15 Aquamarine Round EGL" (other gemstones)
   // Fancy colour = intensity + overtone + color via getDisplayColor — the white
-  // `color` field is always empty on Fancy rows.
+  // `color` field is always empty on Fancy rows. Clarity prints for both.
   const title = isDiamond
     ? [
         wt,
         shape,
         isFancy ? getDisplayColor(stone) : stone.color,
-        isFancy ? "" : stone.clarity,
+        stone.clarity,
         lab,
         fluorDisplay(stone.fluorescence),
       ]
@@ -392,10 +392,12 @@ const StoneDetail = () => {
     : [];
 
   // Diamonds use one flat spec list (no section headers). Weight, color, shape,
-  // clarity, cert lab and fluorescence already live in the title above.
+  // cert lab and fluorescence already live in the title above. Clarity stays
+  // in the table as well so Fancy stones (long colour names) still show it.
   const diamondSpecs = [
     ["SKU", stone.sku || BLANK],
     ...jewelryLinkRow,
+    ["Clarity", stone.clarity || BLANK],
     ["Polish", stone.polish || BLANK],
     ["Sym.", stone.symmetry || BLANK],
     ["L/W/D (mm)", lwd || BLANK],

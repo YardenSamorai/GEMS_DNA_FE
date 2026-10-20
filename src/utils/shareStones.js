@@ -166,7 +166,7 @@ const buildDiamondText = (stone, { withPrice = true, withRap = false } = {}) => 
   const fl = stone.fluorescence ? fluorAbbr(stone.fluorescence) : "";
   const shape = getDisplayShape(stone.shape) || stone.shape;
 
-  const title = [wtStr, shape, color, isFancy ? "" : stone.clarity, fl, lab]
+  const title = [wtStr, shape, color, stone.clarity, fl, lab]
     .filter(Boolean)
     .join(" ");
 
