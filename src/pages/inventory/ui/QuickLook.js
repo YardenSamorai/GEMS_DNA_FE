@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { ArrowUpRight, ChevronDown, ChevronUp, Copy, Expand, Mail, Pencil, Printer, Share, Tag } from "lucide-react";
 import ItemTierManager from "../../../components/catalog/ItemTierManager";
