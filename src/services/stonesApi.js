@@ -138,3 +138,14 @@ export const assignStone = (user, sku, payload) =>
       notes:      payload?.notes ?? null,
     }),
   }).then(json);
+
+/* Admin-only corrections that survive the next Barak sync. */
+export const fetchStoneOverrides = (sku) =>
+  fetch(`${API_BASE}/api/stones/${encodeURIComponent(sku)}/overrides`).then(json);
+
+export const patchStoneOverrides = (sku, fields) =>
+  fetch(`${API_BASE}/api/stones/${encodeURIComponent(sku)}/overrides`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  }).then(json);

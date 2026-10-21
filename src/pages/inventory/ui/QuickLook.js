@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowUpRight, ChevronDown, ChevronUp, Copy, Expand, Mail, Printer, Share, Tag } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, Copy, Expand, Mail, Pencil, Printer, Share, Tag } from "lucide-react";
 import ItemTierManager from "../../../components/catalog/ItemTierManager";
 import StoneUsagePanel from "../../../components/StoneUsagePanel";
 import { getDisplayColor, getDisplayShape } from "../helpers/constants";
@@ -12,6 +12,7 @@ import Thumb from "./Thumb";
 import { Segmented } from "./InventoryHeader";
 import { AssignmentChip, StoneStatus, WhatsAppIcon } from "./bits";
 import { cleanValue as clean, gradingLine, itemTitle } from "./format";
+import SpecEditor from "./SpecEditor";
 
 const isTyping = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
 
@@ -138,9 +139,10 @@ const jewelryGeneral = (j) => [
 
 const QuickLookBody = ({
   item, priceMode, status, allTags, itemTags, onToggleTag, onManageTags, onAssign, assigning,
-  onOpenDna, onPrintLabel, onImage,
+  onOpenDna, onPrintLabel, onImage, canEditStone, onSpecsSaved,
 }) => {
   const jewelry = isJewelryItem(item);
+  const [editingSpecs, setEditingSpecs] = useState(false);
   const path = dnaPathFor(item);
   const shareUrl = shareUrlFor(item);
   const total = scaledPrice(item, "priceTotal", priceMode);
@@ -285,8 +287,27 @@ const QuickLookBody = ({
         </>
       ) : (
         <section className="inv-ql-section" aria-labelledby="ql-details">
-          <h4 id="ql-details" className="inv-ql-h">Details</h4>
-          <Specs rows={stoneSpecs(item)} />
+          <div className="inv-fgroup-row">
+            <h4 id="ql-details" className="inv-ql-h">Details</h4>
+            {canEditStone && !editingSpecs && (
+              <button type="button" className="inv-btn inv-btn--plain inv-btn--sm" onClick={() => setEditingSpecs(true)}>
+                <Pencil size={13} strokeWidth={1.75} aria-hidden="true" />
+                Edit
+              </button>
+            )}
+          </div>
+          {canEditStone && editingSpecs ? (
+            <SpecEditor
+              item={item}
+              onCancel={() => setEditingSpecs(false)}
+              onSaved={(applied) => {
+                setEditingSpecs(false);
+                onSpecsSaved?.(item.sku, applied);
+              }}
+            />
+          ) : (
+            <Specs rows={stoneSpecs(item)} />
+          )}
         </section>
       )}
 
@@ -405,7 +426,7 @@ const QuickLook = ({ item, variant, onClose, index, total, onStep, ...bodyProps 
       }
     >
       {item && <ScrollTop key={item.id} />}
-      {item && <QuickLookBody item={item} {...bodyProps} />}
+      {item && <QuickLookBody key={item.sku} item={item} {...bodyProps} />}
     </Sheet>
   );
 };

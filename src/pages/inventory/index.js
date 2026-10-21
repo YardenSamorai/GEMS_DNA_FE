@@ -1454,6 +1454,11 @@ const StoneSearchPage = () => {
           setNiimbotOpen(true);
         }}
         onImage={(src) => setLightbox({ image: src, video: null })}
+        canEditStone={Boolean(team?.ready && team.isAdmin)}
+        onSpecsSaved={(sku, applied) => {
+          if (!sku || !applied) return;
+          setStones((prev) => prev.map((s) => (s.sku === sku ? { ...s, ...applied } : s)));
+        }}
       />
 
       <Lightbox image={lightbox.image} video={lightbox.video} onClose={() => setLightbox({ image: null, video: null })} />
