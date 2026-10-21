@@ -7,7 +7,7 @@ const ids = (nav) => flatItems(nav).map((it) => it.id);
 describe("visibleNav", () => {
   it("shows everything to admins", () => {
     expect(ids(visibleNav(NAV, admin))).toEqual([
-      "dashboard", "inventory", "sales", "crm", "photos", "quality", "api", "team",
+      "dashboard", "inventory", "sales", "crm", "photos", "quality", "overrides", "api", "team",
     ]);
   });
 
@@ -26,6 +26,10 @@ describe("visibleNav", () => {
   it("maps Data Quality to the tools permission", () => {
     expect(ids(visibleNav(NAV, member(["tools"])))).toEqual(["quality"]);
   });
+
+  it("hides Manual edits from gated members even with tools", () => {
+    expect(ids(visibleNav(NAV, member(["tools"])))).not.toContain("overrides");
+  });
 });
 
 describe("activeItem", () => {
@@ -38,6 +42,7 @@ describe("activeItem", () => {
     expect(at("/crm/customers/12")).toBe("crm");
     expect(at("/photos/review")).toBe("photos");
     expect(at("/qa")).toBe("quality");
+    expect(at("/inventory/overrides")).toBe("overrides");
     expect(at("/api-access")).toBe("api");
     expect(at("/team")).toBe("team");
   });
@@ -71,6 +76,7 @@ describe("pageContext", () => {
     expect(labels("/crm/deals")).toEqual(["CRM", "Deals"]);
     expect(labels("/crm/customers/7")).toEqual(["CRM", "Customer"]);
     expect(labels("/photos/review")).toEqual(["Photo Station", "Review"]);
+    expect(labels("/inventory/overrides")).toEqual(["Inventory", "Manual edits"]);
     expect(labels("/team/")).toEqual(["Team"]);
     expect(labels("/nowhere")).toEqual([]);
   });
@@ -93,14 +99,14 @@ describe("mobileNav", () => {
     const { tabs, more } = mobileNav(NAV, "/dashboard", admin);
     expect(tabs.map((t) => t.label)).toEqual(["Dashboard", "Inventory", "Sales", "CRM"]);
     expect(tabs.find((t) => t.id === "sales").to).toBe("/sales/emeralds");
-    expect(ids(more)).toEqual(["photos", "quality", "api", "team"]);
+    expect(ids(more)).toEqual(["photos", "quality", "overrides", "api", "team"]);
   });
 
   it("switches to category tabs inside the sales catalog", () => {
     const { tabs, more, inSales } = mobileNav(NAV, "/sales/diamonds", admin);
     expect(inSales).toBe(true);
     expect(tabs.map((t) => t.id)).toEqual(["sales-home", "diamonds", "emeralds", "gemstones", "jewelry"]);
-    expect(ids(more)).toEqual(["dashboard", "inventory", "crm", "photos", "quality", "api", "team"]);
+    expect(ids(more)).toEqual(["dashboard", "inventory", "crm", "photos", "quality", "overrides", "api", "team"]);
   });
 
   it("adds Photos as a tab for gated members who have it", () => {

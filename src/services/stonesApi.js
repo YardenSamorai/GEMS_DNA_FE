@@ -140,6 +140,9 @@ export const assignStone = (user, sku, payload) =>
   }).then(json);
 
 /* Admin-only corrections that survive the next Barak sync. */
+export const fetchStoneOverrideList = () =>
+  fetch(`${API_BASE}/api/stone-overrides`).then(json);
+
 export const fetchStoneOverrides = (sku) =>
   fetch(`${API_BASE}/api/stones/${encodeURIComponent(sku)}/overrides`).then(json);
 

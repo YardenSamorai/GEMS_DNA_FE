@@ -290,10 +290,15 @@ const QuickLookBody = ({
           <div className="inv-fgroup-row">
             <h4 id="ql-details" className="inv-ql-h">Details</h4>
             {canEditStone && !editingSpecs && (
-              <button type="button" className="inv-btn inv-btn--plain inv-btn--sm" onClick={() => setEditingSpecs(true)}>
-                <Pencil size={13} strokeWidth={1.75} aria-hidden="true" />
-                Edit
-              </button>
+              <div className="flex items-center gap-2">
+                <Link to="/inventory/overrides" className="inv-btn inv-btn--plain inv-btn--sm">
+                  All edits
+                </Link>
+                <button type="button" className="inv-btn inv-btn--plain inv-btn--sm" onClick={() => setEditingSpecs(true)}>
+                  <Pencil size={13} strokeWidth={1.75} aria-hidden="true" />
+                  Edit
+                </button>
+              </div>
             )}
           </div>
           {canEditStone && editingSpecs ? (

@@ -55,6 +55,7 @@ const StoneDetail = page(() => import("./pages/sales/StoneDetail"));
 const JewelryDetail = page(() => import("./pages/sales/JewelryDetail"));
 const SalesDashboard = page(() => import("./pages/sales/SalesDashboard"));
 const QAPage = page(() => import("./pages/QAPage"));
+const StoneOverridesPage = page(() => import("./pages/inventory/StoneOverridesPage"));
 const PhotoStation = page(() => import("./pages/photos/PhotoStation"));
 const ApiAccess = page(() => import("./pages/api/ApiAccess"));
 const PhotoReview = page(() => import("./pages/photos/PhotoReview"));
@@ -479,6 +480,7 @@ function AppContent() {
             <Route path="/dashboard" element={<Dashboard />} />
             {/* Sprint 1.B merge — InventoryHub fans out into Stones / Jewelry tabs. */}
             <Route path="/inventory" element={<InventoryHub />} />
+            <Route path="/inventory/overrides" element={<OwnerOnly><StoneOverridesPage /></OwnerOnly>} />
 
             {/* Jewelry sub-system — the jewelry inventory/workshop surfaces were
                 retired; /jewelry now lands on the stones inventory. */}

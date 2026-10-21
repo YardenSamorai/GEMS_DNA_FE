@@ -31,7 +31,7 @@ export const NAV = [
         to: "/inventory",
         icon: "inventory",
         section: "inventory",
-        match: (p) => under("/inventory")(p) || JEWELRY_ALIASES.includes(p),
+        match: (p) => (under("/inventory")(p) && p !== "/inventory/overrides") || JEWELRY_ALIASES.includes(p),
       },
       {
         id: "sales",
@@ -61,6 +61,14 @@ export const NAV = [
         section: "tools",
         match: (p) => p === "/qa-data" || p === "/qa",
       },
+      {
+        id: "overrides",
+        label: "Manual edits",
+        to: "/inventory/overrides",
+        icon: "overrides",
+        adminOnly: true,
+        match: (p) => p === "/inventory/overrides",
+      },
       { id: "api", label: "API Access", to: "/api-access", icon: "api", anyOf: ["sales", "inventory"], match: under("/api-access") },
       { id: "team", label: "Team", to: "/team", icon: "team", section: "team", match: under("/team") },
     ],
@@ -69,6 +77,7 @@ export const NAV = [
 
 /* Admins see everything; gated members only what they were granted. */
 export const canSee = (item, { gated, can }) => {
+  if (item.adminOnly && gated) return false;
   if (!gated) return true;
   if (item.anyOf) return item.anyOf.some((k) => can(k));
   return !item.section || can(item.section);
@@ -126,6 +135,9 @@ export const pageContext = (path) => {
   }
   if (item.id === "photos" && p === "/photos/review") {
     return { crumbs: [parent, { label: "Review" }], heading: false };
+  }
+  if (item.id === "overrides") {
+    return { crumbs: [{ label: "Inventory", to: "/inventory" }, { label: item.label }], heading: false };
   }
   return { crumbs: [{ label: item.label }], heading: false };
 };

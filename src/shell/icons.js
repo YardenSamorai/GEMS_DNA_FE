@@ -1,5 +1,5 @@
 import React from "react";
-import { BookUser, Camera, Gem, House, KeyRound, LayoutGrid, ShieldCheck, Tag, Users } from "lucide-react";
+import { BookUser, Camera, Gem, History, House, KeyRound, LayoutGrid, ShieldCheck, Tag, Users } from "lucide-react";
 
 const lucide = (Icon) => {
   const Wrapped = ({ size = 18 }) => <Icon size={size} strokeWidth={1.75} aria-hidden="true" />;
@@ -23,6 +23,7 @@ export const ICONS = {
   crm: lucide(BookUser),
   photos: lucide(Camera),
   quality: lucide(ShieldCheck),
+  overrides: lucide(History),
   api: lucide(KeyRound),
   team: lucide(Users),
   salesHome: lucide(House),
