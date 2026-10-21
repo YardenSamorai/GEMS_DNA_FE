@@ -28,7 +28,8 @@ const IMAGE_RE = /\.(jpe?g|png|webp|gif)(\?|$)/i;
 const isVideoFile = (src) =>
   /\.(mp4|webm|mov|m4v)(\?|$)/i.test(src) ||
   /vimeocdn\.com/i.test(src) ||
-  /player\.vimeo\.com\/progressive/i.test(src);
+  /player\.vimeo\.com\/progressive/i.test(src) ||
+  /\/api\/vimeo-file\/\d+(?:\/file)?/i.test(src);
 
 const MediaViewer = () => {
   const [params] = useSearchParams();

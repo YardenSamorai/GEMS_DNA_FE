@@ -90,42 +90,59 @@ const stoneImageUrl = (stone) => {
   return null;
 };
 
-const videoUrl = (stone) => httpUrl(stone?.videoUrl) || httpUrl(stone?.additionalVideos);
-
-/* ---- direct (full-quality) video links ------------------------------------
- * A player.vimeo.com embed link opens Vimeo's adaptive player, which serves
- * a low rendition on phones. The BE's /api/vimeo-file/:id resolves the direct
- * 1080p MP4 (Vimeo API) — the same source our in-app player uses — so every
- * link we hand to a client opens at full quality. Resolutions are cached
- * in-module; failures fall back to the original embed link. */
+/* ---- full-quality video links ---------------------------------------------
+ * A player.vimeo.com embed opens Vimeo's adaptive player, which serves a
+ * low rendition on phones. Our BE /api/vimeo-file/:id/file 302s to the
+ * current 1080p MP4 — a stable URL we can put in WhatsApp / copy / PDF
+ * without leaking Vimeo's short-lived oauth file link. */
 const VIMEO_EMBED_RE = /player\.vimeo\.com\/video\/(\d+)/i;
-const directVideoCache = new Map(); // vimeoId -> direct link | null
+const VIMEO_FILE_RE = /\/api\/vimeo-file\/(\d+)/i;
+
+const vimeoIdFromUrl = (url) => {
+  const embed = VIMEO_EMBED_RE.exec(url || "");
+  if (embed) return embed[1];
+  const file = VIMEO_FILE_RE.exec(url || "");
+  return file ? file[1] : null;
+};
+
+export const shareVideoFileUrl = (url) => {
+  const id = vimeoIdFromUrl(url);
+  return id ? `${API_BASE}/api/vimeo-file/${id}/file` : url || null;
+};
+
+const videoUrl = (stone) =>
+  shareVideoFileUrl(httpUrl(stone?.videoUrl) || httpUrl(stone?.additionalVideos));
+
+const directVideoCache = new Map(); // vimeoId -> Vimeo CDN MP4 | null
 
 export const resolveDirectVideoUrl = async (url) => {
-  const m = VIMEO_EMBED_RE.exec(url || "");
-  if (!m) return url || null;
-  const id = m[1];
-  if (directVideoCache.has(id)) return directVideoCache.get(id) || url;
+  const id = vimeoIdFromUrl(url);
+  if (!id) return url || null;
+  if (directVideoCache.has(id)) return directVideoCache.get(id) || shareVideoFileUrl(url);
   try {
     const r = await fetch(`${API_BASE}/api/vimeo-file/${id}`);
     const link = r.ok ? (await r.json())?.link || null : null;
     directVideoCache.set(id, link);
-    return link || url;
+    return link || shareVideoFileUrl(url);
   } catch {
-    return url; // transient failure — don't poison the cache
+    return shareVideoFileUrl(url);
   }
 };
 
-/* Clone the given item(s) with videoUrl swapped to the direct MP4 link.
- * Call ahead of a share gesture to warm the cache (keeps iOS activation). */
+/* Clone the given item(s) with Vimeo embeds rewritten to our stable 1080p
+ * /file URL. Also warms the CDN MP4 cache so a mobile share can attach the
+ * real file without an extra hop (keeps iOS user-activation). */
 export const withDirectVideoLinks = async (stones) => {
   const arr = (Array.isArray(stones) ? stones : [stones]).filter(Boolean);
   return Promise.all(
     arr.map(async (s) => {
-      const v = videoUrl(s);
-      if (!v) return s;
-      const direct = await resolveDirectVideoUrl(v);
-      return direct && direct !== v ? { ...s, videoUrl: direct } : s;
+      const raw = httpUrl(s?.videoUrl) || httpUrl(s?.additionalVideos);
+      if (!raw) return s;
+      if (vimeoIdFromUrl(raw)) {
+        resolveDirectVideoUrl(raw).catch(() => {});
+      }
+      const share = shareVideoFileUrl(raw);
+      return share && share !== raw ? { ...s, videoUrl: share } : s;
     })
   );
 };
@@ -351,11 +368,11 @@ const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
  * Sending the actual file preserves the full 1080p quality — a WhatsApp link
  * preview or the embedded player would degrade it. */
 const fetchVideoFile = async (stone) => {
-  const v = videoUrl(stone);
-  if (!VIMEO_EMBED_RE.test(v || "")) return null;
+  const raw = httpUrl(stone?.videoUrl) || httpUrl(stone?.additionalVideos);
+  if (!vimeoIdFromUrl(raw || "")) return null;
   try {
-    const link = await resolveDirectVideoUrl(v);
-    if (!link || link === v) return null;
+    const link = await resolveDirectVideoUrl(raw);
+    if (!link || /\/api\/vimeo-file\//i.test(link)) return null;
     const res = await fetch(link, { mode: "cors" });
     if (!res.ok) return null;
     const blob = await res.blob();
@@ -441,9 +458,8 @@ export const shareStonesOnWhatsApp = async (
   stones,
   { files, actor, withPrice = true, withRap = false } = {}
 ) => {
-  // Swap embed video links for the direct 1080p MP4s so the client gets the
-  // full-quality file, not Vimeo's phone-degraded player. Usually instant —
-  // the detail pages warm the cache when the action sheet opens.
+  // Embed player.vimeo.com links become our /file redirect (1080p MP4).
+  // The action sheet already warms the CDN cache for file attachments.
   const arr = await withDirectVideoLinks(stones);
   const text = buildStonesMessage(arr, { withPrice, withRap });
 
