@@ -173,6 +173,14 @@ export const removeWebListings = (skus) =>
     body: JSON.stringify({ skus }),
   }).then(json);
 
+/* Pulls Barak's newest eTrade file from the FTP now. A refused or failed sync
+ * still resolves, with success: false and the reason in message. */
+export const syncWebListings = async () => {
+  const res = await fetch(`${API_BASE}/api/web-listings/sync`, { method: "POST" });
+  if (res.status === 502) return res.json();
+  return json(res);
+};
+
 /* Downloads the eTrade CSV under the server's Diamonds<date>_<time>.csv name. */
 export const downloadEtradeCsv = async () => {
   const res = await fetch(`${API_BASE}/api/web-listings/etrade.csv`);

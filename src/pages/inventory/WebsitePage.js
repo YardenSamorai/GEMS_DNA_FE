@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -6,9 +6,9 @@ import {
   downloadEtradeCsv,
   fetchWebListings,
   removeWebListings,
+  syncWebListings,
 } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
-import { planImport, skusFromEtradeCsv } from "./etradeImport";
 
 const WARNINGS = {
   not_in_inventory: { label: "Not in inventory", tone: "red" },
@@ -43,6 +43,12 @@ const specLine = (it) =>
     .filter(Boolean)
     .join(" · ");
 
+const formatWhen = (iso) => {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+};
+
 const parseSkus = (text) =>
   String(text || "")
     .split(/[\s,;]+/)
@@ -59,8 +65,7 @@ const WebsitePage = () => {
   const [shown, setShown] = useState(PAGE);
   const [addText, setAddText] = useState("");
   const [busy, setBusy] = useState("");
-  const [importPlan, setImportPlan] = useState(null);
-  const fileInput = useRef(null);
+  const [sync, setSync] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +73,7 @@ const WebsitePage = () => {
     try {
       const data = await fetchWebListings();
       setItems(Array.isArray(data.items) ? data.items : []);
+      setSync(data.sync || null);
     } catch (err) {
       setError(err.message || "Could not load the website list");
     } finally {
@@ -89,6 +95,7 @@ const WebsitePage = () => {
   }, [items]);
 
   const exportable = items.length - (counts.not_in_inventory || 0);
+  const barakCount = items.filter((it) => it.source === "barak").length;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -133,9 +140,12 @@ const WebsitePage = () => {
   const remove = async (sku) => {
     setBusy(sku);
     try {
-      const { removed = [] } = await removeWebListings([sku]);
+      const { removed = [], managed = [] } = await removeWebListings([sku]);
       const partners = removed.filter((s) => s !== sku);
-      toast.success(`Removed ${sku}${partners.length ? ` and its pair ${partners.join(", ")}` : ""}`);
+      if (removed.length) {
+        toast.success(`Removed ${sku}${partners.length ? ` and its pair ${partners.join(", ")}` : ""}`);
+      }
+      if (managed.length) toast(`${managed.join(", ")} comes from Barak — take it off in Barak's eTrade`);
       setItems((prev) => prev.filter((it) => !removed.includes(it.sku)));
     } catch (err) {
       toast.error(err.message || "Could not remove");
@@ -144,47 +154,20 @@ const WebsitePage = () => {
     }
   };
 
-  const pickFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  const syncNow = async () => {
+    setBusy("sync");
     try {
-      const fileSkus = skusFromEtradeCsv(await file.text());
-      if (!fileSkus.length) throw new Error("No stones in this file");
-      setImportPlan({ name: file.name, fileSkus, ...planImport(fileSkus, items.map((it) => it.sku)) });
-    } catch (err) {
-      toast.error(err.message || "Could not read the file");
-    }
-  };
-
-  const runImport = async (mirror) => {
-    const { fileSkus, notInFile } = importPlan;
-    setBusy("import");
-    try {
-      const removed = mirror && notInFile.length ? (await removeWebListings(notInFile)).removed || [] : [];
-      const { added = [], skus: accepted = [] } = await addWebListings(fileSkus);
-      const unknown = fileSkus.filter((s) => !accepted.includes(s));
-      const removedNow = removed.filter((s) => !added.includes(s));
-      toast.success(
-        [
-          `Added ${added.length} stone${added.length === 1 ? "" : "s"}`,
-          removedNow.length ? `removed ${removedNow.length}` : "",
-        ]
-          .filter(Boolean)
-          .join(", ")
-      );
-      if (unknown.length) {
-        toast.error(
-          `${unknown.length} SKU${unknown.length === 1 ? " is" : "s are"} not in DNA inventory: ` +
-            unknown.slice(0, 10).join(", ") +
-            (unknown.length > 10 ? "…" : ""),
-          { duration: 8000 }
+      const r = await syncWebListings();
+      if (r.success) {
+        toast.success(
+          `${r.fileName} · +${r.added?.length || 0} −${r.removed?.length || 0}`
         );
+      } else {
+        toast.error(r.message || "Sync failed", { duration: 8000 });
       }
-      setImportPlan(null);
       await load();
     } catch (err) {
-      toast.error(err.message || "Import failed");
+      toast.error(err.message || "Sync failed");
     } finally {
       setBusy("");
     }
@@ -227,8 +210,8 @@ const WebsitePage = () => {
         <div>
           <h1 className="text-[26px] font-semibold tracking-tight text-app-ink">Website</h1>
           <p className="mt-1 max-w-2xl text-[14px] leading-relaxed text-app-muted">
-            Stones published on Eshed.com. Add them here or from Inventory (select, then Actions),
-            and download the eTrade file for the site sync. Stones stay on the list until you remove them.
+            Stones published on Eshed.com. The list follows Barak's eTrade file, checked every 3 hours.
+            Stones you add here or from Inventory (select, then Actions) stay until you remove them.
             Pairs are always added and removed together.
           </p>
         </div>
@@ -241,6 +224,33 @@ const WebsitePage = () => {
           {busy === "download" ? "Preparing…" : `Download eTrade CSV (${exportable})`}
         </button>
       </header>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-app-line bg-app-surface px-4 py-3">
+        <p className="min-w-0 text-[13px] leading-relaxed text-app-muted">
+          {sync ? (
+            <>
+              <span className={sync.success ? "font-semibold text-app-ink" : "font-semibold text-red-700"}>
+                {sync.success ? "Synced with Barak" : "Last sync failed"}
+              </span>{" "}
+              · {formatWhen(sync.ranAt)}
+              {sync.fileName ? ` · ${sync.fileName}` : ""}
+              {sync.success && sync.stones != null ? ` · ${sync.stones} stones` : ""}
+              {!sync.success && sync.message ? ` · ${sync.message}` : ""}
+            </>
+          ) : (
+            "Not synced with Barak yet"
+          )}
+          <span className="ml-1">· {barakCount} from Barak, {items.length - barakCount} added in DNA</span>
+        </p>
+        <button
+          type="button"
+          className="inv-btn inv-btn--quiet"
+          disabled={Boolean(busy) || loading}
+          onClick={syncNow}
+        >
+          {busy === "sync" ? "Syncing…" : "Sync now"}
+        </button>
+      </div>
 
       <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-app-line bg-app-surface p-3">
         <input
@@ -258,57 +268,7 @@ const WebsitePage = () => {
         >
           {busy === "add" ? "Adding…" : "Add to website"}
         </button>
-        <button
-          type="button"
-          className="inv-btn inv-btn--quiet"
-          disabled={Boolean(busy) || loading}
-          onClick={() => fileInput.current?.click()}
-        >
-          Import Barak eTrade
-        </button>
-        <input ref={fileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={pickFile} />
       </div>
-
-      {importPlan && (
-        <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-          <p className="text-[14px] font-semibold text-app-ink">{importPlan.name}</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-app-muted">
-            {importPlan.fileSkus.length} stones in the file · {importPlan.toAdd.length} new ·{" "}
-            {importPlan.already.length} already on the list
-            {importPlan.notInFile.length
-              ? ` · ${importPlan.notInFile.length} on the list but not in this file`
-              : ""}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="inv-btn inv-btn--primary"
-              disabled={busy === "import" || !importPlan.toAdd.length}
-              onClick={() => runImport(false)}
-            >
-              {busy === "import" ? "Importing…" : `Add ${importPlan.toAdd.length} new`}
-            </button>
-            {importPlan.notInFile.length > 0 && (
-              <button
-                type="button"
-                className="inv-btn inv-btn--quiet"
-                disabled={busy === "import"}
-                onClick={() => runImport(true)}
-              >
-                Match the file (also remove {importPlan.notInFile.length})
-              </button>
-            )}
-            <button
-              type="button"
-              className="inv-btn inv-btn--quiet"
-              disabled={busy === "import"}
-              onClick={() => setImportPlan(null)}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {chips.map(([k, label]) => (
@@ -347,7 +307,7 @@ const WebsitePage = () => {
         <div className="rounded-2xl border border-app-line bg-app-surface px-5 py-10 text-center text-[14px] text-app-muted">
           {items.length
             ? "No matches."
-            : "Nothing on the website list yet. Import Barak's eTrade file, add SKUs above, or select stones in Inventory and choose Add to website."}
+            : "Nothing on the website list yet. Press Sync now to pull Barak's eTrade file, or add SKUs above."}
         </div>
       ) : (
         <>
@@ -390,14 +350,23 @@ const WebsitePage = () => {
                 <div className="hidden shrink-0 text-right text-[13px] font-semibold tabular-nums text-app-ink sm:block">
                   {money(it.priceTotal)}
                 </div>
-                <button
-                  type="button"
-                  className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                  disabled={Boolean(busy)}
-                  onClick={() => remove(it.sku)}
-                >
-                  Remove
-                </button>
+                {it.source === "barak" ? (
+                  <span
+                    className="shrink-0 px-3 py-1.5 text-[12px] font-medium text-app-muted"
+                    title="Listed in Barak's eTrade. Take it off there and it leaves at the next sync."
+                  >
+                    Barak
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    disabled={Boolean(busy)}
+                    onClick={() => remove(it.sku)}
+                  >
+                    Remove
+                  </button>
+                )}
               </li>
             ))}
           </ul>

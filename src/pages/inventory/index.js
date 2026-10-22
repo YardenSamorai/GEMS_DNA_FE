@@ -999,10 +999,15 @@ const StoneSearchPage = () => {
       const changed = add ? res.added || [] : res.removed || [];
       const partners = changed.filter((s) => !skus.includes(s));
       const pairNote = partners.length ? ` (incl. ${partners.length} pair partner${partners.length === 1 ? "" : "s"})` : "";
+      const managed = add ? [] : res.managed || [];
+      const managedNote = managed.length
+        ? `${managed.length} come${managed.length === 1 ? "s" : ""} from Barak — take ${managed.length === 1 ? "it" : "them"} off in Barak's eTrade`
+        : "";
       if (changed.length) {
         toast.success(`${add ? "Added" : "Removed"} ${changed.length} stone${changed.length === 1 ? "" : "s"}${pairNote}`, { id: t });
+        if (managedNote) toast(managedNote);
       } else {
-        toast(add ? "Already on the website" : "None of these were on the website", { id: t });
+        toast(managedNote || (add ? "Already on the website" : "None of these were on the website"), { id: t });
       }
     } catch (err) {
       toast.error(err.message || "Could not update the website list", { id: t });
