@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -8,6 +8,7 @@ import {
   removeWebListings,
 } from "../../services/stonesApi";
 import { useTeam } from "../../context/TeamContext";
+import { planImport, skusFromEtradeCsv } from "./etradeImport";
 
 const WARNINGS = {
   not_in_inventory: { label: "Not in inventory", tone: "red" },
@@ -58,6 +59,8 @@ const WebsitePage = () => {
   const [shown, setShown] = useState(PAGE);
   const [addText, setAddText] = useState("");
   const [busy, setBusy] = useState("");
+  const [importPlan, setImportPlan] = useState(null);
+  const fileInput = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,6 +144,52 @@ const WebsitePage = () => {
     }
   };
 
+  const pickFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const fileSkus = skusFromEtradeCsv(await file.text());
+      if (!fileSkus.length) throw new Error("No stones in this file");
+      setImportPlan({ name: file.name, fileSkus, ...planImport(fileSkus, items.map((it) => it.sku)) });
+    } catch (err) {
+      toast.error(err.message || "Could not read the file");
+    }
+  };
+
+  const runImport = async (mirror) => {
+    const { fileSkus, notInFile } = importPlan;
+    setBusy("import");
+    try {
+      const removed = mirror && notInFile.length ? (await removeWebListings(notInFile)).removed || [] : [];
+      const { added = [], skus: accepted = [] } = await addWebListings(fileSkus);
+      const unknown = fileSkus.filter((s) => !accepted.includes(s));
+      const removedNow = removed.filter((s) => !added.includes(s));
+      toast.success(
+        [
+          `Added ${added.length} stone${added.length === 1 ? "" : "s"}`,
+          removedNow.length ? `removed ${removedNow.length}` : "",
+        ]
+          .filter(Boolean)
+          .join(", ")
+      );
+      if (unknown.length) {
+        toast.error(
+          `${unknown.length} SKU${unknown.length === 1 ? " is" : "s are"} not in DNA inventory: ` +
+            unknown.slice(0, 10).join(", ") +
+            (unknown.length > 10 ? "…" : ""),
+          { duration: 8000 }
+        );
+      }
+      setImportPlan(null);
+      await load();
+    } catch (err) {
+      toast.error(err.message || "Import failed");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const download = async () => {
     setBusy("download");
     try {
@@ -179,7 +228,8 @@ const WebsitePage = () => {
           <h1 className="text-[26px] font-semibold tracking-tight text-app-ink">Website</h1>
           <p className="mt-1 max-w-2xl text-[14px] leading-relaxed text-app-muted">
             Stones published on Eshed.com. Add them here or from Inventory (select, then Actions),
-            and download the eTrade file for the site sync. Pairs are always added and removed together.
+            and download the eTrade file for the site sync. Stones stay on the list until you remove them.
+            Pairs are always added and removed together.
           </p>
         </div>
         <button
@@ -208,7 +258,57 @@ const WebsitePage = () => {
         >
           {busy === "add" ? "Adding…" : "Add to website"}
         </button>
+        <button
+          type="button"
+          className="inv-btn inv-btn--quiet"
+          disabled={Boolean(busy) || loading}
+          onClick={() => fileInput.current?.click()}
+        >
+          Import Barak eTrade
+        </button>
+        <input ref={fileInput} type="file" accept=".csv,text/csv" className="hidden" onChange={pickFile} />
       </div>
+
+      {importPlan && (
+        <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <p className="text-[14px] font-semibold text-app-ink">{importPlan.name}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-app-muted">
+            {importPlan.fileSkus.length} stones in the file · {importPlan.toAdd.length} new ·{" "}
+            {importPlan.already.length} already on the list
+            {importPlan.notInFile.length
+              ? ` · ${importPlan.notInFile.length} on the list but not in this file`
+              : ""}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="inv-btn inv-btn--primary"
+              disabled={busy === "import" || !importPlan.toAdd.length}
+              onClick={() => runImport(false)}
+            >
+              {busy === "import" ? "Importing…" : `Add ${importPlan.toAdd.length} new`}
+            </button>
+            {importPlan.notInFile.length > 0 && (
+              <button
+                type="button"
+                className="inv-btn inv-btn--quiet"
+                disabled={busy === "import"}
+                onClick={() => runImport(true)}
+              >
+                Match the file (also remove {importPlan.notInFile.length})
+              </button>
+            )}
+            <button
+              type="button"
+              className="inv-btn inv-btn--quiet"
+              disabled={busy === "import"}
+              onClick={() => setImportPlan(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {chips.map(([k, label]) => (
@@ -247,7 +347,7 @@ const WebsitePage = () => {
         <div className="rounded-2xl border border-app-line bg-app-surface px-5 py-10 text-center text-[14px] text-app-muted">
           {items.length
             ? "No matches."
-            : "Nothing on the website list yet. Add SKUs above, or select stones in Inventory and choose Add to website."}
+            : "Nothing on the website list yet. Import Barak's eTrade file, add SKUs above, or select stones in Inventory and choose Add to website."}
         </div>
       ) : (
         <>
