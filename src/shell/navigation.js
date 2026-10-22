@@ -6,6 +6,8 @@ const JEWELRY_ALIASES = ["/jewelry", "/jewelry/", "/jewelry/items", "/jewelry-it
 
 const under = (base) => (p) => p === base || p.startsWith(`${base}/`);
 
+const INVENTORY_ADMIN_PAGES = ["/inventory/overrides", "/inventory/website"];
+
 export const SALES_CHILDREN = [
   { id: "diamonds", label: "Diamonds", to: "/sales/diamonds", match: under("/sales/diamonds") },
   { id: "emeralds", label: "Emeralds", to: "/sales/emeralds", match: under("/sales/emeralds") },
@@ -31,7 +33,7 @@ export const NAV = [
         to: "/inventory",
         icon: "inventory",
         section: "inventory",
-        match: (p) => (under("/inventory")(p) && p !== "/inventory/overrides") || JEWELRY_ALIASES.includes(p),
+        match: (p) => (under("/inventory")(p) && !INVENTORY_ADMIN_PAGES.includes(p)) || JEWELRY_ALIASES.includes(p),
       },
       {
         id: "sales",
@@ -68,6 +70,14 @@ export const NAV = [
         icon: "overrides",
         adminOnly: true,
         match: (p) => p === "/inventory/overrides",
+      },
+      {
+        id: "website",
+        label: "Website",
+        to: "/inventory/website",
+        icon: "website",
+        adminOnly: true,
+        match: (p) => p === "/inventory/website",
       },
       { id: "api", label: "API Access", to: "/api-access", icon: "api", anyOf: ["sales", "inventory"], match: under("/api-access") },
       { id: "team", label: "Team", to: "/team", icon: "team", section: "team", match: under("/team") },
@@ -136,7 +146,7 @@ export const pageContext = (path) => {
   if (item.id === "photos" && p === "/photos/review") {
     return { crumbs: [parent, { label: "Review" }], heading: false };
   }
-  if (item.id === "overrides") {
+  if (item.id === "overrides" || item.id === "website") {
     return { crumbs: [{ label: "Inventory", to: "/inventory" }, { label: item.label }], heading: false };
   }
   return { crumbs: [{ label: item.label }], heading: false };

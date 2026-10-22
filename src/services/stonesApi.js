@@ -152,3 +152,41 @@ export const patchStoneOverrides = (sku, fields) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields }),
   }).then(json);
+
+/* Website (eTrade) list — admin only. Pair partners are added/removed
+ * together on the server. */
+export const fetchWebListings = () => fetch(`${API_BASE}/api/web-listings`).then(json);
+
+export const fetchWebListingSkus = () => fetch(`${API_BASE}/api/web-listings/skus`).then(json);
+
+export const addWebListings = (skus) =>
+  fetch(`${API_BASE}/api/web-listings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skus }),
+  }).then(json);
+
+export const removeWebListings = (skus) =>
+  fetch(`${API_BASE}/api/web-listings/remove`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skus }),
+  }).then(json);
+
+/* Downloads the eTrade CSV under the server's Diamonds<date>_<time>.csv name. */
+export const downloadEtradeCsv = async () => {
+  const res = await fetch(`${API_BASE}/api/web-listings/etrade.csv`);
+  if (!res.ok) await json(res);
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const name = /filename="([^"]+)"/.exec(disposition)?.[1] || "Diamonds.csv";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { name, count: Number(res.headers.get("X-Stone-Count")) || 0 };
+};

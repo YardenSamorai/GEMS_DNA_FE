@@ -7,6 +7,8 @@ import {
   FileSpreadsheet,
   FileSignature,
   FileText,
+  Globe,
+  GlobeLock,
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,7 +27,13 @@ import SendToCrmModal from "../crm/components/SendToCrmModal";
 import AssistantChat from "../../components/assistant/AssistantChat";
 import { useTeam } from "../../context/TeamContext";
 import { useSelection } from "../../context/SelectionContext";
-import { assignStone, fetchSoapStones, fetchStoneInventoryStatus } from "../../services/stonesApi";
+import {
+  addWebListings,
+  assignStone,
+  fetchSoapStones,
+  fetchStoneInventoryStatus,
+  removeWebListings,
+} from "../../services/stonesApi";
 
 import {
   API_BASE,
@@ -977,6 +985,43 @@ const StoneSearchPage = () => {
     setMemoStones(applyPriceMode(stones));
   };
 
+  /* Website list (eTrade). Stones only — jewelry still comes from Barak.
+   * The server takes each pair partner along. */
+  const updateWebsite = async (add) => {
+    const skus = selectedItems.filter((it) => !isJewelryItem(it)).map((it) => it.sku).filter(Boolean);
+    if (!skus.length) {
+      toast.error("Select at least one stone — jewelry isn't managed here yet.");
+      return;
+    }
+    const t = toast.loading(add ? "Adding to website…" : "Removing from website…");
+    try {
+      const res = add ? await addWebListings(skus) : await removeWebListings(skus);
+      const changed = add ? res.added || [] : res.removed || [];
+      const partners = changed.filter((s) => !skus.includes(s));
+      const pairNote = partners.length ? ` (incl. ${partners.length} pair partner${partners.length === 1 ? "" : "s"})` : "";
+      if (changed.length) {
+        toast.success(`${add ? "Added" : "Removed"} ${changed.length} stone${changed.length === 1 ? "" : "s"}${pairNote}`, { id: t });
+      } else {
+        toast(add ? "Already on the website" : "None of these were on the website", { id: t });
+      }
+    } catch (err) {
+      toast.error(err.message || "Could not update the website list", { id: t });
+    }
+  };
+
+  const websiteActions = team?.ready && team.isAdmin
+    ? [
+        {
+          label: "Website",
+          items: [
+            { id: "web-add", label: "Add to website", sub: "Eshed.com · eTrade file", icon: Globe, onSelect: () => updateWebsite(true) },
+            { id: "web-remove", label: "Remove from website", sub: "Pairs are removed together", icon: GlobeLock, onSelect: () => updateWebsite(false) },
+            { id: "web-open", label: "Website list", sub: "Review and download eTrade CSV", icon: FileSpreadsheet, onSelect: () => navigate("/inventory/website") },
+          ],
+        },
+      ]
+    : [];
+
   const selectionActions = [
     {
       label: "Export",
@@ -1023,6 +1068,7 @@ const StoneSearchPage = () => {
         { id: "wa", label: "WhatsApp DNA links", sub: "One message with every link", icon: MessageCircle, onSelect: () => shareMultipleToWhatsApp(selectedItems) },
       ],
     },
+    ...websiteActions,
   ];
 
   /* ---------------- scroll ---------------- */
