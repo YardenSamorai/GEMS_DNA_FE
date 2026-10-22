@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGenerating }) => {
   const [layout, setLayout] = useState('grid');
   const [showPrices, setShowPrices] = useState(true);
+  const [showPricePerCt, setShowPricePerCt] = useState(false);
 
   if (!isOpen) return null;
 
@@ -87,12 +88,31 @@ export const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGen
                 <input
                   type="checkbox"
                   checked={showPrices}
-                  onChange={(e) => setShowPrices(e.target.checked)}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setShowPrices(on);
+                    if (!on) setShowPricePerCt(false);
+                  }}
                   className="w-5 h-5 rounded border-stone-300 text-red-500 focus:ring-red-500"
                 />
                 <div>
                   <span className="font-medium text-stone-700">Show Prices</span>
-                  <p className="text-xs text-stone-500">Include price information in the catalog</p>
+                  <p className="text-xs text-stone-500">Include the total price on each stone</p>
+                </div>
+              </label>
+              <label className={`mt-2 flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                showPrices ? "bg-stone-50 hover:bg-stone-100" : "bg-stone-50/60 cursor-not-allowed opacity-50"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={showPricePerCt}
+                  disabled={!showPrices}
+                  onChange={(e) => setShowPricePerCt(e.target.checked)}
+                  className="w-5 h-5 rounded border-stone-300 text-red-500 focus:ring-red-500"
+                />
+                <div>
+                  <span className="font-medium text-stone-700">Show price per carat</span>
+                  <p className="text-xs text-stone-500">Also print $/ct next to the total</p>
                 </div>
               </label>
             </div>
@@ -126,7 +146,7 @@ export const PDFOptionsModal = ({ isOpen, onClose, onGenerate, stoneCount, isGen
               Cancel
             </button>
             <button
-              onClick={() => onGenerate({ layout, showPrices })}
+              onClick={() => onGenerate({ layout, showPrices, showPricePerCt: showPrices && showPricePerCt })}
               disabled={isGenerating}
               className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >

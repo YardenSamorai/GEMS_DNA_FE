@@ -87,12 +87,16 @@ export const generatePDFCatalog = async (selectedStones, options = {}) => {
   const {
     layout = 'grid',
     showPrices = true,
+    showPricePerCt = false,
     itemsPerPage = 4,
     userLocation,
     userEmail,
   } = options;
 
   const office = getOfficeContact({ location: userLocation, email: userEmail });
+  const money = (n) => `$${Math.round(Number(n)).toLocaleString()}`;
+  const ppcText = (stone) =>
+    showPricePerCt && stone.pricePerCt ? `${money(stone.pricePerCt)}/ct` : "";
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -461,7 +465,16 @@ export const generatePDFCatalog = async (selectedStones, options = {}) => {
           pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
           pdf.setFontSize(10);
           pdf.setTextColor(...green);
-          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, textX + 58, bottomY);
+          const totalStr = money(stone.priceTotal);
+          pdf.text(totalStr, textX + 58, bottomY);
+          const extra = ppcText(stone);
+          if (extra) {
+            const tw = pdf.getTextWidth(totalStr);
+            pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+            pdf.setFontSize(8);
+            pdf.setTextColor(90, 90, 90);
+            pdf.text(extra, textX + 58 + tw + 2, bottomY);
+          }
         }
 
         // View DNA pill button (right-aligned)
@@ -626,7 +639,16 @@ export const generatePDFCatalog = async (selectedStones, options = {}) => {
           pdf.setFont(PDF_FONTS.title, PDF_FONTS.titleStyle);
           pdf.setFontSize(11.5);
           pdf.setTextColor(...green);
-          pdf.text(`$${Math.round(stone.priceTotal).toLocaleString()}`, x + colWidth / 2 + 15, wpY);
+          const totalStr = money(stone.priceTotal);
+          pdf.text(totalStr, x + colWidth / 2 + 15, wpY);
+          const extra = ppcText(stone);
+          if (extra) {
+            const tw = pdf.getTextWidth(totalStr);
+            pdf.setFont(PDF_FONTS.body, PDF_FONTS.bodyStyle);
+            pdf.setFontSize(8);
+            pdf.setTextColor(90, 90, 90);
+            pdf.text(extra, x + colWidth / 2 + 15 + tw + 1.5, wpY);
+          }
         }
 
         // Divider 2
