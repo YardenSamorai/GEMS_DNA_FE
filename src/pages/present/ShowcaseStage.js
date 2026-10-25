@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { FileText } from "lucide-react";
 import { API_BASE } from "../inventory/helpers/constants";
 import { directVideoUrl } from "./presentModel";
+import { certPageImage } from "./certPage";
 
 /* The stage takes the shape of what it shows, so there is never a margin
  * between the media and its rounded edge. */
@@ -118,6 +119,33 @@ const Empty = ({ children }) => (
   <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-[15px] text-[#86868b]">{children}</div>
 );
 
+const CertOnRequest = () => (
+  <Empty>
+    <FileText size={40} strokeWidth={1.2} />
+    Certificate available on request
+  </Empty>
+);
+
+/* A PDF certificate, shown as its first page. Links that aren't a readable
+ * PDF (a lab's web page, a missing file) fall back to "on request". */
+const CertPdf = ({ src, title, duration, onSwipe, onAspect }) => {
+  const [page, setPage] = useState({ src: null, failed: false });
+  useEffect(() => {
+    let live = true;
+    setPage({ src: null, failed: false });
+    certPageImage(src).then(
+      (img) => live && setPage({ src: img, failed: false }),
+      () => live && setPage({ src: null, failed: true })
+    );
+    return () => {
+      live = false;
+    };
+  }, [src]);
+  if (page.failed) return <CertOnRequest />;
+  if (!page.src) return <Empty>Loading certificate…</Empty>;
+  return <Photo src={page.src} alt={`Certificate for ${title}`} onPanEnd={onSwipe} onAspect={onAspect} contain duration={duration} />;
+};
+
 /* Renders the media for one stage of `size` ({w, h}); reports the media's own
  * aspect through onAspect so the parent can reshape the stage to it. */
 const ShowcaseStage = ({ m, poster, title, duration, onSwipe, size, onAspect }) => {
@@ -151,10 +179,7 @@ const ShowcaseStage = ({ m, poster, title, duration, onSwipe, size, onAspect }) 
     content = m.image ? (
       <Photo src={m.src} alt={`Certificate for ${title}`} onPanEnd={onSwipe} onAspect={report} contain duration={duration} />
     ) : (
-      <Empty>
-        <FileText size={40} strokeWidth={1.2} />
-        Certificate available on request
-      </Empty>
+      <CertPdf key={m.src} src={m.src} title={title} duration={duration} onSwipe={onSwipe} onAspect={report} />
     );
   } else {
     const src = m.type === "image" ? m.src : poster;
