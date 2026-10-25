@@ -1,4 +1,14 @@
-import { itemsParam, mediaFor, parseItemsParam, pickItems, specsFor } from "./presentModel";
+import {
+  directVideoUrl,
+  itemsParam,
+  mediaFor,
+  mediaGroups,
+  parseItemsParam,
+  pickItems,
+  primaryMediaIndex,
+  showcaseSpecs,
+  specsFor,
+} from "./presentModel";
 
 const stone = {
   id: 7,
@@ -47,4 +57,22 @@ test("specs are client-facing: no box or location", () => {
   expect(labels).not.toContain("Box");
   expect(labels).not.toContain("Location");
   expect(specsFor(ring)).toEqual([["Type", "Ring"], ["Metal", "18K"]]);
+});
+
+test("showcase opens on the 360°, groups photos into one button, and plays Vimeo as MP4", () => {
+  const media = mediaFor(stone);
+  expect(media[primaryMediaIndex(media)].label).toBe("360°");
+  expect(primaryMediaIndex(mediaFor(ring))).toBe(0);
+  expect(mediaGroups(media).map((g) => [g.label, g.indices])).toEqual([
+    ["Video 1", [2]],
+    ["360°", [3]],
+    ["Photos · 2", [0, 1]],
+    ["Certificate", [4]],
+  ]);
+  expect(directVideoUrl("https://player.vimeo.com/video/1220478132", "https://be")).toBe(
+    "https://be/api/vimeo-file/1220478132/1080.mp4"
+  );
+  expect(directVideoUrl("https://v360.in/gemstone/vision360.html?d=T-432E", "https://be")).toBe(null);
+  expect(showcaseSpecs(stone).map(([k]) => k)).not.toEqual(expect.arrayContaining(["Shape"]));
+  expect(showcaseSpecs(ring)).toEqual([["Metal", "18K"]]);
 });

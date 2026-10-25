@@ -97,6 +97,49 @@ export const mediaFor = (item) => {
 
 export const posterFor = (item) => mediaFor(item).find((m) => m.type === "image")?.src || null;
 
+/* The showcase opens on motion: a 360° spin, else a video, else the photo. */
+export const primaryMediaIndex = (media) => {
+  const spin = media.findIndex((m) => m.type === "video" && m.label === "360°");
+  if (spin >= 0) return spin;
+  const video = media.findIndex((m) => m.type === "video");
+  if (video >= 0) return video;
+  return Math.max(0, media.findIndex((m) => m.type === "image"));
+};
+
+/* One button per video, one for all photos, one for the certificate. */
+export const mediaGroups = (media) => {
+  const groups = [];
+  const photos = media.map((m, i) => (m.type === "image" ? i : -1)).filter((i) => i >= 0);
+  media.forEach((m, i) => {
+    if (m.type === "video") groups.push({ key: `v${i}`, label: m.label, kind: "video", indices: [i] });
+  });
+  if (photos.length) {
+    groups.push({ key: "photos", label: photos.length > 1 ? `Photos · ${photos.length}` : "Photo", kind: "image", indices: photos });
+  }
+  const cert = media.findIndex((m) => m.type === "cert");
+  if (cert >= 0) groups.push({ key: "cert", label: "Certificate", kind: "cert", indices: [cert] });
+  return groups;
+};
+
+const VIMEO_ID = /vimeo\.com\/(?:video\/|manage\/videos\/)?(\d+)/i;
+
+/* Vimeo plays as the BE's 1080p MP4 so it can autoplay muted in a <video>;
+ * other direct files play as-is; anything else (V360…) needs its own iframe. */
+export const directVideoUrl = (url, apiBase) => {
+  const id = VIMEO_ID.exec(url || "")?.[1];
+  if (id) return `${apiBase}/api/vimeo-file/${id}/1080.mp4`;
+  return /\.(mp4|m4v|mov|webm)(\?|$)/i.test(url || "") ? url : null;
+};
+
+/* The title already carries weight and shape (stones) or the type (jewelry);
+ * the showcase has room for eight tiles. */
+export const showcaseSpecs = (item) => {
+  const skip = isJewelryItem(item) ? ["Type"] : ["Shape", "Weight"];
+  return specsFor(item)
+    .filter(([k]) => !skip.includes(k))
+    .slice(0, 8);
+};
+
 /* "Emerald", "Diamond", "Ring" — the small caps line above the title. */
 export const categoryLabel = (item) => {
   if (isJewelryItem(item)) return clean(item.jewelryType) || "Jewelry";
