@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { useUser } from "@clerk/clerk-react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useClerk, useUser } from "@clerk/clerk-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, FileText, LayoutGrid, Maximize, Minimize, Play, Rotate3d, X } from "lucide-react";
 import VimeoEmbed from "../sales/VimeoEmbed";
@@ -22,12 +22,25 @@ import {
   recallItems,
   specsFor,
 } from "./presentModel";
+import CodeSheet from "./CodeSheet";
+import {
+  CODE_LENGTH,
+  checkCode,
+  engageLock,
+  forgetEverything,
+  hasCode,
+  releaseLock,
+  saveCode,
+  waitRemaining,
+} from "./presentLock";
 
 /* =============================================================================
  * Presentation — the selected stones and jewelry, full screen, for showing a
  * client on an iPad. Overview grid first, then one piece at a time: large
  * media on the left (photos, video / 360°, certificate), the essentials on
  * the right. Swipe, the arrows or the keyboard move between pieces.
+ * Leaving takes the device's exit code (see presentLock.js), so a client
+ * holding the iPad can't wander into the rest of the inventory.
  * ========================================================================== */
 
 const PRICES_KEY = "present.prices";
@@ -203,7 +216,7 @@ const TopBar = ({ view, index, count, prices, onPrices, onClose, onToggleView, f
     style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
   >
     <div className="flex h-16 flex-1 items-center gap-1">
-      <IconButton label="Close presentation" onClick={onClose}>
+      <IconButton label="Exit presentation" onClick={onClose}>
         <X size={22} strokeWidth={1.75} />
       </IconButton>
       {count > 1 && (
@@ -438,8 +451,19 @@ const PresentPage = () => {
   const [params] = useSearchParams();
   const param = params.get("items") || "";
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signOut } = useClerk();
   const reduceMotion = useReducedMotion();
   const { items, loading, error } = usePresentationItems(param);
+  const here = `${location.pathname}${location.search}`;
+  const [sheet, setSheet] = useState(() => (hasCode() ? null : "setup"));
+  const [firstCode, setFirstCode] = useState("");
+  const [waitUntil, setWaitUntil] = useState(0);
+  const [forgot, setForgot] = useState(false);
+
+  useEffect(() => {
+    if (hasCode()) engageLock(here);
+  }, [here]);
   const priceMode = useMemo(readPriceMode, []);
   const [prices, setPrices] = useState(readPrices);
   const [view, setView] = useState("grid");
@@ -472,13 +496,14 @@ const PresentPage = () => {
     setView("slide");
   };
 
-  const close = useCallback(() => {
-    if (window.history.length > 1) navigate(-1);
-    else navigate("/inventory");
-  }, [navigate]);
+  const requestExit = useCallback(() => {
+    setWaitUntil(Date.now() + waitRemaining());
+    setSheet("exit");
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => {
+      if (sheet || forgot) return;
       if (view === "slide" && (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ")) {
         e.preventDefault();
         go(1);
@@ -487,12 +512,52 @@ const PresentPage = () => {
         go(-1);
       } else if (e.key === "Escape") {
         if (view === "slide" && count > 1) setView("grid");
-        else close();
+        else requestExit();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, count, go, close]);
+  }, [view, count, go, requestExit, sheet, forgot]);
+
+  const onCode = async (code) => {
+    if (sheet === "setup") {
+      setFirstCode(code);
+      setSheet("confirm");
+      return null;
+    }
+    if (sheet === "confirm") {
+      if (code !== firstCode) {
+        setFirstCode("");
+        setSheet("setup");
+        return "The codes didn't match. Choose a code again.";
+      }
+      await saveCode(code);
+      engageLock(here);
+      setSheet(null);
+      return null;
+    }
+    const res = await checkCode(code);
+    if (res.ok) {
+      releaseLock();
+      navigate("/inventory", { replace: true });
+      return null;
+    }
+    setWaitUntil(Date.now() + res.wait);
+    return "Wrong code";
+  };
+
+  const resetBySignOut = async () => {
+    try {
+      await signOut();
+    } catch {
+      setForgot(false);
+      return;
+    }
+    forgetEverything();
+    window.location.assign("/sign-in");
+  };
+
+  const settingUp = sheet === "setup" || sheet === "confirm";
 
   // Warm the neighbours' photos so a swipe lands on a painted image.
   useEffect(() => {
@@ -521,7 +586,7 @@ const PresentPage = () => {
         count={count}
         prices={prices}
         onPrices={setPrices}
-        onClose={close}
+        onClose={requestExit}
         onToggleView={() => setView((v) => (v === "grid" ? "slide" : "grid"))}
         fullscreen={fullscreen}
       />
@@ -556,7 +621,84 @@ const PresentPage = () => {
           </>
         )}
       </main>
+
+      <AnimatePresence>
+        {forgot ? (
+          <ForgotSheet key="forgot" onCancel={() => setForgot(false)} onSignOut={resetBySignOut} />
+        ) : sheet ? (
+          <CodeSheet
+            key={settingUp ? "setup" : "exit"}
+            title={sheet === "setup" ? "Set an exit code" : sheet === "confirm" ? "Confirm the code" : "Enter the exit code"}
+            message={
+              sheet === "setup"
+                ? `Choose ${CODE_LENGTH} digits. They will be needed to leave the presentation on this device.`
+                : sheet === "confirm"
+                ? "Enter the same code again."
+                : "The presentation is locked."
+            }
+            onComplete={onCode}
+            onCancel={settingUp ? () => navigate("/inventory", { replace: true }) : () => setSheet(null)}
+            cancelLabel={settingUp ? "Back" : "Cancel"}
+            waitUntil={sheet === "exit" ? waitUntil : 0}
+            footer={
+              sheet === "exit" && (
+                <button
+                  type="button"
+                  onClick={() => setForgot(true)}
+                  className="select-none text-[14px] font-medium text-glass-muted active:opacity-60"
+                  style={{ touchAction: "manipulation" }}
+                >
+                  Forgot the code?
+                </button>
+              )
+            }
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
+  );
+};
+
+const ForgotSheet = ({ onCancel, onSignOut }) => {
+  const [busy, setBusy] = useState(false);
+  return (
+    <motion.div
+      role="alertdialog"
+      aria-modal="true"
+      aria-label="Reset the exit code"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-6 backdrop-blur-2xl"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="w-full max-w-[360px] rounded-[32px] border border-white/70 bg-white/90 p-7 text-center shadow-[0_24px_80px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+        <h2 className="text-[20px] font-semibold tracking-[-0.015em] text-glass-ink">Reset the exit code</h2>
+        <p className="mt-2 text-[14px] leading-snug text-glass-muted">
+          This signs DNA out on this device. Signing back in needs the account password, then you can set a new code.
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-12 flex-1 select-none rounded-full bg-black/[0.05] text-[15px] font-medium text-glass-ink active:scale-[0.98]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              onSignOut();
+            }}
+            className="h-12 flex-1 select-none rounded-full bg-red-600 text-[15px] font-medium text-white active:scale-[0.98] disabled:opacity-60"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </motion.div>
   );
 };
 

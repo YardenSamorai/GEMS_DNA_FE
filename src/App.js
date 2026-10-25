@@ -13,6 +13,7 @@ import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
 import { SelectionProvider } from "./context/SelectionContext";
 import { sectionForPath, firstAllowedLanding } from "./utils/permissions";
+import { lockRedirect, lockedUrl } from "./pages/present/presentLock";
 import AppShell from "./shell/AppShell";
 import ActivityTracker from "./components/ActivityTracker";
 import SessionLimitGuard from "./components/SessionLimitGuard";
@@ -234,6 +235,13 @@ const AppLayout = () => {
       </SignedOut>
     </>
   );
+};
+
+// While a presentation is locked, every other page sends the device back to it.
+const PresentLockGate = ({ children }) => {
+  const location = useLocation();
+  const to = lockRedirect(lockedUrl(), location.pathname, location.search);
+  return to ? <Navigate to={to} replace /> : children;
 };
 
 // ---------- Presentation: signed-in, inventory access, but no app shell ----------
@@ -497,6 +505,7 @@ function AppContent() {
         <RouteLoadingProvider>
           <RouteTransitionOverlay />
           <Suspense fallback={<PageLoading />}>
+          <PresentLockGate>
           <Routes>
           {/* Public homepage — its own header, no app shell */}
           <Route path="/" element={<HomePage />} />
@@ -650,6 +659,7 @@ function AppContent() {
           <Route path="/jewelry/:modelNumber" element={<JewelryPage />} />
           <Route path="/:stone_id" element={<DiamondCard />} />
           </Routes>
+          </PresentLockGate>
           </Suspense>
         </RouteLoadingProvider>
       </Router>
