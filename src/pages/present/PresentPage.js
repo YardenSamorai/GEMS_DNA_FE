@@ -8,7 +8,6 @@ import { fetchSoapStones } from "../../services/stonesApi";
 import { readPriceMode } from "../../utils/pricing";
 import { API_BASE } from "../inventory/helpers/constants";
 import {
-  isJewelryItem,
   normalizeCatalogJewelry,
   normalizeStone,
   normalizeWorkshopJewelry,
@@ -42,6 +41,8 @@ const readPrices = () => {
   const v = localStorage.getItem(PRICES_KEY);
   return PRICE_OPTIONS.some((o) => o.id === v) ? v : "off";
 };
+
+const NO_SCROLLBAR = "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 const SWIPE_DISTANCE = 70;
 const SWIPE_VELOCITY = 450;
@@ -330,22 +331,35 @@ const Stage = ({ item, go }) => {
             </a>
           </div>
         ) : (
-          <motion.img
-            key={m.src}
-            src={m.src}
-            alt={m.type === "cert" ? `Certificate for ${title}` : title}
-            draggable={false}
-            onPanEnd={swipeHandler(go)}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.25 }}
-            className={`h-full w-full select-none ${m.type === "cert" ? "object-contain p-4" : "object-contain"}`}
-            style={{ touchAction: "pan-y pinch-zoom" }}
-          />
+          <>
+            {/* Photos come on white or black studio grounds; a blurred copy
+                fills the letterbox in the photo's own colour. */}
+            {m.type === "image" && (
+              <img
+                src={m.src}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-90 blur-3xl"
+              />
+            )}
+            <motion.img
+              key={m.src}
+              src={m.src}
+              alt={m.type === "cert" ? `Certificate for ${title}` : title}
+              draggable={false}
+              onPanEnd={swipeHandler(go)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25 }}
+              className={`relative h-full w-full select-none object-contain ${m.type === "cert" ? "p-4" : ""}`}
+              style={{ touchAction: "pan-y pinch-zoom" }}
+            />
+          </>
         )}
       </div>
       {media.length > 1 && (
-        <div className="flex gap-2.5 overflow-x-auto overscroll-contain px-1 pb-1 pt-1">
+        <div className={`flex gap-2.5 overflow-x-auto overscroll-contain px-1 pb-1 pt-1 ${NO_SCROLLBAR}`}>
           {media.map((x, i) => (
             <MediaChip key={`${x.type}-${x.src}`} m={x} active={i === active} onClick={() => setActive(i)} />
           ))}
@@ -359,12 +373,11 @@ const Details = ({ item, prices, priceMode, go }) => {
   const { total, perCt } = priceLines(item, prices, priceMode);
   const specs = specsFor(item);
   const grading = gradingLine(item);
-  const description = isJewelryItem(item) ? item.description : "";
 
   return (
     <motion.div
       onPanEnd={swipeHandler(go)}
-      className="flex min-h-0 flex-col landscape:overflow-y-auto landscape:overscroll-contain landscape:pr-1"
+      className={`flex min-h-0 flex-col landscape:overflow-y-auto landscape:overscroll-contain ${NO_SCROLLBAR}`}
       style={{ touchAction: "pan-y" }}
     >
       <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-glass-soft">{categoryLabel(item)}</p>
@@ -388,14 +401,13 @@ const Details = ({ item, prices, priceMode, go }) => {
           ))}
         </dl>
       )}
-      {description && <p className="mt-5 text-[15px] leading-relaxed text-glass-graphite">{description}</p>}
       <p className="mt-5 text-[13px] tabular-nums text-glass-soft">{item.sku}</p>
     </motion.div>
   );
 };
 
 const Slide = ({ item, prices, priceMode, go }) => (
-  <div className="mx-auto flex h-full max-w-[1400px] flex-col gap-6 overflow-y-auto overscroll-contain px-5 pb-28 pt-6 sm:px-8 landscape:grid landscape:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)] landscape:grid-rows-[minmax(0,1fr)] landscape:gap-10 landscape:overflow-hidden landscape:pb-24">
+  <div className="mx-auto flex h-full max-w-[1400px] flex-col gap-6 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-5 pb-28 pt-6 sm:px-8 landscape:grid landscape:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)] landscape:grid-rows-[minmax(0,1fr)] landscape:gap-10 landscape:overflow-hidden landscape:pb-24">
     <Stage key={item.sku} item={item} go={go} />
     <Details item={item} prices={prices} priceMode={priceMode} go={go} />
   </div>
