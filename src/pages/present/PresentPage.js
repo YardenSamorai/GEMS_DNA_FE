@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -14,7 +14,7 @@ import {
   showcaseSpecs,
 } from "./presentModel";
 import { useFullscreen, usePresentationItems, useWakeLock } from "./presentHooks";
-import ShowcaseStage, { Glow } from "./ShowcaseStage";
+import ShowcaseStage from "./ShowcaseStage";
 import CodeSheet from "./CodeSheet";
 import { ForgotSheet, StaffSheet } from "./StaffSheets";
 import {
@@ -31,8 +31,8 @@ import {
 /* =============================================================================
  * Showcase — the selected stones and jewelry on an iPad standing on the
  * counter at a show. Each piece fills the screen: its 360° spin (or video, or
- * a slowly drifting photo) on a dark stage lit in the stone's own colour, the
- * essentials beside it, nothing to scroll. With several pieces it rotates on
+ * a slowly drifting photo) on a stage shaped to the media, the essentials
+ * beside it on Apple's light ground, nothing to scroll. With several pieces it rotates on
  * its own; a visitor's touch holds the current piece for a while. Prices,
  * timing and leaving sit behind the staff code (presentLock.js), so a visitor
  * can't change what is shown or wander into the rest of the inventory.
@@ -84,31 +84,59 @@ const rise = {
   shown: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 30 } },
 };
 
-const MediaButtons = ({ groups, active, onPick }) =>
+/* Apple segmented control: one track, the selected segment a white chip
+ * that slides between choices. */
+const MediaSwitch = ({ groups, active, onPick }) =>
   groups.length > 1 ? (
-    <motion.div variants={rise} className="flex flex-wrap gap-2">
-      {groups.map((g) => {
-        const on = g.indices.includes(active);
-        return (
-          <button
-            key={g.key}
-            type="button"
-            aria-pressed={on}
-            onClick={() => {
-              const at = g.indices.indexOf(active);
-              onPick(on && g.indices.length > 1 ? g.indices[(at + 1) % g.indices.length] : g.indices[0]);
-            }}
-            className={`h-10 select-none rounded-full px-4 text-[14px] font-medium transition active:scale-95 ${
-              on ? "bg-white text-black" : "bg-white/10 text-white/80 active:bg-white/20"
-            }`}
-            style={{ touchAction: "manipulation" }}
-          >
-            {g.label}
-          </button>
-        );
-      })}
+    <motion.div variants={rise} className="flex">
+      <div className="flex max-w-full gap-0.5 overflow-hidden rounded-full bg-[#e8e8ed] p-1">
+        {groups.map((g) => {
+          const on = g.indices.includes(active);
+          return (
+            <button
+              key={g.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => {
+                const at = g.indices.indexOf(active);
+                onPick(on && g.indices.length > 1 ? g.indices[(at + 1) % g.indices.length] : g.indices[0]);
+              }}
+              className={`relative h-10 shrink-0 select-none whitespace-nowrap rounded-full px-[18px] text-[15px] font-medium tracking-[-0.01em] transition-colors ${
+                on ? "text-[#1d1d1f]" : "text-[#6e6e73] active:text-[#1d1d1f]"
+              }`}
+              style={{ touchAction: "manipulation" }}
+            >
+              {on && (
+                <motion.span
+                  layoutId="media-chip"
+                  className="absolute inset-0 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1),0_3px_10px_rgba(0,0,0,0.06)]"
+                  transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                />
+              )}
+              <span className="relative">{g.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </motion.div>
   ) : null;
+
+/* Watches an element's content box. */
+const useBox = () => {
+  const ref = useRef(null);
+  const [box, setBox] = useState(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(([e]) => {
+      const { width, height } = e.contentRect;
+      setBox((b) => (b && b.w === width && b.h === height ? b : { w: width, h: height }));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, box];
+};
 
 const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, onSwipe }) => {
   const reduceMotion = useReducedMotion();
@@ -118,16 +146,28 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
   const specs = showcaseSpecs(item);
   const { total, perCt } = priceLines(item, prices, priceMode);
 
+  const [area, box] = useBox();
+  const [aspect, setAspect] = useState(1);
+  const stageW = box ? Math.floor(Math.min(box.w, box.h * aspect)) : 0;
+  const size = { w: stageW, h: Math.floor(stageW / aspect) };
+
   return (
     <div
-      className="flex h-full w-full flex-col items-center gap-[clamp(20px,3.2vh,40px)] px-[clamp(20px,4.5vw,72px)] pb-[clamp(24px,4vh,48px)] pt-[clamp(44px,6.5vh,76px)] landscape:flex-row landscape:gap-[clamp(28px,4.5vw,80px)]"
-      style={{ paddingTop: "max(clamp(44px, 6.5vh, 76px), calc(env(safe-area-inset-top, 0px) + 36px))" }}
+      className="flex h-full w-full flex-col gap-[clamp(24px,3.4vh,44px)] px-[clamp(24px,5vw,80px)] pb-[clamp(40px,6vh,64px)] landscape:flex-row landscape:items-stretch landscape:gap-[clamp(32px,5vw,88px)]"
+      style={{ paddingTop: "max(clamp(48px, 7vh, 80px), calc(env(safe-area-inset-top, 0px) + 40px))" }}
     >
-      <div className="relative aspect-square shrink-0 portrait:w-full portrait:max-w-[min(100%,50dvh)] landscape:h-full landscape:max-w-[58%]">
-        <Glow src={poster} />
-        <div className="relative h-full w-full">
-          <ShowcaseStage m={media[active]} poster={poster} title={title} duration={duration} onSwipe={onSwipe} />
-        </div>
+      <div ref={area} className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+        {box && (
+          <ShowcaseStage
+            m={media[active]}
+            poster={poster}
+            title={title}
+            duration={duration}
+            onSwipe={onSwipe}
+            size={size}
+            onAspect={setAspect}
+          />
+        )}
       </div>
 
       <motion.div
@@ -135,43 +175,43 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
         variants={enter}
         initial={reduceMotion ? "shown" : "hidden"}
         animate="shown"
-        className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center gap-[clamp(14px,2.4vh,28px)] self-stretch"
+        className="flex min-w-0 shrink-0 flex-col justify-center gap-[clamp(16px,2.6vh,30px)] landscape:w-[clamp(340px,38%,500px)]"
         style={{ touchAction: "pan-y" }}
       >
         <motion.div variants={rise}>
-          <p className="text-[clamp(12px,1.1vw,14px)] font-semibold uppercase tracking-[0.24em] text-white/50">
-            {categoryLabel(item)}
-          </p>
+          <p className="text-[clamp(15px,1.4vw,19px)] font-semibold tracking-[-0.01em] text-[#86868b]">{categoryLabel(item)}</p>
           <h1
-            className={`mt-3 line-clamp-4 font-semibold leading-[1.04] tracking-[-0.035em] text-white ${
+            className={`mt-1.5 line-clamp-3 font-semibold leading-[1.06] tracking-[-0.035em] text-[#1d1d1f] ${
               title.length <= 28
-                ? "text-[clamp(34px,4.3vw,64px)]"
+                ? "text-[clamp(36px,4.4vw,60px)]"
                 : title.length <= 48
-                ? "text-[clamp(28px,3.3vw,48px)]"
-                : "text-[clamp(24px,2.7vw,38px)]"
+                ? "text-[clamp(30px,3.4vw,46px)]"
+                : "text-[clamp(26px,2.8vw,36px)]"
             }`}
           >
             {title}
           </h1>
-          {grading && <p className="mt-3 text-[clamp(17px,1.7vw,24px)] tracking-[-0.01em] text-white/60">{grading}</p>}
+          {grading && <p className="mt-2.5 text-[clamp(19px,1.8vw,24px)] tracking-[-0.015em] text-[#6e6e73]">{grading}</p>}
+          {total && (
+            <p className="mt-4 text-[clamp(21px,2vw,28px)] font-semibold tabular-nums tracking-[-0.02em] text-[#1d1d1f]">
+              {total}
+              {perCt && <span className="ml-2.5 text-[0.7em] font-normal text-[#86868b]">{perCt}</span>}
+            </p>
+          )}
         </motion.div>
-
-        {total && (
-          <motion.p variants={rise} className="text-[clamp(24px,2.6vw,36px)] font-semibold tabular-nums tracking-[-0.02em]">
-            {total}
-            {perCt && <span className="ml-3 text-[0.55em] font-normal text-white/55">{perCt}</span>}
-          </motion.p>
-        )}
 
         {specs.length > 0 && (
           <motion.dl
             variants={rise}
-            className="grid grid-cols-2 gap-x-[clamp(16px,2.4vw,36px)] border-t border-white/10 portrait:grid-cols-4"
+            className="grid grid-cols-2 overflow-hidden rounded-[22px] bg-white px-[clamp(18px,2vw,26px)] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_14px_40px_rgba(0,0,0,0.05)] portrait:grid-cols-4"
           >
             {specs.map(([k, v]) => (
-              <div key={k} className="min-w-0 border-b border-white/10 py-[clamp(9px,1.5vh,14px)]">
-                <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/40">{k}</dt>
-                <dd title={v} className="mt-1 truncate text-[clamp(15px,1.5vw,20px)] font-medium tabular-nums tracking-[-0.01em] text-white/90">
+              <div
+                key={k}
+                className="min-w-0 border-t border-black/[0.07] py-[clamp(11px,1.7vh,16px)] pr-3 [&:nth-child(-n+2)]:border-t-0 portrait:[&:nth-child(-n+4)]:border-t-0"
+              >
+                <dt className="text-[13px] tracking-[-0.005em] text-[#86868b]">{k}</dt>
+                <dd title={v} className="mt-0.5 truncate text-[clamp(16px,1.5vw,19px)] font-semibold tabular-nums tracking-[-0.015em] text-[#1d1d1f]">
                   {v}
                 </dd>
               </div>
@@ -179,10 +219,10 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
           </motion.dl>
         )}
 
-        <MediaButtons groups={mediaGroups(media)} active={active} onPick={onPick} />
+        <MediaSwitch groups={mediaGroups(media)} active={active} onPick={onPick} />
 
-        <motion.div variants={rise} className="flex items-center justify-between text-[12px] tracking-[0.08em] text-white/30">
-          <span className="font-semibold uppercase tracking-[0.28em]">Gems DNA</span>
+        <motion.div variants={rise} className="flex items-center justify-between text-[13px] text-[#aeaeb2]">
+          <span className="font-semibold tracking-[-0.01em]">Gems DNA</span>
           <span className="tabular-nums">{item.sku}</span>
         </motion.div>
       </motion.div>
@@ -194,8 +234,8 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
 
 const Overview = ({ items, prices, priceMode, onOpen }) => (
   <div
-    className="h-full overflow-y-auto overscroll-contain px-[clamp(20px,4.5vw,72px)] pb-32"
-    style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 40px)" }}
+    className="h-full overflow-y-auto overscroll-contain px-[clamp(24px,5vw,80px)] pb-32"
+    style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
   >
     <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-3 xl:grid-cols-4">
       {items.map((item, i) => {
@@ -209,17 +249,17 @@ const Overview = ({ items, prices, priceMode, onOpen }) => (
             className="select-none text-left transition active:scale-[0.98]"
             style={{ touchAction: "manipulation" }}
           >
-            <div className="relative aspect-square overflow-hidden rounded-[26px] bg-[#111113] ring-1 ring-white/10">
+            <div className="relative aspect-square overflow-hidden rounded-[18px] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]">
               {poster ? (
-                <img src={poster} alt="" loading="lazy" draggable={false} className="h-full w-full object-contain" />
+                <img src={poster} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full items-center justify-center text-[13px] text-white/30">No photo</div>
+                <div className="flex h-full items-center justify-center text-[13px] text-[#aeaeb2]">No photo</div>
               )}
             </div>
-            <p className="mt-3.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">{categoryLabel(item)}</p>
-            <p className="mt-1 line-clamp-2 text-[17px] font-semibold leading-snug tracking-[-0.01em] text-white">{itemTitle(item)}</p>
-            {gradingLine(item) && <p className="mt-0.5 text-[14px] text-white/55">{gradingLine(item)}</p>}
-            {total && <p className="mt-1.5 text-[15px] font-medium tabular-nums text-white/85">{total}</p>}
+            <p className="mt-3.5 text-[13px] font-semibold text-[#86868b]">{categoryLabel(item)}</p>
+            <p className="mt-0.5 line-clamp-2 text-[17px] font-semibold leading-snug tracking-[-0.015em] text-[#1d1d1f]">{itemTitle(item)}</p>
+            {gradingLine(item) && <p className="mt-0.5 text-[14px] text-[#6e6e73]">{gradingLine(item)}</p>}
+            {total && <p className="mt-1.5 text-[15px] font-medium tabular-nums text-[#1d1d1f]">{total}</p>}
           </button>
         );
       })}
@@ -233,14 +273,14 @@ const Overview = ({ items, prices, priceMode, onOpen }) => (
  * bar is driven straight from the rotation loop, not through React. */
 const Progress = ({ count, index, fillRef }) => (
   <div
-    className="pointer-events-none absolute inset-x-0 top-0 z-10 flex gap-1.5 px-[clamp(20px,4.5vw,72px)]"
-    style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)" }}
+    className="pointer-events-none absolute inset-x-0 top-0 z-10 flex gap-1.5 px-[clamp(24px,5vw,80px)]"
+    style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)" }}
   >
     {(count <= 30 ? Array.from({ length: count }, (_, i) => i) : [index]).map((i) => (
-      <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/20">
+      <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-black/[0.08]">
         <div
           ref={i === index ? fillRef : undefined}
-          className="h-full w-full origin-left rounded-full bg-white/85"
+          className="h-full w-full origin-left rounded-full bg-[#1d1d1f]/70"
           style={{ transform: `scaleX(${i < index ? 1 : 0})` }}
         />
       </div>
@@ -254,7 +294,7 @@ const Btn = ({ label, onClick, children }) => (
     aria-label={label}
     title={label}
     onClick={onClick}
-    className="flex h-12 w-12 select-none items-center justify-center rounded-full text-white transition active:scale-95 active:bg-white/20"
+    className="flex h-12 w-12 select-none items-center justify-center rounded-full text-[#1d1d1f] transition active:scale-95 active:bg-black/[0.06]"
     style={{ touchAction: "manipulation" }}
   >
     {children}
@@ -268,7 +308,7 @@ const Controls = ({ visible, count, view, paused, onGrid, onPrev, onPause, onNex
     }`}
     style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
   >
-    <div className="flex items-center gap-0.5 rounded-full border border-white/15 bg-white/10 p-1.5 shadow-[0_10px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl backdrop-saturate-150">
+    <div className="flex items-center gap-0.5 rounded-full border border-black/[0.07] bg-white/70 p-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.08),0_20px_60px_rgba(0,0,0,0.14)] backdrop-blur-xl backdrop-saturate-[1.8]">
       {count > 1 && (
         <Btn label={view === "grid" ? "Back to the show" : "All pieces"} onClick={onGrid}>
           {view === "grid" ? <Play size={20} strokeWidth={1.75} /> : <LayoutGrid size={20} strokeWidth={1.75} />}
@@ -287,7 +327,7 @@ const Controls = ({ visible, count, view, paused, onGrid, onPrev, onPause, onNex
           </Btn>
         </>
       )}
-      {count > 1 && <span className="mx-1 h-6 w-px bg-white/15" aria-hidden="true" />}
+      {count > 1 && <span className="mx-1 h-6 w-px bg-black/10" aria-hidden="true" />}
       <Btn label="Staff settings" onClick={onStaff}>
         <Lock size={18} strokeWidth={1.75} />
       </Btn>
@@ -490,7 +530,7 @@ const PresentPage = () => {
 
   return (
     <div
-      className="fixed inset-0 select-none overflow-hidden bg-black text-white antialiased"
+      className="fixed inset-0 select-none overflow-hidden bg-[#f5f5f7] text-[#1d1d1f] antialiased"
       style={{ height: "100dvh", overscrollBehavior: "none", WebkitTapHighlightColor: "transparent", fontFamily: FONT }}
       onPointerDown={() => {
         hold();
@@ -498,13 +538,13 @@ const PresentPage = () => {
       }}
     >
       {loading ? (
-        <div className="flex h-full items-center justify-center text-[15px] text-white/50">Preparing the presentation…</div>
+        <div className="flex h-full items-center justify-center text-[15px] text-[#86868b]">Preparing the presentation…</div>
       ) : error ? (
-        <div className="flex h-full items-center justify-center px-8 text-center text-[15px] text-red-400">{error}</div>
+        <div className="flex h-full items-center justify-center px-8 text-center text-[15px] text-[#d70015]">{error}</div>
       ) : !count ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
           <p className="text-[21px] font-semibold tracking-tight">Nothing to present</p>
-          <p className="text-[15px] text-white/50">Select stones or jewelry in Inventory, then choose Present.</p>
+          <p className="text-[15px] text-[#6e6e73]">Select stones or jewelry in Inventory, then choose Present.</p>
         </div>
       ) : view === "grid" ? (
         <Overview
