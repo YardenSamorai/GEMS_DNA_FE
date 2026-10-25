@@ -153,7 +153,7 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
 
   return (
     <div
-      className="flex h-full w-full flex-col gap-[clamp(24px,3.4vh,44px)] px-[clamp(24px,5vw,80px)] pb-[clamp(40px,6vh,64px)] landscape:flex-row landscape:items-stretch landscape:gap-[clamp(32px,5vw,88px)]"
+      className="flex h-full w-full flex-col gap-[clamp(24px,3.4vh,44px)] px-[clamp(24px,5vw,80px)] pb-[clamp(40px,6vh,64px)] landscape:flex-row landscape:items-stretch landscape:gap-[clamp(32px,4.5vw,80px)]"
       style={{ paddingTop: "max(clamp(48px, 7vh, 80px), calc(env(safe-area-inset-top, 0px) + 40px))" }}
     >
       <div ref={area} className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
@@ -175,7 +175,7 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
         variants={enter}
         initial={reduceMotion ? "shown" : "hidden"}
         animate="shown"
-        className="flex min-w-0 shrink-0 flex-col justify-center gap-[clamp(16px,2.6vh,30px)] landscape:w-[clamp(340px,38%,500px)]"
+        className="flex min-w-0 shrink-0 flex-col justify-center gap-[clamp(16px,2.6vh,30px)] landscape:w-[clamp(320px,34%,480px)]"
         style={{ touchAction: "pan-y" }}
       >
         <motion.div variants={rise}>
