@@ -16,15 +16,33 @@ import { Html5Qrcode } from "html5-qrcode";
  * times. Codes are therefore collected in a set and each one only counts once
  * per session, which also matches what the caller wants (a list of distinct
  * stock numbers) and needs no timing guesswork.
+ *
+ * With `batchable` the user picks the mode in the scanner itself (remembered
+ * per device). onScan may return false for a code it couldn't use; that code is
+ * marked as not found in the receipt instead of counted.
  * ========================================================================== */
 
-const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
+const BATCH_KEY = "scanner.batch";
+
+const BarcodeScanner = ({
+  isOpen,
+  onClose,
+  onScan,
+  continuous = false,
+  batchable = false,
+  continuousHint = "Keep scanning — every code is added to your search",
+  doneLabel = (n) => `Show ${n}`,
+}) => {
+  const [batch, setBatch] = useState(() => batchable && localStorage.getItem(BATCH_KEY) === "1");
+  const many = continuous || (batchable && batch);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState(null);
   const [lastResult, setLastResult] = useState(null);
-  // Codes read in this session, newest first — both the on-screen receipt and,
-  // via the ref below, the duplicate guard.
+  // Codes read in this session, newest first ({ code, ok }) — both the
+  // on-screen receipt and, via the ref below, the duplicate guard.
   const [collected, setCollected] = useState([]);
+  const found = collected.filter((c) => c.ok).length;
+  const missing = collected.length - found;
   // Flashes when the camera re-reads something already collected, so holding a
   // stone in view a moment too long looks deliberate rather than broken.
   const [repeat, setRepeat] = useState(null);
@@ -34,11 +52,18 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
   // The decoder callback is created once, when the camera starts, so it must
   // not close over props that change between renders.
   const onScanRef = useRef(onScan);
-  const continuousRef = useRef(continuous);
+  const onCloseRef = useRef(onClose);
+  const continuousRef = useRef(many);
   useEffect(() => {
     onScanRef.current = onScan;
-    continuousRef.current = continuous;
-  }, [onScan, continuous]);
+    onCloseRef.current = onClose;
+    continuousRef.current = many;
+  }, [onScan, onClose, many]);
+
+  const chooseBatch = (on) => {
+    setBatch(on);
+    localStorage.setItem(BATCH_KEY, on ? "1" : "0");
+  };
 
   const stopScanner = useCallback(async () => {
     if (html5QrCodeRef.current) {
@@ -57,9 +82,13 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
     if (!code) return;
 
     if (!continuousRef.current) {
+      // Frames keep decoding until the camera has actually stopped.
+      if (collectedRef.current.size) return;
+      collectedRef.current.add(code);
       setLastResult(code);
       onScanRef.current(code);
       stopScanner();
+      onCloseRef.current?.();
       return;
     }
 
@@ -68,17 +97,17 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
       return;
     }
     collectedRef.current.add(code);
+    const ok = onScanRef.current(code) !== false;
     setRepeat(null);
     setLastResult(code);
-    setCollected((prev) => [code, ...prev]);
-    // A short buzz is the only confirmation available when the rep is looking
-    // at the tray rather than the screen.
+    setCollected((prev) => [{ code, ok }, ...prev]);
+    // A buzz is the only confirmation available when the rep is looking at the
+    // tray rather than the screen; a not-found code buzzes differently.
     try {
-      navigator.vibrate?.(40);
+      navigator.vibrate?.(ok ? 40 : [70, 60, 70]);
     } catch {
       /* unsupported — the on-screen list is the fallback */
     }
-    onScanRef.current(code);
   }, [stopScanner]);
 
   const startScanner = useCallback(async () => {
@@ -171,9 +200,7 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
                 <div>
                   <h2 className="text-lg font-bold text-white">Scan Barcode</h2>
                   <p className="text-emerald-100 text-xs">
-                    {continuous
-                      ? "Keep scanning — every code is added to your search"
-                      : "Point camera at barcode or QR code"}
+                    {many ? continuousHint : "Point camera at barcode or QR code"}
                   </p>
                 </div>
               </div>
@@ -190,6 +217,27 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
 
           {/* Scanner Area */}
           <div className="p-4">
+            {batchable && (
+              <div role="radiogroup" aria-label="Scan mode" className="mb-3 flex rounded-lg bg-stone-800 p-1">
+                {[
+                  [false, "One at a time"],
+                  [true, "Several in a row"],
+                ].map(([on, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="radio"
+                    aria-checked={batch === on}
+                    onClick={() => chooseBatch(on)}
+                    className={`h-9 flex-1 rounded-md text-xs font-semibold transition-colors ${
+                      batch === on ? "bg-emerald-600 text-white" : "text-stone-300 hover:text-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="relative rounded-xl overflow-hidden bg-black">
               <div 
                 id="barcode-reader" 
@@ -228,8 +276,8 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
               ) : scanning ? (
                 <p className="text-emerald-400 text-sm flex items-center justify-center gap-2">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                  {continuous && collected.length > 0
-                    ? `Scanning\u2026 ${collected.length} added`
+                  {many && collected.length > 0
+                    ? `Scanning\u2026 ${found} added${missing ? ` · ${missing} not found` : ""}`
                     : "Scanning... Point at barcode"}
                 </p>
               ) : (
@@ -239,18 +287,23 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
 
             {/* Everything read so far — the receipt that lets the rep look away
                 from the tray and know the scan landed. */}
-            {continuous ? (
+            {many ? (
               collected.length > 0 && (
                 <div className="mt-4 p-3 bg-emerald-900/30 rounded-lg border border-emerald-700">
                   <p className="text-xs text-emerald-300">
                     Scanned ({collected.length})
-                    {repeat && <span className="text-amber-300"> · {repeat} already added</span>}
+                    {repeat && <span className="text-amber-300"> · {repeat} already scanned</span>}
                   </p>
                   <div className="mt-1.5 max-h-24 overflow-y-auto flex flex-wrap gap-1.5">
-                    {collected.map((code) => (
+                    {collected.map(({ code, ok }) => (
                       <span
                         key={code}
-                        className="text-xs font-mono text-emerald-300 bg-emerald-950/60 border border-emerald-800 rounded px-1.5 py-0.5"
+                        title={ok ? undefined : "Not found"}
+                        className={`text-xs font-mono rounded px-1.5 py-0.5 border ${
+                          ok
+                            ? "text-emerald-300 bg-emerald-950/60 border-emerald-800"
+                            : "text-red-300 bg-red-950/60 border-red-800 line-through"
+                        }`}
                       >
                         {code}
                       </span>
@@ -275,12 +328,12 @@ const BarcodeScanner = ({ isOpen, onClose, onScan, continuous = false }) => {
               <button
                 onClick={finish}
                 className={
-                  continuous && collected.length > 0
+                  many && found > 0
                     ? "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors"
                     : "px-4 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg transition-colors"
                 }
               >
-                {continuous && collected.length > 0 ? `Show ${collected.length}` : "Cancel"}
+                {many && found > 0 ? doneLabel(found) : many && collected.length > 0 ? "Close" : "Cancel"}
               </button>
             </div>
           </div>

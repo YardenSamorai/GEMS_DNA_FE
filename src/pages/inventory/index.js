@@ -826,20 +826,22 @@ const StoneSearchPage = () => {
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const stonesRef = useLatest(stones);
+  // The camera scanner closes itself in one-at-a-time mode and stays open in a
+  // row; the return value marks the code as found or not in its receipt.
   const handleScan = useCallback(
     (scanned) => {
-      setScannerOpen(false);
       const code = String(scanned || "").toUpperCase();
       const found = stonesRef.current.find((s) => {
         const sku = s.sku?.toUpperCase() || "";
-        return sku === code || sku.includes(code) || code.includes(sku);
+        return Boolean(sku) && (sku === code || sku.includes(code) || code.includes(sku));
       });
       if (found) {
         setSelected((prev) => new Set(prev).add(found.id));
         toast.success(`Added: ${scanned}`);
-      } else {
-        toast.error(`Stone not found: ${scanned}`);
+        return true;
       }
+      toast.error(`Stone not found: ${scanned}`);
+      return false;
     },
     [stonesRef]
   );
@@ -1538,7 +1540,14 @@ const StoneSearchPage = () => {
         liftAboveFab={selected.size > 0}
       />
 
-      <BarcodeScanner isOpen={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
+      <BarcodeScanner
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleScan}
+        batchable
+        continuousHint="Keep scanning — each stone is added to your selection"
+        doneLabel={(n) => `Done · ${n} added`}
+      />
 
       <ColumnSettingsModal
         isOpen={columnsOpen}
