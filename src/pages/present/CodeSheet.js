@@ -58,9 +58,9 @@ const CodeSheet = ({ title, message, onComplete, onCancel, cancelLabel = "Cancel
       const err = await onComplete(full);
       busyRef.current = false;
       setBusy(false);
+      put("");
       if (!err) return;
       setError(err);
-      put("");
       setNow(Date.now());
       if (!reduceMotion) shake.start({ x: [0, -12, 12, -9, 9, -4, 4, 0], transition: { duration: 0.45 } });
     },
