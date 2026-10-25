@@ -71,7 +71,7 @@ const BrandLogo = ({ logo, className = "" }) => (
     width={logo.w}
     height={logo.h}
     draggable={false}
-    className={`block h-auto w-[clamp(104px,10vw,132px)] shrink-0 select-none ${className}`}
+    className={`block h-auto w-[clamp(128px,12vw,168px)] shrink-0 select-none ${className}`}
   />
 );
 
