@@ -30,8 +30,8 @@ import {
 
 /* =============================================================================
  * Showcase — the selected stones and jewelry on an iPad standing on the
- * counter at a show. Each piece fills the screen: its 360° spin (or video, or
- * a slowly drifting photo) on a stage shaped to the media, the essentials
+ * counter at a show. Each piece fills the screen: its photo slowly drifting
+ * (360° and videos one tap away) on a stage shaped to the media, the essentials
  * beside it on Apple's light ground, nothing to scroll. With several pieces it rotates on
  * its own; a visitor's touch holds the current piece for a while. Prices,
  * timing and leaving sit behind the staff code (presentLock.js), so a visitor

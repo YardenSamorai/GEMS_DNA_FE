@@ -67,14 +67,19 @@ const unique = (list) => [...new Set(list.filter(Boolean))];
 
 const isImageUrl = (u) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(u || "");
 
+// Barak's stand-in for "no photo yet" (StoneImages/no_image1.jpg).
+const isPlaceholder = (u) => /\/no_?image\d*\.(jpe?g|png)(\?|$)/i.test(u || "");
+
 /* Everything the stage can show for one item, in presenting order:
  * photos, then videos / 360° spins, then the certificate. */
 export const mediaFor = (item) => {
   if (!item) return [];
   const jewelry = isJewelryItem(item);
-  const images = jewelry
-    ? unique([...(item.allImages || []).map(usableMediaUrl), usableMediaUrl(item.imageUrl)])
-    : unique([usableMediaUrl(item.imageUrl), ...splitList(item.additionalPictures)]);
+  const images = (
+    jewelry
+      ? unique([...(item.allImages || []).map(usableMediaUrl), usableMediaUrl(item.imageUrl)])
+      : unique([usableMediaUrl(item.imageUrl), ...splitList(item.additionalPictures)])
+  ).filter((u) => !isPlaceholder(u));
   const videos = jewelry
     ? splitList(item.videoLink)
     : unique([usableMediaUrl(item.videoUrl), ...splitList(item.additionalVideos)]);
@@ -97,25 +102,27 @@ export const mediaFor = (item) => {
 
 export const posterFor = (item) => mediaFor(item).find((m) => m.type === "image")?.src || null;
 
-/* The showcase opens on motion: a 360° spin, else a video, else the photo. */
+/* The showcase opens on the photo; without one, a 360° spin, else a video. */
 export const primaryMediaIndex = (media) => {
+  const photo = media.findIndex((m) => m.type === "image");
+  if (photo >= 0) return photo;
   const spin = media.findIndex((m) => m.type === "video" && m.label === "360°");
   if (spin >= 0) return spin;
   const video = media.findIndex((m) => m.type === "video");
   if (video >= 0) return video;
-  return Math.max(0, media.findIndex((m) => m.type === "image"));
+  return 0;
 };
 
-/* One button per video, one for all photos, one for the certificate. */
+/* One button for all photos, one per video, one for the certificate. */
 export const mediaGroups = (media) => {
   const groups = [];
   const photos = media.map((m, i) => (m.type === "image" ? i : -1)).filter((i) => i >= 0);
-  media.forEach((m, i) => {
-    if (m.type === "video") groups.push({ key: `v${i}`, label: m.label, kind: "video", indices: [i] });
-  });
   if (photos.length) {
     groups.push({ key: "photos", label: photos.length > 1 ? `Photos · ${photos.length}` : "Photo", kind: "image", indices: photos });
   }
+  media.forEach((m, i) => {
+    if (m.type === "video") groups.push({ key: `v${i}`, label: m.label, kind: "video", indices: [i] });
+  });
   const cert = media.findIndex((m) => m.type === "cert");
   if (cert >= 0) groups.push({ key: "cert", label: "Certificate", kind: "cert", indices: [cert] });
   return groups;

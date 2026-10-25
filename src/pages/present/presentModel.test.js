@@ -61,12 +61,20 @@ test("specs are client-facing: no box or location", () => {
 
 test("showcase opens on the 360°, groups photos into one button, and plays Vimeo as MP4", () => {
   const media = mediaFor(stone);
-  expect(media[primaryMediaIndex(media)].label).toBe("360°");
+  expect(media[primaryMediaIndex(media)].type).toBe("image");
+  expect(primaryMediaIndex(media.filter((m) => m.type !== "image"))).toBe(1);
   expect(primaryMediaIndex(mediaFor(ring))).toBe(0);
+  const noPhoto = mediaFor({
+    ...stone,
+    imageUrl: "https://be/api/barak/Gemstones/Output/StoneImages/no_image1.jpg",
+    additionalPictures: "",
+  });
+  expect(noPhoto.some((m) => m.type === "image")).toBe(false);
+  expect(noPhoto[primaryMediaIndex(noPhoto)].type).toBe("video");
   expect(mediaGroups(media).map((g) => [g.label, g.indices])).toEqual([
+    ["Photos · 2", [0, 1]],
     ["Video 1", [2]],
     ["360°", [3]],
-    ["Photos · 2", [0, 1]],
     ["Certificate", [4]],
   ]);
   expect(directVideoUrl("https://player.vimeo.com/video/1220478132", "https://be")).toBe(
