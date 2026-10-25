@@ -213,7 +213,7 @@ const TopBar = ({ view, index, count, prices, onPrices, onClose, onToggleView, f
       )}
     </div>
     <p className="hidden text-[15px] font-semibold tabular-nums tracking-tight text-glass-ink md:block">
-      {view === "grid" ? `${count} ${count === 1 ? "piece" : "pieces"}` : `${index + 1} of ${count}`}
+      {!count ? "" : view === "grid" ? `${count} ${count === 1 ? "piece" : "pieces"}` : `${index + 1} of ${count}`}
     </p>
     <div className="flex flex-1 items-center justify-end gap-2">
       <PriceToggle value={prices} onChange={onPrices} />
@@ -340,7 +340,7 @@ const Stage = ({ item, go }) => {
                 alt=""
                 aria-hidden="true"
                 draggable={false}
-                className="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover opacity-90 blur-3xl"
+                className="pointer-events-none absolute inset-0 h-full w-full scale-150 object-cover blur-3xl"
               />
             )}
             <motion.img
