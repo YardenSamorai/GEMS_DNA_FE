@@ -123,11 +123,12 @@ export const mediaGroups = (media) => {
 
 const VIMEO_ID = /vimeo\.com\/(?:video\/|manage\/videos\/)?(\d+)/i;
 
-/* Vimeo plays as the BE's 1080p MP4 so it can autoplay muted in a <video>;
- * other direct files play as-is; anything else (V360…) needs its own iframe. */
+/* Vimeo plays as the BE's largest progressive MP4 so it can autoplay muted in
+ * a <video> at full quality; other direct files play as-is; anything else
+ * (V360…) needs its own iframe. */
 export const directVideoUrl = (url, apiBase) => {
   const id = VIMEO_ID.exec(url || "")?.[1];
-  if (id) return `${apiBase}/api/vimeo-file/${id}/1080.mp4`;
+  if (id) return `${apiBase}/api/vimeo-file/${id}/file`;
   return /\.(mp4|m4v|mov|webm)(\?|$)/i.test(url || "") ? url : null;
 };
 

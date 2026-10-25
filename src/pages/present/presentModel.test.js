@@ -70,7 +70,7 @@ test("showcase opens on the 360°, groups photos into one button, and plays Vime
     ["Certificate", [4]],
   ]);
   expect(directVideoUrl("https://player.vimeo.com/video/1220478132", "https://be")).toBe(
-    "https://be/api/vimeo-file/1220478132/1080.mp4"
+    "https://be/api/vimeo-file/1220478132/file"
   );
   expect(directVideoUrl("https://v360.in/gemstone/vision360.html?d=T-432E", "https://be")).toBe(null);
   expect(showcaseSpecs(stone).map(([k]) => k)).not.toEqual(expect.arrayContaining(["Shape"]));
