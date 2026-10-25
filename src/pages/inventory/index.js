@@ -12,6 +12,7 @@ import {
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Presentation,
   Printer,
   SlidersHorizontal,
   Table2,
@@ -46,6 +47,7 @@ import {
 } from "./helpers/constants";
 import { exportForLabels } from "./helpers/labelExport";
 import { generatePDFCatalog } from "./helpers/pdfCatalog";
+import { itemsParam, rememberItems } from "../present/presentModel";
 import { shareMultipleToWhatsApp, shareToWhatsApp } from "./helpers/whatsappHelpers";
 import { exportToExcel, exportToExcelSeparate, exportToInternalExcel, getCategoryBreakdown } from "./helpers/excelExport";
 import { exportCatalogLiran } from "./helpers/catalogLiran";
@@ -935,6 +937,13 @@ const StoneSearchPage = () => {
     return true;
   };
 
+  const openPresentation = () => {
+    if (!requireSelection()) return;
+    const param = itemsParam(selectedItems);
+    rememberItems(param, selectedItems);
+    navigate(`/present?items=${encodeURIComponent(param)}`);
+  };
+
   const handleExportClick = () => {
     if (!requireSelection()) return;
     const b = getCategoryBreakdown(selectedItems);
@@ -1069,6 +1078,7 @@ const StoneSearchPage = () => {
     {
       label: "Share",
       items: [
+        { id: "present", label: "Present", sub: "Full-screen presentation for iPad", icon: Presentation, onSelect: openPresentation },
         { id: "crm", label: "Send to CRM", sub: "Add to a deal or contact", icon: Users, onSelect: () => setCrmOpen(true) },
         { id: "wa", label: "WhatsApp DNA links", sub: "One message with every link", icon: MessageCircle, onSelect: () => shareMultipleToWhatsApp(selectedItems) },
       ],

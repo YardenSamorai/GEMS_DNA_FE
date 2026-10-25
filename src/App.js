@@ -80,6 +80,7 @@ const StorePortalAccount = page(() => import("./pages/portal/StorePortalAccount"
 const StorePortalCatalog = page(() => import("./pages/portal/StorePortalCatalog"));
 const StorePortalRequests = page(() => import("./pages/portal/StorePortalRequests"));
 const StorePortalDocuments = page(() => import("./pages/portal/StorePortalDocuments"));
+const PresentPage = page(() => import("./pages/present/PresentPage"));
 
 // ---------- Theme Context ----------
 const ThemeContext = createContext();
@@ -232,6 +233,34 @@ const AppLayout = () => {
         </div>
       </SignedOut>
     </>
+  );
+};
+
+// ---------- Presentation: signed-in, inventory access, but no app shell ----------
+const PresentLayout = () => {
+  const team = useTeam();
+  const { isSignedIn, isLoaded: clerkLoaded } = useAuth();
+
+  if (!clerkLoaded || (isSignedIn && !team?.ready)) return <FullScreenLoader />;
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <MarketingHeader />
+        <main className="flex-1">
+          <AuthPrompt message="Please sign in to open this presentation" />
+        </main>
+      </div>
+    );
+  }
+  if (team.loadError) return <WorkspaceLoadErrorScreen onRetry={team.refresh} />;
+  if (team.notMember) return <NotInvitedScreen email={team.actor?.email} />;
+  if (team.isStoreUser) return <Navigate to="/store-portal" replace />;
+  if (!team.isAdmin && !team.can("inventory")) return <NoAccessScreen />;
+
+  return (
+    <Suspense fallback={<FullScreenLoader />}>
+      <Outlet />
+    </Suspense>
   );
 };
 
@@ -563,6 +592,12 @@ function AppContent() {
             <Route path="/store-portal/documents" element={<StorePortalDocuments />} />
             <Route path="/store-portal/account" element={<StorePortalAccount />} />
             <Route path="/store-portal/memos/:id" element={<StorePortalMemoDetail />} />
+          </Route>
+
+          {/* Full-screen client presentation (iPad) of the stones and jewelry
+              picked in Inventory — signed-in, but without the sidebar. */}
+          <Route element={<PresentLayout />}>
+            <Route path="/present" element={<PresentPage />} />
           </Route>
 
           {/* Short URL aliases */}
