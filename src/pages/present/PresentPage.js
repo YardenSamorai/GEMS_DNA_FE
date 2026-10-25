@@ -53,6 +53,28 @@ const INTERVAL_OPTIONS = [
   { id: "30", label: "30 s" },
 ];
 
+const BRAND_KEY = "present.brand";
+const BRAND_OPTIONS = [
+  { id: "none", label: "None" },
+  { id: "eshed", label: "Eshed" },
+  { id: "gemstar", label: "Gemstar" },
+];
+const BRAND_LOGOS = {
+  eshed: { src: "/images/eshed_logo_dark.png", alt: "Eshed", w: 429, h: 189 },
+  gemstar: { src: "/brands/gemstar.svg", alt: "Gemstar", w: 1071, h: 584 },
+};
+
+const BrandLogo = ({ logo, className = "" }) => (
+  <img
+    src={logo.src}
+    alt={logo.alt}
+    width={logo.w}
+    height={logo.h}
+    draggable={false}
+    className={`block h-auto w-[clamp(104px,10vw,132px)] shrink-0 select-none ${className}`}
+  />
+);
+
 const readOption = (key, options, fallback) => {
   const v = localStorage.getItem(key);
   return options.some((o) => o.id === v) ? v : fallback;
@@ -138,7 +160,7 @@ const useBox = () => {
   return [ref, box];
 };
 
-const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, onSwipe }) => {
+const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, onSwipe, logo }) => {
   const reduceMotion = useReducedMotion();
   const poster = posterFor(item);
   const title = itemTitle(item);
@@ -178,26 +200,32 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
         className="flex min-w-0 shrink-0 flex-col justify-center gap-[clamp(16px,2.6vh,30px)] landscape:w-[clamp(320px,34%,480px)]"
         style={{ touchAction: "pan-y" }}
       >
-        <motion.div variants={rise}>
-          <p className="text-[clamp(15px,1.4vw,19px)] font-semibold tracking-[-0.01em] text-[#86868b]">{categoryLabel(item)}</p>
-          <h1
-            className={`mt-1.5 line-clamp-3 font-semibold leading-[1.06] tracking-[-0.035em] text-[#1d1d1f] ${
-              title.length <= 28
-                ? "text-[clamp(36px,4.4vw,60px)]"
-                : title.length <= 48
-                ? "text-[clamp(30px,3.4vw,46px)]"
-                : "text-[clamp(26px,2.8vw,36px)]"
-            }`}
-          >
-            {title}
-          </h1>
-          {grading && <p className="mt-2.5 text-[clamp(19px,1.8vw,24px)] tracking-[-0.015em] text-[#6e6e73]">{grading}</p>}
-          {total && (
-            <p className="mt-4 text-[clamp(21px,2vw,28px)] font-semibold tabular-nums tracking-[-0.02em] text-[#1d1d1f]">
-              {total}
-              {perCt && <span className="ml-2.5 text-[0.7em] font-normal text-[#86868b]">{perCt}</span>}
-            </p>
-          )}
+        <motion.div
+          variants={rise}
+          className="flex gap-x-8 gap-y-[clamp(16px,2.6vh,30px)] landscape:flex-col portrait:flex-row-reverse portrait:items-start portrait:justify-between"
+        >
+          {logo && <BrandLogo logo={logo} />}
+          <div className="min-w-0">
+            <p className="text-[clamp(15px,1.4vw,19px)] font-semibold tracking-[-0.01em] text-[#86868b]">{categoryLabel(item)}</p>
+            <h1
+              className={`mt-1.5 line-clamp-3 font-semibold leading-[1.06] tracking-[-0.035em] text-[#1d1d1f] ${
+                title.length <= 28
+                  ? "text-[clamp(36px,4.4vw,60px)]"
+                  : title.length <= 48
+                  ? "text-[clamp(30px,3.4vw,46px)]"
+                  : "text-[clamp(26px,2.8vw,36px)]"
+              }`}
+            >
+              {title}
+            </h1>
+            {grading && <p className="mt-2.5 text-[clamp(19px,1.8vw,24px)] tracking-[-0.015em] text-[#6e6e73]">{grading}</p>}
+            {total && (
+              <p className="mt-4 text-[clamp(21px,2vw,28px)] font-semibold tabular-nums tracking-[-0.02em] text-[#1d1d1f]">
+                {total}
+                {perCt && <span className="ml-2.5 text-[0.7em] font-normal text-[#86868b]">{perCt}</span>}
+              </p>
+            )}
+          </div>
         </motion.div>
 
         {specs.length > 0 && (
@@ -222,7 +250,7 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
         <MediaSwitch groups={mediaGroups(media)} active={active} onPick={onPick} />
 
         <motion.div variants={rise} className="flex items-center justify-between text-[13px] text-[#aeaeb2]">
-          <span className="font-semibold tracking-[-0.01em]">Gems DNA</span>
+          <span className="font-semibold tracking-[-0.01em]">{logo ? "" : "Gems DNA"}</span>
           <span className="tabular-nums">{item.sku}</span>
         </motion.div>
       </motion.div>
@@ -232,11 +260,12 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
 
 /* ---------------- All pieces ---------------- */
 
-const Overview = ({ items, prices, priceMode, onOpen }) => (
+const Overview = ({ items, prices, priceMode, onOpen, logo }) => (
   <div
     className="h-full overflow-y-auto overscroll-contain px-[clamp(24px,5vw,80px)] pb-32"
     style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 48px)" }}
   >
+    {logo && <BrandLogo logo={logo} className="mx-auto mb-10" />}
     <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-3 xl:grid-cols-4">
       {items.map((item, i) => {
         const poster = posterFor(item);
@@ -351,6 +380,8 @@ const PresentPage = () => {
 
   const [prices, setPrices] = useState(() => readOption(PRICES_KEY, PRICE_OPTIONS, "off"));
   const [interval, setInterval_] = useState(() => readOption(INTERVAL_KEY, INTERVAL_OPTIONS, "12"));
+  const [brand, setBrand] = useState(() => readOption(BRAND_KEY, BRAND_OPTIONS, "none"));
+  const logo = BRAND_LOGOS[brand] || null;
   const [view, setView] = useState("show");
   const [{ index }, setPos] = useState({ index: 0 });
   const [pick, setPick] = useState({ index: -1, media: 0 });
@@ -381,6 +412,7 @@ const PresentPage = () => {
 
   useEffect(() => localStorage.setItem(PRICES_KEY, prices), [prices]);
   useEffect(() => localStorage.setItem(INTERVAL_KEY, interval), [interval]);
+  useEffect(() => localStorage.setItem(BRAND_KEY, brand), [brand]);
 
   const hold = () => {
     holdRef.current = performance.now() + HOLD_MS;
@@ -551,6 +583,7 @@ const PresentPage = () => {
           items={items}
           prices={prices}
           priceMode={priceMode}
+          logo={logo}
           onOpen={(i) => {
             hold();
             setPos({ index: i });
@@ -579,6 +612,7 @@ const PresentPage = () => {
               priceMode={priceMode}
               duration={durationMs}
               onSwipe={onSwipe}
+              logo={logo}
             />
           </motion.div>
         </AnimatePresence>
@@ -615,6 +649,9 @@ const PresentPage = () => {
             interval={interval}
             intervalOptions={INTERVAL_OPTIONS}
             onInterval={setInterval_}
+            brand={brand}
+            brandOptions={BRAND_OPTIONS}
+            onBrand={setBrand}
             fullscreen={fullscreen}
             onExit={exitPresentation}
             onDone={() => setStaff(false)}

@@ -64,11 +64,25 @@ const Pill = ({ children, onClick, tone = "plain", disabled }) => (
   </button>
 );
 
-export const StaffSheet = ({ prices, priceOptions, onPrices, interval, intervalOptions, onInterval, fullscreen, onExit, onDone }) => (
+export const StaffSheet = ({
+  prices,
+  priceOptions,
+  onPrices,
+  interval,
+  intervalOptions,
+  onInterval,
+  brand,
+  brandOptions,
+  onBrand,
+  fullscreen,
+  onExit,
+  onDone,
+}) => (
   <Backdrop label="Presentation settings">
     <h2 className="text-[20px] font-semibold tracking-[-0.015em]">Presentation settings</h2>
     <p className="mt-1 text-[14px] text-glass-muted">Visitors can browse, but only staff can change these.</p>
     <div className="mt-6 space-y-5">
+      <Segmented label="Logo" options={brandOptions} value={brand} onChange={onBrand} />
       <Segmented label="Prices" options={priceOptions} value={prices} onChange={onPrices} />
       <Segmented label="Next piece every" options={intervalOptions} value={interval} onChange={onInterval} />
     </div>
