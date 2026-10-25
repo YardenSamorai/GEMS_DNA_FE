@@ -64,6 +64,7 @@ const SpinFrame = ({ src, title }) => {
       title={title}
       onLoad={() => setReady(true)}
       frameBorder="0"
+      scrolling="no"
       allow="autoplay; fullscreen; accelerometer; gyroscope"
       className={`relative h-full w-full transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
     />

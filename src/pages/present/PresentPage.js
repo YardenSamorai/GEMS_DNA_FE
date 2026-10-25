@@ -142,7 +142,15 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
           <p className="text-[clamp(12px,1.1vw,14px)] font-semibold uppercase tracking-[0.24em] text-white/50">
             {categoryLabel(item)}
           </p>
-          <h1 className="mt-3 line-clamp-3 text-[clamp(34px,4.3vw,64px)] font-semibold leading-[1.02] tracking-[-0.035em] text-white">
+          <h1
+            className={`mt-3 line-clamp-4 font-semibold leading-[1.04] tracking-[-0.035em] text-white ${
+              title.length <= 28
+                ? "text-[clamp(34px,4.3vw,64px)]"
+                : title.length <= 48
+                ? "text-[clamp(28px,3.3vw,48px)]"
+                : "text-[clamp(24px,2.7vw,38px)]"
+            }`}
+          >
             {title}
           </h1>
           {grading && <p className="mt-3 text-[clamp(17px,1.7vw,24px)] tracking-[-0.01em] text-white/60">{grading}</p>}
