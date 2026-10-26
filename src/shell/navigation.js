@@ -6,7 +6,7 @@ const JEWELRY_ALIASES = ["/jewelry", "/jewelry/", "/jewelry/items", "/jewelry-it
 
 const under = (base) => (p) => p === base || p.startsWith(`${base}/`);
 
-const INVENTORY_ADMIN_PAGES = ["/inventory/overrides", "/inventory/website"];
+const INVENTORY_ADMIN_PAGES = ["/inventory/overrides", "/inventory/website", "/inventory/fantasy"];
 
 export const SALES_CHILDREN = [
   { id: "diamonds", label: "Diamonds", to: "/sales/diamonds", match: under("/sales/diamonds") },
@@ -79,6 +79,14 @@ export const NAV = [
         adminOnly: true,
         match: (p) => p === "/inventory/website",
       },
+      {
+        id: "fantasy",
+        label: "Fantasy",
+        to: "/inventory/fantasy",
+        icon: "fantasy",
+        adminOnly: true,
+        match: (p) => p === "/inventory/fantasy",
+      },
       { id: "api", label: "API Access", to: "/api-access", icon: "api", anyOf: ["sales", "inventory"], match: under("/api-access") },
       { id: "team", label: "Team", to: "/team", icon: "team", section: "team", match: under("/team") },
     ],
@@ -146,7 +154,7 @@ export const pageContext = (path) => {
   if (item.id === "photos" && p === "/photos/review") {
     return { crumbs: [parent, { label: "Review" }], heading: false };
   }
-  if (item.id === "overrides" || item.id === "website") {
+  if (item.id === "overrides" || item.id === "website" || item.id === "fantasy") {
     return { crumbs: [{ label: "Inventory", to: "/inventory" }, { label: item.label }], heading: false };
   }
   return { crumbs: [{ label: item.label }], heading: false };

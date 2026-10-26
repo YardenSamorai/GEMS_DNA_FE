@@ -175,6 +175,15 @@ export const removeWebListings = (skus) =>
 
 /* Pulls Barak's newest eTrade file from the FTP now. A refused or failed sync
  * still resolves, with success: false and the reason in message. */
+/* Barak ↔ Fantasy comparison: { summary, issues[], jewelry[], sync } */
+export const fetchFantasyOverview = () => fetch(`${API_BASE}/api/fantasy/overview`).then(json);
+
+export const syncFantasy = async () => {
+  const res = await fetch(`${API_BASE}/api/fantasy/sync`, { method: "POST" });
+  if (res.status === 502) return res.json();
+  return json(res);
+};
+
 export const syncWebListings = async () => {
   const res = await fetch(`${API_BASE}/api/web-listings/sync`, { method: "POST" });
   if (res.status === 502) return res.json();

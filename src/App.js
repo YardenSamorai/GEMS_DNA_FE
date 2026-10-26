@@ -58,6 +58,7 @@ const SalesDashboard = page(() => import("./pages/sales/SalesDashboard"));
 const QAPage = page(() => import("./pages/QAPage"));
 const StoneOverridesPage = page(() => import("./pages/inventory/StoneOverridesPage"));
 const WebsitePage = page(() => import("./pages/inventory/WebsitePage"));
+const FantasyPage = page(() => import("./pages/inventory/FantasyPage"));
 const PhotoStation = page(() => import("./pages/photos/PhotoStation"));
 const ApiAccess = page(() => import("./pages/api/ApiAccess"));
 const PhotoReview = page(() => import("./pages/photos/PhotoReview"));
@@ -521,6 +522,7 @@ function AppContent() {
             <Route path="/inventory" element={<InventoryHub />} />
             <Route path="/inventory/overrides" element={<OwnerOnly><StoneOverridesPage /></OwnerOnly>} />
             <Route path="/inventory/website" element={<OwnerOnly><WebsitePage /></OwnerOnly>} />
+            <Route path="/inventory/fantasy" element={<OwnerOnly><FantasyPage /></OwnerOnly>} />
 
             {/* Jewelry sub-system — the jewelry inventory/workshop surfaces were
                 retired; /jewelry now lands on the stones inventory. */}

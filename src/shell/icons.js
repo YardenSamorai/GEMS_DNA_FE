@@ -1,5 +1,5 @@
 import React from "react";
-import { BookUser, Camera, Gem, Globe, History, House, KeyRound, LayoutGrid, ShieldCheck, Tag, Users } from "lucide-react";
+import { ArrowLeftRight, BookUser, Camera, Gem, Globe, History, House, KeyRound, LayoutGrid, ShieldCheck, Tag, Users } from "lucide-react";
 
 const lucide = (Icon) => {
   const Wrapped = ({ size = 18 }) => <Icon size={size} strokeWidth={1.75} aria-hidden="true" />;
@@ -25,6 +25,7 @@ export const ICONS = {
   quality: lucide(ShieldCheck),
   overrides: lucide(History),
   website: lucide(Globe),
+  fantasy: lucide(ArrowLeftRight),
   api: lucide(KeyRound),
   team: lucide(Users),
   salesHome: lucide(House),
