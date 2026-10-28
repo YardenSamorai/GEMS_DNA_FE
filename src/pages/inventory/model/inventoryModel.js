@@ -1,7 +1,7 @@
 import { getMappedCategories } from "../../../utils/categoryMap";
 import { inventoryPriceScale } from "../../../utils/pricing";
 import { sanitizeText } from "../../../utils/helper";
-import { canonicalSku } from "../../../utils/skuQuery";
+import { canonicalSku, compileSkuQuery, skuMatchRank } from "../../../utils/skuQuery";
 import {
   BARAK_DISPLAY_NAMES,
   DIAMOND_FILTER_GROUPS,
@@ -249,12 +249,12 @@ export const hasSmartTerms = (ss) =>
 
 /* ---------------- Filtering ---------------- */
 
-const filterJewelry = (items, { filters, skuQuery, smartSearch }) =>
-  items.filter((item) => {
-    if (skuQuery.terms.length > 0) {
-      const itemSku = canonicalSku(item.sku);
+const filterJewelry = (items, { filters, skuQuery, skuIndex, smartSearch }) => {
+  const compiled = compileSkuQuery(skuQuery, skuIndex);
+  return items.filter((item) => {
+    if (compiled.length > 0) {
       const itemTitle = canonicalSku(item.title);
-      if (!skuQuery.terms.some((q) => itemSku.includes(q) || itemTitle.includes(q))) return false;
+      if (skuMatchRank(item.sku, compiled) === -1 && !skuQuery.terms.some((q) => itemTitle.includes(q))) return false;
     }
     if (filters.minPrice && item.priceTotal < Number(filters.minPrice)) return false;
     if (filters.maxPrice && item.priceTotal > Number(filters.maxPrice)) return false;
@@ -274,17 +274,14 @@ const filterJewelry = (items, { filters, skuQuery, smartSearch }) =>
     }
     return true;
   });
+};
 
-const filterStones = (items, { filters, skuQuery, parsedSearch, priceMode, stoneTags }) => {
+const filterStones = (items, { filters, skuQuery, skuIndex, parsedSearch, priceMode, stoneTags }) => {
   const ss = parsedSearch;
   const hasSmartSearch = hasSmartTerms(ss);
+  const compiled = compileSkuQuery(skuQuery, skuIndex);
   return items.filter((stone) => {
-    if (skuQuery.terms.length > 0) {
-      // Matching stays exact per SKU — a rep pasting a list wants those
-      // stones, not everything whose SKU contains them.
-      const stoneSku = canonicalSku(stone.sku);
-      if (!skuQuery.terms.some((term) => stoneSku === term)) return false;
-    }
+    if (compiled.length > 0 && skuMatchRank(stone.sku, compiled) === -1) return false;
     const priceScale = inventoryPriceScale(stone, priceMode);
     const effectiveTotal = stone.priceTotal != null ? stone.priceTotal * priceScale : stone.priceTotal;
     const effectivePPC = stone.pricePerCt != null ? stone.pricePerCt * priceScale : stone.pricePerCt;

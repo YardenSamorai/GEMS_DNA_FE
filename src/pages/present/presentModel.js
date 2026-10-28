@@ -143,9 +143,7 @@ export const directVideoUrl = (url, apiBase) => {
  * the showcase has room for eight tiles. */
 export const showcaseSpecs = (item) => {
   const skip = isJewelryItem(item) ? ["Type"] : ["Shape", "Weight"];
-  return specsFor(item)
-    .filter(([k]) => !skip.includes(k))
-    .slice(0, 8);
+  return specsFor(item).filter(([k]) => !skip.includes(k));
 };
 
 /* "Emerald", "Diamond", "Ring" — the small caps line above the title. */

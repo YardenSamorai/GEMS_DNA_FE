@@ -44,6 +44,9 @@ const normalizeSpace = (value) =>
 /** The form both sides of a SKU comparison are reduced to before matching. */
 export const canonicalSku = (value) => normalizeSpace(value).toLowerCase();
 
+/** Letters and digits only, so "m1040127", "M104 0127" and "M104-0127" meet. */
+export const compactSku = (value) => canonicalSku(value).replace(/[^a-z0-9]/g, "");
+
 /**
  * Build the lookup the parser consults. `maxWords` comes from the data rather
  * than a guess, so a five-word SKU would start working the day one appears.
@@ -195,4 +198,56 @@ export const parseSkuQuery = (raw, index) => {
   }
 
   return { terms, unknown };
+};
+
+/* -----------------------------------------------------------------------------
+ * Matching as you type
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Compile parsed terms into what a SKU is matched against.
+ *
+ * A single term is someone typing, so it matches from the first character:
+ * anywhere in the SKU, ignoring hyphens, dots and spaces. In a pasted list a
+ * term that is a real SKU stays exact — "T905" in a list wants T905, not every
+ * T905x — while a list entry that names no stone still matches partially.
+ */
+export const compileSkuQuery = (skuQuery, index) => {
+  const terms = skuQuery?.terms || [];
+  return terms.map((key) => ({
+    key,
+    compact: compactSku(key),
+    partial: terms.length === 1 || !index?.known?.has(key),
+  }));
+};
+
+/**
+ * How well a SKU answers the compiled query, best term wins:
+ * 0 exact · 1 starts with · 2 a hyphen/space-separated part starts with · 3 contains.
+ * -1 when no term matches.
+ */
+export const skuMatchRank = (sku, compiled) => {
+  const key = canonicalSku(sku);
+  let compact = null;
+  let best = -1;
+  for (const t of compiled) {
+    if (key === t.key) return 0;
+    if (!t.partial || !t.compact) continue;
+    if (compact === null) compact = compactSku(key);
+    let rank = -1;
+    if (compact.startsWith(t.compact)) rank = 1;
+    else if (key.split(/[^a-z0-9]+/).some((part) => part.startsWith(t.compact))) rank = 2;
+    else if (compact.includes(t.compact)) rank = 3;
+    if (rank !== -1 && (best === -1 || rank < best)) best = rank;
+  }
+  return best;
+};
+
+/** Best matches first; the existing order is kept within each rank. */
+export const rankBySku = (items, compiled, skuOf = (it) => it.sku) => {
+  if (!compiled.some((t) => t.partial)) return items;
+  return items
+    .map((it, i) => ({ it, i, r: skuMatchRank(skuOf(it), compiled) }))
+    .sort((a, b) => (a.r === -1) - (b.r === -1) || a.r - b.r || a.i - b.i)
+    .map((x) => x.it);
 };

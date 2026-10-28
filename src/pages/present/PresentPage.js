@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, LayoutGrid, Lock, Pause, Play } from "lucide-react";
@@ -20,19 +20,23 @@ import { ForgotSheet, StaffSheet } from "./StaffSheets";
 import {
   CODE_LENGTH,
   checkCode,
+  clearLeft,
   engageLock,
   forgetEverything,
   hasCode,
+  lockedUrl,
+  markLeft,
   releaseLock,
   saveCode,
   waitRemaining,
+  wasLeft,
 } from "./presentLock";
 
 /* =============================================================================
  * Showcase — the selected stones and jewelry on an iPad standing on the
  * counter at a show. Each piece fills the screen: its photo slowly drifting
- * (360° and videos one tap away) on a stage shaped to the media, the essentials
- * beside it on Apple's light ground, nothing to scroll. With several pieces it rotates on
+ * (360° and videos one tap away) on a stage shaped to the media, its details
+ * beside it on Apple's light ground, scrolling when they run long. With several pieces it rotates on
  * its own; a visitor's touch holds the current piece for a while. Prices,
  * timing and leaving sit behind the staff code (presentLock.js), so a visitor
  * can't change what is shown or wander into the rest of the inventory.
@@ -197,8 +201,8 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
         variants={enter}
         initial={reduceMotion ? "shown" : "hidden"}
         animate="shown"
-        className="flex min-w-0 shrink-0 flex-col justify-center gap-[clamp(16px,2.6vh,30px)] landscape:w-[clamp(320px,34%,480px)]"
-        style={{ touchAction: "pan-y" }}
+        className="flex min-h-0 min-w-0 shrink-0 flex-col gap-[clamp(16px,2.6vh,30px)] overflow-y-auto overscroll-contain portrait:max-h-[55%] landscape:w-[clamp(320px,34%,480px)] [&>:first-child]:mt-auto [&>:last-child]:mb-auto"
+        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
       >
         <motion.div
           variants={rise}
@@ -239,7 +243,7 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
                 className="min-w-0 border-t border-black/[0.07] py-[clamp(11px,1.7vh,16px)] pr-3 [&:nth-child(-n+2)]:border-t-0 portrait:[&:nth-child(-n+4)]:border-t-0"
               >
                 <dt className="text-[13px] tracking-[-0.005em] text-[#86868b]">{k}</dt>
-                <dd title={v} className="mt-0.5 truncate text-[clamp(16px,1.5vw,19px)] font-semibold tabular-nums tracking-[-0.015em] text-[#1d1d1f]">
+                <dd className="mt-0.5 break-words text-[clamp(16px,1.5vw,19px)] font-semibold tabular-nums tracking-[-0.015em] text-[#1d1d1f]">
                   {v}
                 </dd>
               </div>
@@ -371,6 +375,7 @@ const PresentPage = () => {
   const param = params.get("items") || "";
   const navigate = useNavigate();
   const location = useLocation();
+  const navigationType = useNavigationType();
   const { signOut } = useClerk();
   const reduceMotion = useReducedMotion();
   const { items, loading, error } = usePresentationItems(param);
@@ -407,8 +412,19 @@ const PresentPage = () => {
   runningRef.current = !paused && view === "show" && !sheet && !staff && !forgot && count > 1;
 
   useEffect(() => {
-    if (hasCode()) engageLock(here);
+    if (!hasCode()) return;
+    if (navigationType === "POP" && wasLeft(here)) return;
+    clearLeft();
+    engageLock(here);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [here]);
+
+  // iPad's back swipe can't be switched off, so while locked a copy of this
+  // page sits on top of it: the swipe lands on that copy and a new one is laid.
+  useEffect(() => {
+    if (!location.state?.presentGuard && lockedUrl() === here) navigate(here, { state: { presentGuard: true } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key, sheet]);
 
   useEffect(() => localStorage.setItem(PRICES_KEY, prices), [prices]);
   useEffect(() => localStorage.setItem(INTERVAL_KEY, interval), [interval]);
@@ -544,6 +560,7 @@ const PresentPage = () => {
 
   const exitPresentation = () => {
     releaseLock();
+    markLeft(here);
     navigate("/inventory", { replace: true });
   };
 

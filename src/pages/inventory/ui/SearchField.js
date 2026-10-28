@@ -3,7 +3,7 @@ import { Search, X } from "lucide-react";
 
 const isTyping = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
 
-/* SKU search. Accepts one SKU or a pasted list; matching stays exact per SKU.
+/* SKU search. One term matches as you type; in a pasted list real SKUs stay exact.
  * "/" focuses it from anywhere, Escape clears it. */
 const SearchField = ({ value, onChange, skuQuery, placeholder, children }) => {
   const ref = useRef(null);

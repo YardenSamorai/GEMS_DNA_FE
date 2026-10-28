@@ -13,7 +13,7 @@ import { TeamProvider, useTeam } from "./context/TeamContext";
 import { MemoSkusProvider } from "./context/MemoSkusContext";
 import { SelectionProvider } from "./context/SelectionContext";
 import { sectionForPath, firstAllowedLanding } from "./utils/permissions";
-import { lockRedirect, lockedUrl } from "./pages/present/presentLock";
+import { installLockGuard, lockRedirect, lockedUrl } from "./pages/present/presentLock";
 import AppShell from "./shell/AppShell";
 import ActivityTracker from "./components/ActivityTracker";
 import SessionLimitGuard from "./components/SessionLimitGuard";
@@ -237,6 +237,8 @@ const AppLayout = () => {
     </>
   );
 };
+
+installLockGuard();
 
 // While a presentation is locked, every other page sends the device back to it.
 const PresentLockGate = ({ children }) => {

@@ -48,6 +48,13 @@ export const releaseLock = () => {
   write(ATTEMPTS_KEY, null);
 };
 
+/* The presentation staff last walked out of, in this tab. Going Back or
+ * Forward onto it again shows it without locking the device a second time. */
+const LEFT_KEY = "present.left";
+export const markLeft = (url) => sessionStorage.setItem(LEFT_KEY, url);
+export const wasLeft = (url) => sessionStorage.getItem(LEFT_KEY) === url;
+export const clearLeft = () => sessionStorage.removeItem(LEFT_KEY);
+
 export const forgetEverything = () => {
   write(LOCK_KEY, null);
   write(CODE_KEY, null);
@@ -60,6 +67,19 @@ export const lockRedirect = (lock, pathname, search) => {
   if (`${pathname}${search || ""}` === lock) return null;
   if (OPEN_PATHS.some((re) => re.test(pathname))) return null;
   return lock;
+};
+
+/* Safari's back swipe can restore an earlier page of the app from its page
+ * cache, frozen as it was before the lock existed — no route renders, so the
+ * gate in App never runs. Every page checks again when it is shown. */
+export const installLockGuard = () => {
+  window.addEventListener("pageshow", (e) => {
+    if (!e.persisted) return;
+    const to = lockRedirect(lockedUrl(), window.location.pathname, window.location.search);
+    if (!to) return;
+    document.documentElement.style.visibility = "hidden";
+    window.location.replace(to);
+  });
 };
 
 /* Five free tries, then the wait doubles with every miss: 30 s, 1 min, 2 min… capped at 1 h. */

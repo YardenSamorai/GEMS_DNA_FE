@@ -3,7 +3,10 @@ import {
   buildSkuIndex,
   canonicalSku,
   endSkuTerm,
+  compileSkuQuery,
   parseSkuQuery,
+  rankBySku,
+  skuMatchRank,
 } from "./skuQuery";
 
 /* SKUs shaped like the real ones, including the spaced lots that make a plain
@@ -173,5 +176,34 @@ describe("endSkuTerm", () => {
       box = endSkuTerm(box);
     }
     expect(parseSkuQuery(box, index).terms).toEqual(["t9548", "mtps-0298", "t9549"]);
+  });
+});
+
+describe("matching as you type", () => {
+  const skus = ["T9052", "T9097", "LA0006", "M104-0127", "BAG SET-0001", "AT905", "T905"];
+  const idx = buildSkuIndex(skus);
+  const find = (raw) => {
+    const compiled = compileSkuQuery(parseSkuQuery(raw, idx), idx);
+    return rankBySku(skus.filter((s) => skuMatchRank(s, compiled) !== -1), compiled, (s) => s);
+  };
+
+  it("finds stones from the first characters", () => {
+    expect(find("t")).toEqual(expect.arrayContaining(["T9052", "T9097", "T905", "AT905"]));
+    expect(find("la0")).toEqual(["LA0006"]);
+  });
+
+  it("ignores hyphens, spaces and case", () => {
+    expect(find("m1040127")).toEqual(["M104-0127"]);
+    expect(find("bagset")).toEqual(["BAG SET-0001"]);
+    expect(find("0127")).toEqual(["M104-0127"]);
+  });
+
+  it("puts the exact SKU first, then starts-with, then contains", () => {
+    expect(find("t905")).toEqual(["T905", "T9052", "AT905"]);
+  });
+
+  it("keeps real SKUs exact inside a pasted list", () => {
+    expect(find("T905, LA0006")).toEqual(["LA0006", "T905"]);
+    expect(find("T905, LA00")).toEqual(["T905", "LA0006"]);
   });
 });

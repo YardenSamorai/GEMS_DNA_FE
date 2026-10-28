@@ -22,7 +22,7 @@ import {
 
 import { getMappedCategories } from "../../utils/categoryMap";
 import { inventoryPriceScale, readPriceMode, writePriceMode } from "../../utils/pricing";
-import { buildSkuIndex, parseSkuQuery } from "../../utils/skuQuery";
+import { buildSkuIndex, compileSkuQuery, parseSkuQuery, rankBySku } from "../../utils/skuQuery";
 import NiimbotPrintDialog from "../../components/NiimbotPrintDialog";
 import SendToCrmModal from "../crm/components/SendToCrmModal";
 import AssistantChat from "../../components/assistant/AssistantChat";
@@ -451,10 +451,13 @@ const StoneSearchPage = () => {
   const parsedSearch = useMemo(() => parseSmartSearch(smartSearch), [smartSearch]);
 
   const filtered = useMemo(
-    () => filterItems(modeItems, { mode, filters, skuQuery, smartSearch, parsedSearch, priceMode, stoneTags }),
-    [modeItems, mode, filters, skuQuery, smartSearch, parsedSearch, priceMode, stoneTags]
+    () => filterItems(modeItems, { mode, filters, skuQuery, skuIndex, smartSearch, parsedSearch, priceMode, stoneTags }),
+    [modeItems, mode, filters, skuQuery, skuIndex, smartSearch, parsedSearch, priceMode, stoneTags]
   );
-  const sorted = useMemo(() => sortItems(filtered, sort, selected), [filtered, sort, selected]);
+  const sorted = useMemo(
+    () => rankBySku(sortItems(filtered, sort, selected), compileSkuQuery(skuQuery, skuIndex)),
+    [filtered, sort, selected, skuQuery, skuIndex]
+  );
 
   const pairOnly = mode !== "jewelry" && isPairOnly(filters);
   const pairView = pairOnly && pairLayout === "pairs";
