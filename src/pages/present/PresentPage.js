@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, LayoutGrid, Lock, Pause, Play } from "lucide-react";
 import { readPriceMode } from "../../utils/pricing";
 import { gradingLine, itemTitle, pricePerCtText, priceTotalText } from "../inventory/ui/format";
+import { isJewelryItem } from "../inventory/model/inventoryModel";
 import {
   categoryLabel,
   mediaFor,
@@ -36,7 +37,7 @@ import {
  * Showcase — the selected stones and jewelry on an iPad standing on the
  * counter at a show. Each piece fills the screen: its photo slowly drifting
  * (360° and videos one tap away) on a stage shaped to the media, its details
- * beside it on Apple's light ground, nothing to scroll. With several pieces it rotates on
+ * beside it on Apple's light ground (only jewelry's long table scrolls). With several pieces it rotates on
  * its own; a visitor's touch holds the current piece for a while. Prices,
  * timing and leaving sit behind the staff code (presentLock.js), so a visitor
  * can't change what is shown or wander into the rest of the inventory.
@@ -152,6 +153,71 @@ const MediaSwitch = ({ groups, active, onPick }) =>
 const lastCellSpan = (n) =>
   `${n % 2 ? "col-span-2" : ""} ${["", "portrait:col-span-4", "portrait:col-span-3", "portrait:col-span-2"][n % 4]}`;
 
+/* Stones fit beside the photo as they are. Jewelry carries more details, so
+ * its table scrolls inside itself, with a fade at the bottom while more is below. */
+const SpecTable = ({ specs, scroll }) => {
+  const ref = useRef(null);
+  const [more, setMore] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!scroll || !el) return undefined;
+    const check = () => setMore(el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro.disconnect();
+    };
+  }, [scroll, specs]);
+
+  const compact = !scroll && specs.length > 8;
+
+  return (
+    <motion.div
+      variants={rise}
+      className="relative shrink-0 overflow-hidden rounded-[22px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05),0_14px_40px_rgba(0,0,0,0.05)]"
+    >
+      <dl
+        ref={ref}
+        className={`grid grid-cols-2 px-[clamp(18px,2vw,26px)] portrait:grid-cols-4 ${
+          scroll ? "max-h-[clamp(220px,36vh,340px)] overflow-y-auto overscroll-contain" : ""
+        }`}
+        style={scroll ? { touchAction: "pan-y", WebkitOverflowScrolling: "touch" } : undefined}
+      >
+        {specs.map(([k, v], i) => (
+          <div
+            key={k}
+            className={`min-w-0 border-t border-black/[0.07] pr-3 [&:nth-child(-n+2)]:border-t-0 portrait:[&:nth-child(-n+4)]:border-t-0 ${
+              compact ? "py-[clamp(8px,1.2vh,12px)] leading-tight" : "py-[clamp(11px,1.7vh,16px)]"
+            } ${i === specs.length - 1 ? lastCellSpan(specs.length) : ""}`}
+          >
+            <dt className="text-[13px] tracking-[-0.005em] text-[#86868b]">{k}</dt>
+            <dd
+              title={v}
+              className={`mt-0.5 truncate font-semibold tabular-nums tracking-[-0.015em] text-[#1d1d1f] ${
+                v.length > 14 ? "text-[clamp(15px,1.3vw,17px)]" : "text-[clamp(16px,1.5vw,19px)]"
+              }`}
+            >
+              {v}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {scroll && (
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/80 to-transparent transition-opacity duration-300 ${
+            more ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      )}
+    </motion.div>
+  );
+};
+
 /* Watches an element's content box. */
 const useBox = () => {
   const ref = useRef(null);
@@ -237,31 +303,7 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
           </div>
         </motion.div>
 
-        {specs.length > 0 && (
-          <motion.dl
-            variants={rise}
-            className="grid grid-cols-2 overflow-hidden rounded-[22px] bg-white px-[clamp(18px,2vw,26px)] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_14px_40px_rgba(0,0,0,0.05)] portrait:grid-cols-4"
-          >
-            {specs.map(([k, v], i) => (
-              <div
-                key={k}
-                className={`min-w-0 border-t border-black/[0.07] pr-3 [&:nth-child(-n+2)]:border-t-0 portrait:[&:nth-child(-n+4)]:border-t-0 ${
-                  specs.length > 8 ? "py-[clamp(8px,1.2vh,12px)] leading-tight" : "py-[clamp(11px,1.7vh,16px)]"
-                } ${i === specs.length - 1 ? lastCellSpan(specs.length) : ""}`}
-              >
-                <dt className="text-[13px] tracking-[-0.005em] text-[#86868b]">{k}</dt>
-                <dd
-                  title={v}
-                  className={`mt-0.5 truncate font-semibold tabular-nums tracking-[-0.015em] text-[#1d1d1f] ${
-                    v.length > 14 ? "text-[clamp(15px,1.3vw,17px)]" : "text-[clamp(16px,1.5vw,19px)]"
-                  }`}
-                >
-                  {v}
-                </dd>
-              </div>
-            ))}
-          </motion.dl>
-        )}
+        {specs.length > 0 && <SpecTable specs={specs} scroll={isJewelryItem(item)} />}
 
         <MediaSwitch groups={mediaGroups(media)} active={active} onPick={onPick} />
 

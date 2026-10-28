@@ -142,10 +142,9 @@ export const directVideoUrl = (url, apiBase) => {
 /* The title already carries weight and shape (stones) or the type (jewelry);
  * the showcase has room for eight tiles. */
 export const showcaseSpecs = (item) => {
-  const skip = isJewelryItem(item) ? ["Type"] : ["Shape", "Weight"];
-  return specsFor(item)
-    .filter(([k]) => !skip.includes(k))
-    .slice(0, 10);
+  const jewelry = isJewelryItem(item);
+  const specs = specsFor(item).filter(([k]) => !(jewelry ? ["Type"] : ["Shape", "Weight"]).includes(k));
+  return jewelry ? specs : specs.slice(0, 10);
 };
 
 /* "Emerald", "Diamond", "Ring" — the small caps line above the title. */
