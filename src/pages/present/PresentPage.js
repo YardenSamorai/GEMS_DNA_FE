@@ -36,7 +36,7 @@ import {
  * Showcase — the selected stones and jewelry on an iPad standing on the
  * counter at a show. Each piece fills the screen: its photo slowly drifting
  * (360° and videos one tap away) on a stage shaped to the media, its details
- * beside it on Apple's light ground, scrolling when they run long. With several pieces it rotates on
+ * beside it on Apple's light ground, nothing to scroll. With several pieces it rotates on
  * its own; a visitor's touch holds the current piece for a while. Prices,
  * timing and leaving sit behind the staff code (presentLock.js), so a visitor
  * can't change what is shown or wander into the rest of the inventory.
@@ -147,6 +147,11 @@ const MediaSwitch = ({ groups, active, onPick }) =>
     </motion.div>
   ) : null;
 
+/* The last spec cell stretches to the end of its row, so the divider above a
+ * lone last cell runs the full width (2 columns, or 4 in portrait). */
+const lastCellSpan = (n) =>
+  `${n % 2 ? "col-span-2" : ""} ${["", "portrait:col-span-4", "portrait:col-span-3", "portrait:col-span-2"][n % 4]}`;
+
 /* Watches an element's content box. */
 const useBox = () => {
   const ref = useRef(null);
@@ -201,8 +206,8 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
         variants={enter}
         initial={reduceMotion ? "shown" : "hidden"}
         animate="shown"
-        className="flex min-h-0 min-w-0 shrink-0 flex-col gap-[clamp(16px,2.6vh,30px)] overflow-y-auto overscroll-contain portrait:max-h-[55%] landscape:w-[clamp(320px,34%,480px)] [&>:first-child]:mt-auto [&>:last-child]:mb-auto"
-        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+        className="flex min-w-0 shrink-0 flex-col justify-center gap-[clamp(16px,2.6vh,30px)] landscape:w-[clamp(340px,40%,540px)]"
+        style={{ touchAction: "pan-y" }}
       >
         <motion.div
           variants={rise}
@@ -237,13 +242,20 @@ const Showcase = ({ item, media, active, onPick, prices, priceMode, duration, on
             variants={rise}
             className="grid grid-cols-2 overflow-hidden rounded-[22px] bg-white px-[clamp(18px,2vw,26px)] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_14px_40px_rgba(0,0,0,0.05)] portrait:grid-cols-4"
           >
-            {specs.map(([k, v]) => (
+            {specs.map(([k, v], i) => (
               <div
                 key={k}
-                className="min-w-0 border-t border-black/[0.07] py-[clamp(11px,1.7vh,16px)] pr-3 [&:nth-child(-n+2)]:border-t-0 portrait:[&:nth-child(-n+4)]:border-t-0"
+                className={`min-w-0 border-t border-black/[0.07] pr-3 [&:nth-child(-n+2)]:border-t-0 portrait:[&:nth-child(-n+4)]:border-t-0 ${
+                  specs.length > 8 ? "py-[clamp(8px,1.2vh,12px)] leading-tight" : "py-[clamp(11px,1.7vh,16px)]"
+                } ${i === specs.length - 1 ? lastCellSpan(specs.length) : ""}`}
               >
                 <dt className="text-[13px] tracking-[-0.005em] text-[#86868b]">{k}</dt>
-                <dd className="mt-0.5 break-words text-[clamp(16px,1.5vw,19px)] font-semibold tabular-nums tracking-[-0.015em] text-[#1d1d1f]">
+                <dd
+                  title={v}
+                  className={`mt-0.5 truncate font-semibold tabular-nums tracking-[-0.015em] text-[#1d1d1f] ${
+                    v.length > 14 ? "text-[clamp(15px,1.3vw,17px)]" : "text-[clamp(16px,1.5vw,19px)]"
+                  }`}
+                >
                   {v}
                 </dd>
               </div>
