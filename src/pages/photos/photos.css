@@ -608,6 +608,23 @@
 .ph-verdict h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.018em; }
 .ph-verdict p { margin: 4px 0 0; color: var(--dna-text-2); }
 
+/* When something needs fixing, the fix matters more than the picture. */
+.ph-shot--compact { width: 58%; margin-inline: auto; }
+
+/* The one thing to do about the headline issue. */
+.ph-fix { margin-top: 14px; padding: 14px 16px; }
+.ph-fix-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dna-accent);
+  margin-bottom: 4px;
+}
+.ph-fix p { margin: 0; font-size: 16px; line-height: 1.45; color: var(--dna-text); }
+.ph-fix ul { margin: 10px 0 0; padding: 10px 0 0; list-style: none; border-top: 0.5px solid var(--dna-hairline); }
+.ph-fix li { font-size: 13px; color: var(--dna-text-2); }
+.ph-fix li + li { margin-top: 4px; }
+
 .ph-next {
   margin-top: 14px;
   width: 100%;

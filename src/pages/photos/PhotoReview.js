@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Check, ChevronRight, ExternalLink, Info } from "lucide-react";
 import { approveCapture, fetchCaptures, fetchStatus, rejectCapture } from "../../services/photoStationApi";
-import { REJECT_REASONS, issueText, stoneLine, when } from "./photoText";
+import { REJECT_REASONS, issueText, rankIssues, stoneLine, when } from "./photoText";
 import "./photos.css";
 
 /* =============================================================================
@@ -35,7 +35,7 @@ const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
   const pending = item.status === "pending";
   const shown = pending ? variant : item.chosenVariant || "clean";
   const url = shown === "cutout" ? item.cutoutUrl : item.cleanUrl;
-  const issues = item.quality?.issues || [];
+  const issues = rankIssues(item.quality?.issues);
   const stone = { sku: item.sku, ...(item.stone || {}) };
 
   const approve = async () => {

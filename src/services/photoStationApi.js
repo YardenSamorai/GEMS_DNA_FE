@@ -34,7 +34,11 @@ export const uploadCapture = (sku, blob) => {
   const form = new FormData();
   form.append("sku", sku);
   form.append("photo", blob, `${sku}.jpg`);
-  return fetch(`${BASE}/captures`, { method: "POST", body: form }).then(json);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 120000);
+  return fetch(`${BASE}/captures`, { method: "POST", body: form, signal: ctl.signal })
+    .then(json)
+    .finally(() => clearTimeout(timer));
 };
 
 export const fetchCaptures = (status = "pending") => fetch(`${BASE}/captures?status=${status}`).then(json);

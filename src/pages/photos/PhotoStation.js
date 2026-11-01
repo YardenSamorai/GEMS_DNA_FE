@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  CloudOff,
   ImagePlus,
   Info,
   MapPin,
@@ -27,7 +28,7 @@ import {
   searchStones,
   uploadCapture,
 } from "../../services/photoStationApi";
-import { KIND_LABELS, STATUS, groupingHint, issueText, kindLabel, stoneLine } from "./photoText";
+import { KIND_LABELS, STATUS, groupingHint, issueInfo, kindLabel, rankIssues, stoneLine, uploadFailure } from "./photoText";
 import "./photos.css";
 
 /* =============================================================================
@@ -173,7 +174,7 @@ const Stats = ({ queue }) => (
       <span>ממתינות לאישור</span>
     </div>
     <div className="ph-stat">
-      <b>{queue ? queue.remaining.toLocaleString("he-IL") : "–"}</b>
+      <b>{queue ? Number(queue.remaining || 0).toLocaleString("he-IL") : "–"}</b>
       <span>בלי תמונה</span>
     </div>
   </div>
@@ -227,7 +228,7 @@ const Queue = ({ queue, loading, kind, location, onKind, onLocation, onOpen, onM
     <>
       <div className="ph-section">
         <h2>הבאות בתור</h2>
-        {queue && <span>{queue.matching.toLocaleString("he-IL")} אבנים · היקרות ראשונות</span>}
+        {queue && <span>{Number(queue.matching ?? queue.items?.length ?? 0).toLocaleString("he-IL")} אבנים · היקרות ראשונות</span>}
       </div>
 
       {locations.length > 1 && (
@@ -392,6 +393,7 @@ export default function PhotoStation() {
   const shotThisVisit = useRef(new Set());
   const cameraRef = useRef(null);
   const libraryRef = useRef(null);
+  const lastShot = useRef(null);
 
   const loadQueue = useCallback(() => {
     setQueueLoading(true);
@@ -451,6 +453,24 @@ export default function PhotoStation() {
     }
   };
 
+  const send = async (shot) => {
+    setScreen("processing");
+    window.scrollTo(0, 0);
+    try {
+      const r = await uploadCapture(stone.sku, shot);
+      shotThisVisit.current.add(stone.sku);
+      setResult(r);
+      buzz((r.quality?.issues || []).length ? [60, 50, 60] : 30);
+      loadQueue();
+      loadMine();
+    } catch (err) {
+      if (err.status === 422) setResult({ rejected: true, quality: err.body && err.body.quality });
+      else setResult({ failed: uploadFailure(err), canResend: true });
+      buzz([80, 60, 80]);
+    }
+    setScreen("result");
+  };
+
   const onPhoto = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
@@ -460,24 +480,14 @@ export default function PhotoStation() {
     setScreen("processing");
     window.scrollTo(0, 0);
     try {
-      const shot = await prepareShot(file);
-      const r = await uploadCapture(stone.sku, shot);
-      shotThisVisit.current.add(stone.sku);
-      setResult(r);
-      buzz((r.quality?.issues || []).length ? [60, 50, 60] : 30);
-    } catch (err) {
-      if (err.status === 422) {
-        setResult({ rejected: true, quality: err.body && err.body.quality });
-        buzz([80, 60, 80]);
-      } else {
-        setError(`ההעלאה נכשלה: ${err.message}. נסה שוב.`);
-        setScreen("stone");
-        return;
-      }
+      lastShot.current = await prepareShot(file);
+    } catch {
+      lastShot.current = null;
+      setResult({ failed: "לא הצלחנו לקרוא את התמונה. צלם אותה שוב מכאן." });
+      setScreen("result");
+      return;
     }
-    setScreen("result");
-    loadQueue();
-    loadMine();
+    send(lastShot.current);
   };
 
   const backHome = () => {
@@ -494,8 +504,12 @@ export default function PhotoStation() {
     [queue, stone, result]
   );
 
-  const issues = result?.quality?.issues || [];
-  const verdict = !result ? null : result.rejected ? "bad" : issues.length ? "warn" : "good";
+  const issues = rankIssues(result?.quality?.issues);
+  const verdict = !result ? null : result.failed ? "error" : result.rejected ? "bad" : issues.length ? "warn" : "good";
+  // A missing stone names its likely cause second; that cause is what to fix.
+  const headline = verdict === "bad" ? issueInfo("no_stone") : issueInfo(issues[0]);
+  const fix = verdict === "bad" ? issueInfo(issues[1] || "no_stone").fix : headline.fix;
+  const others = verdict === "warn" ? issues.slice(1) : [];
   const shoot = () => cameraRef.current?.click();
 
   return (
@@ -569,9 +583,9 @@ export default function PhotoStation() {
           <StoneNotes stone={stone} />
 
           <ol className="ph-card ph-steps">
-            <li>שים את האבן במרכז הלייטבוקס</li>
-            <li>החזק את הטלפון ישר מעל האבן</li>
-            <li>צלם. הרקע מתנקה אוטומטית</li>
+            <li>הנח את האבן על המשטח הלבן, בלי פינצטה</li>
+            <li>החזק את הטלפון ישר מעליה והקש עליה כדי למקד</li>
+            <li>צלם. הרקע מתנקה והאבן ממורכזת אוטומטית</li>
           </ol>
 
           <div className="ph-bar">
@@ -613,32 +627,46 @@ export default function PhotoStation() {
             רשימה
           </button>
 
-          <div className="ph-shot" style={{ marginTop: 8 }}>
+          <div className={`ph-shot${verdict === "good" ? "" : " ph-shot--compact"}`} style={{ marginTop: 8 }}>
             {(result.cleanUrl || preview) && <img src={result.cleanUrl || preview} alt={stone.sku} />}
           </div>
 
           <div className="ph-verdict">
-            <div className={`ph-verdict-icon ph-verdict-icon--${verdict}`}>
-              {verdict === "good" ? <Check size={28} strokeWidth={2.5} /> : verdict === "warn" ? <AlertTriangle size={26} /> : <RotateCcw size={26} />}
+            <div className={`ph-verdict-icon ph-verdict-icon--${verdict === "error" ? "bad" : verdict}`}>
+              {verdict === "good" ? (
+                <Check size={28} strokeWidth={2.5} />
+              ) : verdict === "warn" ? (
+                <AlertTriangle size={26} />
+              ) : verdict === "error" ? (
+                <CloudOff size={26} />
+              ) : (
+                <RotateCcw size={26} />
+              )}
             </div>
             <h2>
-              {verdict === "good" ? "התמונה נשלחה לאישור" : verdict === "warn" ? "נשמרה, אבל כדאי לצלם שוב" : "צריך לצלם שוב"}
+              {verdict === "good" ? "התמונה נשלחה לאישור" : verdict === "error" ? "התמונה לא נשלחה" : headline.title}
             </h2>
             <p className="ph-ltr" style={{ fontWeight: 600 }}>{stone.sku}</p>
             {verdict === "good" && <p>אחרי אישור מנהל היא תעלה לברק.</p>}
+            {verdict === "warn" && <p>התמונה נשמרה ותגיע לאישור, אבל עדיף לצלם שוב.</p>}
+            {verdict === "error" && <p>{result.failed}</p>}
           </div>
 
-          {issues.length > 0 && (
-            <div className="ph-notes">
-              {issues.map((code) => (
-                <Note key={code} tone={verdict === "bad" ? "bad" : "warn"} icon={AlertTriangle}>
-                  {issueText(code)}
-                </Note>
-              ))}
+          {(verdict === "warn" || verdict === "bad") && (
+            <div className="ph-card ph-fix">
+              <span className="ph-fix-label">איך לתקן</span>
+              <p>{fix}</p>
+              {others.length > 0 && (
+                <ul>
+                  {others.map((code) => (
+                    <li key={code}>גם: {issueInfo(code).title}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
-          {verdict !== "bad" && next && (
+          {(verdict === "good" || verdict === "warn") && next && (
             <button type="button" className="ph-next" onClick={() => openStone(next.sku)}>
               <span className="ph-row-main">
                 <span className="ph-next-label">הבאה בתור</span>
@@ -660,6 +688,21 @@ export default function PhotoStation() {
                   <button type="button" className="ph-btn ph-btn--quiet ph-btn--sm" onClick={shoot}>
                     <Camera size={16} aria-hidden="true" />
                     צלם שוב בכל זאת
+                  </button>
+                </>
+              ) : verdict === "error" && result.canResend && lastShot.current ? (
+                <>
+                  <button
+                    type="button"
+                    className="ph-btn ph-btn--primary ph-btn--lg ph-btn--block"
+                    onClick={() => send(lastShot.current)}
+                  >
+                    <RotateCcw size={20} strokeWidth={2} aria-hidden="true" />
+                    שלח שוב את אותה תמונה
+                  </button>
+                  <button type="button" className="ph-btn ph-btn--quiet ph-btn--sm" onClick={shoot}>
+                    <Camera size={16} aria-hidden="true" />
+                    צלם מחדש
                   </button>
                 </>
               ) : (
