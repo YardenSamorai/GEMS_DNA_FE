@@ -1,43 +1,42 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { AlertTriangle, Check, ChevronRight, ExternalLink, Info } from "lucide-react";
 import { approveCapture, fetchCaptures, fetchStatus, rejectCapture } from "../../services/photoStationApi";
-import { issueText, stoneLine } from "./photoText";
+import { REJECT_REASONS, issueText, stoneLine, when } from "./photoText";
+import "./photos.css";
+
+/* =============================================================================
+ * Photo review — a manager looks at each shot from the station, picks the
+ * cleaned or the AI cut-out version, and approves it (uploaded to Barak's
+ * picture FTP) or rejects it with a reason the photographer will see.
+ * Shots the automatic check had no complaint about can be approved together.
+ * ========================================================================== */
 
 const TABS = [
-  { key: "pending", label: "ממתינות לאישור" },
-  { key: "uploaded", label: "נשלחו לברק" },
-  { key: "rejected", label: "נדחו" },
+  ["pending", "ממתינות"],
+  ["uploaded", "נשלחו לברק"],
+  ["rejected", "נדחו"],
 ];
 
-const when = (iso) => (iso ? new Date(iso).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" }) : "");
+const isClean = (item) => !(item.quality?.issues || []).length && !item.filenameWarning;
 
-const Variant = ({ label, url, selected, onSelect, note }) => (
-  <button
-    type="button"
-    onClick={onSelect}
-    disabled={!onSelect}
-    className={`flex flex-col gap-1 rounded-xl border-2 p-1.5 text-center transition ${
-      selected ? "border-brand-emerald ring-2 ring-brand-emerald/30" : "border-app-line"
-    } ${onSelect ? "" : "cursor-default"}`}
-  >
-    {url ? (
-      <img src={url} alt={label} className="aspect-square w-full rounded-lg bg-white object-contain" loading="lazy" />
-    ) : (
-      <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-app-canvas2 p-2 text-xs text-app-muted">{note || "אין"}</div>
-    )}
-    <span className="text-sm font-semibold text-app-ink">
-      {selected ? "✓ " : ""}
-      {label}
-    </span>
-  </button>
+const Note = ({ tone, children }) => (
+  <div className={`ph-note ph-note--${tone}`}>
+    <AlertTriangle size={16} strokeWidth={2} aria-hidden="true" />
+    <div>{children}</div>
+  </div>
 );
 
-const CaptureCard = ({ item, onDone }) => {
-  const [variant, setVariant] = useState("clean");
+const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(item.uploadError || "");
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
   const pending = item.status === "pending";
-  const issues = (item.quality && item.quality.issues) || [];
+  const shown = pending ? variant : item.chosenVariant || "clean";
+  const url = shown === "cutout" ? item.cutoutUrl : item.cleanUrl;
+  const issues = item.quality?.issues || [];
+  const stone = { sku: item.sku, ...(item.stone || {}) };
 
   const approve = async () => {
     setBusy(true);
@@ -52,11 +51,9 @@ const CaptureCard = ({ item, onDone }) => {
   };
 
   const reject = async () => {
-    const reason = window.prompt("סיבת הדחייה (לא חובה):", "");
-    if (reason === null) return;
     setBusy(true);
     try {
-      await rejectCapture(item.id, reason);
+      await rejectCapture(item.id, reason.trim());
       onDone();
     } catch (e) {
       setError(e.message);
@@ -65,81 +62,115 @@ const CaptureCard = ({ item, onDone }) => {
   };
 
   return (
-    <div className="rounded-2xl border border-app-line bg-app-surface p-4 space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <div className="text-2xl font-black text-app-ink" dir="ltr">{item.sku}</div>
-          <div className="text-sm text-app-graphite" dir="ltr">{stoneLine({ sku: item.sku, ...(item.stone || {}) })}</div>
-        </div>
-        <div className="text-sm text-app-muted">
-          צולם ע״י {item.capturedBy || "?"} · {when(item.capturedAt)}
-        </div>
+    <article className="ph-card ph-review">
+      <div className="ph-shot">
+        {url ? <img src={url} alt={item.sku} loading="lazy" /> : <div className="ph-empty">אין גרסה כזאת</div>}
+        {item.originalUrl && (
+          <a className="ph-open" href={item.originalUrl} target="_blank" rel="noreferrer">
+            מקור
+            <ExternalLink size={12} aria-hidden="true" />
+          </a>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Variant label="מקור" url={item.originalUrl} />
-        <Variant
-          label="ניקוי"
-          url={item.cleanUrl}
-          selected={pending ? variant === "clean" : item.chosenVariant === "clean"}
-          onSelect={pending ? () => setVariant("clean") : null}
-        />
-        <Variant
-          label="חיתוך AI"
-          url={item.cutoutUrl}
-          note={item.cutoutError ? "חיתוך AI לא זמין" : null}
-          selected={pending ? variant === "cutout" : item.chosenVariant === "cutout"}
-          onSelect={pending && item.cutoutUrl ? () => setVariant("cutout") : null}
-        />
+      <div className="ph-review-body">
+        {pending && (
+          <div className="ph-seg" role="group" aria-label="גרסה">
+            <button type="button" aria-pressed={variant === "clean"} onClick={() => onVariant("clean")}>
+              ניקוי
+            </button>
+            <button
+              type="button"
+              aria-pressed={variant === "cutout"}
+              onClick={() => onVariant("cutout")}
+              disabled={!item.cutoutUrl}
+              title={item.cutoutError || undefined}
+            >
+              חיתוך AI
+            </button>
+          </div>
+        )}
+
+        <div className="ph-review-top">
+          <div style={{ minWidth: 0 }}>
+            <div className="ph-review-sku">{item.sku}</div>
+            <div className="ph-review-meta">{[stoneLine(stone), stone.location].filter(Boolean).join(" · ")}</div>
+          </div>
+          <div className="ph-review-meta" style={{ textAlign: "left", flex: "none" }}>
+            {item.capturedBy || "?"}
+            <br />
+            {when(item.capturedAt)}
+          </div>
+        </div>
+
+        {issues.length > 0 && (
+          <ul className="ph-issues">
+            {issues.map((c) => (
+              <li key={c}>{issueText(c)}</li>
+            ))}
+          </ul>
+        )}
+        {pending && item.filenameWarning && (
+          <Note tone="warn">יש נקודה במק״ט. אחרי הרצת Picture Mapping בברק, ודא שהתמונה התחברה לאבן.</Note>
+        )}
+        {error && <Note tone="bad">ההעלאה לברק נכשלה: {error}</Note>}
+
+        {pending && !rejecting && (
+          <div className="ph-review-actions">
+            <button type="button" className="ph-btn ph-btn--primary" onClick={approve} disabled={busy || locked}>
+              {busy ? "שולח…" : "אשר ושלח לברק"}
+            </button>
+            <button type="button" className="ph-btn ph-btn--danger" onClick={() => setRejecting(true)} disabled={busy || locked}>
+              דחה
+            </button>
+          </div>
+        )}
+
+        {pending && rejecting && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div className="ph-reasons">
+              {REJECT_REASONS.map((r) => (
+                <button key={r} type="button" className="ph-chip" aria-pressed={reason === r} onClick={() => setReason(r)}>
+                  {r}
+                </button>
+              ))}
+            </div>
+            <input
+              className="ph-reason-input"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="סיבה אחרת (לא חובה)"
+              maxLength={300}
+            />
+            <div className="ph-review-actions">
+              <button type="button" className="ph-btn ph-btn--danger" style={{ flex: 1 }} onClick={reject} disabled={busy}>
+                {busy ? "דוחה…" : "דחה את הצילום"}
+              </button>
+              <button type="button" className="ph-btn" onClick={() => setRejecting(false)} disabled={busy}>
+                ביטול
+              </button>
+            </div>
+          </div>
+        )}
+
+        {item.status === "uploaded" && (
+          <div className="ph-review-meta">
+            <span className="ph-pill ph-pill--uploaded">
+              <Check size={12} strokeWidth={3} aria-hidden="true" />
+              נשלחה
+            </span>{" "}
+            אושר ע״י {item.reviewedBy || "?"} · {when(item.uploadedAt)} ·{" "}
+            <span className="ph-ltr" style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>{item.ftpFilename}</span>
+          </div>
+        )}
+        {item.status === "rejected" && (
+          <div className="ph-review-meta">
+            <span className="ph-pill ph-pill--rejected">נדחתה</span> {item.reviewedBy || "?"} · {when(item.reviewedAt)}
+            {item.rejectReason ? ` · ${item.rejectReason}` : ""}
+          </div>
+        )}
       </div>
-
-      {issues.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <div className="font-semibold">הבדיקה האוטומטית מצאה:</div>
-          {issues.map((c) => (
-            <div key={c}>• {issueText(c)}</div>
-          ))}
-        </div>
-      )}
-      {item.filenameWarning && pending && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" dir="ltr">
-          {item.filenameWarning}
-        </div>
-      )}
-      {error && <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">ההעלאה לברק נכשלה: {error}</div>}
-
-      {pending && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={approve}
-            disabled={busy}
-            className="flex-1 rounded-xl bg-brand-emerald px-4 py-3 text-lg font-bold text-white disabled:opacity-50"
-          >
-            {busy ? "שולח…" : "אשר ושלח לברק"}
-          </button>
-          <button
-            type="button"
-            onClick={reject}
-            disabled={busy}
-            className="rounded-xl border-2 border-app-line px-5 py-3 text-lg font-semibold text-app-ink disabled:opacity-50"
-          >
-            דחה
-          </button>
-        </div>
-      )}
-      {item.status === "uploaded" && (
-        <div className="text-sm text-app-graphite">
-          אושר ע״י {item.reviewedBy || "?"} · נשלח כ-<span dir="ltr" className="font-mono">{item.ftpFilename}</span> · {when(item.uploadedAt)}
-        </div>
-      )}
-      {item.status === "rejected" && (
-        <div className="text-sm text-app-graphite">
-          נדחה ע״י {item.reviewedBy || "?"} · {when(item.reviewedAt)}
-          {item.rejectReason ? ` · ${item.rejectReason}` : ""}
-        </div>
-      )}
-    </div>
+    </article>
   );
 };
 
@@ -148,6 +179,8 @@ export default function PhotoReview() {
   const [items, setItems] = useState(null);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
+  const [variants, setVariants] = useState({});
+  const [bulk, setBulk] = useState(null);
 
   const load = useCallback(() => {
     setError("");
@@ -168,59 +201,136 @@ export default function PhotoReview() {
     fetchStatus(true).then(setStatus).catch(() => {});
   }, []);
 
-  const conn = status && status.ftpConnection;
+  const variantOf = (item) => variants[item.id] || (item.cleanUrl ? "clean" : "cutout");
+  const ready = tab === "pending" && items ? items.filter(isClean) : [];
+
+  const approveAll = async () => {
+    if (!window.confirm(`לשלוח לברק ${ready.length} תמונות שהבדיקה האוטומטית לא מצאה בהן בעיה?`)) return;
+    let failed = 0;
+    for (let i = 0; i < ready.length; i += 1) {
+      setBulk({ done: i, total: ready.length });
+      try {
+        await approveCapture(ready[i].id, variantOf(ready[i]));
+      } catch {
+        failed += 1;
+      }
+    }
+    setBulk(null);
+    if (failed) setError(`${failed} תמונות לא נשלחו. הן נשארו ברשימה עם פירוט השגיאה.`);
+    load();
+  };
+
+  const conn = status?.ftpConnection;
 
   return (
-    <div dir="rtl" className="mx-auto w-full max-w-4xl px-4 py-5 space-y-4 text-right">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-black text-app-ink">אישור תמונות</h1>
-        <Link to="/photos" className="rounded-xl border border-app-line px-4 py-2 text-sm font-semibold text-app-ink">
-          לעמדת הצילום
+    <div className="ph" dir="rtl">
+      <div className="ph-page ph-page--wide">
+        <Link to="/photos" className="ph-back" style={{ textDecoration: "none" }}>
+          <ChevronRight size={20} aria-hidden="true" />
+          עמדת הצילום
         </Link>
-      </div>
 
-      {status && !status.ftp && (
-        <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-red-900">חיבור ה-FTP של ברק לא מוגדר בשרת. אי אפשר לשלוח תמונות.</div>
-      )}
-      {conn && !conn.ok && (
-        <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-red-900">
-          אין חיבור ל-FTP של ברק כרגע: <span dir="ltr">{conn.error}</span>
+        <header className="ph-head" style={{ marginTop: 4 }}>
+          <div>
+            <h1 className="ph-title">אישור תמונות</h1>
+            <p className="ph-sub">בחר גרסה ואשר. התמונה עולה ל־FTP של ברק, ומשם מקשרים אותה לאבן.</p>
+          </div>
+        </header>
+
+        <div className="ph-card ph-status">
+          {!status ? (
+            <span>בודק חיבורים…</span>
+          ) : (
+            <>
+              <span>
+                <i className={`ph-dot ${status.ftp && (!conn || conn.ok) ? "ph-dot--good" : "ph-dot--bad"}`} />
+                {!status.ftp
+                  ? "ה־FTP של ברק לא מוגדר בשרת. אי אפשר לשלוח תמונות."
+                  : conn && !conn.ok
+                  ? `אין חיבור ל־FTP של ברק: ${conn.error}`
+                  : "מחובר ל־FTP של ברק"}
+              </span>
+              <span>
+                <i className={`ph-dot ${status.cutout ? "ph-dot--good" : ""}`} />
+                {status.cutout ? "חיתוך AI פעיל" : "חיתוך AI כבוי. זמינה רק גרסת הניקוי"}
+              </span>
+            </>
+          )}
         </div>
-      )}
-      {status && !status.cutout && (
-        <div className="rounded-xl border border-app-line bg-app-canvas2 px-4 py-2 text-sm text-app-graphite">
-          חיתוך AI כבוי (לא הוגדר מפתח remove.bg). זמינה רק גרסת הניקוי.
+
+        <div className="ph-toolbar">
+          <div className="ph-seg" role="group" aria-label="סטטוס">
+            {TABS.map(([id, label]) => (
+              <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>
+                {label}
+                {tab === id && items && <small>{items.length}</small>}
+              </button>
+            ))}
+          </div>
+          {ready.length > 0 && (
+            <button type="button" className="ph-btn ph-btn--primary" onClick={approveAll} disabled={Boolean(bulk)}>
+              <Check size={18} strokeWidth={2.5} aria-hidden="true" />
+              {bulk ? `שולח ${bulk.done + 1} מתוך ${bulk.total}…` : `אשר את כל התקינות (${ready.length})`}
+            </button>
+          )}
         </div>
-      )}
 
-      <div className="flex gap-2 overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold ${
-              tab === t.key ? "bg-app-ink text-app-surface" : "border border-app-line text-app-ink"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        {tab === "uploaded" && (
+          <details className="ph-card ph-help" style={{ marginBottom: 16 }}>
+            <summary>
+              <Info size={16} aria-hidden="true" style={{ verticalAlign: "-3px", marginInlineEnd: 6 }} />
+              איך מקשרים את התמונות לאבנים בברק
+            </summary>
+            <ol>
+              <li>בברק פותחים Picture Mapping.</li>
+              <li>
+                בוחרים <code>Non-Linked</code> ו־<code>Parcel Name</code>.
+              </li>
+              <li>
+                Suffix: <code>{status?.suffix || "_DNA"}</code>, Extension: <code>jpg</code>, ומריצים.
+              </li>
+              <li>התמונה תופיע ב־DNA אחרי הסנכרון הבא מברק.</li>
+            </ol>
+          </details>
+        )}
 
-      {tab === "uploaded" && (
-        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          התמונות נמצאות ב-FTP של ברק. כדי לקשר אותן לאבנים: בברק פותחים Picture Mapping, בוחרים Non-Linked, Parcel Name,
-          Suffix <span dir="ltr" className="font-mono">{(status && status.suffix) || "_DNA"}</span>, Extension{" "}
-          <span dir="ltr" className="font-mono">jpg</span>, ומריצים. התמונה תופיע ב-DNA אחרי הייצוא הבא מברק.
-        </div>
-      )}
+        {error && (
+          <div className="ph-notes" style={{ marginTop: 0, marginBottom: 16 }}>
+            <Note tone="bad">{error}</Note>
+          </div>
+        )}
 
-      {error && <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-red-900">{error}</div>}
-      {!items && <div className="text-app-muted">טוען…</div>}
-      {items && items.length === 0 && !error && <div className="py-10 text-center text-app-muted">אין תמונות כאן.</div>}
-      <div className="grid gap-4 md:grid-cols-2">
-        {items && items.map((item) => <CaptureCard key={item.id} item={item} onDone={load} />)}
+        {!items ? (
+          <div className="ph-grid" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="ph-card ph-review">
+                <div className="ph-skel" style={{ aspectRatio: "1", borderRadius: 0 }} />
+                <div className="ph-review-body">
+                  <div className="ph-skel" style={{ width: "45%", height: 18 }} />
+                  <div className="ph-skel" style={{ width: "70%", height: 12 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="ph-card ph-empty">
+            <b>{tab === "pending" ? "אין תמונות שמחכות לאישור" : "אין תמונות כאן"}</b>
+            {tab === "pending" ? "כל הצילומים טופלו." : ""}
+          </div>
+        ) : (
+          <div className="ph-grid">
+            {items.map((item) => (
+              <ReviewCard
+                key={item.id}
+                item={item}
+                variant={variantOf(item)}
+                onVariant={(v) => setVariants((m) => ({ ...m, [item.id]: v }))}
+                onDone={load}
+                locked={Boolean(bulk)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

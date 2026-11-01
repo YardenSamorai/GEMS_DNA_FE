@@ -1,0 +1,714 @@
+/* ================================================================
+   Photo station + review — scoped to `.ph`. Shared Gems DNA tokens
+   (styles/gemsdna-tokens.css). Hebrew, right-to-left, phone first:
+   the station is used one-handed beside a lightbox.
+   ================================================================ */
+
+@import "../../styles/gemsdna-tokens.css";
+
+.ph {
+  --ph-tint: rgba(4, 120, 87, 0.09);
+  --ph-tint-2: rgba(4, 120, 87, 0.16);
+  --ph-warn: #a15c07;
+  --ph-warn-bg: rgba(255, 159, 10, 0.12);
+  --ph-bad: #c0362c;
+  --ph-bad-bg: rgba(255, 59, 48, 0.1);
+  --ph-good: #047857;
+  --ph-good-bg: rgba(52, 199, 89, 0.12);
+  --ph-control: 44px;
+
+  font-family: var(--dna-font);
+  color: var(--dna-text);
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="dark"] .ph {
+  --dna-surface: #2c2c2e;
+  --dna-hover: #333336;
+  --ph-tint: rgba(16, 185, 129, 0.14);
+  --ph-tint-2: rgba(16, 185, 129, 0.22);
+  --ph-warn: #f5b041;
+  --ph-bad: #ff6961;
+  --ph-good: #30d158;
+  --dna-glass: rgba(36, 36, 38, 0.74);
+}
+
+.ph *,
+.ph *::before,
+.ph *::after { box-sizing: border-box; }
+:where(.ph) button { font: inherit; color: inherit; letter-spacing: inherit; }
+:where(.ph) input { font: inherit; letter-spacing: inherit; }
+.ph :focus { outline: none; }
+.ph :focus-visible { outline: 2px solid var(--dna-accent); outline-offset: 2px; border-radius: 8px; }
+.ph button,
+.ph [role="button"] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ph-ltr { direction: ltr; unicode-bidi: isolate; }
+.ph-num { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- page */
+
+.ph-page {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+.ph-page--wide { max-width: 1180px; padding-inline: 24px; }
+.ph-page--bar { padding-bottom: 0; }
+@media (max-width: 767px) {
+  .ph-page--wide { padding-inline: 16px; }
+}
+
+.ph-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ph-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: -0.024em;
+}
+.ph-sub {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: var(--dna-text-2);
+}
+.ph-section {
+  margin: 28px 0 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ph-section h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.016em;
+}
+.ph-section span { font-size: 13px; color: var(--dna-text-3); }
+
+/* ---------------------------------------------------------------- surfaces */
+
+.ph-card {
+  background: var(--dna-surface);
+  border-radius: var(--dna-r-card);
+  box-shadow: var(--dna-sh-card);
+}
+
+.ph-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 14px 4px;
+}
+.ph-stat {
+  text-align: center;
+  padding: 0 6px;
+  border-inline-start: 1px solid var(--dna-hairline);
+}
+.ph-stat:first-child { border-inline-start: 0; }
+.ph-stat b {
+  display: block;
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ph-stat span { display: block; margin-top: 2px; font-size: 12px; color: var(--dna-text-2); }
+.ph-stat--accent b { color: var(--dna-accent); }
+
+/* ---------------------------------------------------------------- buttons */
+
+.ph-btn {
+  appearance: none;
+  border: 0;
+  height: var(--ph-control);
+  padding: 0 18px;
+  border-radius: var(--dna-r-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--dna-track);
+  color: var(--dna-text);
+  text-decoration: none;
+  transition: transform 0.12s var(--dna-ease-out), background-color 0.18s var(--dna-ease-out), opacity 0.18s;
+}
+.ph-btn:active { transform: scale(0.97); background: var(--dna-press); }
+.ph-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+.ph-btn svg { flex: none; }
+.ph-btn--primary { background: var(--dna-accent); color: var(--dna-on-accent); }
+.ph-btn--primary:active { background: var(--dna-accent-press); }
+.ph-btn--ink { background: var(--dna-text); color: var(--dna-surface); }
+.ph-btn--quiet { background: transparent; color: var(--dna-accent); padding: 0 10px; }
+.ph-btn--quiet:active { background: var(--ph-tint); }
+.ph-btn--danger { background: var(--ph-bad-bg); color: var(--ph-bad); }
+.ph-btn--lg { height: 56px; font-size: 17px; border-radius: 16px; }
+.ph-btn--block { width: 100%; }
+.ph-btn--sm { height: 34px; padding: 0 14px; font-size: 14px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .ph-btn:hover { background: var(--dna-press); }
+  .ph-btn--primary:hover { background: var(--dna-accent-press); }
+  .ph-btn--ink:hover { background: var(--dna-text-body); }
+  .ph-btn--quiet:hover { background: var(--ph-tint); }
+  .ph-btn--danger:hover { background: var(--ph-bad-bg); filter: brightness(0.97); }
+}
+
+.ph-back {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--dna-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 4px;
+  margin-inline-start: -4px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.ph-back:active { opacity: 0.5; }
+
+/* ---------------------------------------------------------------- search */
+
+.ph-find { position: relative; margin-top: 10px; }
+.ph-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--dna-surface);
+  box-shadow: var(--dna-sh-card);
+  color: var(--dna-text-3);
+}
+.ph-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--dna-text);
+  font-size: 16px; /* no iOS zoom */
+  text-align: left;
+  direction: ltr;
+}
+.ph-field input::placeholder { color: var(--dna-text-3); text-align: right; direction: rtl; }
+.ph-field input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.ph-clear {
+  appearance: none;
+  border: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dna-track);
+  color: var(--dna-text-2);
+  cursor: pointer;
+}
+
+.ph-suggest {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--dna-surface);
+  border-radius: 14px;
+  box-shadow: var(--dna-sh-overlay);
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- lists */
+
+.ph-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--dna-surface);
+  border-radius: var(--dna-r-card);
+  box-shadow: var(--dna-sh-card);
+  overflow: hidden;
+}
+.ph-suggest .ph-row,
+.ph-list .ph-row { position: relative; }
+.ph-list > li + li .ph-row::before,
+.ph-suggest > li + li .ph-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  inset-inline: 16px 0;
+  border-top: 1px solid var(--dna-hairline);
+}
+.ph-row {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  min-height: 64px;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  text-align: right;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+.ph-row:active { background: var(--dna-press); }
+@media (hover: hover) and (pointer: fine) {
+  .ph-row:hover { background: var(--dna-hover); }
+}
+.ph-row-rank {
+  width: 22px;
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dna-text-4);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.ph-row-main { flex: 1; min-width: 0; }
+.ph-row-sku {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dna-text);
+  direction: ltr;
+  text-align: right;
+  unicode-bidi: plaintext;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph-row-meta {
+  display: block;
+  margin-top: 1px;
+  font-size: 13px;
+  color: var(--dna-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph-row-side { flex: none; display: flex; align-items: center; gap: 6px; color: var(--dna-text-4); }
+
+/* ---------------------------------------------------------------- chips */
+
+.ph-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 16px 10px;
+  margin: 0 -16px;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.ph-chips::-webkit-scrollbar { display: none; }
+.ph-chip {
+  appearance: none;
+  border: 0;
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--dna-r-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--dna-track);
+  color: var(--dna-text-body);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.18s var(--dna-ease-out), color 0.18s;
+}
+.ph-chip small { font-size: 12px; color: var(--dna-text-3); font-variant-numeric: tabular-nums; }
+.ph-chip[aria-pressed="true"] { background: var(--dna-text); color: var(--dna-surface); }
+.ph-chip[aria-pressed="true"] small { color: inherit; opacity: 0.7; }
+
+.ph-seg {
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 10px;
+  background: var(--dna-track);
+}
+.ph-seg button {
+  appearance: none;
+  border: 0;
+  flex: 1;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dna-text-body);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.18s var(--dna-ease-out), color 0.18s;
+}
+.ph-seg button[aria-pressed="true"] {
+  background: var(--dna-surface);
+  color: var(--dna-text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.ph-seg button:disabled { opacity: 0.35; cursor: default; }
+.ph-seg small { margin-inline-start: 4px; font-size: 12px; color: var(--dna-text-3); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- status */
+
+.ph-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--dna-r-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ph-pill--pending { background: var(--ph-warn-bg); color: var(--ph-warn); }
+.ph-pill--uploaded { background: var(--ph-good-bg); color: var(--ph-good); }
+.ph-pill--rejected { background: var(--ph-bad-bg); color: var(--ph-bad); }
+.ph-pill--neutral { background: var(--dna-track); color: var(--dna-text-2); }
+
+.ph-notes { display: grid; gap: 8px; margin-top: 12px; }
+.ph-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 1.4;
+  background: var(--dna-track);
+  color: var(--dna-text-body);
+}
+.ph-note svg { flex: none; margin-top: 1px; }
+.ph-note--warn { background: var(--ph-warn-bg); color: var(--dna-text); }
+.ph-note--warn svg { color: var(--ph-warn); }
+.ph-note--bad { background: var(--ph-bad-bg); color: var(--dna-text); }
+.ph-note--bad svg { color: var(--ph-bad); }
+.ph-note--good { background: var(--ph-good-bg); color: var(--dna-text); }
+.ph-note--good svg { color: var(--ph-good); }
+.ph-note b { font-weight: 600; }
+
+.ph-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--dna-text-4); }
+.ph-dot--good { background: #34c759; }
+.ph-dot--bad { background: #ff3b30; }
+
+/* ---------------------------------------------------------------- recent */
+
+.ph-recent {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 16px 6px;
+  margin: 0 -16px;
+  scrollbar-width: none;
+}
+.ph-recent::-webkit-scrollbar { display: none; }
+.ph-thumb {
+  appearance: none;
+  border: 0;
+  flex: none;
+  width: 92px;
+  padding: 0;
+  background: transparent;
+  text-align: center;
+  cursor: pointer;
+}
+.ph-thumb-img {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--dna-sh-card);
+  overflow: hidden;
+}
+.ph-thumb-img img { width: 100%; height: 100%; object-fit: contain; }
+.ph-thumb-img .ph-pill { position: absolute; bottom: 6px; inset-inline: 6px; justify-content: center; height: 20px; font-size: 11px; }
+.ph-thumb-sku {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dna-text-body);
+  direction: ltr;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- stone */
+
+.ph-hero { padding: 22px 20px 18px; text-align: center; }
+.ph-hero-kind { font-size: 13px; font-weight: 600; color: var(--dna-text-3); }
+.ph-hero-sku {
+  margin: 4px 0 0;
+  font-size: 40px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  direction: ltr;
+  word-break: break-all;
+}
+.ph-hero-line { margin-top: 6px; font-size: 16px; color: var(--dna-text-2); }
+
+.ph-facts { margin: 0; padding: 0 20px; }
+.ph-fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 46px;
+  border-top: 1px solid var(--dna-hairline);
+  font-size: 15px;
+}
+.ph-fact dt { color: var(--dna-text-2); display: inline-flex; align-items: center; gap: 8px; }
+.ph-fact dd { margin: 0; font-weight: 600; text-align: left; }
+
+.ph-steps {
+  margin: 12px 0 0;
+  padding: 14px 16px;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  counter-reset: ph-step;
+}
+.ph-steps li {
+  counter-increment: ph-step;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--dna-text-body);
+}
+.ph-steps li::before {
+  content: counter(ph-step);
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dna-track);
+  color: var(--dna-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Action bar — glass, because the page scrolls under it. Sticky inside the
+   page column, so it clears the sidebar and sits on the phone's tab bar. */
+.ph-bar {
+  position: sticky;
+  bottom: calc(var(--shell-dock-h, 0px) + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  margin: 24px -16px 0;
+  padding: 12px 16px;
+  background: var(--dna-glass);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--dna-hairline);
+}
+.ph-bar-inner { display: grid; gap: 8px; }
+@media (min-width: 768px) {
+  .ph-bar { margin-inline: 0; padding-inline: 0; border-top: 0; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ph-bar { background: var(--dna-surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ---------------------------------------------------------------- shot */
+
+.ph-shot {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--dna-r-panel);
+  background: #fff;
+  box-shadow: var(--dna-sh-panel);
+  overflow: hidden;
+}
+.ph-shot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.ph-shot-veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #1d1d1f;
+  font-size: 17px;
+  font-weight: 600;
+}
+.ph-shot-veil small { font-size: 14px; font-weight: 400; color: #6e6e73; }
+
+.ph-spin {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 0, 0, 0.12);
+  border-top-color: currentColor;
+  animation: ph-spin 0.8s linear infinite;
+}
+@keyframes ph-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ph-spin { animation-duration: 2.4s; }
+}
+
+.ph-verdict { margin-top: 16px; text-align: center; }
+.ph-verdict-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ph-verdict-icon--good { background: var(--ph-good-bg); color: var(--ph-good); }
+.ph-verdict-icon--warn { background: var(--ph-warn-bg); color: var(--ph-warn); }
+.ph-verdict-icon--bad { background: var(--ph-bad-bg); color: var(--ph-bad); }
+.ph-verdict h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.018em; }
+.ph-verdict p { margin: 4px 0 0; color: var(--dna-text-2); }
+
+.ph-next {
+  margin-top: 14px;
+  width: 100%;
+  appearance: none;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--dna-surface);
+  border-radius: var(--dna-r-card);
+  box-shadow: var(--dna-sh-card);
+  text-align: right;
+  cursor: pointer;
+}
+.ph-next:active { background: var(--dna-press); }
+.ph-next-label { font-size: 12px; font-weight: 600; color: var(--dna-text-3); display: block; }
+
+/* ---------------------------------------------------------------- review */
+
+.ph-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--dna-text-body);
+}
+.ph-status span { display: inline-flex; align-items: center; gap: 8px; }
+
+.ph-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 14px;
+}
+.ph-toolbar .ph-seg { min-width: min(100%, 420px); }
+
+.ph-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.ph-review { display: flex; flex-direction: column; overflow: hidden; }
+.ph-review .ph-shot { border-radius: 0; box-shadow: none; }
+.ph-review-body { padding: 14px 16px 16px; display: grid; gap: 12px; }
+.ph-review-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ph-review-sku { font-size: 20px; font-weight: 700; letter-spacing: -0.018em; direction: ltr; unicode-bidi: plaintext; }
+.ph-review-meta { font-size: 13px; color: var(--dna-text-2); }
+.ph-review-actions { display: flex; gap: 8px; }
+.ph-review-actions .ph-btn--primary { flex: 1; }
+.ph-issues { margin: 0; padding: 10px 12px; list-style: none; border-radius: 12px; background: var(--ph-warn-bg); font-size: 14px; display: grid; gap: 4px; }
+.ph-reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.ph-reason-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--dna-track);
+  color: var(--dna-text);
+  font-size: 16px;
+}
+.ph-open {
+  position: absolute;
+  top: 10px;
+  inset-inline-end: 10px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--dna-r-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #1d1d1f;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.ph-help { margin-top: 12px; padding: 0 16px; font-size: 14px; color: var(--dna-text-body); }
+.ph-help summary { cursor: pointer; padding: 12px 0; font-weight: 600; color: var(--dna-text); list-style: none; }
+.ph-help summary::-webkit-details-marker { display: none; }
+.ph-help[open] summary { padding-bottom: 4px; }
+.ph-help ol { margin: 0; padding: 0 18px 14px; display: grid; gap: 4px; }
+.ph-help code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; direction: ltr; unicode-bidi: isolate; }
+
+.ph-empty { padding: 48px 20px; text-align: center; color: var(--dna-text-2); }
+.ph-empty b { display: block; font-size: 17px; color: var(--dna-text); margin-bottom: 4px; }
+
+.ph-skel { background: var(--dna-track); border-radius: 8px; animation: ph-pulse 1.4s ease-in-out infinite; }
+@keyframes ph-pulse { 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .ph-skel { animation: none; } }
+
+@media (max-width: 380px) {
+  .ph-stats { grid-template-columns: repeat(2, 1fr); row-gap: 12px; }
+  .ph-stat:nth-child(3) { border-inline-start: 0; }
+  .ph-hero-sku { font-size: 34px; }
+}

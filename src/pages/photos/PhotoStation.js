@@ -1,84 +1,454 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  AlertTriangle,
+  Box,
+  Camera,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ImagePlus,
+  Info,
+  MapPin,
+  RotateCcw,
+  ScanLine,
+  Search,
+  User,
+  X,
+} from "lucide-react";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
-import { fetchQueue, fetchStatus, fetchStone, prepareShot, uploadCapture } from "../../services/photoStationApi";
-import { groupingHint, issueText, stoneLine } from "./photoText";
+import {
+  fetchMine,
+  fetchQueue,
+  fetchStatus,
+  fetchStone,
+  prepareShot,
+  searchStones,
+  uploadCapture,
+} from "../../services/photoStationApi";
+import { KIND_LABELS, STATUS, groupingHint, issueText, kindLabel, stoneLine } from "./photoText";
+import "./photos.css";
 
-const BigButton = ({ children, onClick, tone = "primary", disabled, className = "" }) => {
-  const tones = {
-    primary: "bg-app-ink text-app-surface",
-    good: "bg-brand-emerald text-white",
-    plain: "bg-app-surface text-app-ink border-2 border-app-line",
-  };
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full min-h-[64px] rounded-2xl px-6 text-xl font-bold shadow-sm active:scale-[0.99] disabled:opacity-50 ${tones[tone]} ${className}`}
-    >
-      {children}
-    </button>
-  );
+/* =============================================================================
+ * Photo station — office staff photograph stones that have no picture yet.
+ * Scan the sticker (or type the SKU), shoot on the lightbox, and the server
+ * cleans the shot and checks its quality. A manager approves it on the review
+ * screen, which uploads it to Barak's picture FTP.
+ *
+ * Built for a long run at the lightbox: after each shot the next stone is one
+ * tap away, the queue only shows what is physically at the chosen location,
+ * and every shot's fate (waiting, sent, rejected and why) stays visible.
+ * ========================================================================== */
+
+const PAGE = 30;
+const KIND_KEY = "photos.kind";
+const LOCATION_KEY = "photos.location";
+
+const buzz = (pattern) => {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* unsupported */
+  }
 };
 
-const Notice = ({ tone = "info", children }) => {
-  const tones = {
-    info: "bg-sky-50 text-sky-900 border-sky-200",
-    warn: "bg-amber-50 text-amber-900 border-amber-300",
-    bad: "bg-red-50 text-red-900 border-red-300",
-    good: "bg-emerald-50 text-emerald-900 border-emerald-300",
-  };
-  return <div className={`rounded-xl border-2 px-4 py-3 text-lg leading-snug ${tones[tone]}`}>{children}</div>;
-};
-
-const StoneHeader = ({ stone }) => (
-  <div className="rounded-2xl bg-app-surface border border-app-line p-5 text-center">
-    <div className="text-sm text-app-muted">מק״ט</div>
-    <div className="text-4xl font-black tracking-wide text-app-ink break-all" dir="ltr">{stone.sku}</div>
-    <div className="mt-2 text-lg text-app-graphite" dir="ltr">{stoneLine(stone)}</div>
+const Note = ({ tone, icon: Icon = Info, children }) => (
+  <div className={`ph-note${tone ? ` ph-note--${tone}` : ""}`}>
+    <Icon size={18} strokeWidth={2} aria-hidden="true" />
+    <div>{children}</div>
   </div>
 );
 
+const Pill = ({ status }) => {
+  const s = STATUS[status];
+  return s ? <span className={`ph-pill ph-pill--${s.tone}`}>{s.label}</span> : null;
+};
+
+/* ---------------------------------------------------------------- SKU finder */
+
+const SkuFinder = ({ onOpen, busy }) => {
+  const [text, setText] = useState("");
+  const [items, setItems] = useState([]);
+  const [open, setOpen] = useState(false);
+  const seq = useRef(0);
+
+  useEffect(() => {
+    const q = text.trim();
+    if (!q) {
+      setItems([]);
+      return undefined;
+    }
+    const id = ++seq.current;
+    const t = setTimeout(() => {
+      searchStones(q)
+        .then((r) => id === seq.current && setItems(r.items || []))
+        .catch(() => id === seq.current && setItems([]));
+    }, 180);
+    return () => clearTimeout(t);
+  }, [text]);
+
+  const pick = (sku) => {
+    setOpen(false);
+    setText("");
+    onOpen(sku);
+  };
+
+  return (
+    <form
+      className="ph-find"
+      role="search"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const q = text.trim();
+        if (!q) return;
+        const exact = items.find((s) => s.sku.toUpperCase() === q.toUpperCase());
+        pick(exact ? exact.sku : items.length === 1 ? items[0].sku : q);
+      }}
+    >
+      <label className="ph-field">
+        <Search size={18} strokeWidth={2} aria-hidden="true" />
+        <input
+          type="search"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="או הקלד מק״ט"
+          aria-label="מק״ט"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="characters"
+          spellCheck="false"
+          enterKeyHint="go"
+          disabled={busy}
+        />
+        {text && (
+          <button type="button" className="ph-clear" aria-label="נקה" onClick={() => setText("")}>
+            <X size={14} strokeWidth={2.5} />
+          </button>
+        )}
+      </label>
+      {open && items.length > 0 && (
+        <ul className="ph-suggest">
+          {items.map((s) => (
+            <li key={s.sku}>
+              <button type="button" className="ph-row" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(s.sku)}>
+                <span className="ph-row-main">
+                  <span className="ph-row-sku">{s.sku}</span>
+                  <span className="ph-row-meta">
+                    {[stoneLine(s), s.location].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                <span className="ph-row-side">
+                  {s.hasPhoto && <span className="ph-pill ph-pill--neutral">יש תמונה</span>}
+                  <ChevronLeft size={18} aria-hidden="true" />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </form>
+  );
+};
+
+/* ---------------------------------------------------------------- home */
+
+const Stats = ({ queue }) => (
+  <div className="ph-card ph-stats">
+    <div className="ph-stat ph-stat--accent">
+      <b>{queue ? queue.mineToday : "–"}</b>
+      <span>צילמת היום</span>
+    </div>
+    <div className="ph-stat">
+      <b>{queue ? queue.mineWeek : "–"}</b>
+      <span>השבוע</span>
+    </div>
+    <div className="ph-stat">
+      <b>{queue ? queue.awaitingReview : "–"}</b>
+      <span>ממתינות לאישור</span>
+    </div>
+    <div className="ph-stat">
+      <b>{queue ? queue.remaining.toLocaleString("he-IL") : "–"}</b>
+      <span>בלי תמונה</span>
+    </div>
+  </div>
+);
+
+const Recent = ({ items, onOpen }) =>
+  items.length > 0 ? (
+    <>
+      <div className="ph-section">
+        <h2>הצילומים שלך</h2>
+        <span>הקש כדי לצלם שוב</span>
+      </div>
+      <div className="ph-recent">
+        {items.map((c) => (
+          <button key={c.id} type="button" className="ph-thumb" onClick={() => onOpen(c.sku)}>
+            <span className="ph-thumb-img">
+              {c.cleanUrl && <img src={c.cleanUrl} alt="" loading="lazy" />}
+              <Pill status={c.status} />
+            </span>
+            <span className="ph-thumb-sku">{c.sku}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  ) : null;
+
+const QueueRow = ({ s, onOpen }) => (
+  <li>
+    <button type="button" className="ph-row" onClick={() => onOpen(s.sku)}>
+      <span className="ph-row-rank">{s.rank}</span>
+      <span className="ph-row-main">
+        <span className="ph-row-sku">{s.sku}</span>
+        <span className="ph-row-meta">{[stoneLine(s), s.location].filter(Boolean).join(" · ")}</span>
+      </span>
+      <span className="ph-row-side">
+        {s.lastRejected && (
+          <span className="ph-pill ph-pill--rejected" title={s.lastRejected.reason || ""}>
+            נדחתה
+          </span>
+        )}
+        <ChevronLeft size={18} aria-hidden="true" />
+      </span>
+    </button>
+  </li>
+);
+
+const Queue = ({ queue, loading, kind, location, onKind, onLocation, onOpen, onMore }) => {
+  const kinds = queue?.kinds || {};
+  const locations = queue?.locations || [];
+  return (
+    <>
+      <div className="ph-section">
+        <h2>הבאות בתור</h2>
+        {queue && <span>{queue.matching.toLocaleString("he-IL")} אבנים · היקרות ראשונות</span>}
+      </div>
+
+      {locations.length > 1 && (
+        <div className="ph-chips" role="group" aria-label="מיקום">
+          <button type="button" className="ph-chip" aria-pressed={location === "all"} onClick={() => onLocation("all")}>
+            <MapPin size={14} strokeWidth={2} aria-hidden="true" />
+            כל המקומות
+          </button>
+          {locations.slice(0, 6).map((l) => (
+            <button
+              key={l.name}
+              type="button"
+              className="ph-chip"
+              aria-pressed={location === l.name}
+              onClick={() => onLocation(l.name)}
+            >
+              {l.name} <small>{l.n.toLocaleString("he-IL")}</small>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="ph-seg" role="group" aria-label="סוג" style={{ marginBottom: 12 }}>
+        {KIND_LABELS.map(([id, label]) => (
+          <button key={id} type="button" aria-pressed={kind === id} onClick={() => onKind(id)} disabled={id !== "all" && !kinds[id]}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {!queue ? (
+        <ul className="ph-list" aria-busy="true">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} style={{ padding: "14px 16px" }}>
+              <div className="ph-skel" style={{ width: "40%", height: 16 }} />
+              <div className="ph-skel" style={{ width: "65%", height: 12, marginTop: 8 }} />
+            </li>
+          ))}
+        </ul>
+      ) : queue.items.length === 0 ? (
+        <div className="ph-card ph-empty">
+          <b>אין כאן אבנים שמחכות לצילום</b>
+          נסה מיקום או סוג אחר.
+        </div>
+      ) : (
+        <>
+          <ul className="ph-list" style={{ opacity: loading ? 0.6 : 1, transition: "opacity 0.2s" }}>
+            {queue.items.map((s) => (
+              <QueueRow key={s.sku} s={s} onOpen={onOpen} />
+            ))}
+          </ul>
+          {queue.items.length < queue.matching && (
+            <div style={{ textAlign: "center", marginTop: 12 }}>
+              <button type="button" className="ph-btn ph-btn--sm" onClick={onMore} disabled={loading}>
+                הצג עוד
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+};
+
+/* ---------------------------------------------------------------- stone */
+
+const StoneCard = ({ stone }) => (
+  <div className="ph-card">
+    <div className="ph-hero">
+      <div className="ph-hero-kind">{kindLabel(stone.groupingType)}</div>
+      <h1 className="ph-hero-sku">{stone.sku}</h1>
+      <div className="ph-hero-line ph-ltr">{stoneLine(stone)}</div>
+    </div>
+    {(stone.location || stone.box || stone.holder) && (
+      <dl className="ph-facts">
+        {stone.location && (
+          <div className="ph-fact">
+            <dt>
+              <MapPin size={16} aria-hidden="true" />
+              מיקום
+            </dt>
+            <dd>{stone.location}</dd>
+          </div>
+        )}
+        {stone.box && (
+          <div className="ph-fact">
+            <dt>
+              <Box size={16} aria-hidden="true" />
+              קופסה
+            </dt>
+            <dd className="ph-ltr">{stone.box}</dd>
+          </div>
+        )}
+        {stone.holder && (
+          <div className="ph-fact">
+            <dt>
+              <User size={16} aria-hidden="true" />
+              אצל
+            </dt>
+            <dd>{stone.holder}</dd>
+          </div>
+        )}
+      </dl>
+    )}
+  </div>
+);
+
+const StoneNotes = ({ stone }) => {
+  const last = stone.lastCapture;
+  const hint = groupingHint(stone.groupingType, stone.stones);
+  return (
+    <div className="ph-notes">
+      <Note>בדוק שהמק״ט על המדבקה זהה למק״ט שעל המסך.</Note>
+      {hint && <Note tone="warn" icon={AlertTriangle}>{hint}</Note>}
+      {stone.onMemo && (
+        <Note tone="warn" icon={AlertTriangle}>
+          האבן רשומה בממו אצל לקוח. ודא שהיא באמת כאן.
+        </Note>
+      )}
+      {stone.hasPhoto && (
+        <Note tone="warn" icon={AlertTriangle}>
+          לאבן הזאת כבר יש תמונה במערכת. צלם רק אם ביקשו ממך.
+        </Note>
+      )}
+      {last?.status === "pending" && (
+        <Note tone="warn" icon={Clock}>
+          כבר יש צילום שמחכה לאישור. צילום חדש יחליף אותו.
+        </Note>
+      )}
+      {last?.status === "uploaded" && (
+        <Note tone="good" icon={Check}>
+          תמונה של האבן כבר נשלחה לברק.
+        </Note>
+      )}
+      {last?.status === "rejected" && (
+        <Note tone="bad" icon={RotateCcw}>
+          <b>הצילום הקודם נדחה</b>
+          {last.rejectReason ? `: ${last.rejectReason}.` : "."} צלם שוב.
+        </Note>
+      )}
+    </div>
+  );
+};
+
+/* ---------------------------------------------------------------- page */
+
 export default function PhotoStation() {
   const [screen, setScreen] = useState("home");
-  const [queue, setQueue] = useState(null);
   const [status, setStatus] = useState(null);
+  const [queue, setQueue] = useState(null);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [mine, setMine] = useState([]);
+  const [limit, setLimit] = useState(PAGE);
+  const [kind, setKind] = useState(() => localStorage.getItem(KIND_KEY) || "all");
+  const [location, setLocation] = useState(() => localStorage.getItem(LOCATION_KEY));
   const [stone, setStone] = useState(null);
+  const [preview, setPreview] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
-  const [typedSku, setTypedSku] = useState("");
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef(null);
+  const shotThisVisit = useRef(new Set());
+  const cameraRef = useRef(null);
+  const libraryRef = useRef(null);
 
   const loadQueue = useCallback(() => {
-    fetchQueue(12).then(setQueue).catch((e) => setError(e.message));
+    setQueueLoading(true);
+    fetchQueue({ limit, kind, location: location || "all" })
+      .then((q) => {
+        setQueue(q);
+        // First visit: start where most of the stones are — the office.
+        if (location == null && q.locations?.[0]) {
+          localStorage.setItem(LOCATION_KEY, q.locations[0].name);
+          setLocation(q.locations[0].name);
+        }
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setQueueLoading(false));
+  }, [limit, kind, location]);
+
+  const loadMine = useCallback(() => {
+    fetchMine(12).then((r) => setMine(r.items || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
     loadQueue();
-    fetchStatus().then(setStatus).catch(() => {});
   }, [loadQueue]);
 
+  useEffect(() => {
+    loadMine();
+    fetchStatus().then(setStatus).catch(() => {});
+  }, [loadMine]);
+
+  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
+
+  const chooseKind = (k) => {
+    localStorage.setItem(KIND_KEY, k);
+    setLimit(PAGE);
+    setKind(k);
+  };
+  const chooseLocation = (l) => {
+    localStorage.setItem(LOCATION_KEY, l);
+    setLimit(PAGE);
+    setLocation(l);
+  };
+
   const openStone = async (sku) => {
-    const clean = String(sku || "").trim();
-    if (!clean) return;
+    const code = String(sku || "").trim();
+    if (!code) return;
     setError("");
     setBusy(true);
     try {
-      setStone(await fetchStone(clean));
+      setStone(await fetchStone(code));
+      setResult(null);
       setScreen("stone");
+      window.scrollTo(0, 0);
     } catch (e) {
-      setError(e.status === 404 ? `המק״ט ${clean} לא נמצא במלאי. בדוק את המדבקה ונסה שוב.` : e.message);
+      setError(e.status === 404 ? `המק״ט ${code} לא נמצא במלאי. בדוק את המדבקה ונסה שוב.` : e.message);
     } finally {
       setBusy(false);
     }
-  };
-
-  const onScan = (code) => {
-    setScanOpen(false);
-    openStone(code);
   };
 
   const onPhoto = async (e) => {
@@ -86,174 +456,226 @@ export default function PhotoStation() {
     e.target.value = "";
     if (!file || !stone) return;
     setError("");
+    setPreview(URL.createObjectURL(file));
     setScreen("processing");
+    window.scrollTo(0, 0);
     try {
       const shot = await prepareShot(file);
-      setResult(await uploadCapture(stone.sku, shot));
-      setScreen("result");
+      const r = await uploadCapture(stone.sku, shot);
+      shotThisVisit.current.add(stone.sku);
+      setResult(r);
+      buzz((r.quality?.issues || []).length ? [60, 50, 60] : 30);
     } catch (err) {
       if (err.status === 422) {
         setResult({ rejected: true, quality: err.body && err.body.quality });
-        setScreen("result");
+        buzz([80, 60, 80]);
       } else {
         setError(`ההעלאה נכשלה: ${err.message}. נסה שוב.`);
         setScreen("stone");
+        return;
       }
     }
+    setScreen("result");
+    loadQueue();
+    loadMine();
   };
-
-  const takePhoto = () => fileRef.current && fileRef.current.click();
 
   const backHome = () => {
     setStone(null);
     setResult(null);
     setError("");
-    setTypedSku("");
     setScreen("home");
-    loadQueue();
+    window.scrollTo(0, 0);
   };
 
-  const issues = (result && result.quality && result.quality.issues) || [];
-  const good = result && !result.rejected && issues.length === 0;
-  const last = stone && stone.lastCapture;
+  const next = useMemo(
+    () => (queue?.items || []).find((s) => s.sku !== stone?.sku && !shotThisVisit.current.has(s.sku)) || null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queue, stone, result]
+  );
+
+  const issues = result?.quality?.issues || [];
+  const verdict = !result ? null : result.rejected ? "bad" : issues.length ? "warn" : "good";
+  const shoot = () => cameraRef.current?.click();
 
   return (
-    <div dir="rtl" className="mx-auto w-full max-w-xl px-4 py-5 space-y-5 text-right">
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto} />
-      <BarcodeScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScan={onScan} />
-
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-3xl font-black text-app-ink">עמדת צילום</h1>
-        {status && status.canReview && (
-          <Link to="/photos/review" className="rounded-xl border border-app-line px-4 py-2 text-base font-semibold text-app-ink">
-            אישור תמונות{queue && queue.awaitingReview ? ` (${queue.awaitingReview})` : ""}
-          </Link>
-        )}
-      </div>
-
-      {error && <Notice tone="bad">{error}</Notice>}
+    <div className="ph" dir="rtl">
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={onPhoto} />
+      <input ref={libraryRef} type="file" accept="image/*" hidden onChange={onPhoto} />
+      <BarcodeScanner isOpen={scanOpen} onClose={() => setScanOpen(false)} onScan={(code) => openStone(code)} />
 
       {screen === "home" && (
-        <>
-          {queue && (
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="rounded-2xl bg-app-surface border border-app-line p-4">
-                <div className="text-4xl font-black text-app-ink">{queue.mineToday}</div>
-                <div className="text-base text-app-muted">צילמת היום</div>
-              </div>
-              <div className="rounded-2xl bg-app-surface border border-app-line p-4">
-                <div className="text-4xl font-black text-app-ink">{queue.remaining}</div>
-                <div className="text-base text-app-muted">אבנים בלי תמונה</div>
-              </div>
+        <div className="ph-page">
+          <header className="ph-head">
+            <div>
+              <h1 className="ph-title">צילום אבנים</h1>
+              <p className="ph-sub">צלם אבן. אחרי אישור מנהל היא עולה לברק.</p>
+            </div>
+            {status?.canReview && (
+              <Link to="/photos/review" className="ph-btn ph-btn--sm">
+                אישור תמונות
+                {queue?.awaitingReview ? <span className="ph-pill ph-pill--pending">{queue.awaitingReview}</span> : null}
+              </Link>
+            )}
+          </header>
+
+          {error && (
+            <div className="ph-notes" style={{ marginTop: 0, marginBottom: 12 }}>
+              <Note tone="bad" icon={AlertTriangle}>{error}</Note>
             </div>
           )}
 
-          <BigButton onClick={() => setScanOpen(true)} disabled={busy}>סרוק מדבקה של אבן</BigButton>
+          <Stats queue={queue} />
 
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              openStone(typedSku);
-            }}
-          >
-            <input
-              value={typedSku}
-              onChange={(e) => setTypedSku(e.target.value)}
-              placeholder="או הקלד מק״ט"
-              dir="ltr"
-              className="min-w-0 flex-1 rounded-xl border-2 border-app-line bg-app-surface px-4 py-3 text-xl text-app-ink"
-            />
-            <button type="submit" disabled={busy || !typedSku.trim()} className="rounded-xl bg-app-ink px-5 text-lg font-bold text-app-surface disabled:opacity-40">
-              פתח
+          <div style={{ marginTop: 16 }}>
+            <button type="button" className="ph-btn ph-btn--primary ph-btn--lg ph-btn--block" onClick={() => setScanOpen(true)} disabled={busy}>
+              <ScanLine size={22} strokeWidth={2} aria-hidden="true" />
+              סרוק מדבקה של אבן
             </button>
-          </form>
-
-          <div>
-            <h2 className="mb-2 text-xl font-bold text-app-ink">הבאות בתור לצילום</h2>
-            <p className="mb-3 text-base text-app-muted">האבנים החשובות ביותר ראשונות. לחץ על אבן כדי לצלם אותה.</p>
-            {!queue && <div className="text-app-muted">טוען…</div>}
-            {queue && queue.items.length === 0 && <Notice tone="good">אין אבנים שמחכות לצילום. כל הכבוד!</Notice>}
-            <div className="space-y-2">
-              {queue &&
-                queue.items.map((s) => (
-                  <button
-                    key={s.sku}
-                    type="button"
-                    onClick={() => openStone(s.sku)}
-                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-app-line bg-app-surface px-4 py-4 text-right active:bg-app-canvas2"
-                  >
-                    <span className="text-2xl font-black text-app-muted">{s.rank}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-2xl font-bold text-app-ink break-all" dir="ltr">{s.sku}</span>
-                      <span className="block text-base text-app-graphite" dir="ltr">{stoneLine(s)}</span>
-                    </span>
-                  </button>
-                ))}
-            </div>
+            <SkuFinder onOpen={openStone} busy={busy} />
           </div>
-        </>
+
+          <Recent items={mine} onOpen={openStone} />
+
+          <Queue
+            queue={queue}
+            loading={queueLoading}
+            kind={kind}
+            location={location || "all"}
+            onKind={chooseKind}
+            onLocation={chooseLocation}
+            onOpen={openStone}
+            onMore={() => setLimit((n) => n + PAGE)}
+          />
+        </div>
       )}
 
       {screen === "stone" && stone && (
-        <>
-          <StoneHeader stone={stone} />
-          <Notice tone="info">בדוק שהמק״ט על המדבקה זהה למק״ט שעל המסך.</Notice>
-          {groupingHint(stone.groupingType, stone.stones) && <Notice tone="warn">{groupingHint(stone.groupingType, stone.stones)}</Notice>}
-          {stone.hasPhoto && <Notice tone="warn">לאבן הזאת כבר יש תמונה במערכת. צלם רק אם ביקשו ממך.</Notice>}
-          {stone.onMemo && <Notice tone="warn">האבן רשומה כנמצאת בממו אצל לקוח. ודא שהיא באמת כאן.</Notice>}
-          {last && last.status === "pending" && <Notice tone="warn">כבר צילמו את האבן והתמונה מחכה לאישור. צילום חדש יחליף אותה.</Notice>}
-          {last && last.status === "uploaded" && <Notice tone="warn">תמונה של האבן הזאת כבר נשלחה לברק.</Notice>}
-          <div className="rounded-2xl border border-app-line bg-app-surface p-4 text-lg text-app-graphite space-y-1">
-            <div>1. שים את האבן במרכז הלייטבוקס.</div>
-            <div>2. החזק את הטלפון ישר מעל האבן.</div>
-            <div>3. לחץ על הכפתור וצלם.</div>
+        <div className="ph-page ph-page--bar">
+          <button type="button" className="ph-back" onClick={backHome}>
+            <ChevronRight size={20} aria-hidden="true" />
+            רשימה
+          </button>
+
+          {error && (
+            <div className="ph-notes">
+              <Note tone="bad" icon={AlertTriangle}>{error}</Note>
+            </div>
+          )}
+
+          <div style={{ marginTop: 8 }}>
+            <StoneCard stone={stone} />
           </div>
-          <BigButton tone="good" onClick={takePhoto}>צלם את האבן</BigButton>
-          <BigButton tone="plain" onClick={backHome}>חזרה</BigButton>
-        </>
+          <StoneNotes stone={stone} />
+
+          <ol className="ph-card ph-steps">
+            <li>שים את האבן במרכז הלייטבוקס</li>
+            <li>החזק את הטלפון ישר מעל האבן</li>
+            <li>צלם. הרקע מתנקה אוטומטית</li>
+          </ol>
+
+          <div className="ph-bar">
+            <div className="ph-bar-inner">
+              <button type="button" className="ph-btn ph-btn--primary ph-btn--lg ph-btn--block" onClick={shoot}>
+                <Camera size={22} strokeWidth={2} aria-hidden="true" />
+                צלם את האבן
+              </button>
+              <button type="button" className="ph-btn ph-btn--quiet ph-btn--sm" onClick={() => libraryRef.current?.click()}>
+                <ImagePlus size={16} aria-hidden="true" />
+                בחר תמונה קיימת
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {screen === "processing" && (
-        <div className="flex flex-col items-center gap-4 py-16 text-center">
-          <div className="h-16 w-16 animate-spin rounded-full border-4 border-app-line border-t-app-ink" />
-          <div className="text-2xl font-bold text-app-ink">מסדר את התמונה…</div>
-          <div className="text-lg text-app-muted">זה לוקח כמה שניות. אל תסגור את המסך.</div>
+      {screen === "processing" && stone && (
+        <div className="ph-page">
+          <div className="ph-hero" style={{ paddingTop: 4 }}>
+            <div className="ph-hero-kind">מעבד</div>
+            <h1 className="ph-hero-sku" style={{ fontSize: 28 }}>{stone.sku}</h1>
+          </div>
+          <div className="ph-shot">
+            {preview && <img src={preview} alt="" />}
+            <div className="ph-shot-veil" role="status">
+              <span className="ph-spin" aria-hidden="true" />
+              מנקה רקע ובודק איכות
+              <small>כמה שניות. אל תסגור את המסך.</small>
+            </div>
+          </div>
         </div>
       )}
 
       {screen === "result" && stone && result && (
-        <>
-          <StoneHeader stone={stone} />
-          {result.cleanUrl && (
-            <img src={result.cleanUrl} alt={stone.sku} className="w-full rounded-2xl border border-app-line bg-white" />
-          )}
-          {good ? (
-            <Notice tone="good">
-              <div className="text-2xl font-bold">התמונה טובה ✓</div>
-              <div>היא נשלחה למנהל לאישור.</div>
-            </Notice>
-          ) : (
-            <Notice tone={result.rejected ? "bad" : "warn"}>
-              <div className="text-2xl font-bold mb-1">{result.rejected ? "צריך לצלם שוב" : "כדאי לצלם שוב"}</div>
+        <div className="ph-page ph-page--bar">
+          <button type="button" className="ph-back" onClick={backHome}>
+            <ChevronRight size={20} aria-hidden="true" />
+            רשימה
+          </button>
+
+          <div className="ph-shot" style={{ marginTop: 8 }}>
+            {(result.cleanUrl || preview) && <img src={result.cleanUrl || preview} alt={stone.sku} />}
+          </div>
+
+          <div className="ph-verdict">
+            <div className={`ph-verdict-icon ph-verdict-icon--${verdict}`}>
+              {verdict === "good" ? <Check size={28} strokeWidth={2.5} /> : verdict === "warn" ? <AlertTriangle size={26} /> : <RotateCcw size={26} />}
+            </div>
+            <h2>
+              {verdict === "good" ? "התמונה נשלחה לאישור" : verdict === "warn" ? "נשמרה, אבל כדאי לצלם שוב" : "צריך לצלם שוב"}
+            </h2>
+            <p className="ph-ltr" style={{ fontWeight: 600 }}>{stone.sku}</p>
+            {verdict === "good" && <p>אחרי אישור מנהל היא תעלה לברק.</p>}
+          </div>
+
+          {issues.length > 0 && (
+            <div className="ph-notes">
               {issues.map((code) => (
-                <div key={code}>• {issueText(code)}</div>
+                <Note key={code} tone={verdict === "bad" ? "bad" : "warn"} icon={AlertTriangle}>
+                  {issueText(code)}
+                </Note>
               ))}
-            </Notice>
+            </div>
           )}
-          {good ? (
-            <>
-              <BigButton tone="good" onClick={backHome}>לאבן הבאה</BigButton>
-              <BigButton tone="plain" onClick={takePhoto}>צלם שוב בכל זאת</BigButton>
-            </>
-          ) : (
-            <>
-              <BigButton tone="good" onClick={takePhoto}>צלם שוב</BigButton>
-              {!result.rejected && <BigButton tone="plain" onClick={backHome}>השאר את התמונה ועבור לאבן הבאה</BigButton>}
-              {result.rejected && <BigButton tone="plain" onClick={backHome}>חזרה</BigButton>}
-            </>
+
+          {verdict !== "bad" && next && (
+            <button type="button" className="ph-next" onClick={() => openStone(next.sku)}>
+              <span className="ph-row-main">
+                <span className="ph-next-label">הבאה בתור</span>
+                <span className="ph-row-sku">{next.sku}</span>
+                <span className="ph-row-meta">{[stoneLine(next), next.location].filter(Boolean).join(" · ")}</span>
+              </span>
+              <ChevronLeft size={20} aria-hidden="true" style={{ color: "var(--dna-text-4)" }} />
+            </button>
           )}
-        </>
+
+          <div className="ph-bar">
+            <div className="ph-bar-inner">
+              {verdict === "good" ? (
+                <>
+                  <button type="button" className="ph-btn ph-btn--primary ph-btn--lg ph-btn--block" onClick={() => setScanOpen(true)}>
+                    <ScanLine size={22} strokeWidth={2} aria-hidden="true" />
+                    סרוק את האבן הבאה
+                  </button>
+                  <button type="button" className="ph-btn ph-btn--quiet ph-btn--sm" onClick={shoot}>
+                    <Camera size={16} aria-hidden="true" />
+                    צלם שוב בכל זאת
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="ph-btn ph-btn--primary ph-btn--lg ph-btn--block" onClick={shoot}>
+                    <Camera size={22} strokeWidth={2} aria-hidden="true" />
+                    צלם שוב
+                  </button>
+                  <button type="button" className="ph-btn ph-btn--quiet ph-btn--sm" onClick={backHome}>
+                    {verdict === "warn" ? "השאר את התמונה וחזור לרשימה" : "חזרה לרשימה"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

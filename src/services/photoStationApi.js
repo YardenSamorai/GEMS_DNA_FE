@@ -21,7 +21,12 @@ const post = (url, payload) =>
 
 export const fetchStatus = (check = false) => fetch(`${BASE}/status${check ? "?check=1" : ""}`).then(json);
 
-export const fetchQueue = (limit = 12) => fetch(`${BASE}/queue?limit=${limit}`).then(json);
+export const fetchQueue = ({ limit = 30, kind = "all", location = "all" } = {}) =>
+  fetch(`${BASE}/queue?${new URLSearchParams({ limit, kind, location })}`).then(json);
+
+export const searchStones = (q) => fetch(`${BASE}/search?q=${encodeURIComponent(q)}`).then(json);
+
+export const fetchMine = (limit = 12) => fetch(`${BASE}/mine?limit=${limit}`).then(json);
 
 export const fetchStone = (sku) => fetch(`${BASE}/stone/${encodeURIComponent(sku)}`).then(json);
 

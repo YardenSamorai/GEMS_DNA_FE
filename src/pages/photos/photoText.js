@@ -25,6 +25,30 @@ export const groupingHint = (groupingType, stones) => {
   return null;
 };
 
+export const KIND_LABELS = [
+  ["all", "הכל"],
+  ["single", "בודדות"],
+  ["pair", "זוגות"],
+  ["set", "סטים"],
+  ["parcel", "פרצלים"],
+];
+
+export const kindLabel = (groupingType) =>
+  ({ single: "אבן בודדת", pair: "זוג", set: "סט", parcel: "פרצל" })[String(groupingType || "").toLowerCase()] || "פרצל";
+
+export const STATUS = {
+  pending: { label: "ממתינה לאישור", tone: "pending" },
+  uploading: { label: "נשלחת לברק", tone: "pending" },
+  uploaded: { label: "נשלחה לברק", tone: "uploaded" },
+  rejected: { label: "נדחתה", tone: "rejected" },
+};
+
+// One tap for the reasons managers actually give; anything else is typed.
+export const REJECT_REASONS = ["מטושטשת", "האבן לא במרכז", "רקע לא נקי", "השתקפות חזקה", "אבן לא נכונה"];
+
+export const when = (iso) =>
+  iso ? new Date(iso).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+
 export const stoneLine = (s) =>
   [s.category, s.shape, s.weightCt ? `${s.weightCt}ct` : null, s.stones > 1 ? `${s.stones} אבנים` : null]
     .filter(Boolean)
