@@ -676,6 +676,7 @@
 .ph-review-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .ph-review-sku { font-size: 20px; font-weight: 700; letter-spacing: -0.018em; direction: ltr; unicode-bidi: plaintext; }
 .ph-review-meta { font-size: 13px; color: var(--dna-text-2); }
+.ph-review-hint { margin: -4px 2px 0; font-size: 12px; line-height: 1.45; color: var(--dna-text-3); }
 .ph-review-actions { display: flex; gap: 8px; }
 .ph-review-actions .ph-btn--primary { flex: 1; }
 .ph-issues { margin: 0; padding: 10px 12px; list-style: none; border-radius: 12px; background: var(--ph-warn-bg); font-size: 14px; display: grid; gap: 4px; }

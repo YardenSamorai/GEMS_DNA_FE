@@ -7,7 +7,7 @@ import "./photos.css";
 
 /* =============================================================================
  * Photo review — a manager looks at each shot from the station, picks the
- * cleaned or the AI cut-out version, and approves it (uploaded to Barak's
+ * cleaned or the AI version, and approves it (uploaded to Barak's
  * picture FTP) or rejects it with a reason the photographer will see.
  * Shots the automatic check had no complaint about can be approved together.
  * ========================================================================== */
@@ -34,7 +34,7 @@ const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
   const [reason, setReason] = useState("");
   const pending = item.status === "pending";
   const shown = pending ? variant : item.chosenVariant || "clean";
-  const url = shown === "cutout" ? item.cutoutUrl : item.cleanUrl;
+  const url = { clean: item.cleanUrl, cutout: item.cutoutUrl, ai: item.aiUrl }[shown];
   const issues = rankIssues(item.quality?.issues);
   const stone = { sku: item.sku, ...(item.stone || {}) };
 
@@ -79,16 +79,26 @@ const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
             <button type="button" aria-pressed={variant === "clean"} onClick={() => onVariant("clean")}>
               ניקוי
             </button>
-            <button
-              type="button"
-              aria-pressed={variant === "cutout"}
-              onClick={() => onVariant("cutout")}
-              disabled={!item.cutoutUrl}
-              title={item.cutoutError || undefined}
-            >
-              חיתוך AI
-            </button>
+            {item.aiStatus && (
+              <button
+                type="button"
+                aria-pressed={variant === "ai"}
+                onClick={() => onVariant("ai")}
+                disabled={!item.aiUrl}
+                title={item.aiError || undefined}
+              >
+                {item.aiUrl ? "AI" : item.aiStatus === "working" ? "AI · מעבד…" : "AI נכשל"}
+              </button>
+            )}
+            {item.cutoutUrl && (
+              <button type="button" aria-pressed={variant === "cutout"} onClick={() => onVariant("cutout")}>
+                חיתוך
+              </button>
+            )}
           </div>
+        )}
+        {pending && variant === "ai" && (
+          <p className="ph-review-hint">רקע, פינצטה ומיקום טופלו ב־AI. הצבע הוחזר לזה שנמדד בצילום המקורי, אבל פרטים קטנים באבן מצוירים. השווה ל״ניקוי״ לפני שליחה.</p>
         )}
 
         <div className="ph-review-top">
@@ -201,6 +211,15 @@ export default function PhotoReview() {
     fetchStatus(true).then(setStatus).catch(() => {});
   }, []);
 
+  const aiWorking = tab === "pending" && (items || []).some((i) => i.aiStatus === "working");
+  useEffect(() => {
+    if (!aiWorking) return undefined;
+    const t = setInterval(() => {
+      fetchCaptures(tab).then((r) => setItems(r.items)).catch(() => {});
+    }, 15000);
+    return () => clearInterval(t);
+  }, [aiWorking, tab]);
+
   const variantOf = (item) => variants[item.id] || (item.cleanUrl ? "clean" : "cutout");
   const ready = tab === "pending" && items ? items.filter(isClean) : [];
 
@@ -251,8 +270,8 @@ export default function PhotoReview() {
                   : "מחובר ל־FTP של ברק"}
               </span>
               <span>
-                <i className={`ph-dot ${status.cutout ? "ph-dot--good" : ""}`} />
-                {status.cutout ? "חיתוך AI פעיל" : "חיתוך AI כבוי. זמינה רק גרסת הניקוי"}
+                <i className={`ph-dot ${status.ai ? "ph-dot--good" : ""}`} />
+                {status.ai ? "עיצוב AI פעיל. גרסת AI מוכנה כדקה וחצי אחרי הצילום" : "עיצוב AI כבוי. זמינה רק גרסת הניקוי"}
               </span>
             </>
           )}
