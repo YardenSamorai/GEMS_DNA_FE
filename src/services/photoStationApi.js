@@ -47,6 +47,8 @@ export const approveCapture = (id, variant) => post(`${BASE}/captures/${id}/appr
 
 export const rejectCapture = (id, reason) => post(`${BASE}/captures/${id}/reject`, { reason });
 
+export const requestAiVersion = (id) => post(`${BASE}/captures/${id}/ai`, {});
+
 // Phones shoot 12-50MP. The server works at 3000px on the long side, so
 // anything bigger is wasted upload time on the office wifi.
 export const prepareShot = (file, maxSide = 3000, quality = 0.92) =>

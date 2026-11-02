@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Check, ChevronRight, ExternalLink, Info } from "lucide-react";
-import { approveCapture, fetchCaptures, fetchStatus, rejectCapture } from "../../services/photoStationApi";
+import { AlertTriangle, Check, ChevronRight, ExternalLink, Info, Sparkles } from "lucide-react";
+import { approveCapture, fetchCaptures, fetchStatus, rejectCapture, requestAiVersion } from "../../services/photoStationApi";
 import { REJECT_REASONS, issueText, rankIssues, stoneLine, when } from "./photoText";
 import "./photos.css";
 
@@ -27,8 +27,10 @@ const Note = ({ tone, children }) => (
   </div>
 );
 
-const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
+const ReviewCard = ({ item, variant, onVariant, onDone, onUpdate, aiAvailable, locked }) => {
   const [busy, setBusy] = useState(false);
+  const [aiAsked, setAiAsked] = useState(false);
+  const [aiProblem, setAiProblem] = useState("");
   const [error, setError] = useState(item.uploadError || "");
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
@@ -37,6 +39,25 @@ const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
   const url = { clean: item.cleanUrl, cutout: item.cutoutUrl, ai: item.aiUrl }[shown];
   const issues = rankIssues(item.quality?.issues);
   const stone = { sku: item.sku, ...(item.stone || {}) };
+
+  // Show the AI version as soon as the one this reviewer asked for is ready.
+  useEffect(() => {
+    if (aiAsked && item.aiUrl) {
+      onVariant("ai");
+      setAiAsked(false);
+    }
+  }, [aiAsked, item.aiUrl, onVariant]);
+
+  const askAi = async () => {
+    setAiProblem("");
+    setAiAsked(true);
+    try {
+      onUpdate(await requestAiVersion(item.id));
+    } catch (e) {
+      setAiAsked(false);
+      setAiProblem(e.message);
+    }
+  };
 
   const approve = async () => {
     setBusy(true);
@@ -74,20 +95,14 @@ const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
       </div>
 
       <div className="ph-review-body">
-        {pending && (
+        {pending && (item.aiUrl || item.cutoutUrl) && (
           <div className="ph-seg" role="group" aria-label="גרסה">
             <button type="button" aria-pressed={variant === "clean"} onClick={() => onVariant("clean")}>
               ניקוי
             </button>
-            {item.aiStatus && (
-              <button
-                type="button"
-                aria-pressed={variant === "ai"}
-                onClick={() => onVariant("ai")}
-                disabled={!item.aiUrl}
-                title={item.aiError || undefined}
-              >
-                {item.aiUrl ? "AI" : item.aiStatus === "working" ? "AI · מעבד…" : "AI נכשל"}
+            {item.aiUrl && (
+              <button type="button" aria-pressed={variant === "ai"} onClick={() => onVariant("ai")}>
+                AI
               </button>
             )}
             {item.cutoutUrl && (
@@ -97,6 +112,27 @@ const ReviewCard = ({ item, variant, onVariant, onDone, locked }) => {
             )}
           </div>
         )}
+        {pending && aiAvailable && !item.aiUrl && item.cleanUrl && (
+          <div className="ph-ai-ask">
+            <button
+              type="button"
+              className="ph-btn ph-btn--sm"
+              onClick={askAi}
+              disabled={item.aiStatus === "working" || locked}
+            >
+              <Sparkles size={15} aria-hidden="true" />
+              {item.aiStatus === "working" ? "יוצר גרסת AI…" : item.aiStatus === "failed" ? "נסה שוב גרסת AI" : "צור גרסת AI"}
+            </button>
+            <span>
+              {item.aiStatus === "working"
+                ? "כדקה וחצי. אפשר להמשיך לעבוד"
+                : item.aiStatus === "failed"
+                ? `נכשל: ${item.aiError || "שגיאה לא ידועה"}`
+                : "מנקה רקע ופינצטה · כ־$0.28"}
+            </span>
+          </div>
+        )}
+        {aiProblem && <Note tone="bad">לא הצלחנו לבקש גרסת AI: {aiProblem}</Note>}
         {pending && variant === "ai" && (
           <p className="ph-review-hint">רקע, פינצטה ומיקום טופלו ב־AI. הצבע הוחזר לזה שנמדד בצילום המקורי, אבל פרטים קטנים באבן מצוירים. השווה ל״ניקוי״ לפני שליחה.</p>
         )}
@@ -271,7 +307,7 @@ export default function PhotoReview() {
               </span>
               <span>
                 <i className={`ph-dot ${status.ai ? "ph-dot--good" : ""}`} />
-                {status.ai ? "עיצוב AI פעיל. גרסת AI מוכנה כדקה וחצי אחרי הצילום" : "עיצוב AI כבוי. זמינה רק גרסת הניקוי"}
+                {status.ai ? "גרסת AI זמינה לפי בקשה בכל תמונה" : "גרסת AI כבויה. זמינה רק גרסת הניקוי"}
               </span>
             </>
           )}
@@ -344,6 +380,8 @@ export default function PhotoReview() {
                 item={item}
                 variant={variantOf(item)}
                 onVariant={(v) => setVariants((m) => ({ ...m, [item.id]: v }))}
+                onUpdate={(next) => setItems((list) => list.map((i) => (i.id === next.id ? { ...i, ...next } : i)))}
+                aiAvailable={Boolean(status?.ai)}
                 onDone={load}
                 locked={Boolean(bulk)}
               />
