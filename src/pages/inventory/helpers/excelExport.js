@@ -5,6 +5,43 @@ import { getDisplayColor, EMERALD_COLUMNS, DIAMOND_COLUMNS } from "./constants";
 import { imageToBase64 } from "./imageData";
 import { getOfficeContact } from "./pdfCatalog";
 
+const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
+const BARAK_FILES = "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/";
+
+const grsCertName = (stone) => {
+  if (!stone.lab || stone.lab.toUpperCase() !== "GRS" || !stone.certificateUrl) return null;
+  const m = stone.certificateUrl.match(/\/([^/]+)\.pdf$/i);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+};
+
+// Barak names GRS appendices inconsistently ("<cert>-ap.pdf" mostly, newer
+// ones "<cert> ap.pdf", many have none), so the server checks which file
+// exists. Stones it answered for get `appendixUrl` (null = no appendix);
+// the rest keep the "-ap" guess.
+const withAppendixLinks = async (stones) => {
+  const certs = [...new Set(stones.map(grsCertName).filter(Boolean))];
+  if (!certs.length) return stones;
+  const found = {};
+  try {
+    for (let i = 0; i < certs.length; i += 150) {
+      const batch = certs.slice(i, i + 150).join(",");
+      const r = await fetch(`${API_BASE}/api/barak-appendix?certs=${encodeURIComponent(batch)}`);
+      if (r.ok) Object.assign(found, (await r.json()).appendix);
+    }
+  } catch (e) {
+    console.log("Could not check GRS appendices:", e.message);
+  }
+  return stones.map((s) => {
+    const cert = grsCertName(s);
+    return cert && cert in found ? { ...s, appendixUrl: found[cert] } : s;
+  });
+};
+
 // Determine category of stones
 export const getCategoryBreakdown = (stonesArray) => {
   return stonesArray.reduce((acc, stone) => {
@@ -22,7 +59,9 @@ export const getCategoryBreakdown = (stonesArray) => {
 
 // Export to Excel with separate sheets per category
 export const exportToExcelSeparate = async (customStones, options = {}, user = null) => {
-  const selectedData = customStones || [];
+  const selectedData = options.includeAppendix === false
+    ? customStones || []
+    : await withAppendixLinks(customStones || []);
   
   // Separate by mapped category
   const emeralds = selectedData.filter(s => getMappedCategories(s.category).includes('Emerald'));
@@ -297,13 +336,13 @@ export const createCategorySheet = (workbook, sheetName, data, columns, accentCo
       row.getCell(certCol + 1).value = { text: "Cert", hyperlink: certUrl };
       row.getCell(certCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
     }
-    if (appendixCol >= 0 && stone.lab && stone.lab.toUpperCase() === "GRS" && stone.certificateUrl) {
-      const certMatch = stone.certificateUrl.match(/\/([^/]+)\.pdf$/i);
-      if (certMatch) {
-        const appendixUrl = `https://app.barakdiamonds.com/Gemstones/Output/StoneImages/${certMatch[1]}-ap.pdf`;
-        row.getCell(appendixCol + 1).value = { text: "Appendix", hyperlink: appendixUrl };
-        row.getCell(appendixCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
-      }
+    const cert = appendixCol >= 0 ? grsCertName(stone) : null;
+    const appendixUrl = stone.appendixUrl !== undefined
+      ? stone.appendixUrl
+      : cert && `${BARAK_FILES}${encodeURIComponent(`${cert}-ap.pdf`)}`;
+    if (cert && appendixUrl) {
+      row.getCell(appendixCol + 1).value = { text: "Appendix", hyperlink: appendixUrl };
+      row.getCell(appendixCol + 1).font = { color: { argb: greenAccent }, underline: true, size: 10, name: "Lato" };
     }
     if (imgCol >= 0 && stone.imageUrl) {
       row.getCell(imgCol + 1).value = { text: "Image", hyperlink: stone.imageUrl };
@@ -479,6 +518,7 @@ export const exportToExcel = async (customStones, options = {}, user = null) => 
     alert("Please select at least one stone to export.");
     return;
   }
+  if (options.includeAppendix !== false) selectedData = await withAppendixLinks(selectedData);
 
   // Reorder: place paired stones adjacent to each other
   const ordered = [];
