@@ -33,6 +33,7 @@ import {
   STATUS,
   groupingHint,
   issueInfo,
+  itemKind,
   kindLabel,
   rankIssues,
   stoneLine,
@@ -42,10 +43,11 @@ import {
 import "./photos.css";
 
 /* =============================================================================
- * Photo station — office staff photograph stones that have no picture yet.
- * Scan the sticker (or type the SKU), shoot on the lightbox, and the server
- * cleans the shot and checks its quality. A manager approves it on the review
- * screen, which uploads it to Barak's picture FTP.
+ * Photo station — office staff photograph stones that have no picture yet,
+ * and jewelry pieces by model number. Scan the sticker (or type the code),
+ * shoot on the lightbox, and the server cleans the shot and checks its
+ * quality. A manager approves it on the review screen, which saves it in DNA
+ * as part of the item's gallery (and can also send a stone's photo to Barak).
  *
  * Built for a long run at the lightbox: after each shot the next stone is one
  * tap away, the queue only shows what is physically at the chosen location,
@@ -178,12 +180,12 @@ const SkuFinder = ({ onOpen, busy, autoFocus = false, placeholder = "או הקל
       {open && items.length > 0 && (
         <ul className="ph-suggest">
           {items.map((s) => (
-            <li key={s.sku}>
+            <li key={`${s.itemType}:${s.sku}`}>
               <button type="button" className="ph-row" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(s.sku)}>
                 <span className="ph-row-main">
                   <span className="ph-row-sku">{s.sku}</span>
                   <span className="ph-row-meta">
-                    {[stoneLine(s), s.location].filter(Boolean).join(" · ")}
+                    {[s.itemType === "jewelry" ? "תכשיט" : null, s.title, stoneLine(s), s.location].filter(Boolean).join(" · ")}
                   </span>
                 </span>
                 <span className="ph-row-side">
@@ -340,8 +342,9 @@ const Queue = ({ queue, loading, kind, location, onKind, onLocation, onOpen, onM
 const StoneCard = ({ stone, detailed = false }) => (
   <div className="ph-card">
     <div className="ph-hero">
-      <div className="ph-hero-kind">{kindLabel(stone.groupingType)}</div>
+      <div className="ph-hero-kind">{itemKind(stone)}</div>
       <h1 className="ph-hero-sku">{stone.sku}</h1>
+      {stone.title && <div className="ph-hero-line">{stone.title}</div>}
       <div className="ph-hero-line ph-ltr">{stoneLine(stone)}</div>
     </div>
     {(detailed || stone.location || stone.box || stone.holder) && (
@@ -351,6 +354,8 @@ const StoneCard = ({ stone, detailed = false }) => (
             ["קטגוריה", stone.category],
             ["צבע", stone.color],
             ["אבנים", stone.stones],
+            ["מתכת", stone.metal],
+            ["מק״ט מלאי", stone.stockNumber],
             ["סניף", stone.branch],
           ]
             .filter(([, v]) => v)
@@ -404,14 +409,21 @@ const StoneNotes = ({ stone }) => {
           האבן רשומה בממו אצל לקוח. ודא שהיא באמת כאן.
         </Note>
       )}
-      {stone.hasPhoto && (
+      {stone.hasPhoto && last?.status !== "approved" && (
         <Note tone="warn" icon={AlertTriangle}>
-          לאבן הזאת כבר יש תמונה במערכת. צלם רק אם ביקשו ממך.
+          {stone.itemType === "jewelry"
+            ? "לתכשיט הזה כבר יש תמונות. צילום מאושר יתווסף לגלריה שלו."
+            : "לאבן הזאת כבר יש תמונה במערכת. צלם רק אם ביקשו ממך."}
         </Note>
       )}
       {last?.status === "pending" && (
         <Note tone="warn" icon={Clock}>
           כבר יש צילום שמחכה לאישור. צילום חדש יחליף אותו.
+        </Note>
+      )}
+      {last?.status === "approved" && (
+        <Note tone="good" icon={Check}>
+          צילום מהעמדה כבר נשמר ב־DNA. צילום חדש שיאושר יתווסף לגלריה.
         </Note>
       )}
       {last?.status === "uploaded" && (
@@ -442,7 +454,7 @@ const Verdict = ({ verdict, headline, sku, failed }) => {
       </div>
       <h2>{verdict === "good" ? "התמונה נשלחה לאישור" : verdict === "error" ? "התמונה לא נשלחה" : headline.title}</h2>
       <p className="ph-ltr" style={{ fontWeight: 600 }}>{sku}</p>
-      {verdict === "good" && <p>אחרי אישור מנהל היא תעלה לברק.</p>}
+      {verdict === "good" && <p>אחרי אישור מנהל היא תישמר ב־DNA.</p>}
       {verdict === "warn" && <p>התמונה נשמרה ותגיע לאישור, אבל עדיף לצלם שוב.</p>}
       {verdict === "error" && <p>{failed}</p>}
     </div>
@@ -483,7 +495,7 @@ const Kpis = ({ queue }) => {
     ["צילמת היום", queue?.mineToday, true],
     ["השבוע", queue?.mineWeek],
     ["ממתינות לאישור", queue?.awaitingReview],
-    ["נשלחו לברק", queue?.uploaded],
+    ["נשמרו ב־DNA", queue?.saved],
     ["מחכות לצילום", queue?.remaining],
   ];
   return (
@@ -497,7 +509,7 @@ const Kpis = ({ queue }) => {
         </div>
         <small>
           {p ? `${fmt(p.photographed)} מתוך ${fmt(p.total)} אבנים` : "\u00a0"}
-          {p?.inFlow ? ` · ${fmt(p.inFlow)} בדרך לברק` : ""}
+          {p?.inFlow ? ` · ${fmt(p.inFlow)} ממתינות לאישור` : ""}
           {p?.onMemo ? ` · ${fmt(p.onMemo)} בממו` : ""}
         </small>
       </div>
@@ -633,7 +645,7 @@ const SideCard = ({ title, aside, children }) => (
 );
 
 const Team = ({ team }) => (
-  <SideCard title="הצוות השבוע" aside="היום · שבוע · נשלחו">
+  <SideCard title="הצוות השבוע" aside="היום · שבוע · נשמרו">
     {team.length === 0 ? (
       <p className="ph-side-empty">עוד אין צילומים השבוע.</p>
     ) : (
@@ -643,7 +655,7 @@ const Team = ({ team }) => (
             <span className="ph-team-name">{m.name || "ללא שם"}</span>
             <span className="ph-num">{fmt(m.today)}</span>
             <span className="ph-num">{fmt(m.week)}</span>
-            <span className="ph-num ph-team-sent">{fmt(m.uploaded)}</span>
+            <span className="ph-num ph-team-sent">{fmt(m.saved)}</span>
           </li>
         ))}
       </ol>
@@ -696,7 +708,7 @@ const DropZone = ({ onFile, onPick, onCamera, touch }) => {
       <span className="ph-drop-icon">
         <ImagePlus size={30} strokeWidth={1.75} aria-hidden="true" />
       </span>
-      <h2>גרור לכאן את תמונת האבן</h2>
+      <h2>גרור לכאן את התמונה</h2>
       <p>או הדבק אותה כאן עם Ctrl+V</p>
       <div className="ph-drop-actions">
         <button type="button" className="ph-btn ph-btn--primary" onClick={onPick}>
@@ -792,7 +804,7 @@ export default function PhotoStation() {
       setScreen("stone");
       window.scrollTo(0, 0);
     } catch (e) {
-      setError(e.status === 404 ? `המק״ט ${code} לא נמצא במלאי. בדוק את המדבקה ונסה שוב.` : e.message);
+      setError(e.status === 404 ? `המק״ט ${code} לא נמצא במלאי האבנים או התכשיטים. בדוק את המדבקה ונסה שוב.` : e.message);
     } finally {
       setBusy(false);
     }
@@ -981,7 +993,7 @@ export default function PhotoStation() {
           <header className="ph-head">
             <div>
               <h1 className="ph-title">צילום אבנים</h1>
-              <p className="ph-sub">בחר אבן, העלה את התמונה שלה, והמערכת מנקה את הרקע ושולחת לאישור. אחרי אישור היא עולה לברק.</p>
+              <p className="ph-sub">בחר אבן או תכשיט, העלה תמונה, והמערכת מנקה את הרקע ושולחת לאישור. אחרי אישור היא נשמרת ב־DNA.</p>
             </div>
             {reviewLink}
           </header>
@@ -999,7 +1011,7 @@ export default function PhotoStation() {
               onMore={() => setLimit((n) => n + PAGE)}
             />
             <aside className="ph-desk-side">
-              <SideCard title="פתח אבן">
+              <SideCard title="פתח אבן או תכשיט">
                 <SkuFinder onOpen={openStone} busy={busy} autoFocus placeholder="הקלד או סרוק מק״ט" />
                 <p className="ph-side-hint">סורק ברקוד USB מקליד ישר לשדה הזה.</p>
                 {touch && (
@@ -1024,11 +1036,19 @@ export default function PhotoStation() {
             <section className="ph-desk-col">
               <StoneCard stone={stone} detailed />
               <StoneNotes stone={stone} />
-              <ol className="ph-card ph-steps">
-                <li>הנח את האבן על המשטח הלבן, בלי פינצטה</li>
-                <li>צלם ישר מלמעלה, ממוקד על האבן</li>
-                <li>העלה את התמונה. הרקע מתנקה והאבן ממורכזת אוטומטית</li>
-              </ol>
+              {stone.itemType === "jewelry" ? (
+                <ol className="ph-card ph-steps">
+                  <li>הנח את התכשיט על המשטח הלבן</li>
+                  <li>צלם ישר מלמעלה, ממוקד על התכשיט</li>
+                  <li>העלה את התמונה. הרקע מתנקה אוטומטית</li>
+                </ol>
+              ) : (
+                <ol className="ph-card ph-steps">
+                  <li>הנח את האבן על המשטח הלבן, בלי פינצטה</li>
+                  <li>צלם ישר מלמעלה, ממוקד על האבן</li>
+                  <li>העלה את התמונה. הרקע מתנקה והאבן ממורכזת אוטומטית</li>
+                </ol>
+              )}
             </section>
             <DropZone onFile={handleFile} onPick={pick} onCamera={shoot} touch={touch} />
           </div>
@@ -1075,7 +1095,7 @@ export default function PhotoStation() {
           <header className="ph-head">
             <div>
               <h1 className="ph-title">צילום אבנים</h1>
-              <p className="ph-sub">צלם אבן. אחרי אישור מנהל היא עולה לברק.</p>
+              <p className="ph-sub">צלם אבן או תכשיט. אחרי אישור מנהל התמונה נשמרת ב־DNA.</p>
             </div>
             {reviewLink}
           </header>
@@ -1086,7 +1106,7 @@ export default function PhotoStation() {
           <div style={{ marginTop: 16 }}>
             <button type="button" className="ph-btn ph-btn--primary ph-btn--lg ph-btn--block" onClick={() => setScanOpen(true)} disabled={busy}>
               <ScanLine size={22} strokeWidth={2} aria-hidden="true" />
-              סרוק מדבקה של אבן
+              סרוק מדבקה
             </button>
             <SkuFinder onOpen={openStone} busy={busy} />
           </div>
@@ -1120,17 +1140,25 @@ export default function PhotoStation() {
           </div>
           <StoneNotes stone={stone} />
 
-          <ol className="ph-card ph-steps">
-            <li>הנח את האבן על המשטח הלבן, בלי פינצטה</li>
-            <li>החזק את הטלפון ישר מעליה והקש עליה כדי למקד</li>
-            <li>צלם. הרקע מתנקה והאבן ממורכזת אוטומטית</li>
-          </ol>
+          {stone.itemType === "jewelry" ? (
+            <ol className="ph-card ph-steps">
+              <li>הנח את התכשיט על המשטח הלבן</li>
+              <li>החזק את הטלפון ישר מעליו והקש עליו כדי למקד</li>
+              <li>צלם. הרקע מתנקה אוטומטית</li>
+            </ol>
+          ) : (
+            <ol className="ph-card ph-steps">
+              <li>הנח את האבן על המשטח הלבן, בלי פינצטה</li>
+              <li>החזק את הטלפון ישר מעליה והקש עליה כדי למקד</li>
+              <li>צלם. הרקע מתנקה והאבן ממורכזת אוטומטית</li>
+            </ol>
+          )}
 
           <div className="ph-bar">
             <div className="ph-bar-inner">
               <button type="button" className="ph-btn ph-btn--primary ph-btn--lg ph-btn--block" onClick={shoot}>
                 <Camera size={22} strokeWidth={2} aria-hidden="true" />
-                צלם את האבן
+                {stone.itemType === "jewelry" ? "צלם את התכשיט" : "צלם את האבן"}
               </button>
               <button type="button" className="ph-btn ph-btn--quiet ph-btn--sm" onClick={pick}>
                 <ImagePlus size={16} aria-hidden="true" />

@@ -43,7 +43,10 @@ export const uploadCapture = (sku, blob) => {
 
 export const fetchCaptures = (status = "pending") => fetch(`${BASE}/captures?status=${status}`).then(json);
 
-export const approveCapture = (id, variant) => post(`${BASE}/captures/${id}/approve`, { variant });
+export const approveCapture = (id, variant, sendToBarak = false) =>
+  post(`${BASE}/captures/${id}/approve`, { variant, sendToBarak });
+
+export const sendCaptureToBarak = (id) => post(`${BASE}/captures/${id}/send-to-barak`, {});
 
 export const rejectCapture = (id, reason) => post(`${BASE}/captures/${id}/reject`, { reason });
 

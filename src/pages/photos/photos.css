@@ -664,6 +664,16 @@
   margin: 18px 0 14px;
 }
 .ph-toolbar .ph-seg { min-width: min(100%, 420px); }
+.ph-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  font-size: 14px;
+  color: var(--dna-text-2);
+  cursor: pointer;
+}
+.ph-toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--dna-accent); cursor: pointer; }
 
 .ph-grid {
   display: grid;

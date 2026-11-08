@@ -51,7 +51,7 @@ export const uploadFailure = (err) => {
   if (err.name === "AbortError") return "השרת לא ענה בזמן. נסה לשלוח שוב.";
   if (err.status === 401) return "פג תוקף ההתחברות. רענן את הדף והתחבר מחדש.";
   if (err.status === 403) return "אין לך הרשאה לצלם אבנים. פנה למנהל.";
-  if (err.status === 404) return "המק״ט לא נמצא במלאי. בדוק את המדבקה.";
+  if (err.status === 404) return "המק״ט לא נמצא במלאי האבנים או התכשיטים. בדוק את המדבקה.";
   if (err.status === 413) return "התמונה גדולה מדי. צלם שוב מהמצלמה.";
   return "משהו השתבש בשרת. התמונה לא אבדה, נסה לשלוח שוב.";
 };
@@ -76,8 +76,11 @@ export const KIND_LABELS = [
 export const kindLabel = (groupingType) =>
   ({ single: "אבן בודדת", pair: "זוג", set: "סט", parcel: "פרצל" })[String(groupingType || "").toLowerCase()] || "פרצל";
 
+export const itemKind = (item) => (item.itemType === "jewelry" ? "תכשיט" : kindLabel(item.groupingType));
+
 export const STATUS = {
   pending: { label: "ממתינה לאישור", tone: "pending" },
+  approved: { label: "נשמרה ב־DNA", tone: "uploaded" },
   uploading: { label: "נשלחת לברק", tone: "pending" },
   uploaded: { label: "נשלחה לברק", tone: "uploaded" },
   rejected: { label: "נדחתה", tone: "rejected" },
@@ -90,6 +93,9 @@ export const when = (iso) =>
   iso ? new Date(iso).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
 export const stoneLine = (s) =>
-  [s.category, s.shape, s.weightCt ? `${s.weightCt}ct` : null, s.stones > 1 ? `${s.stones} אבנים` : null]
+  (s.itemType === "jewelry"
+    ? [s.category, s.metal, s.weightCt ? `${s.weightCt}ct` : null]
+    : [s.category, s.shape, s.weightCt ? `${s.weightCt}ct` : null, s.stones > 1 ? `${s.stones} אבנים` : null]
+  )
     .filter(Boolean)
     .join(" · ");
