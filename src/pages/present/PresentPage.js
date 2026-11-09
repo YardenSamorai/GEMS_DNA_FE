@@ -14,6 +14,8 @@ import {
   PRICES_KEY,
   PRICE_OPTIONS,
   readOption,
+  rememberRecent,
+  itemRefs,
   categoryLabel,
   mediaFor,
   mediaGroups,
@@ -22,7 +24,7 @@ import {
   showcaseSpecs,
 } from "./presentModel";
 import { useFullscreen, usePresentationItems, useSavedPresentation, useWakeLock } from "./presentHooks";
-import { updatePresentation } from "../../services/presentationsApi";
+import { createPresentation, updatePresentation } from "../../services/presentationsApi";
 import ShowcaseStage from "./ShowcaseStage";
 import CodeSheet from "./CodeSheet";
 import { ForgotSheet, StaffSheet } from "./StaffSheets";
@@ -504,6 +506,17 @@ const PresentPage = () => {
   }, [prices, interval, brand, savedId]);
 
   useEffect(() => {
+    if (!savedId && !loading && param && items.length) rememberRecent(param, items);
+  }, [savedId, loading, param, items]);
+
+  const [savedAs, setSavedAs] = useState("");
+  const saveAsPresentation = async (name) => {
+    const p = await createPresentation({ name, items: itemRefs(items), settings: { prices, interval, brand }, shared: true });
+    setSavedAs(p.name);
+    return p;
+  };
+
+  useEffect(() => {
     if (!missing.length) return undefined;
     setMissingNote(true);
     const t = setTimeout(() => setMissingNote(false), 8000);
@@ -778,6 +791,8 @@ const PresentPage = () => {
             fullscreen={fullscreen}
             name={saved.presentation?.name}
             note={missing.length ? missingText(missing) : ""}
+            onSave={savedId ? null : saveAsPresentation}
+            savedAs={savedAs}
             onExit={exitPresentation}
             onDone={() => setStaff(false)}
           />

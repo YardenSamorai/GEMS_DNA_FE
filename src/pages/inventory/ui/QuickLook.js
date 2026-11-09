@@ -7,7 +7,16 @@ import StoneUsagePanel from "../../../components/StoneUsagePanel";
 import { getDisplayColor, getDisplayShape } from "../helpers/constants";
 import { createEmailHtml, createEmailText } from "../helpers/emailTemplates";
 import { shareToWhatsApp } from "../helpers/whatsappHelpers";
-import { dnaPathFor, formatCarat, isJewelryItem, itemImages, scaledPrice, formatMoney, shareUrlFor } from "../model/inventoryModel";
+import {
+  dnaPathFor,
+  formatCarat,
+  isJewelryItem,
+  itemImages,
+  memoClientOf,
+  scaledPrice,
+  formatMoney,
+  shareUrlFor,
+} from "../model/inventoryModel";
 import Sheet from "./Sheet";
 import Thumb from "./Thumb";
 import { Segmented } from "./InventoryHeader";
@@ -175,6 +184,8 @@ const jewelryGeneral = (j) => [
   ["Metal", clean(j.metalType)],
   ["Style", clean(j.style)],
   ["Availability", clean(j.availability)],
+  ["On memo with", memoClientOf(j)],
+  ["Branch", clean(j.branch)],
   ["Certificate #", clean(j.certificateNumber)],
 ];
 

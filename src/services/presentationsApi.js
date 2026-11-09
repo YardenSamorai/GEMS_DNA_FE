@@ -20,10 +20,14 @@ const send = (method, url, payload) =>
 
 export const fetchPresentations = () => fetch(BASE).then(json).then((b) => b.presentations || []);
 
+/* Teammates a presentation can be shared with: [{ id, name, email, pending }]. */
+export const fetchPeople = () => fetch(`${BASE}/people`).then(json).then((b) => b.people || []);
+
 export const fetchPresentation = (id) => fetch(`${BASE}/${encodeURIComponent(id)}`).then(json);
 
-/* { name, items, settings, shared } — items are the showcase's references
- * (a stone SKU, or "j:" and a jewelry model number). */
+/* { name, items, settings, shared, sharedWith } — items are the showcase's
+ * references (a stone SKU, or "j:" and a jewelry model number); sharedWith
+ * names teammates (their ids from fetchPeople) when it isn't the whole team. */
 export const createPresentation = (data) => send("POST", BASE, data);
 
 export const updatePresentation = (id, changes) => send("PATCH", `${BASE}/${encodeURIComponent(id)}`, changes);

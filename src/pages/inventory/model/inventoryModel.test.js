@@ -8,6 +8,7 @@ import {
   filterItems,
   itemImages,
   itemsForMode,
+  normalizeCatalogJewelry,
   normalizeStone,
   parseMeasurements,
   sortItems,
@@ -122,6 +123,16 @@ describe("filterItems", () => {
     const house = stone({ sku: "H1", exactLocation: "Acme Jewels", onMemo: false });
     const f = { ...emptyFilters(), client: ["Acme Jewels"] };
     expect(filterItems([m1, m2, house], ctx({ filters: f })).map((s) => s.sku)).toEqual(["M1"]);
+  });
+
+  it("filters jewelry by the client holding the piece on memo", () => {
+    const piece = (sku, location, onMemo) =>
+      normalizeCatalogJewelry({ model_number: sku, jewelry_type: "Ring", exact_location: location, on_memo: onMemo }, 0);
+    const out = piece("R1", "Itamar Alpert - JN", true);
+    const home = piece("R2", "Jewelry New York - JN", false);
+    const f = { ...emptyFilters(), client: ["Itamar Alpert - JN"] };
+    expect(filterItems([out, home], ctx({ mode: "jewelry", filters: f })).map((j) => j.sku)).toEqual(["R1"]);
+    expect(buildClientOptions([out, home])).toEqual([{ name: "Itamar Alpert - JN", count: 1, carats: 0 }]);
   });
 });
 

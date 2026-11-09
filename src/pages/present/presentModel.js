@@ -38,6 +38,40 @@ export const readOption = (key, options, fallback) => {
   return options.some((o) => o.id === v) ? v : fallback;
 };
 
+/* Presentations opened straight from Inventory aren't saved anywhere, so this
+ * device remembers the last few: Presentations lists them to present again
+ * or save. Newest first; the same selection again moves up instead of repeating. */
+const RECENT_KEY = "present.recent";
+const RECENT_MAX = 8;
+
+export const readRecent = () => {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    return Array.isArray(list) ? list.filter((r) => r && typeof r.param === "string" && r.param) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const rememberRecent = (param, items, now = Date.now()) => {
+  if (!param || !items.length) return;
+  const entry = { param, count: items.length, at: now, covers: items.slice(0, 4).map((it) => posterFor(it)).filter(Boolean) };
+  const list = [entry, ...readRecent().filter((r) => r.param !== param)].slice(0, RECENT_MAX);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch {
+    /* storage full: the list just isn't updated */
+  }
+};
+
+export const forgetRecent = (param) => {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(readRecent().filter((r) => r.param !== param)));
+  } catch {
+    /* nothing to undo */
+  }
+};
+
 /* The settings this device last presented with: where a new saved one starts. */
 export const deviceSettings = () => ({
   prices: readOption(PRICES_KEY, PRICE_OPTIONS, "off"),

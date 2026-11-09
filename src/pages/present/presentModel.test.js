@@ -1,5 +1,8 @@
 import {
   directVideoUrl,
+  forgetRecent,
+  readRecent,
+  rememberRecent,
   itemRefs,
   itemsParam,
   missingSkus,
@@ -40,6 +43,23 @@ test("items survive the URL by SKU, jewelry prefixed, order kept", () => {
     { kind: "stone", sku: "T-432E" },
   ]);
   expect(pickItems(parseItemsParam(`${param},GONE`), [stone], [ring])).toEqual([ring, stone]);
+});
+
+test("presentations opened from Inventory are remembered on the device, newest first, without repeats", () => {
+  localStorage.clear();
+  rememberRecent("A,B", [stone, ring], 1);
+  rememberRecent("C", [stone], 2);
+  rememberRecent("A,B", [stone, ring], 3);
+  rememberRecent("", [stone], 4);
+  expect(readRecent().map((r) => [r.param, r.count, r.at])).toEqual([
+    ["A,B", 2, 3],
+    ["C", 1, 2],
+  ]);
+  expect(readRecent()[0].covers).toEqual(["https://example.com/T-432E_Main.jpg", "https://example.com/rg.jpg"]);
+  forgetRecent("C");
+  expect(readRecent().map((r) => r.param)).toEqual(["A,B"]);
+  for (let i = 0; i < 12; i += 1) rememberRecent(`S${i}`, [stone], 10 + i);
+  expect(readRecent()).toHaveLength(8);
 });
 
 test("a saved presentation names the pieces that left the inventory", () => {

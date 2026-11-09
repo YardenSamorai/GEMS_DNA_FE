@@ -179,7 +179,8 @@ const AssigneeChips = ({ team, value, onChange }) => {
 
 const CLIENT_LIMIT = 8;
 
-const ClientPicker = ({ clients, selected, onChange }) => {
+const ClientPicker = ({ clients, selected, onChange, jewelry = false }) => {
+  const noun = (n) => (jewelry ? (n === 1 ? "piece" : "pieces") : n === 1 ? "stone" : "stones");
   const [query, setQuery] = useState("");
   const [all, setAll] = useState(false);
   const q = query.trim().toLowerCase();
@@ -211,14 +212,15 @@ const ClientPicker = ({ clients, selected, onChange }) => {
               >
                 <span className="inv-client-name">{c.name}</span>
                 <span className="inv-client-meta">
-                  {c.count} {c.count === 1 ? "stone" : "stones"} · {c.carats.toLocaleString("en-US", { maximumFractionDigits: 2 })} ct
+                  {c.count} {noun(c.count)}
+                  {c.carats > 0 ? ` · ${c.carats.toLocaleString("en-US", { maximumFractionDigits: 2 })} ct` : ""}
                 </span>
               </button>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="inv-fnote">{q ? "No client matches." : "No stones on memo in this tab."}</p>
+        <p className="inv-fnote">{q ? "No client matches." : jewelry ? "No jewelry on memo." : "No stones on memo in this tab."}</p>
       )}
       {!q && !all && matches.length > shown.length && (
         <button type="button" className="inv-more" onClick={() => setAll(true)}>
@@ -305,8 +307,9 @@ const STONE_GROUPS = (mode, canSearchClients) => [
   { id: "stock", keys: ["groupingType", "location", "box", "tag"] },
 ];
 
-const JEWELRY_GROUPS = [
+const JEWELRY_GROUPS = (canSearchClients) => [
   { id: "saved", keys: [] },
+  ...(canSearchClients ? [{ id: "client", keys: ["client"] }] : []),
   { id: "source", keys: [] },
   { id: "jtype", keys: ["category"] },
   { id: "weight", keys: ["minCarat", "maxCarat"] },
@@ -342,7 +345,7 @@ const FilterPanel = ({
   jewelryCounts,
 }) => {
   const isJewelry = mode === "jewelry";
-  const groups = isJewelry ? JEWELRY_GROUPS : STONE_GROUPS(mode, canSearchClients);
+  const groups = isJewelry ? JEWELRY_GROUPS(canSearchClients) : STONE_GROUPS(mode, canSearchClients);
   const showAssignee = !isJewelry && team?.ready && (team.members || []).length > 1;
 
   const activeOf = (g) => {
@@ -409,7 +412,12 @@ const FilterPanel = ({
       case "client":
         return (
           <FilterGroup key={g.id} id={g.id} label="Client on memo" open={open[g.id]} onToggle={toggle} count={activeOf(g)} summary={summaryOf(g)}>
-            <ClientPicker clients={options.clients || []} selected={filters.client || []} onChange={setList("client")} />
+            <ClientPicker
+              clients={options.clients || []}
+              selected={filters.client || []}
+              onChange={setList("client")}
+              jewelry={isJewelry}
+            />
           </FilterGroup>
         );
       case "shape":

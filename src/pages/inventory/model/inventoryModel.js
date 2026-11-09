@@ -158,6 +158,9 @@ export const normalizeCatalogJewelry = (row, idx) => {
     shippingFrom: row.shipping_from || "",
     category: "Jewelry",
     jewelrySize: row.jewelry_size || "",
+    branch: row.branch || "",
+    exactLocation: row.exact_location || "",
+    onMemo: Boolean(row.on_memo),
   };
 };
 
@@ -280,6 +283,7 @@ const filterJewelry = (items, { filters, skuQuery, skuIndex, smartSearch }) => {
     if (filters.treatment.length > 0 && !filters.treatment.includes(item.collection)) return false;
     if (filters.diamondColor.length > 0 && !filters.diamondColor.includes((item.stoneType || "").trim())) return false;
     if (filters.fancyColor.length > 0 && !filters.fancyColor.includes(item.metalType)) return false;
+    if (filters.client?.length > 0 && !filters.client.includes(memoClientOf(item))) return false;
     if (smartSearch) {
       const q = smartSearch.toLowerCase();
       const searchable = [item.sku, item.title, item.jewelryType, item.style, item.collection, item.stoneType, item.metalType, item.description]
@@ -579,8 +583,8 @@ export const buildLabOptions = (items) => {
   return Array.from(set).sort();
 };
 
-/* The client holding a stone on memo — the server's exact location, which it
- * only sends to viewers with full location access. In-house stones have none. */
+/* The client holding a stone or piece on memo — the server's exact location,
+ * which it only sends to viewers with full location access. In-house items have none. */
 export const memoClientOf = (stone) =>
   stone.onMemo ? String(stone.exactLocation || "").trim().replace(/\s+/g, " ") : "";
 

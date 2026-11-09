@@ -500,6 +500,7 @@ const StoneSearchPage = () => {
         diamondColors: [],
         fancyColors: [],
         labs: [],
+        clients: canSearchClients ? buildClientOptions(modeItems) : [],
         jewelry: buildJewelryOptions(jewelry),
       };
     }
