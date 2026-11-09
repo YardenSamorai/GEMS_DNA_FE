@@ -75,12 +75,19 @@ export const StaffSheet = ({
   brandOptions,
   onBrand,
   fullscreen,
+  name,
+  note,
   onExit,
   onDone,
 }) => (
   <Backdrop label="Presentation settings">
-    <h2 className="text-[20px] font-semibold tracking-[-0.015em]">Presentation settings</h2>
-    <p className="mt-1 text-[14px] text-glass-muted">Visitors can browse, but only staff can change these.</p>
+    <h2 className="text-[20px] font-semibold tracking-[-0.015em]">{name || "Presentation settings"}</h2>
+    <p className="mt-1 text-[14px] text-glass-muted">
+      {name
+        ? "Visitors can browse, but only staff can change these. Changes are saved to the presentation."
+        : "Visitors can browse, but only staff can change these."}
+    </p>
+    {note && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] leading-snug text-amber-900">{note}</p>}
     <div className="mt-6 space-y-5">
       <Segmented label="Logo" options={brandOptions} value={brand} onChange={onBrand} />
       <Segmented label="Prices" options={priceOptions} value={prices} onChange={onPrices} />

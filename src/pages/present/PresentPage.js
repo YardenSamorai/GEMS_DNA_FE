@@ -7,6 +7,13 @@ import { readPriceMode } from "../../utils/pricing";
 import { gradingLine, itemTitle, pricePerCtText, priceTotalText } from "../inventory/ui/format";
 import { isJewelryItem } from "../inventory/model/inventoryModel";
 import {
+  BRAND_KEY,
+  BRAND_OPTIONS,
+  INTERVAL_KEY,
+  INTERVAL_OPTIONS,
+  PRICES_KEY,
+  PRICE_OPTIONS,
+  readOption,
   categoryLabel,
   mediaFor,
   mediaGroups,
@@ -14,7 +21,8 @@ import {
   primaryMediaIndex,
   showcaseSpecs,
 } from "./presentModel";
-import { useFullscreen, usePresentationItems, useWakeLock } from "./presentHooks";
+import { useFullscreen, usePresentationItems, useSavedPresentation, useWakeLock } from "./presentHooks";
+import { updatePresentation } from "../../services/presentationsApi";
 import ShowcaseStage from "./ShowcaseStage";
 import CodeSheet from "./CodeSheet";
 import { ForgotSheet, StaffSheet } from "./StaffSheets";
@@ -43,27 +51,6 @@ import {
  * can't change what is shown or wander into the rest of the inventory.
  * ========================================================================== */
 
-const PRICES_KEY = "present.prices";
-const PRICE_OPTIONS = [
-  { id: "off", label: "Hidden" },
-  { id: "total", label: "Price" },
-  { id: "both", label: "Price + /ct" },
-];
-
-const INTERVAL_KEY = "present.interval";
-const INTERVAL_OPTIONS = [
-  { id: "8", label: "8 s" },
-  { id: "12", label: "12 s" },
-  { id: "20", label: "20 s" },
-  { id: "30", label: "30 s" },
-];
-
-const BRAND_KEY = "present.brand";
-const BRAND_OPTIONS = [
-  { id: "none", label: "None" },
-  { id: "eshed", label: "Eshed" },
-  { id: "gemstar", label: "Gemstar" },
-];
 const BRAND_LOGOS = {
   eshed: { src: "/images/eshed_logo_dark.png", alt: "Eshed", w: 429, h: 189 },
   gemstar: { src: "/brands/gemstar.svg", alt: "Gemstar", w: 1071, h: 584 },
@@ -80,10 +67,12 @@ const BrandLogo = ({ logo, className = "" }) => (
   />
 );
 
-const readOption = (key, options, fallback) => {
-  const v = localStorage.getItem(key);
-  return options.some((o) => o.id === v) ? v : fallback;
-};
+const missingText = (skus) =>
+  skus.length === 1
+    ? `${skus[0]} is no longer in inventory, so it was left out.`
+    : `${skus.length} pieces are no longer in inventory, so they were left out: ${skus.slice(0, 6).join(", ")}${
+        skus.length > 6 ? "…" : ""
+      }`;
 
 const HOLD_MS = 30_000; // a visitor's touch pauses the rotation this long
 const CHROME_MS = 4_500; // controls fade after this much stillness
@@ -426,20 +415,27 @@ const Controls = ({ visible, count, view, paused, onGrid, onPrev, onPause, onNex
 
 const PresentPage = () => {
   const [params] = useSearchParams();
-  const param = params.get("items") || "";
+  const savedId = params.get("p");
+  const saved = useSavedPresentation(savedId);
+  const param = savedId ? (saved.presentation ? saved.presentation.items.join(",") : null) : params.get("items") || "";
   const navigate = useNavigate();
   const location = useLocation();
   const navigationType = useNavigationType();
   const { signOut } = useClerk();
   const reduceMotion = useReducedMotion();
-  const { items, loading, error } = usePresentationItems(param);
+  const loaded = usePresentationItems(param);
+  const { items, missing } = loaded;
+  const error = saved.error || loaded.error;
+  const loading = loaded.loading && !error;
   const priceMode = useMemo(readPriceMode, []);
   const fullscreen = useFullscreen();
   useWakeLock();
+  const leaveTo = savedId ? "/presentations" : "/inventory";
 
   const [prices, setPrices] = useState(() => readOption(PRICES_KEY, PRICE_OPTIONS, "off"));
   const [interval, setInterval_] = useState(() => readOption(INTERVAL_KEY, INTERVAL_OPTIONS, "12"));
   const [brand, setBrand] = useState(() => readOption(BRAND_KEY, BRAND_OPTIONS, "none"));
+  const [missingNote, setMissingNote] = useState(false);
   const logo = BRAND_LOGOS[brand] || null;
   const [view, setView] = useState("show");
   const [{ index }, setPos] = useState({ index: 0 });
@@ -480,9 +476,39 @@ const PresentPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key, sheet]);
 
-  useEffect(() => localStorage.setItem(PRICES_KEY, prices), [prices]);
-  useEffect(() => localStorage.setItem(INTERVAL_KEY, interval), [interval]);
-  useEffect(() => localStorage.setItem(BRAND_KEY, brand), [brand]);
+  // A saved presentation carries its own settings, and staff changes go back
+  // to it; otherwise they are this device's defaults.
+  const savedSettings = useRef(null);
+  useEffect(() => {
+    const s = saved.presentation?.settings;
+    if (!s) return;
+    savedSettings.current = JSON.stringify({ prices: s.prices, interval: s.interval, brand: s.brand });
+    setPrices(s.prices);
+    setInterval_(s.interval);
+    setBrand(s.brand);
+  }, [saved.presentation]);
+
+  useEffect(() => {
+    if (!savedId) {
+      localStorage.setItem(PRICES_KEY, prices);
+      localStorage.setItem(INTERVAL_KEY, interval);
+      localStorage.setItem(BRAND_KEY, brand);
+      return;
+    }
+    const next = JSON.stringify({ prices, interval, brand });
+    if (!savedSettings.current || next === savedSettings.current) return;
+    savedSettings.current = next;
+    updatePresentation(savedId, { settings: { prices, interval, brand } }).catch(() => {
+      /* offline or no longer there: the settings still hold on this screen */
+    });
+  }, [prices, interval, brand, savedId]);
+
+  useEffect(() => {
+    if (!missing.length) return undefined;
+    setMissingNote(true);
+    const t = setTimeout(() => setMissingNote(false), 8000);
+    return () => clearTimeout(t);
+  }, [missing]);
 
   const hold = () => {
     holdRef.current = performance.now() + HOLD_MS;
@@ -615,7 +641,7 @@ const PresentPage = () => {
   const exitPresentation = () => {
     releaseLock();
     markLeft(here);
-    navigate("/inventory", { replace: true });
+    navigate(leaveTo, { replace: true });
   };
 
   const resetBySignOut = async () => {
@@ -638,6 +664,7 @@ const PresentPage = () => {
       onPointerDown={() => {
         hold();
         poke();
+        setMissingNote(false);
       }}
     >
       {loading ? (
@@ -647,7 +674,13 @@ const PresentPage = () => {
       ) : !count ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
           <p className="text-[21px] font-semibold tracking-tight">Nothing to present</p>
-          <p className="text-[15px] text-[#6e6e73]">Select stones or jewelry in Inventory, then choose Present.</p>
+          <p className="text-[15px] text-[#6e6e73]">
+            {!savedId
+              ? "Select stones or jewelry in Inventory, then choose Present."
+              : missing.length
+              ? "None of the pieces in this presentation are in inventory any more."
+              : "This presentation has no pieces yet. Add them in Presentations."}
+          </p>
         </div>
       ) : view === "grid" ? (
         <Overview
@@ -691,6 +724,25 @@ const PresentPage = () => {
 
       {count > 1 && view === "show" && !loading && <Progress count={count} index={index} fillRef={fillRef} />}
 
+      <AnimatePresence>
+        {missingNote && count > 0 && !sheet && (
+          <motion.div
+            key="missing"
+            role="status"
+            className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-6"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 40px)" }}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: reduceMotion ? 0 : 0.25 }}
+          >
+            <p className="max-w-[560px] rounded-full border border-black/[0.07] bg-white/85 px-5 py-2.5 text-center text-[14px] text-[#1d1d1f] shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl">
+              {missingText(missing)}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {!loading && (
         <Controls
           visible={chrome && !sheet && !staff && !forgot}
@@ -724,6 +776,8 @@ const PresentPage = () => {
             brandOptions={BRAND_OPTIONS}
             onBrand={setBrand}
             fullscreen={fullscreen}
+            name={saved.presentation?.name}
+            note={missing.length ? missingText(missing) : ""}
             onExit={exitPresentation}
             onDone={() => setStaff(false)}
           />
@@ -739,7 +793,7 @@ const PresentPage = () => {
                 : "Enter the code to change settings or exit."
             }
             onComplete={onCode}
-            onCancel={settingUp ? () => navigate("/inventory", { replace: true }) : () => setSheet(null)}
+            onCancel={settingUp ? () => navigate(leaveTo, { replace: true }) : () => setSheet(null)}
             cancelLabel={settingUp ? "Back" : "Cancel"}
             waitUntil={sheet === "code" ? waitUntil : 0}
             footer={

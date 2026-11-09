@@ -12,6 +12,7 @@ import {
   MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  BookmarkPlus,
   Presentation,
   Printer,
   SlidersHorizontal,
@@ -54,6 +55,7 @@ import { exportCatalogLiran } from "./helpers/catalogLiran";
 import BarcodeScanner from "./components/BarcodeScanner";
 import CatalogLiranModal from "./components/CatalogLiranModal";
 import MemoSheet from "./components/MemoSheet";
+import SavePresentationSheet from "./components/SavePresentationSheet";
 import CategoryExportModal from "./components/CategoryExportModal";
 import ColumnSettingsModal from "./components/ColumnSettingsModal";
 import CompareModal from "./components/CompareModal";
@@ -893,6 +895,7 @@ const StoneSearchPage = () => {
   const [niimbotOpen, setNiimbotOpen] = useState(false);
   const [niimbotStones, setNiimbotStones] = useState([]);
   const [crmOpen, setCrmOpen] = useState(false);
+  const [savePresentationOpen, setSavePresentationOpen] = useState(false);
   const [memoStones, setMemoStones] = useState(null);
 
   const legacyModalOpen =
@@ -1084,6 +1087,13 @@ const StoneSearchPage = () => {
       label: "Share",
       items: [
         { id: "present", label: "Present", sub: "Full-screen presentation for iPad", icon: Presentation, onSelect: openPresentation },
+        {
+          id: "save-presentation",
+          label: "Save as presentation",
+          sub: "Keep it to present again, or prepare a show",
+          icon: BookmarkPlus,
+          onSelect: () => requireSelection() && setSavePresentationOpen(true),
+        },
         { id: "crm", label: "Send to CRM", sub: "Add to a deal or contact", icon: Users, onSelect: () => setCrmOpen(true) },
         { id: "wa", label: "WhatsApp DNA links", sub: "One message with every link", icon: MessageCircle, onSelect: () => shareMultipleToWhatsApp(selectedItems) },
       ],
@@ -1671,6 +1681,13 @@ const StoneSearchPage = () => {
       />
 
       {crmOpen && <SendToCrmModal stones={selectedItems} onClose={() => setCrmOpen(false)} />}
+
+      <SavePresentationSheet
+        open={savePresentationOpen}
+        items={selectedItems}
+        onClose={() => setSavePresentationOpen(false)}
+        variant={isPhone ? "bottom" : "side"}
+      />
 
       <MemoSheet
         open={Boolean(memoStones)}

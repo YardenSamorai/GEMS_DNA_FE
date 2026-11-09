@@ -1,6 +1,8 @@
 import {
   directVideoUrl,
+  itemRefs,
   itemsParam,
+  missingSkus,
   mediaFor,
   mediaGroups,
   parseItemsParam,
@@ -38,6 +40,14 @@ test("items survive the URL by SKU, jewelry prefixed, order kept", () => {
     { kind: "stone", sku: "T-432E" },
   ]);
   expect(pickItems(parseItemsParam(`${param},GONE`), [stone], [ring])).toEqual([ring, stone]);
+});
+
+test("a saved presentation names the pieces that left the inventory", () => {
+  expect(itemRefs([ring, stone, { sku: "" }])).toEqual(["j:RG-1", "T-432E"]);
+  const refs = parseItemsParam("j:RG-1,GONE,T-432E,j:T-432E");
+  const items = pickItems(refs, [stone], [ring]);
+  expect(items).toEqual([ring, stone]);
+  expect(missingSkus(refs, items)).toEqual(["GONE", "T-432E"]);
 });
 
 test("media: photos deduped and folder paths dropped, then video and 360°, then the certificate image", () => {

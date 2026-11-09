@@ -7,7 +7,8 @@ import {
   normalizeStone,
   normalizeWorkshopJewelry,
 } from "../inventory/model/inventoryModel";
-import { parseItemsParam, pickItems, recallItems } from "./presentModel";
+import { fetchPresentation } from "../../services/presentationsApi";
+import { missingSkus, parseItemsParam, pickItems, recallItems } from "./presentModel";
 
 const loadJewelry = async (userId) => {
   const [catalog, workshop] = await Promise.allSettled([
@@ -24,35 +25,50 @@ const loadJewelry = async (userId) => {
   ];
 };
 
-/* Items handed over from Inventory appear instantly; a shared link loads them. */
+/* The live inventory behind a list of references, only the halves it needs. */
+export const loadCatalog = (user, { stones = true, jewelry = true } = {}) =>
+  Promise.all([
+    stones
+      ? fetchSoapStones({ id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName }).then(
+          (data) => (Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : []).map(normalizeStone)
+        )
+      : [],
+    jewelry ? loadJewelry(user?.id) : [],
+  ]).then(([s, j]) => ({ stones: s, jewelry: j }));
+
+/* Items handed over from Inventory appear instantly; a shared link or a saved
+ * presentation loads them. A null param means "not known yet": keep waiting. */
 export const usePresentationItems = (param) => {
   const { user, isLoaded } = useUser();
   const [state, setState] = useState(() => {
-    const items = recallItems(param);
-    return items ? { items, loading: false, error: "" } : { items: [], loading: true, error: "" };
+    const items = param == null ? null : recallItems(param);
+    return items
+      ? { param, items, missing: [], loading: false, error: "" }
+      : { param: null, items: [], missing: [], loading: true, error: "" };
   });
 
   useEffect(() => {
-    if (!state.loading || !isLoaded) return undefined;
+    if (param == null || state.param === param || !isLoaded) return undefined;
+    const done = (items, missing = [], error = "") => setState({ param, items, missing, loading: false, error });
+    const recalled = recallItems(param);
+    if (recalled) {
+      done(recalled);
+      return undefined;
+    }
     const refs = parseItemsParam(param);
     if (!refs.length) {
-      setState({ items: [], loading: false, error: "" });
+      done([]);
       return undefined;
     }
     let alive = true;
-    Promise.all([
-      refs.some((r) => r.kind === "stone")
-        ? fetchSoapStones({ id: user?.id, email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName }).then(
-            (data) => (Array.isArray(data?.stones) ? data.stones : Array.isArray(data) ? data : []).map(normalizeStone)
-          )
-        : [],
-      refs.some((r) => r.kind === "jewelry") ? loadJewelry(user?.id) : [],
-    ])
-      .then(([stones, jewelry]) => {
-        if (alive) setState({ items: pickItems(refs, stones, jewelry), loading: false, error: "" });
+    loadCatalog(user, { stones: refs.some((r) => r.kind === "stone"), jewelry: refs.some((r) => r.kind === "jewelry") })
+      .then(({ stones, jewelry }) => {
+        if (!alive) return;
+        const items = pickItems(refs, stones, jewelry);
+        done(items, missingSkus(refs, items));
       })
       .catch((err) => {
-        if (alive) setState({ items: [], loading: false, error: err?.message || "Could not load the selection" });
+        if (alive) done([], [], err?.message || "Could not load the selection");
       });
     return () => {
       alive = false;
@@ -60,6 +76,29 @@ export const usePresentationItems = (param) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [param, isLoaded]);
 
+  return state;
+};
+
+/* A saved presentation (/present?p=<id>). */
+export const useSavedPresentation = (id) => {
+  const [state, setState] = useState({ presentation: null, error: "" });
+  useEffect(() => {
+    if (!id) return undefined;
+    let alive = true;
+    setState({ presentation: null, error: "" });
+    fetchPresentation(id)
+      .then((presentation) => alive && setState({ presentation, error: "" }))
+      .catch((err) =>
+        alive &&
+        setState({
+          presentation: null,
+          error: err.status === 404 ? "This presentation was deleted, or it is private to someone else." : err.message,
+        })
+      );
+    return () => {
+      alive = false;
+    };
+  }, [id]);
   return state;
 };
 

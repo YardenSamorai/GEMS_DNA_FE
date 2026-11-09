@@ -83,6 +83,7 @@ const StorePortalCatalog = page(() => import("./pages/portal/StorePortalCatalog"
 const StorePortalRequests = page(() => import("./pages/portal/StorePortalRequests"));
 const StorePortalDocuments = page(() => import("./pages/portal/StorePortalDocuments"));
 const PresentPage = page(() => import("./pages/present/PresentPage"));
+const PresentationsPage = page(() => import("./pages/present/PresentationsPage"));
 
 // ---------- Theme Context ----------
 const ThemeContext = createContext();
@@ -551,6 +552,7 @@ function AppContent() {
             {/* Back-compat: old /qa URL still resolves to the same data-quality page. */}
             <Route path="/qa" element={<Navigate to="/qa-data" replace />} />
             <Route path="/photos" element={<PhotoStation />} />
+            <Route path="/presentations" element={<OwnerOnly section="inventory"><PresentationsPage /></OwnerOnly>} />
             <Route path="/api-access" element={<ApiAccess />} />
             <Route path="/photos/review" element={<PhotoReview />} />
             {/* Sprint 3 — sales-rep management (admin) + per-rep KPIs. */}

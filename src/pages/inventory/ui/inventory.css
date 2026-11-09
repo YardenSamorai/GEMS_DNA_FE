@@ -1332,6 +1332,28 @@
 .inv-memo-sap .inv-input { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 380px) { .inv-memo-row { grid-template-columns: 1fr; } }
 
+.inv-pres-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.inv-pres-row {
+  appearance: none;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--dna-hairline);
+  border-radius: 12px;
+  background: var(--dna-surface);
+  color: var(--dna-text-2);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.inv-pres-row:hover { border-color: var(--dna-text-4); }
+.inv-pres-row[aria-checked="true"] { border-color: var(--dna-accent); box-shadow: 0 0 0 3px var(--inv-accent-tint-2); }
+.inv-pres-name { font-size: 14px; font-weight: 500; color: var(--dna-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ---------------------------------------------------------------- quick look */
 
 .inv-ql-media {

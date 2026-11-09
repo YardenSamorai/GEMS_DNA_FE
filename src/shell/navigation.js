@@ -56,6 +56,14 @@ export const NAV = [
     items: [
       { id: "photos", label: "Photo Station", shortLabel: "Photos", to: "/photos", icon: "photos", section: "photos", match: under("/photos") },
       {
+        id: "presentations",
+        label: "Presentations",
+        to: "/presentations",
+        icon: "presentations",
+        section: "inventory",
+        match: under("/presentations"),
+      },
+      {
         id: "quality",
         label: "Data Quality",
         to: "/qa-data",

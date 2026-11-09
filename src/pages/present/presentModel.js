@@ -9,11 +9,47 @@ import { cleanValue as clean, isDiamondLike } from "../inventory/ui/format";
  * Jewelry is prefixed because a model number could equal a stone SKU. */
 const JEWELRY_PREFIX = "j:";
 
-export const itemsParam = (items) =>
-  items
-    .filter((it) => it?.sku)
-    .map((it) => (isJewelryItem(it) ? `${JEWELRY_PREFIX}${it.sku}` : it.sku))
-    .join(",");
+/* What staff can set on a presentation. Kept per device, unless the
+ * presentation is a saved one, which carries its own. */
+export const PRICES_KEY = "present.prices";
+export const PRICE_OPTIONS = [
+  { id: "off", label: "Hidden" },
+  { id: "total", label: "Price" },
+  { id: "both", label: "Price + /ct" },
+];
+
+export const INTERVAL_KEY = "present.interval";
+export const INTERVAL_OPTIONS = [
+  { id: "8", label: "8 s" },
+  { id: "12", label: "12 s" },
+  { id: "20", label: "20 s" },
+  { id: "30", label: "30 s" },
+];
+
+export const BRAND_KEY = "present.brand";
+export const BRAND_OPTIONS = [
+  { id: "none", label: "None" },
+  { id: "eshed", label: "Eshed" },
+  { id: "gemstar", label: "Gemstar" },
+];
+
+export const readOption = (key, options, fallback) => {
+  const v = localStorage.getItem(key);
+  return options.some((o) => o.id === v) ? v : fallback;
+};
+
+/* The settings this device last presented with: where a new saved one starts. */
+export const deviceSettings = () => ({
+  prices: readOption(PRICES_KEY, PRICE_OPTIONS, "off"),
+  interval: readOption(INTERVAL_KEY, INTERVAL_OPTIONS, "12"),
+  brand: readOption(BRAND_KEY, BRAND_OPTIONS, "none"),
+});
+
+export const itemRef = (item) => (isJewelryItem(item) ? `${JEWELRY_PREFIX}${item.sku}` : item.sku);
+
+export const itemRefs = (items) => items.filter((it) => it?.sku).map(itemRef);
+
+export const itemsParam = (items) => itemRefs(items).join(",");
 
 export const parseItemsParam = (value) =>
   String(value || "")
@@ -34,6 +70,14 @@ export const pickItems = (refs, stones, jewelry) => {
   return refs
     .map((r) => (r.kind === "jewelry" ? jewelryMap.get(r.sku) : stoneMap.get(r.sku)))
     .filter(Boolean);
+};
+
+/* The SKUs pickItems left out. */
+export const missingSkus = (refs, items) => {
+  const found = new Set(items.map(itemRef));
+  return refs
+    .filter((r) => !found.has(r.kind === "jewelry" ? `${JEWELRY_PREFIX}${r.sku}` : r.sku))
+    .map((r) => r.sku);
 };
 
 /* Opening from Inventory hands the already-loaded items over, so the
