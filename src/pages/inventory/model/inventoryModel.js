@@ -205,6 +205,21 @@ export const normalizeWorkshopJewelry = (row) => ({
 export const isJewelryItem = (item) =>
   (item?.category || "").toLowerCase() === "jewelry" || Boolean(item?.jewelryType);
 
+/* Every photo of an item, main first. Barak's feed lists a folder-only URL
+ * (".../StoneImages/") when no photo was uploaded; those are dropped. */
+export const itemImages = (item) => {
+  if (!item) return [];
+  const extra = isJewelryItem(item) ? item.allImages || [] : String(item.additionalPictures || "").split(";");
+  const seen = new Set();
+  return [item.imageUrl, ...extra]
+    .map((u) => String(u || "").trim())
+    .filter((u) => {
+      if (!u || seen.has(u) || !u.split("?")[0].split("/").pop()) return false;
+      seen.add(u);
+      return true;
+    });
+};
+
 export const stoneMode = (stone) =>
   getMappedCategories(stone.category).includes("Diamond") ? "diamonds" : "gemstones";
 

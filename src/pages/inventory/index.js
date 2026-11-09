@@ -879,7 +879,7 @@ const StoneSearchPage = () => {
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
-  const [lightbox, setLightbox] = useState({ image: null, video: null });
+  const [lightbox, setLightbox] = useState({ images: [], index: 0, video: null });
   const [exportOpen, setExportOpen] = useState(false);
   const [exportMode, setExportMode] = useState("combined");
   const [categoryChoiceOpen, setCategoryChoiceOpen] = useState(false);
@@ -898,7 +898,7 @@ const StoneSearchPage = () => {
   const legacyModalOpen =
     tagsOpen || columnsOpen || compareOpen || exportOpen || categoryChoiceOpen || internalOpen || pdfPriceOpen ||
     pdfOpen || Boolean(liranStones) || niimbotOpen || crmOpen || Boolean(memoStones) || scannerOpen ||
-    Boolean(lightbox.image || lightbox.video);
+    Boolean(lightbox.images.length || lightbox.video);
 
   const railVisible = isDesktop && railPref;
   const quickLookVariant = isWide ? "panel" : isPhone ? "bottom" : "side";
@@ -1336,7 +1336,7 @@ const StoneSearchPage = () => {
           onSortField={handleSortField}
           statusMap={statusMap}
           stoneTags={stoneTags}
-          onVideo={(v) => setLightbox({ image: null, video: v })}
+          onVideo={(v) => setLightbox({ images: [], index: 0, video: v })}
           onWhatsApp={shareToWhatsApp}
           onAssign={handleAssign}
           assigningSku={assigningSku}
@@ -1519,7 +1519,7 @@ const StoneSearchPage = () => {
           setNiimbotStones([item]);
           setNiimbotOpen(true);
         }}
-        onImage={(src) => setLightbox({ image: src, video: null })}
+        onImage={(images, index) => setLightbox({ images, index, video: null })}
         canEditStone={Boolean(team?.ready && team.isAdmin)}
         onSpecsSaved={(sku, applied) => {
           if (!sku || !applied) return;
@@ -1527,7 +1527,12 @@ const StoneSearchPage = () => {
         }}
       />
 
-      <Lightbox image={lightbox.image} video={lightbox.video} onClose={() => setLightbox({ image: null, video: null })} />
+      <Lightbox
+        images={lightbox.images}
+        index={lightbox.index}
+        video={lightbox.video}
+        onClose={() => setLightbox({ images: [], index: 0, video: null })}
+      />
 
       <AssistantChat
         inventoryMode={mode}

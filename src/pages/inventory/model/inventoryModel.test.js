@@ -6,6 +6,7 @@ import {
   buildShapeOptions,
   emptyFilters,
   filterItems,
+  itemImages,
   itemsForMode,
   normalizeStone,
   parseMeasurements,
@@ -262,5 +263,21 @@ describe("URL state", () => {
     const out = convertPriceUnits(f, "bruto", "neto");
     expect(out.minPrice).toBe("10000");
     expect(out.maxPricePerCt).toBe("4500");
+  });
+});
+
+describe("itemImages", () => {
+  it("lists a stone's main photo then its gallery, without repeats or folder-only links", () => {
+    const s = stone({
+      imageUrl: "https://x/a.jpg",
+      additionalPictures: "https://x/a.jpg; https://x/b.jpg;;https://x/StoneImages/;https://x/c.jpg",
+    });
+    expect(itemImages(s)).toEqual(["https://x/a.jpg", "https://x/b.jpg", "https://x/c.jpg"]);
+  });
+
+  it("uses a jewelry piece's picture list", () => {
+    expect(itemImages({ category: "Jewelry", imageUrl: "https://x/a.jpg", allImages: ["https://x/a.jpg", "https://x/b.jpg"] }))
+      .toEqual(["https://x/a.jpg", "https://x/b.jpg"]);
+    expect(itemImages({ category: "Jewelry", imageUrl: null, allImages: [] })).toEqual([]);
   });
 });

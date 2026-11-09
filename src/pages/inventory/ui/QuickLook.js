@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { ArrowUpRight, ChevronDown, ChevronUp, Copy, Expand, Mail, Pencil, Printer, Share, Tag } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Expand, Mail, Pencil, Printer, Share, Tag } from "lucide-react";
 import ItemTierManager from "../../../components/catalog/ItemTierManager";
 import StoneUsagePanel from "../../../components/StoneUsagePanel";
 import { getDisplayColor, getDisplayShape } from "../helpers/constants";
 import { createEmailHtml, createEmailText } from "../helpers/emailTemplates";
 import { shareToWhatsApp } from "../helpers/whatsappHelpers";
-import { dnaPathFor, formatCarat, isJewelryItem, scaledPrice, formatMoney, shareUrlFor } from "../model/inventoryModel";
+import { dnaPathFor, formatCarat, isJewelryItem, itemImages, scaledPrice, formatMoney, shareUrlFor } from "../model/inventoryModel";
 import Sheet from "./Sheet";
 import Thumb from "./Thumb";
 import { Segmented } from "./InventoryHeader";
@@ -32,10 +32,11 @@ const Specs = ({ rows }) => {
   );
 };
 
-/* Photo / 360° / certificate for a stone; image gallery and video for jewelry. */
+/* Photos / 360° / certificate for a stone; photos and video for jewelry.
+ * ←/→ step through the photos (↑/↓ step through the stones). */
 const Media = ({ item, onImage }) => {
   const jewelry = isJewelryItem(item);
-  const images = jewelry ? (item.allImages?.length ? item.allImages : item.imageUrl ? [item.imageUrl] : []) : item.imageUrl ? [item.imageUrl] : [];
+  const images = itemImages(item);
   const video = jewelry ? item.videoLink : item.videoUrl;
   const certImg = !jewelry && item.certificateImageJpg ? item.certificateImageJpg : null;
   const tabs = [
@@ -47,6 +48,27 @@ const Media = ({ item, onImage }) => {
   const [imgIdx, setImgIdx] = useState(0);
   const [failed, setFailed] = useState(false);
   const src = tab === "cert" ? certImg : images[imgIdx];
+  const count = images.length;
+  const browsing = tab === "photo" && count > 1;
+
+  const step = (d) => {
+    setImgIdx((i) => (i + d + count) % count);
+    setFailed(false);
+  };
+
+  useEffect(() => {
+    if (!browsing) return undefined;
+    const onKey = (e) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || isTyping(e.target)) return;
+      if (document.querySelector("[data-inv-layer='menu']")) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      setImgIdx((i) => (i + (e.key === "ArrowRight" ? 1 : -1) + count) % count);
+      setFailed(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [browsing, count]);
 
   return (
     <>
@@ -56,12 +78,30 @@ const Media = ({ item, onImage }) => {
         ) : src && !failed ? (
           <>
             <img src={src} alt={tab === "cert" ? `Certificate for ${item.sku}` : itemTitle(item)} onError={() => setFailed(true)} />
-            <button type="button" className="inv-icon-btn inv-icon-btn--sm inv-ql-expand" onClick={() => onImage(src)} aria-label="View larger">
+            <button
+              type="button"
+              className="inv-icon-btn inv-icon-btn--sm inv-ql-expand"
+              onClick={() => (tab === "cert" ? onImage([certImg], 0) : onImage(images, imgIdx))}
+              aria-label="View larger"
+            >
               <Expand size={15} strokeWidth={1.75} />
             </button>
           </>
         ) : (
           <Thumb src={null} shape={item.shape} jewelry={jewelry} size="fill" alt="" />
+        )}
+        {browsing && (
+          <>
+            <button type="button" className="inv-icon-btn inv-icon-btn--sm inv-ql-step inv-ql-step--prev" onClick={() => step(-1)} aria-label="Previous photo" title="Previous photo (←)">
+              <ChevronLeft size={18} strokeWidth={1.75} />
+            </button>
+            <button type="button" className="inv-icon-btn inv-icon-btn--sm inv-ql-step inv-ql-step--next" onClick={() => step(1)} aria-label="Next photo" title="Next photo (→)">
+              <ChevronRight size={18} strokeWidth={1.75} />
+            </button>
+            <span className="inv-ql-count" aria-live="polite">
+              {imgIdx + 1} / {count}
+            </span>
+          </>
         )}
         {tabs.length > 1 && (
           <div className="inv-ql-media-tabs">
@@ -77,20 +117,20 @@ const Media = ({ item, onImage }) => {
           </div>
         )}
       </div>
-      {tab === "photo" && images.length > 1 && (
+      {browsing && (
         <div className="inv-ql-thumbs">
           {images.map((img, i) => (
             <button
               key={img}
               type="button"
               aria-pressed={i === imgIdx}
-              aria-label={`Image ${i + 1} of ${images.length}`}
+              aria-label={`Image ${i + 1} of ${count}`}
               onClick={() => {
                 setImgIdx(i);
                 setFailed(false);
               }}
             >
-              <Thumb src={img} jewelry size="md" alt="" />
+              <Thumb src={img} shape={item.shape} jewelry={jewelry} size="md" alt="" />
             </button>
           ))}
         </div>

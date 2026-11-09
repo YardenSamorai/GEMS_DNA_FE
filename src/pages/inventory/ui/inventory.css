@@ -1434,6 +1434,29 @@
   background: var(--dna-glass-chip);
   color: #1d1d1f;
 }
+.inv-ql-step {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  background: var(--dna-glass-chip);
+  color: #1d1d1f;
+}
+.inv-ql-step--prev { left: 10px; }
+.inv-ql-step--next { right: 10px; }
+.inv-ql-count {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--dna-glass-chip);
+  color: #1d1d1f;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .inv-sheet-title .inv-ql-sku { font-size: 17px; color: var(--dna-text); letter-spacing: -0.016em; max-width: 100%; }
 .inv-sheet-title .inv-ql-sku svg { color: var(--dna-text-3); flex: none; }
 .inv-fgroup-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -1523,6 +1546,19 @@
 .inv-lightbox img { max-width: min(960px, 100%); max-height: 86vh; object-fit: contain; border-radius: 12px; background: #fff; }
 .inv-lightbox iframe { width: min(860px, 100%); aspect-ratio: 16 / 9; border: 0; border-radius: 12px; background: #000; }
 .inv-lightbox .inv-icon-btn { position: absolute; top: 16px; right: 16px; background: rgba(255, 255, 255, 0.16); color: #fff; }
+.inv-lightbox .inv-lightbox-step { top: 50%; transform: translateY(-50%); width: 44px; height: 44px; }
+.inv-lightbox .inv-lightbox-step--prev { left: 16px; right: auto; }
+.inv-lightbox .inv-lightbox-step--next { right: 16px; }
+.inv-lightbox-count {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ---------------------------------------------------------------- accessibility */
 
