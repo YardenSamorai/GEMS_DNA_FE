@@ -12,6 +12,10 @@ const ISSUES = {
     title: "האבן נחתכה בקצה התמונה",
     fix: "הרחק מעט את הטלפון, כך שכל האבן תיכנס עם רווח לבן מכל הצדדים.",
   },
+  box_cut_off: {
+    title: "הקופסה נחתכה בקצה התמונה",
+    fix: "הרחק מעט את הטלפון, כך שכל הקופסה, כולל המסגרת, תיכנס לתמונה עם קצת רקע מכל הצדדים.",
+  },
   tool_in_photo: {
     title: "יש פינצטה או יד בתמונה",
     fix: "הנח את האבן על הלייטבוקס בלי פינצטה. איפה שהפינצטה מסתירה את האבן אי אפשר לנקות.",
@@ -61,11 +65,12 @@ export const uploadFailure = (err) => {
 };
 
 // What to put in front of the camera, by the parcel's grouping type.
+const IN_BOX = " אם הן בקופסת תצוגה, צלם את הקופסה ישר מלמעלה, כולה בתמונה, והיא תיחתך ותיושר אוטומטית.";
 export const groupingHint = (groupingType, stones) => {
   const t = String(groupingType || "").toLowerCase();
   if (t === "pair") return "זוג: צלם את שתי האבנים יחד באותה תמונה.";
-  if (t === "set") return `סט: צלם את כל ${stones > 1 ? stones + " " : ""}האבנים יחד באותה תמונה.`;
-  if (t === "parcel") return "פרצל: צלם את כל הפרצל יחד באותה תמונה.";
+  if (t === "set") return `סט: צלם את כל ${stones > 1 ? stones + " " : ""}האבנים יחד באותה תמונה.${IN_BOX}`;
+  if (t === "parcel") return `פרצל: צלם את כל הפרצל יחד באותה תמונה.${IN_BOX}`;
   return null;
 };
 

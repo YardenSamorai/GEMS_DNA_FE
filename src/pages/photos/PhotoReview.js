@@ -44,6 +44,7 @@ const ReviewCard = ({ item, variant, onVariant, onDone, onUpdate, aiAvailable, b
   const [reason, setReason] = useState("");
   const pending = item.status === "pending";
   const isStone = item.itemType !== "jewelry";
+  const boxShot = Boolean(item.quality?.metrics?.displayBox);
   const shown = pending ? variant : item.chosenVariant || "clean";
   const url = { clean: item.cleanUrl, cutout: item.cutoutUrl, ai: item.aiUrl }[shown];
   const issues = rankIssues(item.quality?.issues);
@@ -133,7 +134,10 @@ const ReviewCard = ({ item, variant, onVariant, onDone, onUpdate, aiAvailable, b
             )}
           </div>
         )}
-        {pending && aiAvailable && !item.aiUrl && item.cleanUrl && (
+        {pending && boxShot && (
+          <p className="ph-review-hint">קופסת תצוגה: הקופסה זוהתה, יושרה וממלאת את התמונה, והרקע סביבה הולבן. האבנים כפי שצולמו.</p>
+        )}
+        {pending && aiAvailable && !boxShot && !item.aiUrl && item.cleanUrl && (
           <div className="ph-ai-ask">
             <button
               type="button"
