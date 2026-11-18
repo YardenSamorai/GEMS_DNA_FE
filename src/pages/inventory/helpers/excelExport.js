@@ -4,35 +4,18 @@ import { getMappedCategories } from "../../../utils/categoryMap";
 import { getDisplayColor, EMERALD_COLUMNS, DIAMOND_COLUMNS } from "./constants";
 import { imageToBase64 } from "./imageData";
 import { getOfficeContact } from "./pdfCatalog";
+import { findAppendices, grsCertName } from "./certificates";
 
-const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.com";
 const BARAK_FILES = "https://app.barakdiamonds.com/Gemstones/Output/StoneImages/";
 
-const grsCertName = (stone) => {
-  if (!stone.lab || stone.lab.toUpperCase() !== "GRS" || !stone.certificateUrl) return null;
-  const m = stone.certificateUrl.match(/\/([^/]+)\.pdf$/i);
-  if (!m) return null;
-  try {
-    return decodeURIComponent(m[1]);
-  } catch {
-    return m[1];
-  }
-};
-
-// Barak names GRS appendices inconsistently ("<cert>-ap.pdf" mostly, newer
-// ones "<cert> ap.pdf", many have none), so the server checks which file
-// exists. Stones it answered for get `appendixUrl` (null = no appendix);
-// the rest keep the "-ap" guess.
+// Stones the server answered for get `appendixUrl` (null = no appendix); the
+// rest keep the "-ap" guess.
 const withAppendixLinks = async (stones) => {
-  const certs = [...new Set(stones.map(grsCertName).filter(Boolean))];
+  const certs = stones.map(grsCertName).filter(Boolean);
   if (!certs.length) return stones;
-  const found = {};
+  let found = {};
   try {
-    for (let i = 0; i < certs.length; i += 150) {
-      const batch = certs.slice(i, i + 150).join(",");
-      const r = await fetch(`${API_BASE}/api/barak-appendix?certs=${encodeURIComponent(batch)}`);
-      if (r.ok) Object.assign(found, (await r.json()).appendix);
-    }
+    found = await findAppendices(certs);
   } catch (e) {
     console.log("Could not check GRS appendices:", e.message);
   }

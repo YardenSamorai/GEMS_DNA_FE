@@ -9,7 +9,7 @@ const RENDER_WIDTH = 1800;
 const MAX_SCALE = 4;
 
 let libPromise = null;
-const loadPdfJs = () => {
+export const loadPdfJs = () => {
   if (!libPromise) {
     libPromise = import("pdfjs-dist/legacy/build/pdf").then((lib) => {
       lib.GlobalWorkerOptions.workerSrc = WORKER_SRC;

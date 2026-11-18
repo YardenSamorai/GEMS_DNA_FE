@@ -4,6 +4,7 @@ import { useUser } from "@clerk/clerk-react";
 import toast from "react-hot-toast";
 import {
   BookOpen,
+  FileBadge,
   FileSpreadsheet,
   FileSignature,
   FileText,
@@ -56,6 +57,7 @@ import BarcodeScanner from "./components/BarcodeScanner";
 import CatalogLiranModal from "./components/CatalogLiranModal";
 import MemoSheet from "./components/MemoSheet";
 import SavePresentationSheet from "./components/SavePresentationSheet";
+import CertificatesSheet from "./components/CertificatesSheet";
 import CategoryExportModal from "./components/CategoryExportModal";
 import ColumnSettingsModal from "./components/ColumnSettingsModal";
 import CompareModal from "./components/CompareModal";
@@ -897,6 +899,7 @@ const StoneSearchPage = () => {
   const [niimbotStones, setNiimbotStones] = useState([]);
   const [crmOpen, setCrmOpen] = useState(false);
   const [savePresentationOpen, setSavePresentationOpen] = useState(false);
+  const [certificatesOpen, setCertificatesOpen] = useState(false);
   const [memoStones, setMemoStones] = useState(null);
 
   const legacyModalOpen =
@@ -1066,6 +1069,17 @@ const StoneSearchPage = () => {
           icon: BookOpen,
           onSelect: () => requireSelection() && setLiranStones(selectedItems),
         },
+        ...(mode === "jewelry"
+          ? []
+          : [
+              {
+                id: "certificates",
+                label: "Certificates",
+                sub: "Only the lab certificates · ZIP or one PDF",
+                icon: FileBadge,
+                onSelect: () => requireSelection() && setCertificatesOpen(true),
+              },
+            ]),
       ],
     },
     {
@@ -1687,6 +1701,13 @@ const StoneSearchPage = () => {
         open={savePresentationOpen}
         items={selectedItems}
         onClose={() => setSavePresentationOpen(false)}
+        variant={isPhone ? "bottom" : "side"}
+      />
+
+      <CertificatesSheet
+        open={certificatesOpen}
+        items={selectedItems}
+        onClose={() => setCertificatesOpen(false)}
         variant={isPhone ? "bottom" : "side"}
       />
 
