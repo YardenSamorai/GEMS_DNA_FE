@@ -10,13 +10,14 @@ const API_BASE = process.env.REACT_APP_API_URL || "https://gems-dna-be.onrender.
 
 const SyncRow = ({ run }) => {
   const s = syncSummary(run);
+  const warn = run.success && Boolean(run.warning);
   return (
     <li className="gd-row">
-      <span className="gd-status" data-ok={run.success || undefined} aria-hidden="true" />
+      <span className="gd-status" data-ok={(run.success && !warn) || undefined} data-warn={warn || undefined} aria-hidden="true" />
       <span className="gd-row-main">
         <span className="gd-row-title">
           {s.title}
-          <span className="gd-sr">{run.success ? " — succeeded" : " — failed"}</span>
+          <span className="gd-sr">{!run.success ? " — failed" : warn ? " — needs attention" : " — succeeded"}</span>
         </span>
         <span className="gd-row-sub">{s.detail}</span>
         {s.error && <span className="gd-row-sub" data-tone="warn">{s.error}</span>}

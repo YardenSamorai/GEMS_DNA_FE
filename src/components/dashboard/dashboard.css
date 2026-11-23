@@ -260,6 +260,7 @@ a.gd-row:active { background: var(--dna-press); }
   background: #c0362c;
 }
 .gd-status[data-ok] { background: var(--dna-accent-dot); }
+.gd-status[data-warn] { background: #d97706; }
 .gd-sec--sync .gd-rows > li + li::before { left: 32px; }
 
 .gd-empty { padding: 28px 20px; text-align: center; }

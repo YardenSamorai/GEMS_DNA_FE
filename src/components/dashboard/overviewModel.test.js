@@ -83,4 +83,11 @@ describe("sync", () => {
     expect(syncSummary(runs[2]).value).toBe("1 item");
     expect(syncSummary(runs[1])).toMatchObject({ title: "Stones", error: "timeout" });
   });
+
+  it("flags a jewelry run that held back, and names uploads", () => {
+    const stale = { id: 4, sync_type: "jewelry", success: true, stones_count: 418, source: "cron", warning: "Barak's jewelry file hasn't changed since Aug 27, 2026 (87 days), so nothing was removed.", started_at: "2026-11-23T05:00:00Z" };
+    expect(syncSummary(stale)).toMatchObject({ title: "Jewelry", value: "418 items", error: stale.warning });
+    expect(syncSummary({ ...runs[2], source: "upload" }).detail).toMatch(/Uploaded file/);
+    expect(syncSummary(runs[0]).error).toBeUndefined();
+  });
 });

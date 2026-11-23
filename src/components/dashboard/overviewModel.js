@@ -138,13 +138,18 @@ export const fmtWhen = (iso) => {
   return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
+const SOURCE_LABELS = { cron: "Automatic", upload: "Uploaded file" };
+
+/* `warning` marks a run that succeeded but held back: Barak's jewelry file
+ * is stale, or older than the last upload (BE utils/jewelryFeed.js). */
 export const syncSummary = (run) => {
   const jewelry = run.sync_type === "jewelry";
-  const parts = [fmtWhen(run.started_at), run.source === "cron" ? "Automatic" : "Manual"];
+  const parts = [fmtWhen(run.started_at), SOURCE_LABELS[run.source] || "Manual"];
   if (!run.success) return { title: jewelry ? "Jewelry" : "Stones", detail: parts.join(" · "), error: run.message || "Sync failed" };
   return {
     title: jewelry ? "Jewelry" : "Stones",
     value: plural(run.stones_count, jewelry ? "item" : "stone", jewelry ? "items" : "stones"),
     detail: [...parts, fmtDuration(run.duration_ms)].join(" · "),
+    error: run.warning || undefined,
   };
 };
