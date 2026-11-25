@@ -174,29 +174,13 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--dna-faint) transparent;
-  scrollbar-gutter: auto;
+  /* No visible bar: content fading under the sticky footer already says
+     there's more, and the wheel / finger still scroll. */
+  scrollbar-width: none;
   padding: 6px var(--dli-pad) 0;
 }
 
-/* Safari and older Chromium ignore scrollbar-color; give them the same
-   slim pill instead of the OS bar with arrows. */
 .dli-body::-webkit-scrollbar {
-  width: 10px;
-}
-
-.dli-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dli-body::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  border-radius: var(--dna-r-pill);
-  background: var(--dna-faint) padding-box;
-}
-
-.dli-body::-webkit-scrollbar-button {
   display: none;
 }
 
