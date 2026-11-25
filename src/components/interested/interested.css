@@ -1,0 +1,575 @@
+/* ================================================================
+   "I'm interested" sheet. Portals to <body>, so it carries the shared
+   Gems DNA tokens itself (see styles/gemsdna-tokens.css) and follows the
+   app theme like the DNA page it opens from.
+   ================================================================ */
+
+@import "../../styles/gemsdna-tokens.css";
+
+.dli {
+  --dli-pad: 22px;
+  --dli-danger: #d70015;
+
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  color: var(--dna-text);
+  font-family: var(--dna-font);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-theme="dark"] .dli {
+  --dli-danger: #ff453a;
+}
+
+.dli *,
+.dli *::before,
+.dli *::after {
+  box-sizing: border-box;
+}
+
+.dli :focus-visible {
+  outline: 2px solid var(--dna-accent);
+  outline-offset: 3px;
+}
+
+.dli-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--dna-scrim);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.dli-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top));
+  border-radius: var(--dna-r-panel) var(--dna-r-panel) 0 0;
+  background: var(--dna-surface);
+  box-shadow: var(--dna-sh-overlay);
+  overflow: hidden;
+  will-change: transform;
+}
+
+@media (min-width: 640px) {
+  .dli {
+    align-items: center;
+    padding: 32px;
+  }
+  .dli-sheet {
+    width: min(480px, 100%);
+    max-height: min(760px, calc(100dvh - 64px));
+    border-radius: var(--dna-r-hero);
+  }
+}
+
+.dli-grab {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.dli-grab span {
+  width: 38px;
+  height: 5px;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-faint);
+}
+
+@media (min-width: 640px) {
+  .dli-grab {
+    display: none;
+  }
+}
+
+/* ---------- Header: back · progress · close ---------- */
+
+.dli-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 10px 0;
+  touch-action: none;
+}
+
+@media (min-width: 640px) {
+  .dli-head {
+    padding: 12px 12px 0;
+    touch-action: auto;
+  }
+}
+
+.dli-icon,
+.dli-icon-space {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+.dli-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dna-r-pill);
+  background: none;
+  color: var(--dna-text-2);
+  cursor: pointer;
+  transition: transform 0.1s ease-out, background-color 0.2s var(--dna-ease-out), color 0.2s var(--dna-ease-out);
+}
+
+.dli-icon:active {
+  transform: scale(0.92);
+  background: var(--dna-press);
+}
+
+.dli-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dli-progress {
+  display: flex;
+  gap: 6px;
+}
+
+.dli-progress span {
+  width: 18px;
+  height: 4px;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-faint);
+  transition: width 0.35s var(--dna-ease-spring), background-color 0.3s var(--dna-ease-out);
+}
+
+.dli-progress span[data-on] {
+  background: var(--dna-accent);
+}
+
+.dli-progress span[data-current] {
+  width: 30px;
+}
+
+/* ---------- Body ---------- */
+
+.dli-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 6px var(--dli-pad) 0;
+}
+
+.dli-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: var(--dna-r-card);
+  background: var(--dna-bg);
+}
+
+.dli-item-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--dna-r-thumb);
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--dna-hairline);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dli-item-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dli-item-gem {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #a7f3d0, var(--dna-accent-dot) 55%, var(--dna-accent));
+}
+
+.dli-item-text {
+  min-width: 0;
+}
+
+.dli-item-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.dli-item-sub {
+  margin-top: 1px;
+  font-size: 13px;
+  color: var(--dna-text-2);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.dli-step {
+  display: flex;
+  flex-direction: column;
+  padding-top: 22px;
+}
+
+.dli-title {
+  margin: 0;
+  font-size: clamp(25px, 6.4vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+.dli-lede {
+  margin: 8px 0 0;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--dna-text-2);
+}
+
+.dli-group-label {
+  margin: 22px 0 10px 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dna-text-3);
+}
+
+/* ---------- Choices ---------- */
+
+.dli-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dli-step > .dli-chips:first-of-type {
+  margin-top: 20px;
+}
+
+.dli-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-track);
+  color: var(--dna-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.1s ease-out, background-color 0.2s var(--dna-ease-out), color 0.2s var(--dna-ease-out);
+}
+
+.dli-chip[aria-pressed="true"] {
+  background: var(--dna-accent);
+  color: var(--dna-on-accent);
+}
+
+.dli-chip:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dli-chip[aria-pressed="false"]:hover {
+    background: var(--dna-press);
+  }
+  .dli-icon:hover {
+    background: var(--dna-track);
+    color: var(--dna-text);
+  }
+  .dli-primary:hover:not(:disabled) {
+    background: var(--dna-accent-press);
+  }
+}
+
+.dli-seg {
+  display: flex;
+  gap: 2px;
+  margin-top: 20px;
+  padding: 3px;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-track);
+}
+
+.dli-seg-btn {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dna-r-pill);
+  background: none;
+  color: var(--dna-text-2);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.dli-seg-btn[aria-checked="true"] {
+  color: var(--dna-text);
+  font-weight: 600;
+}
+
+.dli-seg-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .dli-seg-pill {
+  background: #3a3a3c;
+}
+
+.dli-seg-label {
+  position: relative;
+}
+
+/* ---------- Fields ---------- */
+
+.dli-field {
+  display: block;
+  margin-top: 18px;
+}
+
+.dli-step > .dli-lede + .dli-field {
+  margin-top: 22px;
+}
+
+.dli-label {
+  display: block;
+  margin: 0 0 7px 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dna-text-2);
+}
+
+.dli-optional {
+  font-weight: 400;
+  color: var(--dna-text-3);
+}
+
+.dli-input {
+  display: block;
+  width: 100%;
+  height: 54px;
+  margin: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--dna-track);
+  box-shadow: inset 0 0 0 1px transparent;
+  color: var(--dna-text);
+  font: inherit;
+  /* 16px+ keeps iOS from zooming the page on focus. */
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.2s var(--dna-ease-out), box-shadow 0.2s var(--dna-ease-out);
+}
+
+textarea.dli-input {
+  height: auto;
+  min-height: 96px;
+  padding: 14px 16px;
+  line-height: 1.45;
+  resize: none;
+}
+
+.dli-input::placeholder {
+  color: var(--dna-text-4);
+  opacity: 1;
+}
+
+.dli-input:focus {
+  background: var(--dna-surface);
+  box-shadow: inset 0 0 0 1.5px var(--dna-accent), 0 0 0 4px rgba(16, 185, 129, 0.16);
+}
+
+.dli-input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--dli-danger);
+}
+
+.dli-error,
+.dli-send-error {
+  display: block;
+  margin: 7px 0 0 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dli-danger);
+}
+
+.dli-send-error {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(215, 0, 21, 0.08);
+}
+
+[data-theme="dark"] .dli-send-error {
+  background: rgba(255, 69, 58, 0.14);
+}
+
+.dli-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* ---------- Footer ---------- */
+
+/* Sticks to the bottom of the scrolling body so the next step is always one
+   tap away, even with the keyboard up. */
+.dli-foot {
+  position: sticky;
+  bottom: 0;
+  margin: 26px calc(var(--dli-pad) * -1) 0;
+  padding: 12px var(--dli-pad) calc(16px + env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, transparent, var(--dna-surface) 14px);
+}
+
+@media (min-width: 640px) {
+  .dli-foot {
+    padding-bottom: 22px;
+  }
+}
+
+.dli-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 54px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: var(--dna-r-pill);
+  background: var(--dna-accent);
+  color: var(--dna-on-accent);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 8px 22px rgba(4, 120, 87, 0.22);
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.1s ease-out, background-color 0.2s var(--dna-ease-out), opacity 0.2s var(--dna-ease-out);
+}
+
+.dli-primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.dli-primary:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.dli-note {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--dna-text-3);
+}
+
+.dli-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: dli-spin 0.7s linear infinite;
+}
+
+@keyframes dli-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Done ---------- */
+
+.dli-done {
+  align-items: center;
+  text-align: center;
+  padding-top: 28px;
+}
+
+.dli-done .dli-lede {
+  max-width: 340px;
+}
+
+.dli-done .dli-foot {
+  align-self: stretch;
+}
+
+.dli-success {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: var(--dna-accent);
+  color: var(--dna-on-accent);
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dli *,
+  .dli *::before,
+  .dli *::after {
+    transition-property: opacity, background-color, color, box-shadow !important;
+  }
+  .dli-spinner {
+    animation-duration: 1.6s;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .dli-scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
