@@ -36,10 +36,19 @@ export const uploadCapture = (sku, blob) => {
   form.append("photo", blob, `${sku}.jpg`);
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 120000);
+  const started = Date.now();
   return fetch(`${BASE}/captures`, { method: "POST", body: form, signal: ctl.signal })
     .then(json)
+    .catch((err) => {
+      err.elapsedMs = Date.now() - started;
+      throw err;
+    })
     .finally(() => clearTimeout(timer));
 };
+
+export const fetchHealth = () => fetch(`${API_BASE}/api/health?t=${Date.now()}`, { cache: "no-store" }).then(json);
+
+export const reportUploadError = (payload) => post(`${BASE}/client-errors`, payload).catch(() => {});
 
 export const fetchCaptures = (status = "pending") => fetch(`${BASE}/captures?status=${status}`).then(json);
 

@@ -53,9 +53,14 @@ export const issueText = (code) => issueInfo(code).title;
 export const rankIssues = (codes = []) =>
   [...new Set(codes)].sort((a, b) => (ORDER.indexOf(a) + 1 || 99) - (ORDER.indexOf(b) + 1 || 99));
 
+// fetch rejects with a TypeError when no reply arrived at all: the device is
+// offline, or the connection to the server dropped mid-request.
+export const isNetworkError = (err) => err instanceof TypeError;
+
 // Upload failures that are not about the photo itself.
 export const uploadFailure = (err) => {
-  if (!navigator.onLine || err instanceof TypeError) return "אין חיבור לאינטרנט. בדוק את ה־Wi‑Fi ונסה שוב.";
+  if (!navigator.onLine) return "אין חיבור לאינטרנט. בדוק את ה־Wi‑Fi ונסה שוב.";
+  if (isNetworkError(err)) return "החיבור לשרת נקטע והשרת עדיין לא חזר. התמונה לא אבדה, נסה לשלוח שוב בעוד דקה.";
   if (err.name === "AbortError") return "השרת לא ענה בזמן. נסה לשלוח שוב.";
   if (err.status === 401) return "פג תוקף ההתחברות. רענן את הדף והתחבר מחדש.";
   if (err.status === 403) return "אין לך הרשאה לצלם אבנים. פנה למנהל.";

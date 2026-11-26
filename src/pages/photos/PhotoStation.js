@@ -20,11 +20,13 @@ import {
 } from "lucide-react";
 import BarcodeScanner from "../inventory/components/BarcodeScanner";
 import {
+  fetchHealth,
   fetchMine,
   fetchQueue,
   fetchStatus,
   fetchStone,
   prepareShot,
+  reportUploadError,
   searchStones,
   uploadCapture,
 } from "../../services/photoStationApi";
@@ -32,6 +34,7 @@ import {
   KIND_LABELS,
   STATUS,
   groupingHint,
+  isNetworkError,
   issueInfo,
   itemKind,
   kindLabel,
@@ -88,6 +91,22 @@ const useMedia = (query) => {
 };
 
 const fmt = (n) => Number(n || 0).toLocaleString("he-IL");
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// A dropped connection usually means the server is restarting; it answers
+// again within a minute or so.
+const waitForServer = async (ms = 90000) => {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    try {
+      return await fetchHealth();
+    } catch {
+      await sleep(3000);
+    }
+  }
+  return null;
+};
 
 const buzz = (pattern) => {
   try {
@@ -747,6 +766,7 @@ export default function PhotoStation() {
   const [error, setError] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const shotThisVisit = useRef(new Set());
   const cameraRef = useRef(null);
   const libraryRef = useRef(null);
@@ -810,11 +830,33 @@ export default function PhotoStation() {
     }
   };
 
+  // Sends once more by itself when the connection dropped and the server came back.
+  const uploadWithRecovery = async (sku, shot) => {
+    try {
+      return await uploadCapture(sku, shot);
+    } catch (err) {
+      if (!navigator.onLine || !isNetworkError(err)) throw err;
+      setReconnecting(true);
+      const health = await waitForServer();
+      reportUploadError({
+        sku,
+        kind: "network",
+        message: err.message,
+        elapsedMs: err.elapsedMs,
+        bytes: shot.size,
+        recovered: !!health,
+      });
+      if (!health) throw err;
+      return uploadCapture(sku, shot);
+    }
+  };
+
   const send = async (shot) => {
     setScreen("processing");
+    setReconnecting(false);
     window.scrollTo(0, 0);
     try {
-      const r = await uploadCapture(stone.sku, shot);
+      const r = await uploadWithRecovery(stone.sku, shot);
       shotThisVisit.current.add(stone.sku);
       setResult(r);
       buzz((r.quality?.issues || []).length ? [60, 50, 60] : 30);
@@ -975,8 +1017,10 @@ export default function PhotoStation() {
   const veil = (
     <div className="ph-shot-veil" role="status">
       <span className="ph-spin" aria-hidden="true" />
-      מנקה רקע ובודק איכות
-      <small>כמה שניות. אל תסגור את המסך.</small>
+      {reconnecting ? "החיבור לשרת נקטע, שולח שוב" : "מנקה רקע ובודק איכות"}
+      <small>
+        {reconnecting ? "מחכה שהשרת יחזור ושולח את אותה תמונה. אל תסגור את המסך." : "כמה שניות. אל תסגור את המסך."}
+      </small>
     </div>
   );
 
